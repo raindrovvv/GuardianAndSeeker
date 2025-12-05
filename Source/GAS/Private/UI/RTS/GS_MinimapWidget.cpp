@@ -27,6 +27,9 @@ void UGS_MinimapWidget::NativeConstruct()
 	InitializeReferences();
 	BindDelegates();
 	StartTimers();
+
+	// 미니맵 위젯 전체에 클리핑 적용 (영역 밖으로 나가는 뷰박스/아이콘 자르기)
+	SetClipping(EWidgetClipping::ClipToBounds);
 }
 
 void UGS_MinimapWidget::NativeDestruct()
@@ -200,6 +203,10 @@ void UGS_MinimapWidget::UpdateUnitIcons()
 void UGS_MinimapWidget::UpdateCameraViewBox()
 {
 	if (!CachedRTSCamera || !CameraViewBox) return;
+
+	// 드래그 중일 때는 뷰박스 위치를 마우스 입력(HandleDrag)이 제어하므로
+	// 카메라 위치 기반 업데이트를 건너뛰어 떨림(Jittering) 방지
+	if (bIsDraggingViewBox) return;
 
 	RefreshViewBoxTransform();
 }
@@ -406,15 +413,71 @@ FVector UGS_MinimapWidget::MinimapLocalToWorld(const FGeometry& Geometry, const 
 
 FReply UGS_MinimapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	// === 우클릭 처리 (즉시 반응하여 인식률 향상) ===
+	if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
+	{
+		FVector2D LocalPos = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
+		HandleRightClick(InGeometry, LocalPos);
+		return FReply::Handled(); // 이벤트 소비하여 다른 위젯이 처리하지 않도록
+	}
+
+	// === 좌클릭 처리 ===
 	if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
 	{
 		FVector2D LocalPos = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
 
-		// 뷰 박스 내부 클릭 시 드래그 시작
+		// 1. RTS 명령 모드인지 확인 (공격, 이동, 홀드 등)
+		if (CachedRTSController)
+		{
+			ERTSCommand CurrentCommand = CachedRTSController->GetCurrentCommand();
+			if (CurrentCommand != ERTSCommand::None)
+			{
+				// 명령 실행 (미니맵 좌표 -> 월드 좌표)
+				FVector WorldLocation = MinimapLocalToWorld(InGeometry, LocalPos);
+
+				switch (CurrentCommand)
+				{
+				case ERTSCommand::Attack:
+					CachedRTSController->AttackAIViaMinimap(WorldLocation);
+					return FReply::Handled(); // 명령 실행 후 클릭 소비
+
+				case ERTSCommand::Move:
+					CachedRTSController->MoveAIViaMinimap(WorldLocation);
+					return FReply::Handled(); // 명령 실행 후 클릭 소비
+
+				default:
+					// Hold, Stop 등 타겟이 필요 없는 명령은 미니맵 클릭 시 명령 모드 해제하고
+					// 카메라 이동/드래그 로직으로 넘어감
+					CachedRTSController->OnEscapeButtonClicked();
+					break;
+				}
+			}
+		}
+
+		// 2. 뷰 박스 내부 클릭 시 드래그 시작 (Offset 계산)
 		if (IsPointInsideViewBox(LocalPos))
 		{
 			bIsDraggingViewBox = true;
-			DragStartPosition = LocalPos;
+
+			if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CameraViewBox->Slot))
+			{
+				FVector2D ViewBoxCenter = CanvasSlot->GetPosition() + (CanvasSlot->GetSize() * 0.5f);
+				DragOffset = ViewBoxCenter - LocalPos;
+			}
+			else
+			{
+				DragOffset = FVector2D::ZeroVector;
+			}
+
+			return FReply::Handled().CaptureMouse(TakeWidget());
+		}
+		else
+		{
+			// 3. 외부 클릭 -> 즉시 이동 및 드래그 시작 (Offset 0)
+			bIsDraggingViewBox = true;
+			DragOffset = FVector2D::ZeroVector;
+
+			HandleDrag(InGeometry, LocalPos);
 			return FReply::Handled().CaptureMouse(TakeWidget());
 		}
 	}
@@ -430,12 +493,8 @@ FReply UGS_MinimapWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, con
 		return FReply::Handled().ReleaseMouseCapture();
 	}
 
-	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
-	{
-		FVector2D LocalPos = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
-		HandleRightClick(InGeometry, LocalPos);
-		return FReply::Handled();
-	}
+	// 우클릭 처리는 NativeOnMouseButtonDown으로 이동 (즉시 반응)
+	// MouseButtonUp에서는 더 이상 우클릭 처리하지 않음
 
 	return FReply::Unhandled();
 }
@@ -463,32 +522,53 @@ void UGS_MinimapWidget::HandleRightClick(const FGeometry& Geometry, const FVecto
 
 	FVector WorldLocation = MinimapLocalToWorld(Geometry, LocalPosition);
 
-	// 현재 명령 모드에 따라 분기
-	ERTSCommand CurrentCommand = CachedRTSController->GetCurrentCommand();
-
-	switch (CurrentCommand)
-	{
-	case ERTSCommand::Move:
-		CachedRTSController->MoveAIViaMinimap(WorldLocation);
-		break;
-
-	case ERTSCommand::Attack:
-		CachedRTSController->AttackAIViaMinimap(WorldLocation);
-		break;
-
-	default:
-		// 기본: 카메라 이동
-		CachedRTSController->MoveCameraViaMinimap(WorldLocation);
-		break;
-	}
+	// 우클릭은 항상 이동 명령으로 처리 (Smart Move)
+	// 공격 모드 등 다른 명령 상태여도 우클릭은 취소 후 이동이 일반적임
+	CachedRTSController->MoveAIViaMinimap(WorldLocation);
 }
 
 void UGS_MinimapWidget::HandleDrag(const FGeometry& Geometry, const FVector2D& LocalPosition)
 {
 	if (!CachedRTSController) return;
 
-	FVector WorldLocation = MinimapLocalToWorld(Geometry, LocalPosition);
-	CachedRTSController->MoveCameraViaMinimap(WorldLocation);
+	// Apply Offset to get the desired center position in Local Space
+	FVector2D TargetLocalPos = LocalPosition + DragOffset;
+
+	FVector WorldLocation = MinimapLocalToWorld(Geometry, TargetLocalPos);
+
+	// 카메라 각도에 따른 오프셋 보정
+	FVector2D Offset = GetCameraToGroundOffset();
+	FVector CorrectedLocation = WorldLocation;
+	CorrectedLocation.X -= Offset.X;
+	CorrectedLocation.Y -= Offset.Y;
+
+	CachedRTSController->MoveCameraViaMinimap(CorrectedLocation);
+
+	if (CameraViewBox)
+	{
+		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CameraViewBox->Slot))
+		{
+			FVector2D CurrentSize = CanvasSlot->GetSize();
+			FVector2D NewPosition = TargetLocalPos - (CurrentSize * 0.5f);
+			CanvasSlot->SetPosition(NewPosition);
+		}
+	}
+}
+
+FVector2D UGS_MinimapWidget::GetCameraToGroundOffset() const
+{
+	if (!CachedRTSCamera) return FVector2D::ZeroVector;
+
+	// 뷰 영역의 중심 (지면 기준)
+	FBox2D ViewBounds = CachedRTSCamera->GetSimpleViewBounds();
+	FVector2D ViewCenter = ViewBounds.GetCenter();
+
+	// 카메라 실제 위치 (X, Y)
+	FVector CamLoc = CachedRTSCamera->GetActorLocation();
+	FVector2D CamPos2D(CamLoc.X, CamLoc.Y);
+
+	// 오프셋 = 뷰 중심 - 카메라 위치
+	return ViewCenter - CamPos2D;
 }
 
 bool UGS_MinimapWidget::IsPointInsideViewBox(const FVector2D& LocalPosition) const
@@ -546,6 +626,12 @@ void UGS_MinimapWidget::CalculateViewBoxScreenRect(const FBox2D& ViewBounds, FVe
 	FVector2D MinScreen = MinNormalized * MinimapSize;
 	FVector2D MaxScreen = MaxNormalized * MinimapSize;
 
-	OutPosition = MinScreen;
-	OutSize = MaxScreen - MinScreen;
+	// MinScreen is (Left, Bottom) because Y is inverted
+	// MaxScreen is (Right, Top)
+
+	OutPosition.X = MinScreen.X;
+	OutPosition.Y = MaxScreen.Y; // Top Y is smaller
+
+	OutSize.X = MaxScreen.X - MinScreen.X;
+	OutSize.Y = MinScreen.Y - MaxScreen.Y; // Bottom Y - Top Y
 }

@@ -4,6 +4,7 @@
 #include "System/GameMode/GS_InGameGM.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Math/Box2D.h"
 #include "Math/Vector.h"
 #include "Math/Vector2D.h"
@@ -45,14 +46,29 @@ bool AGS_RTSCamera::HasCameraChanged() const
 	UCameraComponent* CameraComp = GetCameraComponent();
 	USpringArmComponent* SpringArmComp = GetSpringArmComponent();
 
-	if (!CameraComp || !SpringArmComp)
+	if (!CameraComp)
 	{
 		return true;
 	}
 
 	FVector CurrentLocation = CameraComp->GetComponentLocation();
 	FRotator CurrentRotation = CameraComp->GetComponentRotation();
-	float CurrentArmLength = SpringArmComp->TargetArmLength;
+	float CurrentArmLength = SpringArmComp ? SpringArmComp->TargetArmLength : 0.0f;
+	float CurrentAspectRatio = CameraComp->AspectRatio;
+
+	// Viewport Size Check (if AspectRatio is not fixed)
+	int32 CurrentSizeX = 0;
+	int32 CurrentSizeY = 0;
+	if (CurrentAspectRatio <= 0.0f)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (APlayerController* PC = World->GetFirstPlayerController())
+			{
+				PC->GetViewportSize(CurrentSizeX, CurrentSizeY);
+			}
+		}
+	}
 
 	// 위치/회전/줌이 변경되었는지 체크 (오차 허용)
 	const float LocationTolerance = 1.0f; // 1cm
@@ -62,8 +78,10 @@ bool AGS_RTSCamera::HasCameraChanged() const
 	bool bLocationChanged = !CurrentLocation.Equals(LastCameraLocation, LocationTolerance);
 	bool bRotationChanged = !CurrentRotation.Equals(LastCameraRotation, RotationTolerance);
 	bool bArmLengthChanged = FMath::Abs(CurrentArmLength - LastArmLength) > ArmLengthTolerance;
+	bool bAspectRatioChanged = !FMath::IsNearlyEqual(CurrentAspectRatio, LastAspectRatio);
+	bool bViewportSizeChanged = (CurrentSizeX != LastViewportSizeX) || (CurrentSizeY != LastViewportSizeY);
 
-	return bLocationChanged || bRotationChanged || bArmLengthChanged;
+	return bLocationChanged || bRotationChanged || bArmLengthChanged || bAspectRatioChanged || bViewportSizeChanged;
 }
 
 FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
@@ -78,7 +96,7 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 	UCameraComponent* CameraComp = GetCameraComponent();
 	USpringArmComponent* SpringArmComp = GetSpringArmComponent();
 
-	if (!CameraComp || !SpringArmComp)
+	if (!CameraComp)
 	{
 		// 컴포넌트가 없으면 기본값 반환
 		FVector CameraLocation = GetActorLocation();
@@ -88,66 +106,90 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 		);
 	}
 
-	// 실제 카메라 투영을 고려한 정확한 계산
-	FVector CameraLocation = CameraComp->GetComponentLocation();
-	FRotator CameraRotation = CameraComp->GetComponentRotation();
+	// 4 Corner Raycasting Method for Accurate Bounds
+	FVector CamLoc = CameraComp->GetComponentLocation();
+	FRotator CamRot = CameraComp->GetComponentRotation();
 
-	// FOV와 종횡비 가져오기
-	float FOV = CameraComp->FieldOfView;
-	float AspectRatio = CameraComp->AspectRatio > 0.0f ? CameraComp->AspectRatio : 16.0f / 9.0f;
+	float HFOV = FMath::DegreesToRadians(CameraComp->FieldOfView);
+	float AspectRatio = CameraComp->AspectRatio;
+	
+	int32 ViewportSizeX = 0;
+	int32 ViewportSizeY = 0;
 
-	// 카메라 높이 (Z축)
-	float CameraHeight = CameraLocation.Z;
+	// If AspectRatio is not constrained, calculate it from Viewport
+	if (AspectRatio <= 0.0f)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (APlayerController* PC = World->GetFirstPlayerController())
+			{
+				PC->GetViewportSize(ViewportSizeX, ViewportSizeY);
+				if (ViewportSizeY > 0)
+				{
+					AspectRatio = (float)ViewportSizeX / (float)ViewportSizeY;
+				}
+			}
+		}
+	}
 
-	// 카메라 피치 각도 (아래를 보는 각도)
-	float PitchRadians = FMath::DegreesToRadians(FMath::Abs(CameraRotation.Pitch));
+	// Fallback
+	if (AspectRatio <= 0.0f) AspectRatio = 1.777f; // Default 16:9
 
-	// 지면까지의 거리 계산 (삼각함수 사용)
-	float GroundDistance = CameraHeight / FMath::Tan(PitchRadians);
+	// Calculate VFOV based on HFOV and AspectRatio
+	// tan(V/2) = tan(H/2) / AspectRatio
+	float TanHalfHFOV = FMath::Tan(HFOV * 0.5f);
+	float TanHalfVFOV = TanHalfHFOV / AspectRatio;
 
-	// 수평 FOV 계산 (세로 FOV를 종횡비로 변환)
-	float HorizontalFOV = 2.0f * FMath::Atan(FMath::Tan(FMath::DegreesToRadians(FOV) * 0.5f) * AspectRatio);
+	// 4 Corner Rays in View Space (X=Forward, Y=Right, Z=Up)
+	// Top Right: (1, TanH, TanV)
+	FVector DirTL(1.0f, -TanHalfHFOV, TanHalfVFOV);
+	FVector DirTR(1.0f, TanHalfHFOV, TanHalfVFOV);
+	FVector DirBL(1.0f, -TanHalfHFOV, -TanHalfVFOV);
+	FVector DirBR(1.0f, TanHalfHFOV, -TanHalfVFOV);
 
-	// 화면 중앙에서 좌우 끝까지의 거리
-	float HalfWidth = GroundDistance * FMath::Tan(HorizontalFOV * 0.5f);
+	// Rotate to World Space
+	FVector WorldDirTL = CamRot.RotateVector(DirTL);
+	FVector WorldDirTR = CamRot.RotateVector(DirTR);
+	FVector WorldDirBL = CamRot.RotateVector(DirBL);
+	FVector WorldDirBR = CamRot.RotateVector(DirBR);
 
-	// 화면 중앙에서 상하 끝까지의 거리
-	float HalfHeight = GroundDistance * FMath::Tan(FMath::DegreesToRadians(FOV) * 0.5f);
+	// Intersect with Z=0 Plane
+	// t = -CamZ / DirZ
+	auto IntersectGround = [&](const FVector& Dir) -> FVector2D {
+		// Prevent divide by zero or looking up (Dir.Z should be negative)
+		if (Dir.Z >= -0.01f) 
+		{
+			// Fallback: project forward a fixed distance if looking parallel/up
+			FVector Point = CamLoc + Dir * 5000.0f; 
+			return FVector2D(Point.X, Point.Y);
+		}
+		
+		float t = -CamLoc.Z / Dir.Z;
+		FVector Point = CamLoc + Dir * t;
+		return FVector2D(Point.X, Point.Y);
+	};
 
-	// 카메라 회전(Yaw)을 고려한 방향 벡터
-	FVector ForwardVector = CameraRotation.Vector();
-	FVector RightVector = FRotationMatrix(CameraRotation).GetScaledAxis(EAxis::Y);
+	FVector2D P1 = IntersectGround(WorldDirTL);
+	FVector2D P2 = IntersectGround(WorldDirTR);
+	FVector2D P3 = IntersectGround(WorldDirBL);
+	FVector2D P4 = IntersectGround(WorldDirBR);
 
-	// 화면 중앙 지점 (지면에 투영)
-	FVector GroundCenter = CameraLocation + ForwardVector * GroundDistance;
-	GroundCenter.Z = 0.0f; // 지면으로 투영
-
-	// 2D 경계 계산 (회전 고려)
-	FVector2D Center2D(GroundCenter.X, GroundCenter.Y);
-	FVector2D Right2D(RightVector.X, RightVector.Y);
-	Right2D.Normalize();
-	FVector2D Forward2D(ForwardVector.X, ForwardVector.Y);
-	Forward2D.Normalize();
-
-	// 4개 코너 계산
-	FVector2D TopLeft = Center2D + Forward2D * HalfHeight - Right2D * HalfWidth;
-	FVector2D TopRight = Center2D + Forward2D * HalfHeight + Right2D * HalfWidth;
-	FVector2D BottomLeft = Center2D - Forward2D * HalfHeight - Right2D * HalfWidth;
-	FVector2D BottomRight = Center2D - Forward2D * HalfHeight + Right2D * HalfWidth;
-
-	// AABB (Axis-Aligned Bounding Box) 계산
-	float MinX = FMath::Min(FMath::Min(TopLeft.X, TopRight.X), FMath::Min(BottomLeft.X, BottomRight.X));
-	float MaxX = FMath::Max(FMath::Max(TopLeft.X, TopRight.X), FMath::Max(BottomLeft.X, BottomRight.X));
-	float MinY = FMath::Min(FMath::Min(TopLeft.Y, TopRight.Y), FMath::Min(BottomLeft.Y, BottomRight.Y));
-	float MaxY = FMath::Max(FMath::Max(TopLeft.Y, TopRight.Y), FMath::Max(BottomLeft.Y, BottomRight.Y));
+	// Compute AABB
+	float MinX = FMath::Min(FMath::Min(P1.X, P2.X), FMath::Min(P3.X, P4.X));
+	float MaxX = FMath::Max(FMath::Max(P1.X, P2.X), FMath::Max(P3.X, P4.X));
+	float MinY = FMath::Min(FMath::Min(P1.Y, P2.Y), FMath::Min(P3.Y, P4.Y));
+	float MaxY = FMath::Max(FMath::Max(P1.Y, P2.Y), FMath::Max(P3.Y, P4.Y));
 
 	FBox2D ResultBounds = FBox2D(FVector2D(MinX, MinY), FVector2D(MaxX, MaxY));
 
 	// 캐시 업데이트
 	CachedViewBounds = ResultBounds;
-	LastCameraLocation = CameraLocation;
-	LastCameraRotation = CameraRotation;
-	LastArmLength = SpringArmComp->TargetArmLength;
+	LastCameraLocation = CamLoc;
+	LastCameraRotation = CamRot;
+	LastArmLength = SpringArmComp ? SpringArmComp->TargetArmLength : 0.0f;
+	LastAspectRatio = CameraComp->AspectRatio;
+	LastViewportSizeX = ViewportSizeX;
+	LastViewportSizeY = ViewportSizeY;
 	bViewBoundsCacheValid = true;
 
 	return ResultBounds;

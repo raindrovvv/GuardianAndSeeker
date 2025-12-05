@@ -133,6 +133,7 @@ private:
 
 	bool bIsDraggingViewBox = false;
 	FVector2D DragStartPosition;
+	FVector2D DragOffset;
 
 	// ========== Geometry Cache ==========
 
@@ -199,6 +200,9 @@ private:
 
 	/** 미니맵 로컬 좌표 -> 월드 좌표 (마우스 입력용) */
 	FVector MinimapLocalToWorld(const FGeometry& Geometry, const FVector2D& LocalPosition) const;
+
+	/** 카메라 위치와 실제 뷰 중심(지면) 간의 오프셋 계산 */
+	FVector2D GetCameraToGroundOffset() const;
 
 	// ========== Input Handling ==========
 

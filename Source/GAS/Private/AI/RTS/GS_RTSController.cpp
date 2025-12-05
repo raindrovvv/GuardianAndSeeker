@@ -19,6 +19,7 @@
 #include "Sound/GS_AudioManager.h"
 #include "ResourceSystem/Aether/GS_AetherExtractor.h"
 #include "System/GameMode/GS_InGameGM.h"
+#include "Kismet/GameplayStatics.h"
 
 
 
@@ -50,6 +51,31 @@ AGS_RTSController::AGS_RTSController()
 
 	//[Aether] AetherComp 연결
 	AetherComp = CreateDefaultSubobject<UGS_AetherComp>(TEXT("AetherComp"));
+
+	// Sound
+	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Mouse_Click.S_RTS_Mouse_Click"));
+	if (MouseClickSoundRef.Succeeded())
+	{
+		MouseClickSound = MouseClickSoundRef.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandMoveSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Move.S_RTS_Command_Move"));
+	if (CommandMoveSoundRef.Succeeded())
+	{
+		CommandMoveSound = CommandMoveSoundRef.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandAttackSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Attack.S_RTS_Command_Attack"));
+	if (CommandAttackSoundRef.Succeeded())
+	{
+		CommandAttackSound = CommandAttackSoundRef.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandCancelSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Cancel.S_RTS_Command_Cancel"));
+	if (CommandCancelSoundRef.Succeeded())
+	{
+		CommandCancelSound = CommandCancelSoundRef.Object;
+	}
 }
 
 AActor* AGS_RTSController::GetViewTarget() const
@@ -227,10 +253,14 @@ void AGS_RTSController::OnCommandStop(const FInputActionValue& Value)
 void AGS_RTSController::StopSelectedUnits()
 {
 	CurrentCommand = ERTSCommand::Stop;
-	
+
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
 	Server_RTSStop(Commandables);
+
+	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
+	CurrentCommand = ERTSCommand::None;
+	OnRTSCommandChanged.Broadcast(CurrentCommand);
 }
 
 
@@ -242,10 +272,14 @@ void AGS_RTSController::OnCommandHold(const FInputActionValue& Value)
 void AGS_RTSController::HoldSelectedUnits()
 {
 	CurrentCommand = ERTSCommand::Hold;
-	
+
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
 	Server_RTSHold(Commandables);
+
+	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
+	CurrentCommand = ERTSCommand::None;
+	OnRTSCommandChanged.Broadcast(CurrentCommand);
 }
 
 
@@ -257,11 +291,15 @@ void AGS_RTSController::OnCommandSkill(const FInputActionValue& Value)
 void AGS_RTSController::SkillSelectedUnits()
 {
 	CurrentCommand = ERTSCommand::Skill;
-	OnRTSCommandChanged.Broadcast(CurrentCommand);
 
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
 	Server_RTSSkill(Commandables);
+
+	// 현재는 논타겟팅 스킬이므로 즉시 완료 처리 (우클릭 취소 사운드 방지)
+	// TODO: 타게팅 스킬 추가 시 스킬 타입별 분기 처리 필요
+	CurrentCommand = ERTSCommand::None;
+	OnRTSCommandChanged.Broadcast(CurrentCommand);
 }
 
 
@@ -295,6 +333,10 @@ void AGS_RTSController::OnLeftMousePressed()
 		if (bHit)
 		{
 			Server_RTSMove(Units, Hit.Location);
+			if (CommandMoveSound)
+			{
+				UGameplayStatics::PlaySound2D(this, CommandMoveSound);
+			}
 		}
 		break;
 	case ERTSCommand::Attack:
@@ -310,6 +352,11 @@ void AGS_RTSController::OnLeftMousePressed()
 			{
 				Server_RTSAttackMove(Units, Hit.Location);
 			}
+
+			if (CommandAttackSound)
+			{
+				UGameplayStatics::PlaySound2D(this, CommandAttackSound);
+			}
 		}
 		break;
 	default:
@@ -320,6 +367,11 @@ void AGS_RTSController::OnLeftMousePressed()
 				ClearUnitSelection();
 				SelectedSeeker = Seeker;
 				OnSeekerSelectionChanged.Broadcast(SelectedSeeker);
+				
+				if (MouseClickSound)
+				{
+					UGameplayStatics::PlaySound2D(this, MouseClickSound);
+				}
 				return;
 			}
 		}
@@ -333,6 +385,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		if (AGS_RTSHUD* HUD = Cast<AGS_RTSHUD>(GetHUD()))
 		{
 			HUD->StartSelection();
+			// 드래그 선택 시작 시에는 소리를 재생하지 않거나, 필요하다면 여기서 재생
 		}
 		break;
 	}
@@ -361,6 +414,11 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 	{
 		CurrentCommand = ERTSCommand::None;
 		OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+		if (CommandCancelSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+		}
 		return;
 	}
 	
@@ -374,6 +432,11 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 	TArray<AGS_Monster*> Units;
 	GatherCommandableUnits(Units);
 	Server_RTSMove(Units, GroundHit.Location);
+
+	if (CommandMoveSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandMoveSound);
+	}
 }
 
 void AGS_RTSController::Client_StartGame_Implementation()
@@ -398,6 +461,11 @@ void AGS_RTSController::OnEscapeButtonClicked()
 	{
 		CurrentCommand = ERTSCommand::None;
 		OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+		if (CommandCancelSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+		}
 	}
 }
 
@@ -876,6 +944,11 @@ void AGS_RTSController::MoveAIViaMinimap(const FVector& WorldLocation)
 	
 	Server_RTSMove(Commandables, WorldLocation);
 
+	if (CommandMoveSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandMoveSound);
+	}
+
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
 }
@@ -886,6 +959,11 @@ void AGS_RTSController::AttackAIViaMinimap(const FVector& WorldLocation)
 	GatherCommandableUnits(Commandables);
 	
 	Server_RTSAttackMove(Commandables, WorldLocation);
+
+	if (CommandAttackSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandAttackSound);
+	}
 
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
