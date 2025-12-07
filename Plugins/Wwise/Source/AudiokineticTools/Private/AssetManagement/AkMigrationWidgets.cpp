@@ -548,7 +548,7 @@ bool SBankTransferWidget::CheckWaapiConnection() const
 	{
 		if (!UserSettings->bAutoConnectToWAAPI)
 		{
-			LOCTEXT("WaapiTransferMenuItemText","WAAPI (Auto Connect to WAAPI disabled in user settings)");
+			(void)LOCTEXT("WaapiTransferMenuItemText","WAAPI (Auto Connect to WAAPI disabled in user settings)");
 		}
 		else
 		{
@@ -556,14 +556,14 @@ bool SBankTransferWidget::CheckWaapiConnection() const
 			bWaapiConnected = WaapiClient && WaapiClient->IsConnected();
 			if (!bWaapiConnected)
 			{
-				LOCTEXT("WaapiTransferMenuItemText","WAAPI (WAAPI connection not established)");
+				(void)LOCTEXT("WaapiTransferMenuItemText","WAAPI (WAAPI connection not established)");
 			}
 		}
 	}
 
 	if (bWaapiConnected)
 	{
-		LOCTEXT("WaapiTransferMenuItemText","WAAPI");
+		(void)LOCTEXT("WaapiTransferMenuItemText","WAAPI");
 	}
 	return bWaapiConnected;
 }
