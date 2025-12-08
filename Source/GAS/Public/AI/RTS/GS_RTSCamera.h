@@ -48,6 +48,9 @@ private:
 	mutable FVector LastCameraLocation;
 	mutable FRotator LastCameraRotation;
 	mutable float LastArmLength;
+	mutable float LastAspectRatio;
+	mutable int32 LastViewportSizeX;
+	mutable int32 LastViewportSizeY;
 	mutable bool bViewBoundsCacheValid = false;
 
 	// 캐시 무효화 체크

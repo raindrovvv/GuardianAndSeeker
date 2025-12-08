@@ -295,17 +295,31 @@ private:
 	UPROPERTY()
 	FTimerHandle AttackCursorTimerHandle;
 
-	// 시커 감지 시스템
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> MouseClickSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> CommandMoveSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> CommandAttackSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> CommandCancelSound;
+
+	FTimerHandle DetectionTimerHandle;
+
+	// 감지된 시커들 추적
 	UPROPERTY()
 	TArray<AGS_Seeker*> DetectedSeekers;
 
+	// 감지 업데이트 주기 (초)
 	UPROPERTY(EditAnywhere, Category = "Detection")
-	float DetectionUpdateInterval = 0.5f;
+	float DetectionUpdateInterval = 0.1f;
 
-	UPROPERTY(EditAnywhere, Category = "Detection", meta = (ClampMin = "0.1", ClampMax = "1.0"))
-	float DetectionRPCCooldown = 0.2f; // RPC 최소 간격 (초)
-
-	FTimerHandle DetectionTimerHandle;
+	// RPC 쿨다운 시간 (초)
+	UPROPERTY(EditAnywhere, Category = "Detection")
+	float DetectionRPCCooldown = 0.5f;
 
 	// RPC 쿨다운 추적용 맵
 	UPROPERTY()
