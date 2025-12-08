@@ -17,7 +17,7 @@ struct FWeaponMeshPair
 	FName SocketName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	USkeletalMesh* WeaponSkeletalMeshClass;
+	USkeletalMesh* WeaponSkeletalMeshClass = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -32,7 +32,7 @@ struct FAssetToSpawn
     TSubclassOf<AActor> DisplayActorClass; // SKM 레플리케이션 용
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
-    USkeletalMesh* SkeletalMeshClass;
+    USkeletalMesh* SkeletalMeshClass = nullptr;
 	
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
     TSubclassOf<UAnimInstance> Lobby_AnimBlueprintClass;

@@ -17,10 +17,10 @@ struct FDebuffRepInfo
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
-	EDebuffType Type;
+	EDebuffType Type = EDebuffType();
 
 	UPROPERTY(BlueprintReadOnly)
-	float RemainingTime;
+	float RemainingTime = 0.0f;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnDebuffListUpdated, const TArray<FDebuffRepInfo>&);

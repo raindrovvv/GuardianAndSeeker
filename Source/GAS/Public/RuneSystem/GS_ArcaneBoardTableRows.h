@@ -15,7 +15,7 @@ struct FRuneTableRow : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	uint8 RuneID;
+	uint8 RuneID = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText RuneName;
@@ -30,7 +30,7 @@ struct FRuneTableRow : public FTableRowBase
 	TMap<FIntPoint, UTexture2D*> ConnectedRuneShape;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FIntPoint RuneSize;
+	FIntPoint RuneSize = FIntPoint::ZeroValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UTexture2D> RuneTexture;
@@ -39,7 +39,7 @@ struct FRuneTableRow : public FTableRowBase
 	FStatEffect StatEffect;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bIsPlaced;
+	bool bIsPlaced = false;
 };
 
 USTRUCT(BlueprintType)

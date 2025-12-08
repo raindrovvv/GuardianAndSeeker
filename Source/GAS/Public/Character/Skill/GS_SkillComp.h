@@ -14,13 +14,13 @@ struct FSkillCooldownState
 	GENERATED_BODY()
 
 	UPROPERTY()
-	ESkillSlot Slot;
+	ESkillSlot Slot = ESkillSlot();
 
 	UPROPERTY()
-	float CooldownRemaining; 
+	float CooldownRemaining = 0.0f;
 
-	UPROPERTY() 
-	bool bIsOnCooldown;
+	UPROPERTY()
+	bool bIsOnCooldown = false;
 
 	FTimerHandle CooldownTimer;
 	FTimerHandle UIUpdateTimer;
@@ -32,7 +32,7 @@ struct FSkillRuntimeState
 	GENERATED_BODY()
 
 	UPROPERTY()
-	ESkillSlot Slot;
+	ESkillSlot Slot = ESkillSlot();
 
 	UPROPERTY()
 	bool bIsActive = false;

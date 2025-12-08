@@ -13,7 +13,7 @@ struct GAS_API FManualImageRow : public FTableRowBase
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Manual")
-    uint8 PageIndex;
+    uint8 PageIndex = 0;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Manual")
     FText Title;

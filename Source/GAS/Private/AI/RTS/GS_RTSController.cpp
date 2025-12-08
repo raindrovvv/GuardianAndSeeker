@@ -53,25 +53,25 @@ AGS_RTSController::AGS_RTSController()
 	AetherComp = CreateDefaultSubobject<UGS_AetherComp>(TEXT("AetherComp"));
 
 	// Sound
-	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Mouse_Click.S_RTS_Mouse_Click"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_ClickSound.UI_SFX_ClickSound"));
 	if (MouseClickSoundRef.Succeeded())
 	{
 		MouseClickSound = MouseClickSoundRef.Object;
 	}
 
-	static ConstructorHelpers::FObjectFinder<USoundBase> CommandMoveSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Move.S_RTS_Command_Move"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandMoveSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_MoveSound.UI_SFX_MoveSound"));
 	if (CommandMoveSoundRef.Succeeded())
 	{
 		CommandMoveSound = CommandMoveSoundRef.Object;
 	}
 
-	static ConstructorHelpers::FObjectFinder<USoundBase> CommandAttackSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Attack.S_RTS_Command_Attack"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandAttackSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_AttackSound.UI_SFX_AttackSound"));
 	if (CommandAttackSoundRef.Succeeded())
 	{
 		CommandAttackSound = CommandAttackSoundRef.Object;
 	}
 
-	static ConstructorHelpers::FObjectFinder<USoundBase> CommandCancelSoundRef(TEXT("/Game/Sound/UI/RTS/S_RTS_Command_Cancel.S_RTS_Command_Cancel"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> CommandCancelSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_CancelSound.UI_SFX_CancelSound"));
 	if (CommandCancelSoundRef.Succeeded())
 	{
 		CommandCancelSound = CommandCancelSoundRef.Object;

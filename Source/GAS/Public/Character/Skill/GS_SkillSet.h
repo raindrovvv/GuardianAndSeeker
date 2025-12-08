@@ -17,7 +17,7 @@ struct FSkillAllow
 	GENERATED_BODY()
 
 	UPROPERTY(VisibleAnywhere, Category = "Skill")
-	ESkillSlot Slot;
+	ESkillSlot Slot = ESkillSlot();
 
 	UPROPERTY(EditAnywhere, Category = "Skill")
 	bool bAllow = false;
@@ -42,18 +42,18 @@ struct GAS_API FSkillInfo
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<UGS_SkillBase> SkillClass = nullptr;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Cooltime;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Damage;
-	
+	float Cooltime = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Damage = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<UAnimMontage*> Montages;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UTexture2D* Image;
+	UTexture2D* Image = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSkillAllow> AllowSkillList;
@@ -62,21 +62,21 @@ struct GAS_API FSkillInfo
 	FControlValue AllowControlValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bAllowHitReacct;
+	bool bAllowHitReacct = false;
 
-	
+
 	// 스킬 사운드 이벤트들
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillStartSound;
+	UAkAudioEvent* SkillStartSound = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillEndSound;
+	UAkAudioEvent* SkillEndSound = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillLoopSound; // 스킬 가동 중 루프 사운드 (궁극기용)
+	UAkAudioEvent* SkillLoopSound = nullptr; // 스킬 가동 중 루프 사운드 (궁극기용)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillLoopStopSound; // 스킬 루프 사운드 정지 이벤트 (궁극기용)
+	UAkAudioEvent* SkillLoopStopSound = nullptr; // 스킬 루프 사운드 정지 이벤트 (궁극기용)
 
 	// RTS 모드 전용 스킬 사운드 (존재하지 않으면 TPS 사운드로 폴백)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
@@ -93,13 +93,13 @@ struct GAS_API FSkillInfo
 
 	// 충돌별 특수 사운드 (주로 궁극기 스킬용)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* WallCollisionSound;
+	UAkAudioEvent* WallCollisionSound = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* MonsterCollisionSound;
+	UAkAudioEvent* MonsterCollisionSound = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* GuardianCollisionSound;
+	UAkAudioEvent* GuardianCollisionSound = nullptr;
 
 	// RTS 모드 전용 충돌 사운드 (존재하지 않으면 TPS 사운드로 폴백)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")

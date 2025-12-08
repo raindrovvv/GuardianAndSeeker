@@ -22,7 +22,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(DisplayName="RoomType", EditCondition="ObjectType==EObjectType::Room", EditConditionHides))
 	ERoomType RoomType = ERoomType::None;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(DisplayName="TrapType", EditCondition="ObjectType==EObjectType::Trap", EditConditionHides))
-	ETrapPlacement TrapType;
+	ETrapPlacement TrapType = ETrapPlacement();
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(DisplayName="MonsterType", EditCondition="ObjectType==EObjectType::Monster", EditConditionHides))
 	EMonsterType MonsterType = EMonsterType::None;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(DisplayName="DoorAndWallType", EditCondition="ObjectType==EObjectType::DoorAndWall", EditConditionHides))

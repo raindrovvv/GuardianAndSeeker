@@ -7,6 +7,7 @@
 #include "AkComponent.h"
 #include "AkAudioEvent.h"
 #include "AkRtpc.h"
+#include "AkGameplayStatics.h"
 #include "UObject/UObjectGlobals.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"

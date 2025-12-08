@@ -70,18 +70,18 @@ struct FDEOccupancyData
 
 public:
 	UPROPERTY()
-	EDEditorCellType FloorOccupancyData;
+	EDEditorCellType FloorOccupancyData = EDEditorCellType::None;
 	UPROPERTY()
-	EDEditorCellType CeilingOccupancyData;
+	EDEditorCellType CeilingOccupancyData = EDEditorCellType::None;
 
 	UPROPERTY()
-	TObjectPtr<AActor> RoomOccupancyActor;
+	TObjectPtr<AActor> RoomOccupancyActor = nullptr;
 	UPROPERTY()
-	TObjectPtr<AActor> FloorOccupancyActor;
+	TObjectPtr<AActor> FloorOccupancyActor = nullptr;
 	UPROPERTY()
-	TObjectPtr<AActor> CeilingOccupancyActor;
+	TObjectPtr<AActor> CeilingOccupancyActor = nullptr;
 	UPROPERTY()
-	TObjectPtr<AActor> WallAndDoorOccupancyActor;
+	TObjectPtr<AActor> WallAndDoorOccupancyActor = nullptr;
 };
 
 USTRUCT(Atomic, BlueprintType)
@@ -98,11 +98,11 @@ struct FDESaveData
 	UPROPERTY()
 	TArray<FIntPoint> CellCoord;
 	UPROPERTY()
-	EObjectType ObjectType;
+	EObjectType ObjectType = EObjectType::None;
 	UPROPERTY()
-	ETrapPlacement TrapPlacement;
+	ETrapPlacement TrapPlacement = ETrapPlacement();
 	UPROPERTY()
-	float ConstructionCost;
+	float ConstructionCost = 0.0f;
 	FDESaveData() {}
 };
 
