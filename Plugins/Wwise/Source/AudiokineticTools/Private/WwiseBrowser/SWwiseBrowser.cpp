@@ -248,6 +248,18 @@ void SWwiseBrowser::CreateWwiseBrowserCommands()
 		Commands.RequestStopAllWwiseItem,
 		FExecuteAction::CreateSP(this, &SWwiseBrowser::HandleStopAllWwiseItemCommandExecute));
 
+	// Action to expand all the selected items
+	ActionList.MapAction(
+		Commands.RequestExpandAllSelected,
+		FExecuteAction::CreateSP(this, &SWwiseBrowser::HandleExpandAllSelectedCommandExecute),
+		FCanExecuteAction::CreateSP(this, &SWwiseBrowser::HandleExpandOrCollapseAllSelectedCommandCanExecute));
+
+	// Action to collapse all the selected items
+	ActionList.MapAction(
+		Commands.RequestCollapseAllSelected,
+		FExecuteAction::CreateSP(this, &SWwiseBrowser::HandleCollapseAllSelectedCommandExecute),
+		FCanExecuteAction::CreateSP(this, &SWwiseBrowser::HandleExpandOrCollapseAllSelectedCommandCanExecute));
+
 	// Action to explore an item (workunit) in the containing folder.
 	ActionList.MapAction(
 		Commands.RequestExploreWwiseItem,
@@ -289,7 +301,7 @@ TSharedPtr<SWidget> SWwiseBrowser::MakeWwiseBrowserContextMenu()
 	// Build up the menu
 	FMenuBuilder MenuBuilder(true, CommandList);
 	{
-		MenuBuilder.BeginSection("WwiseBrowserTransport", LOCTEXT("MenuHeader", "WwiseBrowser"));
+		MenuBuilder.BeginSection("WwiseBrowserTransport", LOCTEXT("MenuHeader", "Playback"));
 		{
 			MenuBuilder.AddMenuEntry(Commands.RequestPlayWwiseItem);
 			MenuBuilder.AddMenuEntry(Commands.RequestStopAllWwiseItem);
@@ -297,6 +309,9 @@ TSharedPtr<SWidget> SWwiseBrowser::MakeWwiseBrowserContextMenu()
 		MenuBuilder.EndSection();
 		MenuBuilder.BeginSection("WwiseBrowserFindOptions", LOCTEXT("ExploreMenuHeader", "Explore"));
 		{
+			MenuBuilder.AddMenuEntry(Commands.RequestExpandAllSelected);
+			MenuBuilder.AddMenuEntry(Commands.RequestCollapseAllSelected);
+			MenuBuilder.AddSeparator();
 			MenuBuilder.AddMenuEntry(Commands.RequestFindInProjectExplorerWwiseItem);
 			MenuBuilder.AddMenuEntry(Commands.RequestFindInContentBrowser);
 			MenuBuilder.AddMenuEntry(Commands.RequestExploreWwiseItem);
@@ -389,6 +404,38 @@ void SWwiseBrowser::HandleStopWwiseItemCommandExecute()
 	}
 }
 
+void SWwiseBrowser::HandleExpandAllSelectedCommandExecute()
+{
+	TArray<FWwiseTreeItemPtr> SelectedItems = TreeViewPtr->GetSelectedItems();
+	for (auto TreeItem : SelectedItems)
+	{
+		SetItemAndChildrenExpansion(TreeItem, true);
+	}
+}
+
+bool SWwiseBrowser::HandleExpandOrCollapseAllSelectedCommandCanExecute()
+{
+	TArray<FWwiseTreeItemPtr> SelectedItems = TreeViewPtr->GetSelectedItems();
+	for (auto TreeItem : SelectedItems)
+	{
+		// Return true if at least one selected element has children
+		if (TreeItem->GetChildren().Num() > 0)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void SWwiseBrowser::HandleCollapseAllSelectedCommandExecute()
+{
+	TArray<FWwiseTreeItemPtr> SelectedItems = TreeViewPtr->GetSelectedItems();
+	for (auto TreeItem : SelectedItems)
+	{
+		SetItemAndChildrenExpansion(TreeItem, false);
+	}
+}
+
 void SWwiseBrowser::HandleStopAllWwiseItemCommandExecute()
 {
 	Transport->StopAndDestroyAll();
@@ -403,7 +450,12 @@ void SWwiseBrowser::HandleExploreWwiseItemCommandExecute()
 
 bool SWwiseBrowser::HandleExploreWwiseItemCanExecute()
 {
-	return TreeViewPtr->GetSelectedItems().Num() == 1 && IsWaapiAvailable() == EWwiseConnectionStatus::Connected;
+	if (TreeViewPtr->GetSelectedItems().Num() == 1 && IsWaapiAvailable() == EWwiseConnectionStatus::Connected)
+	{
+		FWwiseTreeItemPtr SelectedItem = TreeViewPtr->GetSelectedItems()[0];
+		return DataSource->GetItemWorkUnitPath(SelectedItem).Len() > 0;
+	}
+	return false;
 }
 
 void SWwiseBrowser::HandleFindInProjectExplorerWwiseItemCommandExecute()
@@ -415,7 +467,20 @@ void SWwiseBrowser::HandleFindInProjectExplorerWwiseItemCommandExecute()
 
 bool SWwiseBrowser::HandleFindInProjectExplorerWwiseItemCanExecute()
 {
-	return TreeViewPtr->GetSelectedItems().Num() >= 1 && IsWaapiAvailable() == EWwiseConnectionStatus::Connected;
+	if (TreeViewPtr->GetSelectedItems().Num() < 1 || IsWaapiAvailable() != EWwiseConnectionStatus::Connected)
+	{
+		return false;
+	}
+
+	for (const auto& item : TreeViewPtr->GetSelectedItems())
+	{
+		if (DataSource->GetItemWorkUnitPath(item).Len() < 1 || item->IsUAssetOrphaned())
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool SWwiseBrowser::HandleFindInContentBrowserCanExecute()
@@ -527,27 +592,66 @@ void SWwiseBrowser::Construct(const FArguments& InArgs)
 		[
 			SNew(SComboButton)
 			.ComboButtonStyle(FAkAppStyle::Get(), "SimpleComboButton")
-		.ToolTipText(LOCTEXT("Browser_AddFilterToolTip", "Add filters to the Wwise Browser."))
-		.OnGetMenuContent(this, &SWwiseBrowser::MakeAddFilterMenu)
-		.ButtonContent()
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
+			.ToolTipText(LOCTEXT("Browser_AddFilterToolTip", "Add filters to the Wwise Browser."))
+			.OnGetMenuContent(this, &SWwiseBrowser::MakeAddFilterMenu)
+			.ButtonContent()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					FilterImage.ToSharedRef()
+				]
+			]
+		]
+		+ SHorizontalBox::Slot()
+		.HAlign(HAlign_Left)
 		.AutoWidth()
 		[
-			FilterImage.ToSharedRef()
+			SNew(SBox)
+			.VAlign(VAlign_Center)
+			.MaxDesiredHeight(16)
+			.MaxAspectRatio(1.0f)
+			.MinAspectRatio(1.0f)
+			[
+				SNew(SButton)
+				.ToolTipText(LOCTEXT("ExpandAll_ToolTip", "Expand All"))
+				.ButtonStyle(FAkAudioStyle::Get(), "AudiokineticTools.HoverHintOnly")
+				.OnClicked(this, &SWwiseBrowser::ExpandAll)
+				[
+					SNew(SImage)
+					.Image(FAkAppStyle::Get().GetBrush("Profiler.EventGraph.ExpandAll"))
+				]
+			]
 		]
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.HAlign(HAlign_Left)
+		[
+			SNew(SBox)
+			.VAlign(VAlign_Center)
+			.MaxDesiredHeight(16)
+			.MaxAspectRatio(1.0f)
+			.MinAspectRatio(1.0f)
+			[
+				SNew(SButton)
+				.ToolTipText(LOCTEXT("CollapseAll_ToolTip", "Collapse All"))
+				.ButtonStyle(FAkAudioStyle::Get(), "AudiokineticTools.HoverHintOnly")
+				.OnClicked(this, &SWwiseBrowser::CollapseAll)
+				[
+					SNew(SImage)
+					.Image(FAkAppStyle::Get().GetBrush("Profiler.EventGraph.CollapseAll"))
+				]
+			]
 		]
-		]
-
-					+ SHorizontalBox::Slot()
+		+ SHorizontalBox::Slot()
 		.FillWidth(1.0f)
 		[
 			SNew(SSearchBox)
 			.HintText(LOCTEXT("WwiseBrowserSearchTooltip", "Search..."))
-		.OnTextChanged(this, &SWwiseBrowser::OnSearchBoxChanged)
-		.SelectAllTextWhenFocused(false)
-		.DelayChangeNotificationsWhileTyping(true)
+			.OnTextChanged(this, &SWwiseBrowser::OnSearchBoxChanged)
+			.SelectAllTextWhenFocused(false)
+			.DelayChangeNotificationsWhileTyping(true)
 		]
 
 		+ SHorizontalBox::Slot()
@@ -656,7 +760,7 @@ void SWwiseBrowser::Construct(const FArguments& InArgs)
 					.AutoWidth()
 					[
 						SNew(SButton)
-						.ToolTipText(LOCTEXT("ProjectSettings_Tooltip", "Open Wwise Project Settings"))
+						.ToolTipText(FText::Format(LOCTEXT("ProjectSettings_Tooltip", "Open Wwise Project Settings\n\nIntegration Version : {0}\nSoundEngine Version : {1}"), FText::FromString(TEXT(WWISE_INTEGRATION_VERSION)), FText::FromString(TEXT(AK_WWISE_SOUNDENGINE_VERSION))))
 						.ButtonStyle(FAkAudioStyle::Get(), "AudiokineticTools.HoverHintOnly")
 						.OnClicked(this, &SWwiseBrowser::OnSettingsClicked)
 						[
@@ -998,6 +1102,11 @@ bool SWwiseBrowser::IsRefreshing() const
 
 EVisibility SWwiseBrowser::IsItemPlaying(FGuid ItemId) const
 {
+	if (!IsTransportValid())
+	{
+		return EVisibility::Hidden;
+	}
+
 	return Transport->IsPlaying(ItemId) ? EVisibility::Visible : EVisibility::Hidden;
 }
 
@@ -1268,9 +1377,15 @@ FReply SWwiseBrowser::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& In
 	}
 
 	else if (KeyPressed == EKeys::F5)
-	{	// Populates the Wwise Browser.
-		HandleRefreshWwiseBrowserCommandExecute();
-		return FReply::Handled();
+	{
+		if (bCanRefresh)
+		{
+			// Populates the Wwise Browser.
+			HandleRefreshWwiseBrowserCommandExecute();
+			bCanRefresh = false;
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
 	}
 
 	else if ((KeyPressed == EKeys::One) && InKeyEvent.IsControlDown() && InKeyEvent.IsShiftDown())
@@ -1284,6 +1399,30 @@ FReply SWwiseBrowser::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& In
 	}
 
 	return FReply::Unhandled();
+}
+
+FReply SWwiseBrowser::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	const FKey KeyUp = InKeyEvent.GetKey();
+
+	if (KeyUp == EKeys::F5)
+	{
+		bCanRefresh = true;
+		return FReply::Handled();
+	}
+
+	return FReply::Unhandled();
+}
+
+bool SWwiseBrowser::IsTransportValid() const
+{
+	if (IsWaapiAvailable() != EWwiseConnectionStatus::Connected)
+	{
+		// If the connection is not established, we clear the transport to remove all playing items.
+		Transport->StopAndDestroyAll();
+		return false;
+	}
+	return true;
 }
 
 void SWwiseBrowser::PopulateSearchStrings(const FString& FolderName, OUT TArray< FString >& OutSearchStrings) const
@@ -1631,6 +1770,33 @@ void SWwiseBrowser::CreateReconcileTab() const
 	else
 	{
 		UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to get Wwise Reconcile Module."));
+	}
+}
+
+FReply SWwiseBrowser::CollapseAll() const
+{
+	for (const auto& item : RootItems)
+	{
+		SetItemAndChildrenExpansion(item, false);
+	}
+	return FReply::Handled();
+}
+
+FReply SWwiseBrowser::ExpandAll() const
+{
+	for (const auto& item : RootItems)
+	{
+		SetItemAndChildrenExpansion(item, true);
+	}
+	return FReply::Handled();
+}
+
+void SWwiseBrowser::SetItemAndChildrenExpansion(FWwiseTreeItemPtr Item, bool bExpanded) const
+{
+	TreeViewPtr->SetItemExpansion(Item, bExpanded);
+	for (const auto& child : Item->GetChildren())
+	{
+		SetItemAndChildrenExpansion(child, bExpanded);
 	}
 }
 

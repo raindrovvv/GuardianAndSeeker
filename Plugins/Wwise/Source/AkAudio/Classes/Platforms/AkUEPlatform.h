@@ -45,6 +45,8 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "AkPlatform_XboxOneGC/AkXboxOneGDKPlatform.h"
 #elif defined(PLATFORM_XSX) && PLATFORM_XSX
 #include "AkPlatform_XboxSeriesX/AkXboxSeriesXPlatform.h"
+#elif defined(AK_PLATFORM_RUNTIME_SWITCH2) && AK_PLATFORM_RUNTIME_SWITCH2
+#include "AkPlatform_Switch2/AkSwitch2Platform.h"
 #else
 #error "The Wwise plug-in does not support the current build platform."
 #endif

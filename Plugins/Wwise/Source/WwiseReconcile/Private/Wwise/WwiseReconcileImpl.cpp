@@ -75,6 +75,7 @@ void FWwiseReconcileImpl::GetAllWwiseRefs()
 			Pair.GetFirst().Guid.GetGuidValues(A, B, C, D);
 			FGuid Guid(A, B, C, D);
 			GuidToWwiseRef.Add(Guid, { DataStructure.GetCurrentPlatformData()->Guids.At(Count) });
+			ShortIdToWwiseRef.Add(Pair.GetSecond().GetId(), { DataStructure.GetCurrentPlatformData()->Guids.At(Count) });
 		}
 		Count++;
 	}
@@ -154,6 +155,7 @@ void FWwiseReconcileImpl::GetAllAssets(TArray<FWwiseReconcileItem>& ReconcileIte
 	AssetRegistryModule->Get().GetAssetsByClass(UAkAudioType::StaticClass()->GetClassPathName(), Assets, true);
 
 	ReconcileItems.Empty();
+	TArray<FAssetData> UnusedAssets;
 	for (const FAssetData& AssetData : Assets)
 	{
 		// Exclude the Init bank
@@ -171,10 +173,32 @@ void FWwiseReconcileImpl::GetAllAssets(TArray<FWwiseReconcileItem>& ReconcileIte
 			{
 				WwiseRef->bAssetExists = true;
 				Item.WwiseAnyRef = { *WwiseRef };
+				ReconcileItems.Add(Item);
+				continue;
+			}
+		}
+		UnusedAssets.Add(AssetData);
+	}
+
+	for (const FAssetData& AssetData : UnusedAssets)
+	{
+		FWwiseReconcileItem Item;
+		Item.Asset = AssetData;
+		auto Value = AssetData.TagsAndValues.FindTag(GET_MEMBER_NAME_CHECKED(FWwiseObjectInfo, WwiseShortId));
+		if (Value.IsSet())
+		{
+			if (auto WwiseRef = ShortIdToWwiseRef.Find(FCString::Atoi(*Value.GetValue())))
+			{
+				if (!WwiseRef->bAssetExists)
+				{
+					WwiseRef->bAssetExists = true;
+					Item.WwiseAnyRef.WwiseAnyRef = { WwiseRef->WwiseAnyRef };
+				}
 			}
 		}
 		ReconcileItems.Add(Item);
 	}
+
 	for (auto WwiseRef : GuidToWwiseRef)
 	{
 		if (!WwiseRef.Value.bAssetExists)
@@ -184,6 +208,7 @@ void FWwiseReconcileImpl::GetAllAssets(TArray<FWwiseReconcileItem>& ReconcileIte
 			Item.ItemId = WwiseRef.Key;
 			ReconcileItems.Add(Item);
 		}
+
 	}
 }
 
@@ -235,19 +260,8 @@ void FWwiseReconcileImpl::GetAssetChanges(TArray<FWwiseReconcileItem>& Reconcile
 		{
 			if (RefClass && Asset.IsValid())
 			{
-				FName AssetName = AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRefValue);
-
-				if(IsAssetOutOfDate(Asset, *WwiseRefValue))
-				{
-					ReconcileItem.OperationRequired |= EWwiseReconcileOperationFlags::UpdateExisting;
-					AssetsToUpdate.Add(ReconcileItem);
-				}
-
-				if (Asset.AssetName != AssetName)
-				{
-					ReconcileItem.OperationRequired |= EWwiseReconcileOperationFlags::RenameExisting;
-					AssetsToRename.Add(ReconcileItem.Asset);
-				}
+				AddToUpdate(ReconcileItem);
+				AddToRename(ReconcileItem);
 			}
 		}
 		if(EnumHasAnyFlags(OperationFlags, EWwiseReconcileOperationFlags::Move))
@@ -423,7 +437,7 @@ bool FWwiseReconcileImpl::RenameExistingAssets(FScopedSlowTask& SlowTask)
 			return false;
 		}
 		auto AkAudioAsset = Cast<UAkAudioType>(AssetData.GetAsset());
-		if (!LIKELY(AkAudioAsset))
+		if (!UNLIKELY(AkAudioAsset))
 		{
 			UE_LOG(LogWwiseReconcile, Error, TEXT("Failed to rename Wwise asset %s."), *AssetData.AssetName.ToString());
 			continue;
@@ -554,6 +568,11 @@ TArray<FAssetData> FWwiseReconcileImpl::CreateAssets(FScopedSlowTask& SlowTask)
 		FName AssetName = AkUnrealAssetDataHelper::GetAssetDefaultName(&WwiseRef);
 		FString AssetPackagePath = GetAssetPackagePath(WwiseRef);
 
+		if (UAssetExists(Asset.WwiseAnyRef))
+		{
+			UE_LOG(LogWwiseReconcile, Warning, TEXT("Asset %s already exists at %s."), *AssetName.ToString(), *AssetPackagePath);
+		}
+
 		UClass* NewAssetClass = GetUClassFromWwiseRefType(WwiseRef.GetType());
 
 		if (!NewAssetClass)
@@ -564,7 +583,7 @@ TArray<FAssetData> FWwiseReconcileImpl::CreateAssets(FScopedSlowTask& SlowTask)
 		
 		int PackageLength = AssetViewUtils::GetPackageLengthForCooking(AssetPackagePath / AssetName.ToString(), FEngineBuildSettings::IsInternalBuild());
 		int MaxPath = AssetViewUtils::GetMaxCookPathLen();
-		if (PackageLength > MaxPath || PackageLength >= NAME_SIZE)
+		if (IsPathTooLong(Asset.WwiseAnyRef))
 		{
 			UE_LOG(LogWwiseReconcile, Error, TEXT("Could not create asset '%s' at location '%s', path exceeds Platform Max Path Length (%i). Please import this asset manually."), *AssetName.ToString(), *AssetPackagePath, MaxPath);
 			continue;
@@ -617,7 +636,7 @@ TArray<FAssetData> FWwiseReconcileImpl::CreateAssets(FScopedSlowTask& SlowTask)
 	return NewAssets;
 }
 
-FString FWwiseReconcileImpl::GetAssetPackagePath(const WwiseAnyRef& WwiseRef)
+FString FWwiseReconcileImpl::GetAssetPackagePath(const WwiseAnyRef& WwiseRef) const
 {
-	return AkUnrealAssetDataHelper::GetAssetDefaultPackagePath(&WwiseRef);;
+	return AkUnrealAssetDataHelper::GetAssetDefaultPackagePath(&WwiseRef);
 }

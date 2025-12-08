@@ -89,6 +89,10 @@ struct AkPlatformInitSettings { };
 #include <AK/SoundEngine/Platforms/NX/AkNXSoundEngine.h>
 #include <AK/SoundEngine/Platforms/NX/AkPlatformContext.h>
 
+#elif defined( AK_OUNCE )
+#include <AK/SoundEngine/Platforms/Ounce/AkOunceSoundEngine.h>
+#include <AK/SoundEngine/Platforms/Ounce/AkPlatformContext.h>
+
 #else
 #error AkSoundEngine.h: Undefined platform
 #endif

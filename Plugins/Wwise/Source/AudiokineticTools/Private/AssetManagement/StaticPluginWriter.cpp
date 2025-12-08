@@ -113,7 +113,7 @@ namespace StaticPluginWriter_Helper
 	{
 		constexpr auto AkFactoryHeaderFormatString = TEXT("#include <AK/Plugin/{0}Factory.h>");
 
-		constexpr auto StaticFactoryHeaderFileTemplate = TEXT("#if PLATFORM_{0}\n{1}\n#endif\n");
+		constexpr auto StaticFactoryHeaderFileTemplate = TEXT("#if defined(PLATFORM_{0}) && PLATFORM_{0}\n{1}\n#endif\n");
 
 		TArray<FString> PluginLines;
 
@@ -183,12 +183,12 @@ namespace StaticPluginWriter
 
 		if (PlatformInfo->bUsesStaticLibraries)
 		{
-			const auto PluginArray = StaticPluginWriter_Helper::GetLibraryFileNames(InWwisePlatform);
+			const auto PluginArray = StaticPluginWriter_Helper::GetLibraryFileNames(PlatformInfo->WwisePlatform);
 
 			const FString AkPluginIncludeFileName = FString::Format(TEXT("Ak{0}Plugins.h"), { PlatformInfo->WwisePlatform });
 			const FString AkPluginIncludeFilePath = FPaths::Combine(FAkPlatform::GetWwiseSoundEnginePluginDirectory(), TEXT("Source"), TEXT("WwiseSoundEngine"), TEXT("Public"), TEXT("Generated"), AkPluginIncludeFileName);
 
-			StaticPluginWriter_Helper::ModifySourceCode(*AkPluginIncludeFilePath, PlatformInfo->WwisePlatform, PluginArray);
+			StaticPluginWriter_Helper::ModifySourceCode(*AkPluginIncludeFilePath, InWwisePlatform, PluginArray);
 		}
 	}
 }

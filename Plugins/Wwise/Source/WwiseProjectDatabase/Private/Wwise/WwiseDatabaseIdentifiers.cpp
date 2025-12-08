@@ -17,13 +17,6 @@ Copyright (c) 2025 Audiokinetic Inc.
 
 #include "Wwise/WwiseDatabaseIdentifiers.h"
 
-WwiseDBShortId GetTypeHash(const WwiseDatabaseMediaIdKey& MediaId)
-{
-	return WwiseDBHashCombine(
-		GetTypeHash(MediaId.MediaId),
-		GetTypeHash(MediaId.SoundBankId));
-}
-
 WwiseDBShortId GetTypeHash(const WwiseDatabaseLocalizableIdKey& LocalizableId)
 {
 	return WwiseDBHashCombine(WwiseDBHashCombine(

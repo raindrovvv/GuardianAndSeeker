@@ -44,6 +44,10 @@ the specific language governing permissions and limitations under the License.
 
 	#include <AK/SoundEngine/Platforms/NX/AkTypes.h>
 
+#elif defined( NN_BUILD_TARGET_PLATFORM_OUNCE )
+
+	#include <AK/SoundEngine/Platforms/Ounce/AkTypes.h>
+
 #elif defined( _GAMING_XBOX )
 
 	#include <AK/SoundEngine/Platforms/XboxGC/AkTypes.h>

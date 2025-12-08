@@ -76,7 +76,8 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 	SECTION("Json Operations")
 	{
 		WwiseProjectDatabaseLoggingUtils::ResetErrors();
-		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 2);
+		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field BadType");
+		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field NoField");
 		WwiseDBString JsonFile = R"({
 			"String": "TestString",
 			"Bool": "false",
@@ -802,7 +803,7 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 	SECTION("MetadataBasicReference Missing Mandatory Field")
 	{
 		WwiseProjectDatabaseLoggingUtils::ResetErrors();
-		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 1);
+		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field GUID", 1);
 		WwiseDBString JsonFile = R"({
 				        "Id": "123456789",
 				        "Name": "ObjectName",
@@ -1085,10 +1086,10 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 		WwiseProjectDatabaseLoggingUtils::ParseErrors();
 	}
 
-	SECTION("MetadataMedia Loose without Path")
+	SECTION("MetadataMedia Path & Location")
 	{
 		WwiseProjectDatabaseLoggingUtils::ResetErrors();
-		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 1);
+		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 3);
 		WwiseDBString JsonFile = R"({
 				        "Id": "123456789",
 						"Language": "SFX",
@@ -1110,14 +1111,8 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 			WwiseMetadataMedia Ref(MetadataLoader);
 		}
 		CHECK(bFileParsed);
-		WwiseProjectDatabaseLoggingUtils::ParseErrors();
-	}
 
-	SECTION("MetadataMedia in Memory and Streaming without Path")
-	{
-		WwiseProjectDatabaseLoggingUtils::ResetErrors();
-		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 1);
-		WwiseDBString JsonFile = R"({
+		JsonFile = R"({
 				        "Id": "123456789",
 						"Language": "SFX",
 						"Streaming": "true",
@@ -1127,8 +1122,8 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 				        "CachePath": "SFX/Media.wem"
 						})"_wwise_db;
 
-		WwiseDBJsonObject RootJsonObject;
-		bool bFileParsed = false;
+		bFileParsed = false;
+		
 		if (WwiseDBJsonObject::CreateJsonObject(JsonFile, RootJsonObject))
 		{
 			//Making sure values read are as expected
@@ -1137,14 +1132,8 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 			WwiseMetadataMedia Ref(MetadataLoader);
 		}
 		CHECK(bFileParsed);
-		WwiseProjectDatabaseLoggingUtils::ParseErrors();
-	}
 
-	SECTION("MetadataMedia in Memory, Streaming and with a Path")
-	{
-		WwiseProjectDatabaseLoggingUtils::ResetErrors();
-		WwiseProjectDatabaseLoggingUtils::AddExpectedError("Could not retrieve field", 1);
-		WwiseDBString JsonFile = R"({
+		JsonFile = R"({
 				        "Id": "123456789",
 						"Language": "SFX",
 						"Streaming": "false",
@@ -1153,9 +1142,8 @@ SCENARIO("Wwise::WwiseProjectDatabase::JSONReader")
 				        "Path": "\\A\\Path\\To\\Object",
 				        "CachePath": "SFX/Media.wem"
 						})"_wwise_db;
-
-		WwiseDBJsonObject RootJsonObject;
-		bool bFileParsed = false;
+		
+		bFileParsed = false;
 		if (WwiseDBJsonObject::CreateJsonObject(JsonFile, RootJsonObject))
 		{
 			//Making sure values read are as expected

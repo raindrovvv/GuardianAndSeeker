@@ -447,9 +447,20 @@ bool WwiseBrowserHelpers::CanCreateAsset(const FWwiseTreeItemPtr& Item)
 	return !Item->IsOfType({ EWwiseItemType::Sound });
 }
 
-FLinearColor WwiseBrowserHelpers::GetTextColor(bool bUpToDate)
+FLinearColor WwiseBrowserHelpers::GetTextColor(bool bUpToDate, bool bRequireAttention)
 {
-	return bUpToDate ? FLinearColor::Gray : FLinearColor(1.f, 0.33f, 0);
+	if (bRequireAttention)
+	{
+		return FLinearColor(0.2, 0.8, 0.9);
+	}
+	else if (bUpToDate)
+	{
+		return FLinearColor::Gray;
+	}
+	else
+	{
+		return FLinearColor(1.f, 0.33f, 0);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

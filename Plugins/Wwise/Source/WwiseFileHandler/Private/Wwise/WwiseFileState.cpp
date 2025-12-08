@@ -152,7 +152,7 @@ void FWwiseFileState::DecrementCountAsyncDone(FWwiseAsyncCycleCounter&& InOpCycl
 
 bool FWwiseFileState::CanDelete() const
 {
-	return OpenedInstances.load() == 0 && State == EState::Closed && LoadCount == 0;
+	return OpenedInstances.load() == 0 && State == EState::Closed && LoadCount == 0 && LaterOpQueue.IsEmpty();
 }
 
 FWwiseFileState::FWwiseFileState():
@@ -861,13 +861,6 @@ void FWwiseFileState::AsyncOp(const TCHAR* InDebugName, FBasicFunction&& Fct)
 	if (UNLIKELY(!FileStateExecutionQueue))
 	{
 		UE_LOG(LogWwiseFileHandler, Error, TEXT("FWwiseFileState::AsyncOp %s %" PRIu32 ": Doing async op on terminated state"), GetManagingTypeName(), GetShortId());
-		if (auto* Module = IWwiseConcurrencyModule::GetModule())
-		{
-			if (auto* DefaultQueue = Module->GetDefaultQueue())
-			{
-				return DefaultQueue->Async(InDebugName, MoveTemp(Fct));
-			}
-		}
 		return Fct();
 	}
 	FileStateExecutionQueue->Async(InDebugName, MoveTemp(Fct));
@@ -883,6 +876,13 @@ void FWwiseFileState::ProcessLaterOpQueue()
 {
 	check(!FileStateExecutionQueue || FileStateExecutionQueue->IsRunningInThisThread());
 
+	if (UNLIKELY(bIsUnwindingLaterOpQueue))
+	{
+		UE_LOG(LogWwiseFileHandler, Verbose, TEXT("FWwiseFileState::ProcessLaterOpQueue: Skipping %s %" PRIu32 ": Already executing. Skipping."),
+			GetManagingTypeName(), GetShortId())
+		return;
+	}
+	bIsUnwindingLaterOpQueue = true;
 	int Count = 0;
 	for (FOpQueueItem* Op; (Op = LaterOpQueue.Peek()) != nullptr; LaterOpQueue.Pop())
 	{
@@ -894,6 +894,7 @@ void FWwiseFileState::ProcessLaterOpQueue()
 #endif
 	}
 	UE_CLOG(Count > 0, LogWwiseFileHandler, VeryVerbose, TEXT("FWwiseFileState::ProcessLaterOpQueue %s %" PRIu32 ": Added back %d operations to be executed."),  GetManagingTypeName(), GetShortId(), Count);
+	bIsUnwindingLaterOpQueue = false;
 }
 
 void FWwiseFileState::RegisterRecurringCallback()

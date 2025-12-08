@@ -71,7 +71,7 @@ struct WWISEFILEHANDLER_API FWwisePackagedFileSerializationOptions
 	bool bOptional{ false };
 
 	/**
-	 * Extra information to add to the logging. For example, the language. Should be followed by a space.
+	 * Extra information to add to the logging. For example, the language. Should be preceded by a ", ".
 	 */
 	FString ExtraLog;
 };
@@ -270,6 +270,12 @@ public:
 	 */
 	UPROPERTY()
 	FString SourcePathName;
+
+	/**
+	 * @brief Debug name of the asset, as used for logging during packaging.
+	 */
+	UPROPERTY()
+	FString DebugName;
 
 	/**
 	 * @brief Number of usages in the Wwise project.

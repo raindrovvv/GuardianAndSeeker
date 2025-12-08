@@ -162,11 +162,7 @@ void FWwiseResourceCookerImpl::CookMedia(const FWwiseObjectInfo& InInfo, const U
 		return;
 	}
 
-	WwiseDatabaseMediaIdKey MediaKey;
-	MediaKey.MediaId = InInfo.WwiseShortId;
-	MediaKey.SoundBankId = InInfo.HardCodedSoundBankShortId;
-
-	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(MediaKey))
+	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(InInfo.WwiseShortId))
 	{
 		CookMediaToSandbox(*CachedCookedData, PackageFilename, WriteAdditionalFile);
 	}
@@ -178,7 +174,7 @@ void FWwiseResourceCookerImpl::CookMedia(const FWwiseObjectInfo& InInfo, const U
 			return;
 		}
 
-		CookingCache->MediaCache.Add(MediaKey, CookedData);
+		CookingCache->MediaCache.Add(InInfo.WwiseShortId, CookedData);
 		CookMediaToSandbox(CookedData, PackageFilename, WriteAdditionalFile);
 	}
 }
@@ -353,7 +349,7 @@ void FWwiseResourceCookerImpl::PreCacheAssetLibraryRef(FCookedAssetLibraryFiles&
 			UpdateAssetLibraryPackagedFile(AssetLibraryPackagedFile);
 
 			OutFiles.Add(AssetLibraryPackagedFile);
-			CookingCache->MediaCache[WwiseDatabaseMediaIdKey(ObjectInfo.WwiseShortId, ObjectInfo.HardCodedSoundBankShortId)] = CookedData;
+			CookingCache->MediaCache[ObjectInfo.WwiseShortId] = CookedData;
 		}
 		break;
 	case EWwiseAssetLibraryRefType::ExternalSource:
@@ -586,18 +582,14 @@ bool FWwiseResourceCookerImpl::PrepareCookedData(FWwiseMediaCookedData& OutCooke
 		return GetMediaCookedData(OutCookedData, *GetOwnerContentFolder(Owner), InInfo);
 	}
 
-	WwiseDatabaseMediaIdKey MediaIdKey;
-	MediaIdKey.MediaId = InInfo.WwiseShortId;
-	MediaIdKey.SoundBankId = InInfo.HardCodedSoundBankShortId;
-
-	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(MediaIdKey))
+	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(InInfo.WwiseShortId))
 	{
 		OutCookedData = *CachedCookedData;
 		return true;
 	}
 	if (LIKELY(GetMediaCookedData(OutCookedData, *GetOwnerContentFolder(Owner), InInfo)))
 	{
-		CookingCache->MediaCache.Add(MediaIdKey, OutCookedData);
+		CookingCache->MediaCache.Add(InInfo.WwiseShortId, OutCookedData);
 		return true;
 	}
 	return false;
@@ -740,7 +732,7 @@ FString FWwiseResourceCookerImpl::GetOwnerContentFolder(const UObject* Owner) co
 	}
 
 	//Extract the full plugin folder using the name.
-	if(!ContentFolder.IsEmpty() && ContentFolder != "Game" && ContentFolder != "Engine")
+	if(!ContentFolder.IsEmpty() && ContentFolder != "Game" && ContentFolder != "Engine" && ContentFolder != "Temp")
 	{
 		const auto PluginInfo = IPluginManager::Get().FindPlugin(ContentFolder);
 		const FString FullPluginPath = PluginInfo->GetDescriptorFileName();
@@ -873,20 +865,17 @@ void FWwiseResourceCookerImpl::UpdatePackagedFile(FWwisePackagedFile& OutPackage
 		SourcePathName = ProjectDatabase->GetGeneratedSoundBanksPathFor(SourcePathName);
 	}
 	OutPackagedFile.SourcePathName = SourcePathName;
+	OutPackagedFile.PackagingStrategy = TargetPackagingStrategy;
 
 	if (bCookingForPackaging && TargetPackagingStrategy != EWwisePackagingStrategy::AdditionalFile)
 	{
-		bool bUnique;
+		bool bMultipleUsage;
 		{
 			WwiseDataStructureScopeLock Lock(*ProjectDatabase);
 			OutPackagedFile.WwiseProjectUsageCount = Lock.GetMediaUsageCount(InMedia.Id);
-			bUnique = (OutPackagedFile.WwiseProjectUsageCount == 1);
+			bMultipleUsage = (OutPackagedFile.WwiseProjectUsageCount != 1);
 		}
-		if (bUnique)
-		{
-			OutPackagedFile.PackagingStrategy = TargetPackagingStrategy;
-		}
-		else
+		if (bMultipleUsage)
 		{
 			OutPackagedFile.PackagingStrategy = EWwisePackagingStrategy::BulkData;
 		}
@@ -909,6 +898,7 @@ void FWwiseResourceCookerImpl::UpdatePackagedFile(FWwisePackagedFile& OutPackage
 	UpdatePackagedFileStreaming(OutPackagedFile, InMedia.Id);
 	
 	OutPackagedFile.Hash = GetTypeHash(OutPackagedFile);
+	OutPackagedFile.DebugName = FString(*InMedia.Language) + TEXT(" ") + *InMedia.ShortName;
 
 	UE_LOG(LogWwiseResourceCooker, VeryVerbose,
 		TEXT("FWwiseResourceCookerImpl::UpdatePackagedFile (Media %s %" PRIu32 "): Source: %s. Packaged: %s."),
@@ -940,20 +930,16 @@ void FWwiseResourceCookerImpl::UpdatePackagedFile(FWwisePackagedFile& OutPackage
 		SourcePathName = ProjectDatabase->GetGeneratedSoundBanksPathFor(SourcePathName);
 	}
 	OutPackagedFile.SourcePathName = SourcePathName;
-
+	OutPackagedFile.PackagingStrategy = TargetPackagingStrategy;
 	if (bCookingForPackaging && TargetPackagingStrategy != EWwisePackagingStrategy::AdditionalFile)
 	{
-		bool bUnique;
+		bool bMultiple;
 		{
 			WwiseDataStructureScopeLock Lock(*ProjectDatabase);
 			OutPackagedFile.WwiseProjectUsageCount = Lock.GetSoundBankUsageCount(InSoundBank.Id, InSoundBank.Language);
-			bUnique = (OutPackagedFile.WwiseProjectUsageCount == 1);
+			bMultiple = (OutPackagedFile.WwiseProjectUsageCount != 1);
 		}
-		if (bUnique)
-		{
-			OutPackagedFile.PackagingStrategy = TargetPackagingStrategy;
-		}
-		else
+		if (bMultiple)
 		{
 			OutPackagedFile.PackagingStrategy = EWwisePackagingStrategy::BulkData;
 		}
@@ -973,6 +959,7 @@ void FWwiseResourceCookerImpl::UpdatePackagedFile(FWwisePackagedFile& OutPackage
 	}
 	
 	OutPackagedFile.Hash = GetTypeHash(OutPackagedFile);
+	OutPackagedFile.DebugName = FString(*InSoundBank.Language) + TEXT(" ") + *InSoundBank.ShortName;
 
 	UE_LOG(LogWwiseResourceCooker, VeryVerbose,
 		TEXT("FWwiseResourceCookerImpl::UpdatePackagedFile (SoundBank %s %" PRIu32 "): Source: %s. Packaged: %s."),
@@ -2793,41 +2780,48 @@ bool FWwiseResourceCookerImpl::GetMediaCookedData(FWwiseMediaCookedData& OutCook
 		return false;
 	}
 
-	auto MediaId = WwiseDatabaseMediaIdKey(InInfo.WwiseShortId, InInfo.HardCodedSoundBankShortId);
+	auto MediaId = WwiseDatabaseLocalizableIdKey(InInfo.WwiseShortId, WwiseDatabaseLocalizableIdKey::GENERIC_LANGUAGE, InInfo.HardCodedSoundBankShortId);
 	const auto* MediaRef = PlatformData->MediaFiles.Find(MediaId);
-	if (UNLIKELY(!MediaRef))
-	{
-		UE_LOG(LogWwiseResourceCooker, Warning,
-			TEXT("GetMediaCookedData (%" PRIu32 "): Could not find Media in SoundBank %" PRIu32),
-			InInfo.WwiseShortId, InInfo.HardCodedSoundBankShortId);
-		return false;
-	}
+	WwiseDBSharedLanguageId LanguageId;
 
-	const WwiseDBSharedLanguageId* LanguageRefPtr = nullptr;
-	if (MediaRef->LanguageId)
+	if (!MediaRef)
 	{
-		const auto& Languages = DataStructure.GetLanguages();
-		for (const auto& Language : Languages)
+		for (const auto& Language : DataStructure.GetLanguages())
 		{
-			if (Language.GetLanguageId() == MediaRef->LanguageId)
+			MediaId = WwiseDatabaseLocalizableIdKey(InInfo.WwiseShortId, Language.GetLanguageId(), InInfo.HardCodedSoundBankShortId);
+			MediaRef = PlatformData->MediaFiles.Find(MediaId);
+			
+			if (MediaRef)
 			{
-				LanguageRefPtr = &Language;
+				LanguageId = Language;
 				break;
 			}
 		}
-		if (UNLIKELY(!LanguageRefPtr))
+		if (UNLIKELY(!MediaRef))
 		{
 			UE_LOG(LogWwiseResourceCooker, Warning,
-				TEXT("GetMediaCookedData (%" PRIu32 "): Could not find language %" PRIu32),
-				InInfo.WwiseShortId, MediaRef->LanguageId);
+				TEXT("GetMediaCookedData (%" PRIu32 "): Could not find media in any language (SB: %" PRIu32 ")"),
+				InInfo.WwiseShortId, InInfo.HardCodedSoundBankShortId);
 			return false;
 		}
+
+		// Precalculate Using Reference Language
+		if (MediaRef->GetMedia()->bUsingReferenceLanguage)
+		{
+			OutCookedData.bUsingReferenceLanguage = true;
+		}
+		else if (auto* LanguageCount = PlatformData->MediaLanguageList.Find(InInfo.WwiseShortId))
+		{
+			if (LanguageCount->Size() > 1)
+			{
+				OutCookedData.bUsingReferenceLanguage = true;
+			}
+		}
 	}
-	const auto& LanguageRef = LanguageRefPtr ? *LanguageRefPtr : WwiseDBSharedLanguageId();
 
 	WwiseDBSet<FWwiseSoundBankCookedData> SoundBankSet;
 	WwiseDBSet<FWwiseMediaCookedData> MediaSet;
-	if (UNLIKELY(!AddRequirementsForMedia(SoundBankSet, MediaSet, *MediaRef, LanguageRef, *PlatformData, ContentFolderName)))
+	if (UNLIKELY(!AddRequirementsForMedia(SoundBankSet, MediaSet, *MediaRef, LanguageId, *PlatformData, ContentFolderName)))
 	{
 		UE_LOG(LogWwiseResourceCooker, Warning,
 			TEXT("GetMediaCookedData (%" PRIu32 "): Could not get requirements for media."),
@@ -2854,7 +2848,10 @@ bool FWwiseResourceCookerImpl::GetMediaCookedData(FWwiseMediaCookedData& OutCook
 	}
 
 	auto Media = MediaSet.AsArray()[0];
-
+	if (!Media.bUsingReferenceLanguage)
+	{
+		Media.bUsingReferenceLanguage = OutCookedData.bUsingReferenceLanguage;
+	}
 	OutCookedData = MoveTemp(Media);
 	return true;
 }
@@ -3461,8 +3458,7 @@ bool FWwiseResourceCookerImpl::FillMediaBaseInfo(FWwiseMediaCookedData& OutMedia
 {
 	if (CookingCache)
 	{
-		if (const auto* CachedData = CookingCache->MediaCache.Find(
-			WwiseDatabaseMediaIdKey(InMedia.Id, InSoundBank.Id)))
+		if (const auto* CachedData = CookingCache->MediaCache.Find(InMedia.Id))
 		{
 			OutMediaCookedData = *CachedData;
 			return true;
@@ -3484,6 +3480,7 @@ bool FWwiseResourceCookerImpl::FillMediaBaseInfo(FWwiseMediaCookedData& OutMedia
 	OutMediaCookedData.PackagedFile.MemoryAlignment = InMedia.Align == 0 ? InPlatformInfo.DefaultAlign : InMedia.Align;
 	OutMediaCookedData.PackagedFile.bDeviceMemory = InMedia.bDeviceMemory;
 	OutMediaCookedData.PackagedFile.bStreaming = InMedia.bStreaming;
+	OutMediaCookedData.bUsingReferenceLanguage = InMedia.bUsingReferenceLanguage;
 
 	if (ExportDebugNameRule == EWwiseExportDebugNameRule::Release)
 	{
@@ -3595,6 +3592,30 @@ bool FWwiseResourceCookerImpl::AddRequirementsForMedia(WwiseDBSet<FWwiseSoundBan
 			return false;
 		}
 		OutSoundBankSet.Add(MoveTemp(MediaSoundBank));
+
+		auto OtherMedia = OtherSoundBankMediaRef.GetMedia();
+		if (UNLIKELY(!OtherMedia))
+		{
+			UE_LOG(LogWwiseResourceCooker, Warning,
+				TEXT("AddRequirementsForMedia (%s %" PRIu32 " in %s %" PRIu32
+					"): Could not get Media Location from Media in another SoundBank Ref"),
+				*FWwiseStringConverter::ToFString(Media->ShortName), Media->Id, *FWwiseStringConverter::ToFString(InLanguage.GetLanguageName()), InLanguage.GetLanguageId());
+			return false;
+		}
+		if (OtherMedia->Location != WwiseMetadataMediaLocation::Memory)
+		{
+			FWwiseMediaCookedData MediaCookedData;
+			if (UNLIKELY(!FillMediaBaseInfo(MediaCookedData, *PlatformInfo, *SoundBank, *Media, ContentFolderName)))
+			{
+				UE_LOG(LogWwiseResourceCooker, Warning,
+					TEXT("AddRequirementsForMedia (%s %" PRIu32 " in %s %" PRIu32
+						"): Could not fill Media from Media Ref"),
+					*FWwiseStringConverter::ToFString(Media->ShortName), Media->Id, *FWwiseStringConverter::ToFString(InLanguage.GetLanguageName()), InLanguage.GetLanguageId());
+				return false;
+			}
+
+			OutMediaSet.Add(MoveTemp(MediaCookedData));
+		}
 	}
 	else
 	{

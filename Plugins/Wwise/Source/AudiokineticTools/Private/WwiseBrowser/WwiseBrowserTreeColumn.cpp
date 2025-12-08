@@ -41,6 +41,7 @@ const TSharedRef<SWidget> FWwiseBrowserTreeColumn::ConstructRowWidget(FWwiseTree
 	auto WwiseBrowser = WwiseBrowserWeak.Pin();
 
 	bool bItemUpToDate = WwiseBrowser->IsWaapiAvailable() == EWwiseConnectionStatus::Connected ? TreeItem->IsItemUpToDate() : TreeItem->IsUAssetUpToDate();
+	bool requireAttention = TreeItem->IsUnusedEffect();
 
 	return SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot()
@@ -58,7 +59,7 @@ const TSharedRef<SWidget> FWwiseBrowserTreeColumn::ConstructRowWidget(FWwiseTree
 		[
 			SNew(STextBlock)
 			.Text(FText::FromString(TreeItem->DisplayName))
-			.ColorAndOpacity(WwiseBrowserHelpers::GetTextColor(bItemUpToDate || !TreeItem->ShouldDisplayInfo()))
+			.ColorAndOpacity(WwiseBrowserHelpers::GetTextColor(bItemUpToDate || !TreeItem->ShouldDisplayInfo(), requireAttention))
 			.HighlightText(WwiseBrowser->GetFilterHighlightText())
 		];
 }

@@ -36,6 +36,7 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "Wwise/API/WwiseSpatialAudioAPI.h"
 #include "Wwise/API/WwiseStreamMgrAPI.h"
 #include "Wwise/Stats/Global.h"
+#include "Wwise/WwiseAllowShrinking.h"
 #include "WwiseInitBankLoader/WwiseInitBankLoader.h"
 
 #include "AkCallbackInfoPool.h"
@@ -619,8 +620,19 @@ bool FAkAudioDevice::Init()
 				ConnectionLostHandle.Reset();
 			}
 		});
+		
 	}
 #endif // AK_SUPPORT_WAAPI
+
+#if UE_EDITOR
+	if (auto* akSettingsPerUser = GetDefault<UAkSettingsPerUser>())
+	{
+		AutoConnectToWAAPIHandler = akSettingsPerUser->OnAutoConnectToWaapiChanged.AddLambda([this]()
+		{
+			SetLocalOutput();
+		});
+	}
+#endif
 
 	FWorldDelegates::OnPreWorldInitialization.AddLambda(
 		[&](UWorld* World, const UWorld::InitializationValues IVS)
@@ -1008,6 +1020,12 @@ bool FAkAudioDevice::Update( float DeltaTime )
 void FAkAudioDevice::Teardown()
 {
 	SCOPED_AKAUDIO_EVENT_2(TEXT("FAkAudioDevice::Teardown"));
+
+	if (m_EngineExiting)
+	{
+		return;
+	}
+	
 #if AK_SUPPORT_WAAPI
 	if (auto waapiClient = FAkWaapiClient::Get())
 	{
@@ -1035,6 +1053,19 @@ void FAkAudioDevice::Teardown()
 			ClientBeginDestroyHandle.Reset();
 		}
 
+#if UE_EDITOR
+		if (AutoConnectToWAAPIHandler.IsValid())
+		{
+			const UAkSettingsPerUser* AkSettingsPerUser = GetDefault<UAkSettingsPerUser>();
+			if (AkSettingsPerUser)
+			{
+				AkSettingsPerUser->OnAutoConnectToWaapiChanged.Remove(AutoConnectToWAAPIHandler);
+			}
+			
+			AutoConnectToWAAPIHandler.Reset();
+		}
+#endif
+
 		OnWwiseProjectModification.Clear();
 	}
 #endif // AK_SUPPORT_WAAPI
@@ -1050,10 +1081,25 @@ void FAkAudioDevice::Teardown()
 
 			if (SoundEngine->IsInitialized())
 			{
-				FAkAudioDevice_Helpers::UnregisterAllGlobalCallbacks();
-
 				SoundEngine->StopAll();
 				SoundEngine->RenderAudio();
+
+				// Before unloading the SoundEngine, we are blocking the system until the resources are properly done playing.
+				// The delay is approximately adjusted to 500ms. After that delay, we give up. Most platforms have clear
+				// limits on app close delays.
+				int MaxCount = 500;
+				while (--MaxCount && ResourceUnloadFutures.Num())
+				{
+					FPlatformProcess::Sleep(0.001f);
+					CleanupUnfinishedResourceUnload();
+				}
+
+				if (UNLIKELY(ResourceUnloadFutures.Num()))
+				{
+					UE_LOG(LogAkAudio, Error, TEXT("%d resources remaining at shutdown"), ResourceUnloadFutures.Num());
+				}
+
+				FAkAudioDevice_Helpers::UnregisterAllGlobalCallbacks();
 			}
 		}
 
@@ -2206,6 +2252,11 @@ void FAkAudioDevice::PostEventAtLocationEndOfEventCallback(AkCallbackType in_eTy
 
 UAkComponent* FAkAudioDevice::SpawnAkComponentAtLocation( class UAkAudioEvent* in_pAkEvent, FVector Location, FRotator Orientation, bool AutoPost, bool AutoDestroy, UWorld* in_World)
 {
+	if (in_pAkEvent == NULL)
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("SpawnAkComponentAtLocation: The specified event was null. Aborting."));
+		return NULL;
+	}
 	UAkComponent * AkComponent = NULL;
 	if (in_World)
 	{
@@ -2231,7 +2282,7 @@ UAkComponent* FAkAudioDevice::SpawnAkComponentAtLocation( class UAkAudioEvent* i
 		{
 			if (AkComponent->PostAssociatedAkEvent(0, FOnAkPostEventCallback()) == AK_INVALID_PLAYING_ID && AutoDestroy)
 			{
-				AkComponent->ConditionalBeginDestroy();
+				AkComponent->DestroyComponent();
 				AkComponent = NULL;
 			}
 		}
@@ -3932,6 +3983,26 @@ AKRESULT FAkAudioDevice::RegisterGameObject(AkGameObjectID GameObjectID, const F
 	return FAkAudioDevice_Helpers::RegisterGameObject(GameObjectID, Name);
 }
 
+void FAkAudioDevice::CleanupUnfinishedResourceUnload()
+{
+	FScopeLock Lock(&ResourceUnloadFuturesCriticalSection);
+	for (auto Num = ResourceUnloadFutures.Num() - 1; Num >= 0; --Num)
+	{
+		if (ResourceUnloadFutures[Num].IsReady())
+		{
+			ResourceUnloadFutures.RemoveAt(Num, 1, EWwiseAllowShrinking::No);
+		}
+	}
+}
+
+void FAkAudioDevice::AddUnfinishedResourceUnload(FWwiseResourceUnloadFuture&& ResourceUnload)
+{
+	CleanupUnfinishedResourceUnload();
+	
+	FScopeLock Lock(&ResourceUnloadFuturesCriticalSection);
+	ResourceUnloadFutures.Emplace(MoveTemp(ResourceUnload));
+}
+
 bool FAkAudioDevice::EnsureInitialized()
 {
 	static bool bPermanentInitializationFailure = false;
@@ -3942,6 +4013,10 @@ bool FAkAudioDevice::EnsureInitialized()
 		return true;
 	}
 	if (UNLIKELY(bPermanentInitializationFailure))
+	{
+		return false;
+	}
+	if (UNLIKELY(m_EngineExiting))
 	{
 		return false;
 	}
@@ -4118,7 +4193,7 @@ void FAkAudioDevice::SetLocalOutput()
 #if WITH_EDITORONLY_DATA && !defined(AK_OPTIMIZED)
 	const UAkSettingsPerUser* AkSettingsPerUser = GetDefault<UAkSettingsPerUser>();
 
-	if (AkSettingsPerUser->WaapiTranslatorTimeout > 0)
+	if (AkSettingsPerUser->WaapiTranslatorTimeout > 0 && AkSettingsPerUser->bAutoConnectToWAAPI)
 	{
 #if AK_SUPPORT_WAAPI
 		auto* WAAPI = IWAAPI::Get();

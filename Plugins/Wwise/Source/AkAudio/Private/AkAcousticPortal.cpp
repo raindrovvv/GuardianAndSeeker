@@ -39,9 +39,6 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "EngineUtils.h"
 #include "Kismet/KismetMathLibrary.h"
 
-// A standard AAkAcousticPortal is based on a cube brush with verts at [+/-]100 X,Y,Z. 
-static const float kDefaultBrushExtents = 100.f;
-
 // min portal size, in cm. For raycasts
 static const float kMinPortalSize = 10.0f; 
 
@@ -1015,7 +1012,7 @@ void AAkAcousticPortal::FitRaycast()
 		FVector to = RaycastOrigin + FVector(x, y, z) * RayLength;
 
 		OutHits.Empty();
-		World->LineTraceMultiByObjectType(OutHits, RaycastOrigin, to, (int)GetCollisionChannel(), CollisionParams);
+		World->LineTraceMultiByChannel(OutHits, RaycastOrigin, to, GetCollisionChannel(), CollisionParams);
 
 		if (OutHits.Num() > 0)
 		{
@@ -1038,7 +1035,7 @@ void AAkAcousticPortal::FitRaycast()
 			if (bHit)
 			{
 				OutHits.Empty();
-				World->LineTraceMultiByObjectType(OutHits, ImpactPoint0, ImpactPoint0 + ImpactNormal0 * RayLength, (int)GetCollisionChannel(), CollisionParams);
+				World->LineTraceMultiByChannel(OutHits, ImpactPoint0, ImpactPoint0 + ImpactNormal0 * RayLength, GetCollisionChannel(), CollisionParams);
 
 				bHit = false;
 				FVector ImpactPoint1;
@@ -1179,7 +1176,7 @@ void AAkAcousticPortal::FitPortal()
 			scale.Y = leni / 2.f;
 			scale.Z = lenj / 2.f;
 
-			scale /= kDefaultBrushExtents;
+			scale /= GetBrushComponent()->Brush->Bounds.BoxExtent;
 
 			scale.X = GetActorScale3D().X;
 

@@ -132,7 +132,11 @@ void FWwiseResourceLoaderImpl::UpdateLanguage(FWwiseSetLanguagePromise&& Promise
 					FWwiseGlobalCallbacks::FCompletionPromise WaitPromise;
 					auto WaitFuture = WaitPromise.GetFuture();
 					WwiseGlobalCallbacks->EndCompletion(MoveTemp(WaitPromise), 2);
+#if UE_5_6_OR_LATER
+					WaitFuture.Next([Promise = MoveTemp(Promise)]() mutable
+#else
 					WaitFuture.Next([Promise = MoveTemp(Promise)](int) mutable
+#endif
 					{
 						Promise.EmplaceValue();
 					});

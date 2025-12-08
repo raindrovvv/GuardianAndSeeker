@@ -54,6 +54,10 @@ FText FSoundBankStatusColumn::GetDisplayedName(FWwiseTreeItemPtr TreeItem)
 	{
 		return LOCTEXT("UAssetStatusMoved", "UAsset in Wrong Location");
 	}
+	else if (TreeItem->IsUnusedEffect())
+	{
+		return LOCTEXT("UAssetStatusUnusedEffect", "");
+	}
 	else if(TreeItem->IsUAssetMissing())
 	{
 		return LOCTEXT("UAssetStatusMissing", "UAsset Missing");
@@ -69,6 +73,8 @@ FName FSoundBankStatusColumn::GetColumnId()
 const TSharedRef<SWidget> FSoundBankStatusColumn::ConstructRowWidget(FWwiseTreeItemPtr TreeItem,
 	const STableRow<FWwiseTreeItemPtr>& Row)
 {
+	bool requireAttention = TreeItem->IsUnusedEffect();
+
 	return SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot()
 		.AutoWidth()
@@ -82,7 +88,7 @@ const TSharedRef<SWidget> FSoundBankStatusColumn::ConstructRowWidget(FWwiseTreeI
 		[
 			SNew(STextBlock)
 			.Text(GetDisplayedName(TreeItem))
-			.ColorAndOpacity(WwiseBrowserHelpers::GetTextColor(TreeItem->IsUAssetUpToDate()))
+			.ColorAndOpacity(WwiseBrowserHelpers::GetTextColor(TreeItem->IsUAssetUpToDate(), requireAttention))
 		];
 }
 

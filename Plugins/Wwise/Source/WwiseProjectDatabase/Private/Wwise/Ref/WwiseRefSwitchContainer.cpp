@@ -103,7 +103,7 @@ WwiseMediaIdsMap WwiseRefSwitchContainer::GetSwitchContainerMedia(const WwiseMed
 	Result.Empty(MediaRefs.Size());
 	for (const auto& Elem : MediaRefs)
 	{
-		WwiseDatabaseMediaIdKey SoundBankFileId(Elem.Id, SoundBank->Id);
+		WwiseDatabaseLocalizableIdKey SoundBankFileId(Elem.Id, LanguageId, SoundBank->Id);
 		const auto* GlobalRef = GlobalMap.Find(SoundBankFileId);
 		if (GlobalRef)
 		{

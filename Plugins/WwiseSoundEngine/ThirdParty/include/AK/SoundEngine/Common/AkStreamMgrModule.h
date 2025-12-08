@@ -523,7 +523,7 @@ namespace AK
 		/// AK::StreamMgr::IAkFileLocationResolver implementations query this string. They may use it to 
 		/// construct a file path (for e.g. SDK/samples/SoundEngine/Common/AkFileLocationBase.cpp), or to
 		/// find a language-specific file within a look-up table (for e.g. SDK/samples/SoundEngine/Common/AkFilePackageLUT.cpp).
-		/// \return Current language.
+		/// \return Current language in string format, as specified in AK::StreamMgr::SetCurrentLanguage().
 		/// \sa AK::StreamMgr::SetCurrentLanguage()
 		AK_EXTERNAPIFUNC( const AkOSChar *, GetCurrentLanguage )();
 

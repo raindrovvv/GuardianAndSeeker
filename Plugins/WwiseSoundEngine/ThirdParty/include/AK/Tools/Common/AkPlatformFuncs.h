@@ -77,6 +77,9 @@ struct AkThreadProperties {};
 #elif defined (AK_NX)
 #include <AK/Tools/NX/AkPlatformFuncs.h>
 
+#elif defined (AK_OUNCE)
+#include <AK/Tools/Ounce/AkPlatformFuncs.h>
+
 #else
 #error AkPlatformFuncs.h: Undefined platform
 #endif

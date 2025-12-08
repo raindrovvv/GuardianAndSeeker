@@ -98,6 +98,10 @@ class AkDynaBlkPool: public TAlloc
 	typedef AkListBareLight< PoolChunk > tChunkList;
 
 public:
+	~AkDynaBlkPool()
+	{
+		AKASSERT(m_chunkList.IsEmpty());
+	}
 
 	T* New()
 	{

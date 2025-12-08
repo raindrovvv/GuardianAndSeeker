@@ -540,10 +540,10 @@ void FWwiseBrowserDataSource::MergeDataSources()
 		}
 	}
 
-	// Add the Orphan UAssets
+	// Add the items only found in Unreal (Previously known as Orphan UAssets)
 	{
 		FScopeLock AutoLock(&RootItemsLock);
-		FWwiseTreeItemPtr RootItem = MakeShared<FWwiseTreeItem>(FString("Orphaned UAssets"), FString("\\Orphaned UAssets"), nullptr, EWwiseItemType::Folder, FGuid());
+		FWwiseTreeItemPtr RootItem = MakeShared<FWwiseTreeItem>(FString("Found only in Unreal"), FString("\\Found only in Unreal"), nullptr, EWwiseItemType::Folder, FGuid());
 		TArray<UAssetDataSourceInformation> OrphanAssets;
 		UAssetDataSource->GetOrphanAssets(OrphanAssets);
 		for(auto& OrphanAsset : OrphanAssets)

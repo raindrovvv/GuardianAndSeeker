@@ -62,6 +62,8 @@ public:
 		return Columns;
 	}
 private:
+	void OnReconcileItemDoubleClicked(TSharedPtr<FWwiseReconcileItem> item);
+
 	FReply ReconcileAssets();
 
 	FReply CloseWindow();

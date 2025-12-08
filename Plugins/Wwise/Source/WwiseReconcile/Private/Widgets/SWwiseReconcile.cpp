@@ -16,26 +16,51 @@ Copyright (c) 2025 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "Widgets/SWwiseReconcile.h"
+
 #include "AkAudioStyle.h"
+#include "Widgets/ProjectedResultColumn.h"
+#include "Widgets/ReconcileOperationColumn.h"
+#include "Widgets/ReconcileUEAssetStatusColumn.h"
+#include "Widgets/SWwiseReconcileItemView.h"
+#include "Widgets/WwiseReconcileObjectColumn.h"
+#include "Wwise/WwiseReconcile.h"
 #include "WwiseUEFeatures.h"
-#include "ProjectedResultColumn.h"
-#include "ReconcileOperationColumn.h"
-#include "ReconcileUEAssetStatusColumn.h"
-#include "WwiseReconcileObjectColumn.h"
-#include "SWwiseReconcileItemView.h"
+
+#include "Editor.h"
 #include "Interfaces/IMainFrameModule.h"
+#include "ObjectTools.h"
+#include "Misc/EnumClassFlags.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
-#include "Wwise/WwiseReconcile.h"
 
 #define LOCTEXT_NAMESPACE "AkAudio"
 
 void SWwiseReconcile::Construct(const FArguments& InArgs, const TArray< FWwiseReconcileItem >& InReconcileItems, TSharedRef<SWindow>& ReconcileWindow)
 {
 	Window = ReconcileWindow;
+	bool bOnlyReferencedAssets = true;
 	for(auto& Item : InReconcileItems)
 	{
 		ReconcileItems.Add(MakeShared<FWwiseReconcileItem>(Item));
+
+		if (bOnlyReferencedAssets)
+		{
+			if (EnumHasAllFlags(Item.OperationRequired, EWwiseReconcileOperationFlags::Delete))
+			{
+				bool bReferenced = false;
+				bool bReferencedByUndo = false;
+				ObjectTools::GatherObjectReferencersForDeletion(Item.Asset.GetAsset(), bReferenced, bReferencedByUndo);
+
+				if (!bReferenced && !bReferencedByUndo)
+				{
+					bOnlyReferencedAssets = false;
+				}
+			}
+			else
+			{
+				bOnlyReferencedAssets = false;
+			}
+		}
 	}
 
 	HeaderRowWidget =
@@ -93,6 +118,17 @@ void SWwiseReconcile::Construct(const FArguments& InArgs, const TArray< FWwiseRe
 					.ClearSelectionOnClick(false)
 					.SelectionMode(ESelectionMode::None)
 					.HeaderRow(HeaderRowWidget)
+					.OnMouseButtonDoubleClick(this, &SWwiseReconcile::OnReconcileItemDoubleClicked)
+				]
+				+ SVerticalBox::Slot()
+				.Padding(0.f, 4.f, 0.f, 4.f)
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				.AutoHeight()
+				[
+					SNew(STextBlock)
+					.Text(bOnlyReferencedAssets ? LOCTEXT("ManualActionWarning", "Manual actions are required. Please follow the instruction for each element.") : LOCTEXT("ManualActionWarningBlank", ""))
+					.ColorAndOpacity(FSlateColor(FColor::Yellow))
 				]
 				+SVerticalBox::Slot()
 				.AutoHeight()
@@ -106,6 +142,7 @@ void SWwiseReconcile::Construct(const FArguments& InArgs, const TArray< FWwiseRe
 					[
 						SNew(SButton)
 						.Text(LOCTEXT("ReconcileButton", "Reconcile Unreal Assets"))
+						.IsEnabled(!bOnlyReferencedAssets)
 						.OnClicked(this, &SWwiseReconcile::ReconcileAssets)
 					]
 					+ SHorizontalBox::Slot()
@@ -166,6 +203,12 @@ FReply SWwiseReconcile::CloseWindow()
 {
 	Window.Pin()->RequestDestroyWindow();
 	return FReply::Handled();
+}
+
+void SWwiseReconcile::OnReconcileItemDoubleClicked(TSharedPtr<FWwiseReconcileItem> item)
+{
+	CloseWindow();
+	GEditor->SyncBrowserToObject(item->Asset);
 }
 
 FReply SWwiseReconcile::ReconcileAssets()

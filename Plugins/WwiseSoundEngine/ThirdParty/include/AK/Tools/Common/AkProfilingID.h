@@ -79,6 +79,8 @@ namespace AK
 			IODevice_BatchRead,
 			IODevice_BatchWrite,
 			CAkLEngine_DispatchBusGraphAsync,
+			AkSoundGeometry_GetOverlapRooms,
+			AkSoundGeometry_ComputeSignedDistance,
 
 			Num // Keep last!
 		};
@@ -137,6 +139,8 @@ namespace AK
 			"AK IODevice BatchRead",
 			"AK IODevice BatchWrite",
 			"CAkLEngine::DispatchBusGraphAsync",
+			"AkSoundGeometry::GetOverlapRooms",
+			"AkSoundGeometry::ComputeSignedDistance",
 
 		};
 

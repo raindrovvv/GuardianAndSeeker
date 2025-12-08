@@ -48,7 +48,7 @@ using WwiseStateIdsMap = WwiseDBMap<GroupValueKey, WwiseRefState>;
 using WwiseSwitchIdsMap = WwiseDBMap<GroupValueKey, WwiseRefSwitch>;
 using WwiseSwitchContainerArray = WwiseDBArray<WwiseRefSwitchContainer>;
 
-using WwiseMediaGlobalIdsMap = WwiseDBMap<MediaIdKey, WwiseRefMedia>;
+using WwiseMediaGlobalIdsMap = WwiseDBMap<LocalizableMediaIdKey, WwiseRefMedia>;
 using WwiseSoundBankGlobalIdsMap = WwiseDBMap<LocalizableIdKey, WwiseRefSoundBank>;
 using WwiseDialogueEventGlobalIdsMap = WwiseDBMap<LocalizableIdKey, WwiseRefDialogueEvent>;
 using WwiseDialogueArgumentGlobalIdsMap = WwiseDBMap<LocalizableIdKey, WwiseRefDialogueArgument>;

@@ -50,14 +50,13 @@ void FWwiseLocalizedAuxBusCookedData::SerializeBulkData(FArchive& Ar, const FWwi
 		if(AuxBus.Key != AuxBus.Key.Sfx)
 		{
 			Options.bOptional = true;
-			Options.ExtraLog += AuxBus.Key.LanguageName.ToString() + " ";
 		}
 		AuxBus.Value.SerializeBulkData(Ar, Options);
 	}
 }
 
 #if WITH_EDITORONLY_DATA && UE_5_5_OR_LATER
-void FWwiseLocalizedAuxBusCookedData::PreSave(FObjectPreSaveContext& SaveContext, FCbWriter& Writer) const
+void FWwiseLocalizedAuxBusCookedData::GetPlatformCookDependencies(FWwiseCookEventContext& Context, FCbWriter& Writer) const
 {
 	Writer << "LocABs";
 	Writer.BeginObject();
@@ -72,7 +71,7 @@ void FWwiseLocalizedAuxBusCookedData::PreSave(FObjectPreSaveContext& SaveContext
 	
 		for (const auto& Language : Languages)
 		{
-			AuxBusLanguageMap[Language].PreSave(SaveContext, Writer);
+			AuxBusLanguageMap[Language].GetPlatformCookDependencies(Context, Writer);
 		}
 		Writer.EndArray();
 	}

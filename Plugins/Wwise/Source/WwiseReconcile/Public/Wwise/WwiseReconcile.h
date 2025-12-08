@@ -111,6 +111,7 @@ class WWISERECONCILE_API IWwiseReconcile
 {
 protected:
 	TMap<FGuid, FWwiseNewAsset> GuidToWwiseRef;
+	TMap<uint32, FWwiseNewAsset> ShortIdToWwiseRef;
 
 	TArray<FWwiseReconcileItem> AssetsToUpdate;
 	TArray<FAssetData> AssetsToRename;
@@ -142,7 +143,7 @@ public:
 		return nullptr;
 	}
 	
-	virtual FString GetAssetPackagePath(const WwiseAnyRef& WwiseRef) = 0;
+	virtual FString GetAssetPackagePath(const WwiseAnyRef& WwiseRef) const = 0;
 	virtual void GetAllAssets(TArray<FWwiseReconcileItem>& ReconcileItems) = 0;
 	virtual TArray<FAssetData> CreateAssets(FScopedSlowTask& SlowTask) = 0;
 	virtual TArray<FAssetData> UpdateExistingAssets(FScopedSlowTask& SlowTask) = 0;
@@ -159,6 +160,9 @@ public:
 	virtual bool AddToUpdate(FWwiseReconcileItem& Item) = 0;
 	virtual bool AddToMove(FWwiseReconcileItem& Item) = 0;
 	virtual bool ShouldMove(const WwiseAnyRef& Ref, FAssetData InAssetPath, FString& OutNewAssetPath) = 0;
+
+	bool UAssetExists(const WwiseAnyRef* WwiseRef) const;
+	bool IsPathTooLong(const WwiseAnyRef* WwiseRef) const;
 	
 	bool ReconcileAssets(EWwiseReconcileOperationFlags OperationFlags = EWwiseReconcileOperationFlags::All);
 

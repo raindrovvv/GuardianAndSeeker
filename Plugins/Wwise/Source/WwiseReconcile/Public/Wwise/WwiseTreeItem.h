@@ -129,6 +129,8 @@ public:
 
 	bool IsFolder() const;
 
+	bool IsUnusedEffect() const;
+
 	bool IsAuxBus() const;
 
 	bool ShouldDisplayInfo() const;

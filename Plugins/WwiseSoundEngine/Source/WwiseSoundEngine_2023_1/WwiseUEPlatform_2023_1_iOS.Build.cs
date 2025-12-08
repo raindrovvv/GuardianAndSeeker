@@ -20,70 +20,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 
-public class WwiseUEPlatform_2023_1_IOS : WwiseUEPlatform
+public class WwiseUEPlatform_2023_1_IOS : WwiseUEPlatform_IOS
 {
 	public WwiseUEPlatform_2023_1_IOS(ReadOnlyTargetRules in_TargetRules, string in_ThirdPartyFolder) : base(in_TargetRules, in_ThirdPartyFolder) {}
-
-	public override string GetLibraryFullPath(string LibName, string LibPath)
-	{
-		return Path.Combine(LibPath, "lib" + LibName + ".a");
-	}
-
-	public override bool SupportsAkAutobahn { get { return false; } }
-
-	public override bool SupportsCommunication { get { return true; } }
-
-	public override bool SupportsDeviceMemory { get { return false; } }
-
-	public override string AkPlatformLibDir { get { return "iOS_Xcode1400";  } }
-
-	public override string DynamicLibExtension { get { return string.Empty; } }
-
-	public override List<string> GetPublicLibraryPaths()
-	{
-		return new List<string>
-		{
-			Path.Combine(ThirdPartyFolder, AkPlatformLibDir, WwiseConfigurationDir + "-iphoneos", "lib")
-		};
-	}
-
-	public override List<string> GetAdditionalWwiseLibs()
-	{
-		return GetAllLibrariesInFolder(Path.Combine(ThirdPartyFolder, AkPlatformLibDir, WwiseConfigurationDir + "-iphoneos", "lib"), "a", true);
-	}
-
-	public override List<string> GetRuntimeDependencies()
-	{
-		return new List<string>();
-	}
-
-	public override List<string> GetPublicDelayLoadDLLs()
-	{
-		return new List<string>();
-	}
-	
-	public override List<string> GetPublicSystemLibraries()
-	{
-		return new List<string>();
-	}
-
-	public override List<string> GetPublicDefinitions()
-	{
-		return new List<string>();
-	}
-
-	public override Tuple<string, string> GetAdditionalPropertyForReceipt(string ModuleDirectory)
-	{
-		return null;
-	}
-
-	public override List<string> GetPublicFrameworks()
-	{
-		return new List<string>
-		{
-			"AudioToolbox",
-			"AVFoundation",
-			"CoreAudio"
-		};
-	}
 }

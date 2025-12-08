@@ -803,7 +803,7 @@ void UNiagaraDataInterfaceWwiseEvent::PostPersistentEvent(FUnrealVectorVMContext
 						uint32 PlayingId = Event->PostOnComponent(AkComponent, nullptr, nullptr, nullptr, (AkCallbackType)0, nullptr, true, AudioContext);
 						if (PlayingId == AK_INVALID_PLAYING_ID )
 						{
-							AkComponent->ConditionalBeginDestroy();
+							AkComponent->DestroyComponent();
 							return;
 						}
 

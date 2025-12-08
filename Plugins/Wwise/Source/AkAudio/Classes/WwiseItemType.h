@@ -56,7 +56,7 @@ namespace EWwiseItemType
 
 	static const FString EventsBrowserName = TEXT("Events");
 	static const FString BussesBrowserName = TEXT("Busses");
-	static const FString AcousticTexturesBrowserName = TEXT("AcousticTextures");
+	static const FString AcousticTexturesBrowserName = TEXT("Virtual Acoustics");
 	static const FString AudioDeviceShareSetBrowserName = TEXT("Audio Device ShareSets");
 	static const FString StatesBrowserName = TEXT("States");
 	static const FString SwitchesBrowserName = TEXT("Switches");

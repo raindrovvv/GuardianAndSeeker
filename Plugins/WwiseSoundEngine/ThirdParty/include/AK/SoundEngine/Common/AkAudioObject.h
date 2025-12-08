@@ -160,6 +160,7 @@ struct AkAudioObject
 	/// Reset object state in preparation for next frame.
 	void ResetState()
 	{
+		cumulativeGain = AkRamp(1.f, 1.f);
 		arCustomMetadata.Term(); // Reset custom metadata in preparation for next frame.
 		objectName.ClearReference(); // Clear reference to string in preparation for next frame.
 	}

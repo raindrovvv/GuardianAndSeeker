@@ -68,6 +68,11 @@ FWwiseAssetLibraryPreCooker::FAssetLibraryInfoMap FWwiseAssetLibraryPreCooker::P
 			continue;
 		}
 
+		if (AssetLibrary->Info.Filters.Num() == 0 && AssetLibrary->Info.SharedFilters.Num() == 0)
+		{
+			UE_LOG(LogWwisePackagingEditor, Warning, TEXT("FWwiseAssetLibraryPreCooker::Process: Asset Library %s contains no filters"), *AssetLibrary->GetName());
+		}
+
 		bool bIsAlreadySet;
 		ProcessedAssetLibraries.Add(AssetLibrary->GetFName(), &bIsAlreadySet);
 		if (UNLIKELY(bIsAlreadySet))
@@ -77,6 +82,7 @@ FWwiseAssetLibraryPreCooker::FAssetLibraryInfoMap FWwiseAssetLibraryPreCooker::P
 		}
 
 		AssetLibrary->Info.PreloadFilters();
+		FWwiseAssetLibraryProcessor::GetRelevantAssets(AssetLibrary->GetPathName(), FilteringSharedData->AssetsData);
 		Processor->FilterLibraryAssets(*FilteringSharedData, AssetLibrary->Info,
 			!AssetLibrary->bFallthrough && Iter < AssetLibraryArray.Num() - 1);
 		Result.Add(AssetLibrary, MakeShared<FWwiseAssetLibraryInfo>(AssetLibrary->Info));

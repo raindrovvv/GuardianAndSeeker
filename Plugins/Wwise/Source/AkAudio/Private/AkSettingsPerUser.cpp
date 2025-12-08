@@ -19,6 +19,8 @@ Copyright (c) 2025 Audiokinetic Inc.
 
 #include "AkAudioDevice.h"
 
+#include "Misc/ConfigCacheIni.h"
+
 #if WITH_EDITOR
 #include "AkUnrealEditorHelper.h"
 #endif
@@ -33,6 +35,11 @@ UAkSettingsPerUser::UAkSettingsPerUser(const FObjectInitializer& ObjectInitializ
 	VisualizeRoomsAndPortals = false;
 	bShowReverbInfo = true;
 #endif
+	// "bAutoConnectToWAAPI" is not read correctly when using the config UProperty. Explicitly load it here.
+	if (!GConfig->GetBool(TEXT("/Script/AkAudio.AkSettingsPerUser"), TEXT("bAutoConnectToWAAPI"), bAutoConnectToWAAPI, GEditorPerProjectIni))
+	{
+		GConfig->GetBool(TEXT("/Script/AkAudio.AkSettingsPerUser"), TEXT("AutoConnectToWAAPI"), bAutoConnectToWAAPI, GEditorPerProjectIni);
+	}
 }
 
 #if WITH_EDITOR

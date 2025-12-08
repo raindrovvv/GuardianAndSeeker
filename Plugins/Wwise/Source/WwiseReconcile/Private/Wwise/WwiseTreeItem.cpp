@@ -163,6 +163,11 @@ bool FWwiseTreeItem::IsFolder() const
 					});
 }
 
+bool FWwiseTreeItem::IsUnusedEffect() const
+{
+	return IsOfType({ EWwiseItemType::EffectShareSet }) && IsNewInWwise();
+}
+
 bool FWwiseTreeItem::IsAuxBus() const
 {
 	return IsOfType({
@@ -285,6 +290,7 @@ bool FWwiseTreeItem::IsBrowserType() const
 			EWwiseItemType::Bus,
 			EWwiseItemType::AuxBus,
 			EWwiseItemType::AcousticTexture,
+			EWwiseItemType::AudioDeviceShareSet,
 			EWwiseItemType::State,
 			EWwiseItemType::Switch,
 			EWwiseItemType::GameParameter,

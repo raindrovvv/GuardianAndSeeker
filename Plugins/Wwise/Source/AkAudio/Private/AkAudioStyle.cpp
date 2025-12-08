@@ -223,7 +223,7 @@ const FSlateBrush* FAkAudioStyle::GetBrush(EWwiseItemType::Type ItemType)
 	case EWwiseItemType::Project: return Style->GetBrush(FWwisePluginStyle::ProjectIconName);
 	case EWwiseItemType::PhysicalFolder: return Style->GetBrush(FWwisePluginStyle::PhysicalFolderIconName);
 	case EWwiseItemType::StandaloneWorkUnit:
-	case EWwiseItemType::NestedWorkUnit: return Style->GetBrush(FWwisePluginStyle::WorkUnitIconName);
+	case EWwiseItemType::NestedWorkUnit: return Style->GetBrush(FWwisePluginStyle::FolderIconName);
 	case EWwiseItemType::ActorMixer: return Style->GetBrush(FWwisePluginStyle::ActorMixerIconName);
 	case EWwiseItemType::Sound: return Style->GetBrush(FWwisePluginStyle::SoundIconName);
 	case EWwiseItemType::SwitchContainer: return Style->GetBrush(FWwisePluginStyle::SwitchContainerIconName);

@@ -58,7 +58,7 @@ WwiseMediaIdsMap WwiseRefCustomPlugin::GetPluginMedia(const WwiseMediaGlobalIdsM
 	Result.Empty(Media.Size());
 	for (const auto& Elem : Media)
 	{
-		WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+		WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 
 		const WwiseRefMedia* MediaInGlobalMap = GlobalMap.Find(Id);
 		if (MediaInGlobalMap)

@@ -69,7 +69,7 @@ WwiseMediaIdsMap WwiseRefEvent::GetEventMedia(const WwiseMediaGlobalIdsMap& Glob
 	Result.Empty(MediaRefs.Size());
 	for (const auto& Elem : MediaRefs)
 	{
-		WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+		WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 		const WwiseRefMedia* GlobalRef = GlobalMap.Find(Id);
 		if (GlobalRef)
 		{
@@ -94,7 +94,7 @@ WwiseMediaIdsMap WwiseRefEvent::GetAllMedia(const WwiseMediaGlobalIdsMap& Global
 	{
 		for (const auto& Elem : SwitchContainer.GetAllMedia())
 		{
-			WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+			WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 			const WwiseRefMedia* GlobalRef = GlobalMap.Find(Id);
 			if (GlobalRef)
 			{
@@ -117,7 +117,7 @@ WwiseMediaIdsMap WwiseRefEvent::GetAllMedia(const WwiseMediaGlobalIdsMap& Global
 			{
 				for (const auto& Elem : Plugin->MediaRefs)
 				{
-					WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+					WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 					const WwiseRefMedia* GlobalRef = GlobalMap.Find(Id);
 					if (GlobalRef)
 					{
@@ -143,7 +143,7 @@ WwiseMediaIdsMap WwiseRefEvent::GetAllMedia(const WwiseMediaGlobalIdsMap& Global
 			{
 				for (const auto& Elem : Plugin->MediaRefs)
 				{
-					WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+					WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 					const WwiseRefMedia* GlobalRef = GlobalMap.Find(Id);
 					if (GlobalRef)
 					{
@@ -169,7 +169,7 @@ WwiseMediaIdsMap WwiseRefEvent::GetAllMedia(const WwiseMediaGlobalIdsMap& Global
 			{
 				for (const auto& Elem : Plugin->MediaRefs)
 				{
-					WwiseDatabaseMediaIdKey Id(Elem.Id, SoundBank->Id);
+					WwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBank->Id);
 					const WwiseRefMedia* GlobalRef = GlobalMap.Find(Id);
 					if (GlobalRef)
 					{

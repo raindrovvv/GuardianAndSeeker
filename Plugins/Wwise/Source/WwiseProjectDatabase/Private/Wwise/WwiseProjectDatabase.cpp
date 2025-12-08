@@ -205,6 +205,19 @@ WwiseDBSet<WwiseRefEvent> WwiseDataStructureScopeLock::GetEvent(const FWwiseEven
 	return Result;
 }
 
+WwiseDBSet<WwiseRefEvent> WwiseDataStructureScopeLock::GetAllLanguageEvents(const FWwiseEventInfo& InInfo) const
+{
+	const auto* PlatformData = GetCurrentPlatformData();
+	if (UNLIKELY(!PlatformData)) return {};
+
+	WwiseDBSet<WwiseRefEvent> Result;
+	for (auto& Language : GetLanguages())
+	{
+		PlatformData->GetRef(Result, Language, ConvertWwiseObjectInfo(InInfo));	
+	}
+	return Result;
+}
+
 const WwiseExternalSourceGlobalIdsMap& WwiseDataStructureScopeLock::GetExternalSources() const
 {
 	static const auto Empty = WwiseExternalSourceGlobalIdsMap();
@@ -255,13 +268,26 @@ const WwiseMediaGlobalIdsMap& WwiseDataStructureScopeLock::GetMediaFiles() const
 	return PlatformData->MediaFiles;
 }
 
-WwiseRefMedia WwiseDataStructureScopeLock::GetMediaFile(const FWwiseObjectInfo& InInfo) const
+WwiseRefMedia WwiseDataStructureScopeLock::GetMediaFile(const FWwiseObjectInfo& InInfo, uint32 LanguageId) const
 {
 	const auto* PlatformData = GetCurrentPlatformData();
 	if (UNLIKELY(!PlatformData)) return {};
 
 	WwiseRefMedia Result;
-	PlatformData->GetRef(Result, GetCurrentLanguage(), ConvertWwiseObjectInfo(InInfo));
+	const WwiseDBSharedLanguageId* LanguagePtr = &GetCurrentLanguage();
+	if (LanguageId != 0)
+	{
+		const auto& Languages{ GetLanguages() };
+		for (const auto& Language : Languages)
+		{
+			if (Language.GetLanguageId() == LanguageId)
+			{
+				LanguagePtr = &Language;
+				break;
+			}
+		}
+	}
+	PlatformData->GetRef(Result, *LanguagePtr, ConvertWwiseObjectInfo(InInfo));
 	return Result;
 }
 
@@ -505,7 +531,7 @@ int WwiseDataStructureScopeLock::GetMediaUsageCount(uint32 InId) const
 	const auto* PlatformData = GetCurrentPlatformData();
 	if (UNLIKELY(!PlatformData)) return 0;
 
-	if (const auto* UsageCount = PlatformData->MediaUsageCount.Find(WwiseDatabaseMediaIdKey(InId, 0)))
+	if (const auto* UsageCount = PlatformData->MediaUsageCount.Find(InId))
 	{
 		return *UsageCount;
 	}

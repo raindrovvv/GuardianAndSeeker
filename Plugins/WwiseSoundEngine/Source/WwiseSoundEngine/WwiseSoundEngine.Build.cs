@@ -22,10 +22,10 @@ public class WwiseSoundEngine : ModuleRules
 {
 	public WwiseSoundEngine(ReadOnlyTargetRules Target) : base(Target)
 	{
-		WwiseSoundEngine_2022_1.Apply(this, Target);
-		WwiseSoundEngine_2023_1.Apply(this, Target);
-		WwiseSoundEngine_2024_1.Apply(this, Target, true);		// Latest version should be written with "latest" to true for logging purposes
-		WwiseSoundEngine_Null.Apply(this, Target);
+		new WwiseSoundEngine_2022_1().Apply(this, Target);
+		new WwiseSoundEngine_2023_1().Apply(this, Target);
+		new WwiseSoundEngine_2024_1().Apply(this, Target, true);		// Latest version should be written with "latest" to true for logging purposes
+		new WwiseSoundEngine_Null().Apply(this, Target);
 
 		PublicDependencyModuleNames.AddRange(
 			new string[]
@@ -61,7 +61,7 @@ public class WwiseSoundEngine : ModuleRules
 		PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "..", Module, "Private"));
 
 #if UE_5_3_OR_LATER
-		bLegacyParentIncludePaths = false;
+		bLegacyParentIncludePaths = true;  // false → true: UE 5.6 호환성
 		CppStandard = CppStandardVersion.Default;
 #endif
 	}

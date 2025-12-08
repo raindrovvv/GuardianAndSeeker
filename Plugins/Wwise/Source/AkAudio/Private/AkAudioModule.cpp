@@ -23,6 +23,7 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "WwiseUnrealDefines.h"
 
 #include "Wwise/Packaging/WwiseAssetLibrary.h"
+#include "Wwise/WwiseFileHandlerModule.h"
 #include "Wwise/WwiseResourceLoader.h"
 #include "Wwise/WwiseSoundEngineModule.h"
 #include "WwiseInitBankLoader/WwiseInitBankLoader.h"
@@ -35,7 +36,6 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "Wwise/API/WwiseSoundEngineAPI.h"
 
 #if WITH_EDITORONLY_DATA
-#include "Wwise/WwiseFileHandlerModule.h"
 #include "Wwise/WwiseProjectDatabase.h"
 #include "Wwise/WwiseDataStructure.h"
 #include "Wwise/WwiseResourceCooker.h"
@@ -49,6 +49,7 @@ Copyright (c) 2025 Audiokinetic Inc.
 #endif
 #include "Async/Async.h"
 #include "Platforms/AkPlatformInfo.h"
+#include "Wwise/WwiseConcurrencyModule.h"
 #include "Wwise/WwisePackagingModule.h"
 #include "Wwise/WwiseExternalSourceManager.h"
 #include "Wwise/Packaging/WwisePackagingSettings.h"
@@ -162,7 +163,16 @@ namespace WwiseUnrealHelper
 
 void FAkAudioModule::StartupModule()
 {
+	IWwiseConcurrencyModule::GetModule();
+	IWwiseFileHandlerModule::GetModule();
+	IWwiseResourceLoaderModule::GetModule();
 	IWwiseSoundEngineModule::ForceLoadModule();
+
+#if WITH_EDITORONLY_DATA
+	IWwiseProjectDatabaseModule::GetModule();
+	IWwiseResourceLoaderModule::GetModule();
+#endif
+
 	WwiseUnrealHelper::SetHelperFunctions(
 		WwiseUnrealHelper::GetWwiseSoundEnginePluginDirectoryImpl,
 		WwiseUnrealHelper::GetWwiseProjectPathImpl,
@@ -272,6 +282,8 @@ void FAkAudioModule::StartupModule()
 		return;
 	}
 
+	OnPreExitHandle = FCoreDelegates::OnEnginePreExit.AddRaw(this, &FAkAudioModule::OnPreExit);
+
 	//Load init bank in Runtime
 	UE_LOG(LogAkAudio, VeryVerbose, TEXT("FAkAudioModule::StartupModule: Loading Init Bank."));
 	FWwiseInitBankLoader::Get()->LoadInitBank();
@@ -305,6 +317,16 @@ void FAkAudioModule::ShutdownModule()
 	}
 
 	AkAudioModuleInstance = nullptr;
+}
+
+
+void FAkAudioModule::OnPreExit()
+{
+	FCoreDelegates::OnEnginePreExit.Remove(OnPreExitHandle);
+	if (AkAudioDevice)
+	{
+		AkAudioDevice->Teardown();
+	}
 }
 
 FAkAudioDevice* FAkAudioModule::GetAkAudioDevice() const
@@ -463,6 +485,11 @@ void FAkAudioModule::CreateResourceCookerForPlatform(const ITargetPlatform* Targ
 				return;
 			}
 			ResourceCooker->PreCacheAssetLibraries(AssetLibraryPreCooker->Process(*AssetLibraries));
+			for (auto& LibrarySoftPtr : *AssetLibraries)
+			{
+				auto* WwisePackagingSettings = GetDefault<UWwisePackagingSettings>();
+				WwisePackagingSettings->AssetLibrariesKeepAlive.Add(LibrarySoftPtr.Get());
+			}
 		}
 	}
 	

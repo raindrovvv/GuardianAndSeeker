@@ -17,6 +17,8 @@ Copyright (c) 2025 Audiokinetic Inc.
 
 #pragma once
 #include "Wwise/WwisePackagingEditorModule.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 class WwiseRefMedia;
 class WwiseRefSoundBank;
@@ -54,6 +56,8 @@ public:
 
 	virtual bool CreateAssetLibraryRef(FWwiseAssetLibraryRef&, const WwiseAnyRef& SourceRef);
 
+	static bool AssetWillBePackaged(const FName& AssetPath, FAssetRegistryModule* AssetRegistryModule, TArray<FName>& AssetsSearched);
+	static void GetRelevantAssets(const FString& PackagePath, TArray<FAssetData>& RelevantAssets);
 protected:
 	static FCriticalSection IsFilteringCrit;
 };

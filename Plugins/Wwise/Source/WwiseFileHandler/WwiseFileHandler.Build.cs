@@ -36,9 +36,15 @@ public class WwiseFileHandler : ModuleRules
 
 		if (Target.bCompileAgainstCoreUObject)
 		{
-			PublicDependencyModuleNames.AddRange(new string[]
-			{
+			PublicDependencyModuleNames.AddRange(new string[] {
 				"WwiseObjectUtils"
+			});
+		}
+		
+		if (Target.bCompileAgainstEngine)
+		{
+			PublicDependencyModuleNames.AddRange(new string[] {
+				"WwiseEngineUtils"
 			});
 		}
 

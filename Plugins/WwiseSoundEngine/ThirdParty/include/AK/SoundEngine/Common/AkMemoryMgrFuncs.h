@@ -55,6 +55,9 @@ namespace AKPLATFORM
 #elif defined (AK_NX)
 #include <AK/SoundEngine/Platforms/NX/AkMemoryMgrFuncs.h>
 
+#elif defined (AK_OUNCE)
+#include <AK/SoundEngine/Platforms/Ounce/AkMemoryMgrFuncs.h>
+
 #elif defined (AK_APPLE) || defined (AK_LINUX) || defined(AK_QNX) || defined( AK_ANDROID ) || defined ( AK_LINUX_AOSP ) || defined(AK_EMSCRIPTEN) || defined(AK_HARMONY)
 #include <AK/SoundEngine/Platforms/POSIX/AkMemoryMgrFuncs.h>
 

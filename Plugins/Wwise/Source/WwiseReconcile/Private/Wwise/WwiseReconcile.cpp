@@ -16,12 +16,34 @@ Copyright (c) 2025 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "Wwise/WwiseReconcile.h"
+
+#include "AkUnrealAssetDataHelper.h"
+#include "AssetViewUtils.h"
 #include "Wwise/Stats/Reconcile.h"
 #include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Misc/App.h"
+#include "Misc/EngineBuildSettings.h"
 #include "Misc/ScopedSlowTask.h"
 
 #define LOCTEXT_NAMESPACE "AkAudio"
+
+bool IWwiseReconcile::UAssetExists(const WwiseAnyRef* WwiseRef) const
+{
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	auto AssetPackagePath = GetAssetPackagePath(*WwiseRef);
+	FAssetData Asset = AssetRegistryModule.GetRegistry().GetAssetByObjectPath(AssetPackagePath / AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef).ToString() + "." + AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef).ToString());
+	return Asset.IsValid();
+}
+
+bool IWwiseReconcile::IsPathTooLong(const WwiseAnyRef* WwiseRef) const
+{
+	FName AssetName = AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef);
+	FString AssetPackagePath = IWwiseReconcile::Get()->GetAssetPackagePath(*WwiseRef);
+	int PackageLength = AssetViewUtils::GetPackageLengthForCooking(AssetPackagePath / AssetName.ToString(), FEngineBuildSettings::IsInternalBuild());
+	int MaxPath = AssetViewUtils::GetMaxCookPathLen();
+	return PackageLength > MaxPath || PackageLength >= NAME_SIZE;
+}
 
 bool IWwiseReconcile::ReconcileAssets(EWwiseReconcileOperationFlags OperationFlags)
 {

@@ -67,7 +67,7 @@ void FWwiseEventCookedData::SerializeBulkData(FArchive& Ar, const FWwisePackaged
 }
 
 #if WITH_EDITORONLY_DATA && UE_5_5_OR_LATER
-void FWwiseEventCookedData::PreSave(FObjectPreSaveContext& SaveContext, FCbWriter& Writer) const
+void FWwiseEventCookedData::GetPlatformCookDependencies(FWwiseCookEventContext& Context, FCbWriter& Writer) const
 {
 	Writer << "Event";
 	Writer.BeginObject();
@@ -78,7 +78,7 @@ void FWwiseEventCookedData::PreSave(FObjectPreSaveContext& SaveContext, FCbWrite
 	Writer.BeginArray();
 	for (auto& SoundBank : SoundBanks)
 	{
-		SoundBank.PreSave(SaveContext, Writer);
+		SoundBank.GetPlatformCookDependencies(Context, Writer);
 	}
 	Writer.EndArray();
 
@@ -86,7 +86,7 @@ void FWwiseEventCookedData::PreSave(FObjectPreSaveContext& SaveContext, FCbWrite
 	Writer.BeginArray();
 	for (auto& MediaItem : Media)
 	{
-		MediaItem.PreSave(SaveContext, Writer);
+		MediaItem.GetPlatformCookDependencies(Context, Writer);
 	}
 	Writer.EndArray();
 
@@ -94,7 +94,7 @@ void FWwiseEventCookedData::PreSave(FObjectPreSaveContext& SaveContext, FCbWrite
 	Writer.BeginArray();
 	for (auto& Leaf : SwitchContainerLeaves)
 	{
-		Leaf.PreSave(SaveContext, Writer);
+		Leaf.GetPlatformCookDependencies(Context, Writer);
 	}
 	Writer.EndArray();
 	Writer.EndObject();

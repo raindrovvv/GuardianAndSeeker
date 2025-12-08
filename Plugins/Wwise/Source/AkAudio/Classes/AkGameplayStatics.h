@@ -38,24 +38,24 @@ struct FAkOutdoorsRoomParameters
 
 public:
 
+	/** Wwise Auxiliary Bus associated with the Outdoors Room. Default is null. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audiokinetic|Spatial Audio")
 	UAkAuxBus* ReverbAuxBus = nullptr;
 
-	/** Maximum send level to the Wwise Auxiliary Bus associated to this Room */
+	/** Maximum send level to the Wwise Auxiliary Bus associated with the Outdoors Room. Valid range is 0.0f-1.0f. Default value is 1. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audiokinetic|Spatial Audio", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float ReverbLevel = 1.0f;
 
 	/**
-	* The transmission loss value in wwise, on emitters in the Room, when no audio paths to the
-	* listener are found via sound propagation in Wwise Spatial Audio. This value can be thought of as
-	* 'thickness', as it relates to how much sound energy is transmitted through the wall. Valid range 0.0f-1.0f.
+	* The transmission loss value in Wwise, on emitters in the Outdoors Room, when no audio paths to the
+	* listener are found via sound propagation in Wwise Spatial Audio. Valid range 0.0f-1.0f. Default value is 0.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audiokinetic|Spatial Audio", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float TransmissionLoss = 0.0f;
 
 	/**
-	* Send level for sounds that are posted on the room. Valid range: (0.f-1.f).
-	* A value of 0 disables the aux send.
+	* Send level for sounds that are posted on the room. Valid range is 0.f-1.f.
+	* A value of 0 disables the aux send. Default value is 0.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audiokinetic|Spatial Audio", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float AuxSendLevel = 0.0f;
@@ -352,7 +352,7 @@ public:
 	static FAkOutdoorsRoomParameters GetCurrentOutdoorsRoomParameters();
 
 	/**
-	* Set the parameters of the defaut Outdoors Room.
+	* Sets the parameters of the defaut Outdoors Room.
 	*
 	* @param InOutdoorsRoomParameters - Structure containing the new parameters of the Outdoors Room.
 	*/
@@ -360,12 +360,12 @@ public:
 	static void SetOutdoorsRoomParameters(FAkOutdoorsRoomParameters InOutdoorsRoomParameters);
 
 	/**
-	 * Reset the Outdoors Room parameters to their default values.
+	 * Resets the Outdoors Room parameters to their default values.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintCosmetic, Category = "Audiokinetic|Spatial Audio")
 	static void ResetOutdoorsRoomParams();
 
-	/** Posts a Wwise Event attached to and following the root component of the specified actor.
+	/** Posts an Event on the Outdoors Room.
 	 *
 	 * @param AkEvent - Event to play.
 	 */
@@ -376,7 +376,7 @@ public:
 	);
 
 	/**
-	 * Stop all sounds for the outdoors room.
+	 * Stops all sounds for the Outdoors Room.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintCosmetic, Category = "Audiokinetic|Spatial Audio")
 	static void StopOutdoors();

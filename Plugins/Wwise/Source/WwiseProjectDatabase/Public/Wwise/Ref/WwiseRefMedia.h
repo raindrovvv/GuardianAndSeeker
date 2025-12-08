@@ -55,3 +55,9 @@ struct WwiseRefMedia::FGlobalIdsMap
 {
 	WwiseMediaGlobalIdsMap GlobalIdsMap;
 };
+
+struct WwiseOutsourcedRefMedia
+{
+	unsigned int ReferenceCount = 0;
+	WwiseDBArray<WwiseDatabaseLocalizableIdKey> SoundBankLocalizableIdKeys = WwiseDBArray<WwiseDatabaseLocalizableIdKey>();
+};

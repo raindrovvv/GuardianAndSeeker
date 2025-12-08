@@ -50,11 +50,10 @@ enum EAkCollisionChannel
 UENUM()
 enum class EAkUnrealAudioRouting
 {
-	Custom UMETA(DisplayName = "Default", ToolTip = "Custom Unreal audio settings set up by the developer"),
+	EnableWwiseOnly UMETA(DisplayName = "Enable Wwise SoundEngine only", ToolTip = "Only use Wwise SoundEngine, and disable Unreal audio"),
 	Separate UMETA(DisplayName = "Both Wwise and Unreal audio", ToolTip = "Use default Unreal audio at the same time than Wwise SoundEngine (might be incompatible with some platforms)"),
 	AudioLink UMETA(DisplayName = "Route through AudioLink", ToolTip = "Use WwiseAudioLink to route all Unreal audio sources to Wwise SoundEngine Inputs"),
 	AudioMixer UMETA(DisplayName = "Route through AkAudioMixer", ToolTip = "(DEPRECATED) Use AkAudioMixer to route Unreal submixes to a Wwise SoundEngine Input"),
-	EnableWwiseOnly UMETA(DisplayName = "Enable Wwise SoundEngine only", ToolTip = "Only use Wwise SoundEngine, and disable Unreal audio"),
 	EnableUnrealOnly UMETA(DisplayName = "Enable Unreal Audio only", ToolTip = "Only use Unreal audio, and disable Wwise SoundEngine")
 };
 
@@ -332,7 +331,7 @@ public:
 
 	// Routing Audio from Unreal Audio to Wwise Sound Engine
 	UPROPERTY(Config, EditAnywhere, Category = "Initialization", DisplayName = "Unreal Audio Routing", meta=(ConfigRestartRequired=true))
-	EAkUnrealAudioRouting AudioRouting = EAkUnrealAudioRouting::Custom;
+	EAkUnrealAudioRouting AudioRouting = EAkUnrealAudioRouting::EnableWwiseOnly;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Initialization", meta=(ConfigRestartRequired=true, EditCondition="AudioRouting == EAkUnrealAudioRouting::Custom"))
 	bool bWwiseSoundEngineEnabled = true;
@@ -425,7 +424,7 @@ private:
 	void FillGeometrySurfacePropertiesTable();
 
 	void SanitizeProjectPath(FString& Path, const FString& PreviousPath, const FText& DialogMessage);
-	void OnAudioRoutingUpdate();
+	void UpdateAudioRouting();
 	
 	bool bGeometrySurfacePropertiesTableInitialized = false;
 
@@ -441,6 +440,9 @@ private:
 #endif
 
 	TMap<FGuid, FAkAcousticTextureParams> AcousticTextureParamsMap;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UDataTable> GeometrySurfacePropertiesKeepAlive = nullptr;
 
 public:
 	bool bRequestRefresh = false;

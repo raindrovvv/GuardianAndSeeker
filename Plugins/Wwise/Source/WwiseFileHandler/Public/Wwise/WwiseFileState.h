@@ -20,6 +20,8 @@ Copyright (c) 2025 Audiokinetic Inc.
 #include "Wwise/WwiseExecutionQueue.h"
 #include <atomic>
 
+#include "Containers/Queue.h"
+
 class FWwiseAsyncCycleCounter;
 class FWwiseStreamableFileStateInfo;
 
@@ -62,10 +64,11 @@ public:
 
 	using FBasicFunction = FWwiseExecutionQueue::FBasicFunction;
 	using FOpQueueItem = FWwiseExecutionQueue::FOpQueueItem; 
-	using FLaterOpQueue = TQueue<FOpQueueItem, EQueueMode::Spsc>;
+	using FLaterOpQueue = TQueue<FOpQueueItem, EQueueMode::Mpsc>;
 
 	/// Operation queue containing operations waiting to be unclogged (such as a load time)
 	FLaterOpQueue LaterOpQueue;
+	std::atomic<bool> bIsUnwindingLaterOpQueue{ false };
 
 	/// Number of instances opened. Slightly equivalent to LoadCount, but set synchronously and updated at extremities.
 	std::atomic<int> OpenedInstances{ 0 };

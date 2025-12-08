@@ -125,6 +125,12 @@ namespace AKPLATFORM
 	}
 
 	/// Platform Independent Helper
+	inline bool AkWaitForEvent( AkEvent & in_event, AkUInt32 in_dwMilliseconds )
+	{
+        return ::WaitForSingleObject( in_event, in_dwMilliseconds ) == WAIT_OBJECT_0;
+	}
+
+	/// Platform Independent Helper
 	inline void AkSignalEvent( const AkEvent & in_event )
 	{
 		AKVERIFY( ::SetEvent( in_event ) );

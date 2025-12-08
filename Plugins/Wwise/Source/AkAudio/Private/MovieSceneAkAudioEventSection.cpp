@@ -343,7 +343,7 @@ void UMovieSceneAkAudioEventSection::UnsubscribeWAAPICallback(uint64& in_iSubID)
 		TSharedPtr<FJsonObject> unsubscribeResult = MakeShareable(new FJsonObject());
 		FAkWaapiClient* pWaapiClient = FAkWaapiClient::Get();
 		if (pWaapiClient != nullptr)
-			pWaapiClient->Unsubscribe(in_iSubID, unsubscribeResult, 500, true);
+			pWaapiClient->Unsubscribe(in_iSubID, unsubscribeResult, true);
 		in_iSubID = 0;
 	}
 }

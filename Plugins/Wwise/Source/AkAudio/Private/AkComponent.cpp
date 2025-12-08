@@ -430,7 +430,7 @@ void UAkComponent::OnRegister()
 		RegisterGameObject(); // Done before parent so that OnUpdateTransform follows registration and updates position correctly.
 
 	FAkAudioDevice* AudioDevice = FAkAudioDevice::Get();
-	if (AudioDevice)
+	if (AudioDevice && CurrentWorld)
 	{
 		ObstructionService.Init(GetAkGameObjectID(), CurrentWorld, OcclusionRefreshInterval, AudioDevice->UsingSpatialAudioRooms(CurrentWorld));
 	}
@@ -462,7 +462,7 @@ void UAkComponent::OnRegister()
 #if WITH_EDITORONLY_DATA
 void UAkComponent::UpdateSpriteTexture()
 {
-	if (SpriteComponent)
+	if (!IsRunningCommandlet() && SpriteComponent)
 	{
 		SpriteComponent->SetSprite(LoadObject<UTexture2D>(NULL, TEXT("/Wwise/S_AkComponent.S_AkComponent")));
 	}
@@ -487,6 +487,10 @@ void UAkComponent::OnUnregister()
 
 void UAkComponent::OnComponentDestroyed( bool bDestroyingHierarchy )
 {
+	if (StopWhenOwnerDestroyed)
+	{
+		Stop();
+	}
 	UnregisterGameObject();
 	Super::OnComponentDestroyed(bDestroyingHierarchy);
 }
@@ -637,6 +641,13 @@ void UAkComponent::BeginPlay()
 
 	if (EnableSpotReflectors)
 		AAkSpotReflector::UpdateSpotReflectors(this);
+
+	FAkAudioDevice* AudioDevice = FAkAudioDevice::Get();
+	UWorld* CurrentWorld = GetWorld();
+	if (AudioDevice && CurrentWorld)
+	{
+		ObstructionService.Init(GetAkGameObjectID(), CurrentWorld, OcclusionRefreshInterval, AudioDevice->UsingSpatialAudioRooms(CurrentWorld));
+	}
 }
 
 void UAkComponent::OnUpdateTransform(EUpdateTransformFlags UpdateTransformFlags, ETeleportType Teleport)

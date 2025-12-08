@@ -170,7 +170,16 @@ void SWwiseBrowserTreeRow::Construct(
 	auto ItemPtr = Item.Pin();
 	auto WwiseBrowserPtr = WwiseBrowserWeak.Pin();
 
-	SetVisibility(ItemPtr->IsVisible ? EVisibility::Visible : EVisibility::Collapsed);
+	bool IsVisible = ItemPtr->IsVisible;
+	if (IsVisible)
+	{
+		// If we have a work unit with no child, we hide it
+		if (ItemPtr->IsOfType({ EWwiseItemType::NestedWorkUnit, EWwiseItemType::StandaloneWorkUnit }) && ItemPtr->GetChildren().IsEmpty())
+		{
+			IsVisible = false;
+		}
+	}
+	SetVisibility(IsVisible ? EVisibility::Visible : EVisibility::Collapsed);
 
 	if (!WwiseBrowserPtr.IsValid())
 	{

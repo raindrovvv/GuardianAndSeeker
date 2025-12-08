@@ -19,29 +19,6 @@ Copyright (c) 2025 Audiokinetic Inc.
 
 #include "AdapterTypes/WwiseWrapperTypes.h"
 
-struct WWISEPROJECTDATABASE_API WwiseDatabaseMediaIdKey
-{
-	WwiseDBShortId MediaId = 0;
-	WwiseDBShortId SoundBankId = 0;
-
-	WwiseDatabaseMediaIdKey()
-	{}
-	WwiseDatabaseMediaIdKey(unsigned int InMediaId, unsigned int InSoundBankId) :
-		MediaId(InMediaId),
-		SoundBankId(InSoundBankId)
-	{}
-	bool operator==(const WwiseDatabaseMediaIdKey& Rhs) const
-	{
-		return MediaId == Rhs.MediaId
-			&& SoundBankId == Rhs.SoundBankId;
-	}
-	bool operator<(const WwiseDatabaseMediaIdKey& Rhs) const
-	{
-		return (MediaId < Rhs.MediaId)
-			|| (MediaId == Rhs.MediaId && SoundBankId < Rhs.SoundBankId);
-	}
-};
-
 struct WWISEPROJECTDATABASE_API WwiseDatabaseLocalizableIdKey
 {
 	static constexpr unsigned int GENERIC_LANGUAGE = 0;
@@ -182,7 +159,6 @@ struct WWISEPROJECTDATABASE_API WwiseDatabaseLocalizableNameKey
 	}
 };
 
-unsigned int WWISEPROJECTDATABASE_API GetTypeHash(const WwiseDatabaseMediaIdKey& FileId);
 unsigned int WWISEPROJECTDATABASE_API GetTypeHash(const WwiseDatabaseLocalizableIdKey& LocalizableId);
 unsigned int WWISEPROJECTDATABASE_API GetTypeHash(const WwiseDatabaseGroupValueKey& LocalizableGroupValue);
 unsigned int WWISEPROJECTDATABASE_API GetTypeHash(const WwiseDatabaseLocalizableGroupValueKey& LocalizableGroupValue);
@@ -216,6 +192,6 @@ inline unsigned int WwiseDBHashCombine(unsigned int A, unsigned int C)
 typedef WwiseDatabaseLocalizableGuidKey LocalizableGuidKey;
 typedef WwiseDatabaseLocalizableIdKey LocalizableIdKey;
 typedef WwiseDatabaseLocalizableNameKey LocalizableNameKey;
-typedef WwiseDatabaseMediaIdKey MediaIdKey;
+typedef WwiseDatabaseLocalizableIdKey LocalizableMediaIdKey;
 typedef WwiseDatabaseLocalizableGroupValueKey LocalizableGroupValueKey;
 typedef WwiseDatabaseGroupValueKey GroupValueKey;

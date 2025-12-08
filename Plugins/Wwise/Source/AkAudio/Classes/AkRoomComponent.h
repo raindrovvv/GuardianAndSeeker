@@ -277,7 +277,11 @@ private:
 	void UpdateParentRoom();
 	void ResetParentRoom();
 	bool IsAParentOf(TWeakObjectPtr<const UAkRoomComponent> InRoom) const;
-	void SetParentRoom(TWeakObjectPtr<const UAkRoomComponent> InParentRoom);
+	void SetParentRoom(TWeakObjectPtr<UAkRoomComponent> InParentRoom);
+
+	void AddChildRoom(TWeakObjectPtr<UAkRoomComponent> InChildRoom);
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UAkRoomComponent>> ChildrenRooms;
 
 	UPROPERTY()
 	TWeakObjectPtr<const UAkRoomComponent> ParentRoom;

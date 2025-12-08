@@ -84,6 +84,9 @@ private:
 #elif defined (AK_NX)
 #include <AK/Tools/NX/AkLock.h>
 
+#elif defined (AK_OUNCE)
+#include <AK/Tools/Ounce/AkLock.h>
+
 #else
 #error AkLock.h: Undefined platform
 #endif

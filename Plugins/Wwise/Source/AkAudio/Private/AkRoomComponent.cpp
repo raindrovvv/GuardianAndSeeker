@@ -213,6 +213,16 @@ void UAkRoomComponent::PostLoad()
 
 void UAkRoomComponent::OnComponentDestroyed(bool bDestroyingHierarchy)
 {
+	// When we destroy a parent room, update the children
+	// so their parent room is undefined.
+	for (auto c : ChildrenRooms)
+	{
+		if (c.IsValid())
+		{
+			c->ResetParentRoom();
+		}
+	}
+	ChildrenRooms.Empty();
 	UAkSettingsPerUser* AkSettingsPerUser = GetMutableDefault<UAkSettingsPerUser>();
 	AkSettingsPerUser->OnShowRoomsPortalsChanged.Remove(ShowRoomsChangedHandle);
 	ShowRoomsChangedHandle.Reset();
@@ -707,7 +717,7 @@ void UAkRoomComponent::BeginPlayInternal()
 		SetReverbZone();
 	}
 
-	if (AutoPost)
+	if (AutoPost && bIsRegisteredWithWwise && !HasActiveEvents())
 	{
 		PostAssociatedAkEvent(0, FOnAkPostEventCallback());
 	}
@@ -1046,7 +1056,12 @@ AkRoomID UAkRoomComponent::GetRootID() const
 	return ParentRoom->GetRootID();
 }
 
-void UAkRoomComponent::SetParentRoom(TWeakObjectPtr<const UAkRoomComponent> InParentRoom)
+void UAkRoomComponent::AddChildRoom(TWeakObjectPtr<UAkRoomComponent> InChildRoom)
+{
+	ChildrenRooms.Add(InChildRoom);
+}
+
+void UAkRoomComponent::SetParentRoom(TWeakObjectPtr<UAkRoomComponent> InParentRoom)
 {
 	if (!InParentRoom.IsValid())
 	{
@@ -1077,4 +1092,7 @@ void UAkRoomComponent::SetParentRoom(TWeakObjectPtr<const UAkRoomComponent> InPa
 		ParentRoom = InParentRoom;
 		ParentRoomName = InParentRoom->GetRoomName();
 	}
+
+	// Add this UAkRoomComponent object as a child room of InParentRoom.
+	InParentRoom->AddChildRoom(this);
 }

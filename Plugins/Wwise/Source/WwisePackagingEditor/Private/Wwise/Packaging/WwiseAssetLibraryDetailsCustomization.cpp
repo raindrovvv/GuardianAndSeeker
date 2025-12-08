@@ -518,7 +518,10 @@ void FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets()
 	}
 	bRebuildAlreadyRequested = true;
 
-	AsyncTask(ENamedThreads::GameThread, [this, IsAliveRefCopy = IsAliveRef]() mutable
+	TArray<FAssetData> AssetsData;
+	FWwiseAssetLibraryProcessor::GetRelevantAssets(GetFilterableAssetLibrary()->GetPathName(), AssetsData);
+
+	AsyncTask(ENamedThreads::GameThread, [this, IsAliveRefCopy = IsAliveRef, AssetsData]() mutable
 	{
 		if (UNLIKELY(!*IsAliveRefCopy))
 		{
@@ -538,7 +541,7 @@ void FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets()
 		}
 
 		ReleaseWorkingThread();
-		UE::Tasks::Launch(TEXT("FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets"), [this, IsAliveRefCopy = IsAliveRef]
+		UE::Tasks::Launch(TEXT("FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets"), [this, IsAliveRefCopy = IsAliveRef, AssetsData]
 		{
 			if (UNLIKELY(!*IsAliveRefCopy))
 			{
@@ -563,7 +566,7 @@ void FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets()
 			TUniquePtr<FWwiseAssetLibraryFilteringSharedData> FilteringSharedData;
 			
 			const bool bResult {
-				CalculateFilteredAssets(AssetLibrary, FilteringSharedData)
+				CalculateFilteredAssets(AssetLibrary, FilteringSharedData, AssetsData)
 				&& CopyFilteredAssets(FilteringSharedData)
 			};
 			ReleaseWorkingThread();
@@ -576,7 +579,7 @@ void FWwiseAssetLibraryDetailsCustomization::RebuildFilteredAssets()
 	});
 }
 
-bool FWwiseAssetLibraryDetailsCustomization::CalculateFilteredAssets(UWwiseFilterableAssetLibrary* AssetLibrary, TUniquePtr<FWwiseAssetLibraryFilteringSharedData>& FilteringSharedData)
+bool FWwiseAssetLibraryDetailsCustomization::CalculateFilteredAssets(UWwiseFilterableAssetLibrary* AssetLibrary, TUniquePtr<FWwiseAssetLibraryFilteringSharedData>& FilteringSharedData, const TArray<FAssetData>& AssetsData)
 {
 	auto* ProjectDB{ FWwiseProjectDatabase::Get() };
 	if (UNLIKELY(!ProjectDB))
@@ -591,6 +594,7 @@ bool FWwiseAssetLibraryDetailsCustomization::CalculateFilteredAssets(UWwiseFilte
 	}
 
 	FilteringSharedData = TUniquePtr<FWwiseAssetLibraryFilteringSharedData>{ Processor->InstantiateSharedData(*ProjectDB) };
+	FilteringSharedData->AssetsData = AssetsData;
 	Processor->RetrieveAssetMap(*FilteringSharedData);
 
 	if (IsPackagingSettingsHonored())
@@ -654,7 +658,7 @@ bool FWwiseAssetLibraryDetailsCustomization::CopyFilteredAssets(TUniquePtr<FWwis
 					(uint32)NewRef.Id,
 					NewRef.Name,
 					(uint32)NewRef.SoundBankId
-				})
+				}, NewRef.LanguageId)
 			};
 			if (!Ref.IsValid())
 			{
@@ -708,7 +712,7 @@ bool FWwiseAssetLibraryDetailsCustomization::CopyFilteredAssets(TUniquePtr<FWwis
 					(uint32)FilteredAsset.Id,
 					FilteredAsset.Name,
 					(uint32)FilteredAsset.SoundBankId
-				})
+				}, FilteredAsset.LanguageId)
 			};
 			if (!Ref.IsValid())
 			{

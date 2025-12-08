@@ -146,6 +146,19 @@ namespace AKPLATFORM
 		AKVERIFY( sem_wait( &in_event ) == AK_POSIX_NO_ERR );
 	}
 
+	// Returns true if event signaled, false if timed out
+	inline bool AkWaitForEvent( AkEvent & in_event, AkUInt32 in_dwMilliseconds )
+	{
+		AKASSERT( in_dwMilliseconds != 0xFFFFFFFF ); // does not support INFINITE
+
+		timespec ts;
+		ts.tv_sec = in_dwMilliseconds / 1000;
+		ts.tv_nsec = (in_dwMilliseconds % 1000) * 1000000;
+
+		int kr = sem_timedwait( &in_event, &ts );
+		return kr == AK_POSIX_NO_ERR;
+	}
+
 	/// Platform Independent Helper
 	inline void AkSignalEvent( AkEvent & in_event )
 	{

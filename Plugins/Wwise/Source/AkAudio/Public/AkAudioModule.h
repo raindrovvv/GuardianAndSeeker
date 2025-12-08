@@ -64,6 +64,7 @@ public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
+	void OnPreExit();
 	FAkAudioDevice* GetAkAudioDevice() const;
 	void ReloadWwiseAssetData() const;
 	static void UpdateWwiseResourceCookerSettings();
@@ -78,5 +79,8 @@ public:
 
 	/** Handle for OnTick. */
 	FTickerDelegateHandle TickDelegateHandle;
+
+	/** Handle for OnPreExit. */
+	FDelegateHandle OnPreExitHandle;
 };
 

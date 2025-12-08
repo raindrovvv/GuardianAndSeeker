@@ -247,10 +247,15 @@ struct WWISEPROJECTDATABASE_API WwisePlatformDataStructure :
 	WwiseGuidMap Guids;
 	WwiseNameMap Names;
 
-	using MediaUsageCountMap = WwiseDBMap<WwiseDatabaseMediaIdKey, int>;
+	using MediaLanguageKey = WwiseDBPair<WwiseDBShortId,WwiseDBShortId>;
+	using MediaUsageCountMap = WwiseDBMap<WwiseDBShortId, int>;
 	using SoundBankUsageCountMap = WwiseDBMap<WwiseDatabaseLocalizableIdKey, int>;
 	MediaUsageCountMap MediaUsageCount;
 	SoundBankUsageCountMap SoundBankUsageCount;
+
+	using MediaLanguageSet = WwiseDBSet<WwiseDBShortId>;
+	using MediaLanguageCountMap = WwiseDBMap<WwiseDBShortId, MediaLanguageSet>;
+	MediaLanguageCountMap MediaLanguageList; 
 
 	WwisePlatformDataStructure();
 	WwisePlatformDataStructure(const WwiseDBSharedPlatformId& InPlatform, WwiseRootDataStructure& InRootData, WwiseMetadataFileMap&& InJsonFiles);
@@ -311,7 +316,7 @@ struct WWISEPROJECTDATABASE_API WwisePlatformDataStructure :
 	void AddRefToMap(WwiseDBMap<WwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const WwiseDBShortId& InId, const WwiseDBString* InName, const WwiseDBString* InObjectPath, const WwiseDBGuid* InGuid);
 
 	void AddMediaRefsCount(const WwiseDBArray<WwiseMetadataMediaReference>& InMediaRefs);
-	void AddSoundBankCount(const uint32 InId, const uint32 InLanguageId);
+	void AddSoundBankCount(const uint32 InId, const uint32 InLanguageId, const uint32 InIncrement = 1);
 
 private:
 	WwisePlatformDataStructure& operator=(const WwisePlatformDataStructure& Rhs) = delete;

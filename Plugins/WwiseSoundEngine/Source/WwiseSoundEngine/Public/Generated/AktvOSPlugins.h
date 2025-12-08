@@ -15,6 +15,6 @@ in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2025 Audiokinetic Inc.
 *******************************************************************************/
 
-#if PLATFORM_TVOS
+#if defined(PLATFORM_TVOS) && PLATFORM_TVOS
 
 #endif

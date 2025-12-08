@@ -28,7 +28,7 @@ protected:
 public:
 	FWwiseReconcileImpl():IWwiseReconcile(){};
 	virtual ~FWwiseReconcileImpl(){};
-	virtual FString GetAssetPackagePath(const WwiseAnyRef& WwiseRef) override;
+	virtual FString GetAssetPackagePath(const WwiseAnyRef& WwiseRef) const override;
 	virtual void GetAllAssets(TArray<FWwiseReconcileItem>& ReconcileItems) override;
 	virtual TArray<FAssetData> CreateAssets(FScopedSlowTask& SlowTask) override;
 	virtual TArray<FAssetData> UpdateExistingAssets(FScopedSlowTask& SlowTask) override;

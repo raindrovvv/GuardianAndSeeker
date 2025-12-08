@@ -78,6 +78,7 @@ public:
 	
 	const WwiseEventGlobalIdsMap& GetEvents() const;
 	WwiseDBSet<WwiseRefEvent> GetEvent(const FWwiseEventInfo& InInfo) const;
+	WwiseDBSet<WwiseRefEvent> GetAllLanguageEvents(const FWwiseEventInfo& InInfo) const;
 	
 	const WwiseExternalSourceGlobalIdsMap& GetExternalSources() const;
 	WwiseRefExternalSource GetExternalSource(const FWwiseObjectInfo& InInfo) const;
@@ -86,7 +87,7 @@ public:
 	WwiseRefGameParameter GetGameParameter(const FWwiseObjectInfo& InInfo) const;
 	
 	const WwiseMediaGlobalIdsMap& GetMediaFiles() const;
-	WwiseRefMedia GetMediaFile(const FWwiseObjectInfo& InInfo) const;
+	WwiseRefMedia GetMediaFile(const FWwiseObjectInfo& InInfo, uint32 InLanguageId = 0) const;
 	
 	const WwisePluginLibGlobalIdsMap& GetPluginLibs() const;
 	WwiseRefPluginLib GetPluginLib(const FWwiseObjectInfo& InInfo) const;

@@ -86,12 +86,9 @@ const TSharedRef<SWidget> FProjectedResultColumn::ConstructRowWidget(FWwiseRecon
 	}
 
 	auto WwiseRef = TreeItem.WwiseAnyRef.WwiseAnyRef;
-	FName AssetName = AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef);
 	FString AssetPackagePath = IWwiseReconcile::Get()->GetAssetPackagePath(*WwiseRef);
-	int PackageLength = AssetViewUtils::GetPackageLengthForCooking(AssetPackagePath / AssetName.ToString(), FEngineBuildSettings::IsInternalBuild());
-	int MaxPath = AssetViewUtils::GetMaxCookPathLen();
 
-	if (PackageLength > MaxPath || PackageLength >= NAME_SIZE)
+	if (IWwiseReconcile::Get()->IsPathTooLong(WwiseRef))
 	{
 		return SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
@@ -112,9 +109,7 @@ const TSharedRef<SWidget> FProjectedResultColumn::ConstructRowWidget(FWwiseRecon
 	
 	if(EnumHasAnyFlags(TreeItem.OperationRequired, EWwiseReconcileOperationFlags::Create | EWwiseReconcileOperationFlags::RenameExisting | EWwiseReconcileOperationFlags::Move))
 	{
-		FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
-		FAssetData Asset = AssetRegistryModule.GetRegistry().GetAssetByObjectPath(AssetPackagePath / AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef).ToString() + "." + AkUnrealAssetDataHelper::GetAssetDefaultName(WwiseRef).ToString());
-		if(Asset.IsValid())
+		if(IWwiseReconcile::Get()->UAssetExists(WwiseRef))
 		{
 			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()

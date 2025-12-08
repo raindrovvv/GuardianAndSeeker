@@ -48,7 +48,7 @@ public:
 	TMap<FWwiseEventInfo, FWwiseLocalizedEventCookedData> EventCache;
 	TMap<uint32, FWwiseExternalSourceCookedData> ExternalSourceCache;
 	TMap<FWwiseObjectInfo, FWwiseInitBankCookedData> InitBankCache;
-	TMap<WwiseDatabaseMediaIdKey, FWwiseMediaCookedData> MediaCache;
+	TMap<uint32, FWwiseMediaCookedData> MediaCache;
 	TMap<FWwiseObjectInfo, FWwiseLocalizedShareSetCookedData> ShareSetCache;
 	TMap<FWwiseGroupValueInfo, FWwiseGroupValueCookedData> StateCache;
 	TMap<FWwiseGroupValueInfo, FWwiseGroupValueCookedData> SwitchCache;

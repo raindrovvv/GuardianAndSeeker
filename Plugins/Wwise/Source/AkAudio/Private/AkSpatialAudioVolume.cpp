@@ -158,7 +158,7 @@ void AAkSpatialAudioVolume::FitRaycast()
 
 		TArray< FHitResult > OutHits;
 		OutHits.Empty();
-		World->LineTraceMultiByObjectType(OutHits, RaycastOrigin, to, (int)GetCollisionChannel(), CollisionParams);
+		World->LineTraceMultiByChannel(OutHits, RaycastOrigin, to, GetCollisionChannel(), CollisionParams);
 
 		for (auto& res : OutHits)
 		{

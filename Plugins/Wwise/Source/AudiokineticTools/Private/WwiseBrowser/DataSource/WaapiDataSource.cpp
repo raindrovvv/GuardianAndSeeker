@@ -378,9 +378,12 @@ void FWaapiDataSource::FindAndCreateItems(FWwiseTreeItemPtr CurrentItem)
 		{
 			// Recover the information from the Json object Result and use it to construct the tree item.
 			FWwiseTreeItemPtr NewRootItem = ConstructWwiseTreeItem(Result->GetArrayField(WwiseWaapiHelper::RETURN)[0]);
-			CurrentItem->Parent = NewRootItem;
-			NewRootItem->AddChild(CurrentItem);
-			FindAndCreateItems(NewRootItem);
+			if (NewRootItem.IsValid())
+			{
+				CurrentItem->Parent = NewRootItem;
+				NewRootItem->AddChild(CurrentItem);
+				FindAndCreateItems(NewRootItem);
+			}
 		}
 		else
 		{
@@ -1079,7 +1082,11 @@ EWwiseConnectionStatus FWaapiDataSource::IsProjectLoaded()
 		{
 			FString WaapiPath;
 			TSharedPtr<FJsonObject> outJsonResult;
-			AkWaapiClient->Call(ak::wwise::core::getProjectInfo, MakeShareable(new FJsonObject()), MakeShareable(new FJsonObject()), outJsonResult, 500, false);
+			AkWaapiClient->Call(ak::wwise::core::getProjectInfo, MakeShareable(new FJsonObject()), MakeShareable(new FJsonObject()), outJsonResult, false);
+			if (outJsonResult == nullptr)
+			{
+				return EWwiseConnectionStatus::WwiseNotOpen;
+			}
 			if(auto directoriesObject = outJsonResult->GetObjectField(TEXT("directories")))
 			{
 				WaapiPath = directoriesObject->GetStringField(TEXT("soundBankOutputRoot"));

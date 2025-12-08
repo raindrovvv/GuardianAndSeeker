@@ -79,7 +79,7 @@ bool WAAPIGetTextureParams(FGuid textureID, FAkAcousticTextureParams& params)
 		options->SetArrayField(FAkWaapiClient::WAAPIStrings::RETURN, StructJsonArray);
 
 		TSharedPtr<FJsonObject> outJsonResult;
-		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, 500, false))
+		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, false))
 		{
 			/* Get absorption values from WAAPI return json. */
 			TArray<TSharedPtr<FJsonValue>> returnJson = outJsonResult->GetArrayField(FAkWaapiClient::WAAPIStrings::RETURN);
@@ -119,7 +119,7 @@ bool WAAPIGetObjectColorIndex(FGuid textureID, int& index)
 		options->SetArrayField(FAkWaapiClient::WAAPIStrings::RETURN, StructJsonArray);
 
 		TSharedPtr<FJsonObject> outJsonResult;
-		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, 500, false))
+		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, false))
 		{
 			/* Get absorption values from WAAPI return json. */
 			TArray<TSharedPtr<FJsonValue>> returnJson = outJsonResult->GetArrayField(FAkWaapiClient::WAAPIStrings::RETURN);
@@ -155,7 +155,7 @@ bool WAAPIGetObjectOverrideColor(FGuid textureID)
 		options->SetArrayField(FAkWaapiClient::WAAPIStrings::RETURN, StructJsonArray);
 
 		TSharedPtr<FJsonObject> outJsonResult;
-		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, 500, false))
+		if (waapiClient->Call(ak::wwise::core::object::get, getArgsJson, options, outJsonResult, false))
 		{
 			/* Get absorption values from WAAPI return json. */
 			TArray<TSharedPtr<FJsonValue>> returnJson = outJsonResult->GetArrayField(FAkWaapiClient::WAAPIStrings::RETURN);
@@ -401,6 +401,7 @@ void UAkSettings::PostInitProperties()
 		RootOutputPath = GeneratedSoundBanksFolder_DEPRECATED;
 		AkUnrealEditorHelper::SaveConfigFile(this);
 	}
+	UpdateAudioRouting();
 #endif // WITH_EDITOR
 }
 
@@ -473,7 +474,7 @@ void UAkSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 	}
 	else if (PropertyName == GET_MEMBER_NAME_CHECKED(UAkSettings, AudioRouting))
 	{
-		OnAudioRoutingUpdate();
+		UpdateAudioRouting();
 	}
 	
 	else if (MemberPropertyName == GET_MEMBER_NAME_CHECKED(UAkSettings, WwiseProjectPath))
@@ -653,7 +654,7 @@ void UAkSettings::InitGeometrySurfacePropertiesTable()
 	} 
 
 	FillGeometrySurfacePropertiesTable();
-
+	GeometrySurfacePropertiesKeepAlive = GeometryTable;
 	bGeometrySurfacePropertiesTableInitialized = true;
 }
 
@@ -663,6 +664,7 @@ void UAkSettings::FillGeometrySurfacePropertiesTable()
 	TArray<FAssetData> PhysicalMaterialAssets, AcousticTextureAssets;
 	AssetRegistryModule->Get().GetAssetsByClass(UPhysicalMaterial::StaticClass()->GetClassPathName(), PhysicalMaterialAssets);
 	AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetClassPathName(), AcousticTextureAssets);
+	Algo::SortBy(PhysicalMaterialAssets, &FAssetData::PackageName, FNameLexicalLess());
 	UpdateGeometrySurfacePropertiesTable(PhysicalMaterialAssets, AcousticTextureAssets);
 }
 
@@ -1113,10 +1115,9 @@ void UAkSettings::SanitizeProjectPath(FString& Path, const FString& PreviousPath
 	}
 }
 
-void UAkSettings::OnAudioRoutingUpdate()
+void UAkSettings::UpdateAudioRouting()
 {
 	// Calculate what is expected
-	bool bExpectedCustom = false;
 	bool bExpectedSeparate = false;
 	bool bExpectedUsingAudioMixer = false;
 	bool bExpectedAudioModuleOverride = false;
@@ -1127,23 +1128,19 @@ void UAkSettings::OnAudioRoutingUpdate()
 	FString ExpectedAudioMixerModuleName;
 	switch (AudioRouting)
 	{
-	case EAkUnrealAudioRouting::Custom:
-		UE_LOG(LogAkAudio, VeryVerbose, TEXT("OnAudioRoutingUpdate: Setting for Custom"));
-		return;
-
-	case EAkUnrealAudioRouting::Separate:
-		UE_LOG(LogAkAudio, VeryVerbose, TEXT("OnAudioRoutingUpdate: Setting for Separate"));
-		bExpectedSeparate = true;
-		bExpectedUsingAudioMixer = true;
-		bExpectedWwiseSoundEngineEnabled = true;
-		break;
-
 	case EAkUnrealAudioRouting::EnableWwiseOnly:
 		UE_LOG(LogAkAudio, VeryVerbose, TEXT("OnAudioRoutingUpdate: Setting for DisableUnreal"));
 		bExpectedAudioModuleOverride = true;
 		bExpectedWwiseSoundEngineEnabled = true;
 		ExpectedAudioDeviceModuleName = TEXT("");
 		ExpectedAudioMixerModuleName = TEXT("");
+		break;
+		
+	case EAkUnrealAudioRouting::Separate:
+		UE_LOG(LogAkAudio, VeryVerbose, TEXT("OnAudioRoutingUpdate: Setting for Separate"));
+		bExpectedSeparate = true;
+		bExpectedUsingAudioMixer = true;
+		bExpectedWwiseSoundEngineEnabled = true;
 		break;
 
 	case EAkUnrealAudioRouting::EnableUnrealOnly:

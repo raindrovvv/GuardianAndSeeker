@@ -150,8 +150,19 @@ bool FAssetTypeActions_AkAudioEvent::AssetsActivatedOverride(const TArray<UObjec
 	}
 	else if (ActivationType == EAssetTypeActivationMethod::Previewed)
 	{
-		auto Events = GetTypedWeakObjectPtrs<UAkAudioEvent>(InObjects);
-		FAkAssetTypeActions_Helpers::PlayEvents<true>(Events);
+		TArray<UObject*> NonNullObjects;
+		for (auto& Obj : InObjects)
+		{
+			if (Obj != nullptr)
+			{
+				NonNullObjects.Add(Obj);
+			}
+		}
+		if (!NonNullObjects.IsEmpty())
+		{
+			auto Events = GetTypedWeakObjectPtrs<UAkAudioEvent>(NonNullObjects);
+			FAkAssetTypeActions_Helpers::PlayEvents<true>(Events);
+		}
 	}
 
 	return true;

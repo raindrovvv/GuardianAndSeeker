@@ -373,6 +373,8 @@ WwisePlatformDataStructure::WwisePlatformDataStructure(const WwiseDBSharedPlatfo
     SwitchGroups(WwiseRefSwitchGroup::FGlobalIdsMap::GlobalIdsMap),
     Triggers(WwiseRefTrigger::FGlobalIdsMap::GlobalIdsMap)
 {
+    WwiseDBMap<MediaLanguageKey, WwiseOutsourcedRefMedia> OutsourcedRefMedias;
+
 	for (const auto& JsonFileKV : JsonFiles)
     {
 	    WwiseDBPair<WwiseDBString, WwiseMetadataSharedRootFilePtr> Pair(JsonFileKV);
@@ -447,13 +449,50 @@ WwisePlatformDataStructure::WwisePlatformDataStructure(const WwiseDBSharedPlatfo
                     const WwiseMetadataSoundBank& SoundBank = SoundBanksInfo.SoundBanks[SoundBankIndex];
                     const WwiseDBShortId LanguageId = InRootData.GetLanguageId(SoundBank.Language);
                     AddRefToMap(SoundBanks, WwiseRefSoundBank(SharedRootFile, JsonFilePath, SoundBankIndex, LanguageId), SoundBank.Id, &SoundBank.ShortName, &SoundBank.ObjectPath, &SoundBank.GUID);
-
+                    
                     // Media
                     for (WwiseRefIndexType MediaIndex = 0; MediaIndex < SoundBank.Media.Size(); ++MediaIndex)
                     {
                         const WwiseMetadataMedia& File = SoundBank.Media[MediaIndex];
-                        MediaFiles.Add(WwiseDatabaseMediaIdKey(File.Id, SoundBank.Id),
+                        MediaFiles.Add(WwiseDatabaseLocalizableIdKey(File.Id, LanguageId, SoundBank.Id),
                             WwiseRefMedia(SharedRootFile, JsonFilePath, SoundBankIndex, LanguageId, MediaIndex));
+
+                        // Keep track of who own the media in order to be able to add a ref count when necessary due to the OtherBank Location
+                        WwiseOutsourcedRefMedia outsourcedRefMedia;
+                        MediaLanguageKey mediaLanguageKey = MediaLanguageKey(File.Id, LanguageId);
+                        if (OutsourcedRefMedias.Find(mediaLanguageKey))
+                        {
+                            outsourcedRefMedia = *OutsourcedRefMedias.Find(mediaLanguageKey);
+                        }
+                        else
+                        {
+                            outsourcedRefMedia = WwiseOutsourcedRefMedia();
+                        }
+                        
+                        if (File.Location == WwiseMetadataMediaLocation::OtherBank)
+                        {
+                            outsourcedRefMedia.ReferenceCount += 1;
+                        }
+                        else
+                        {
+                            outsourcedRefMedia.SoundBankLocalizableIdKeys.Add(WwiseDatabaseLocalizableIdKey(SoundBank.Id,LanguageId));
+                        }
+                        OutsourcedRefMedias.AddOrReplace(mediaLanguageKey, outsourcedRefMedia);
+                        
+
+                        if (File.Location != WwiseMetadataMediaLocation::OtherBank)
+                        {
+                            if (auto* LanguagesPtr = MediaLanguageList.Find(File.Id))
+                            {
+                                LanguagesPtr->Add(LanguageId);
+                            }
+                            else
+                            {
+                                MediaLanguageSet LanguageSet;
+                                LanguageSet.Add(LanguageId);
+                                MediaLanguageList.Add(File.Id, std::move(LanguageSet));
+                            }
+                        }
                     }
 
                     // DialogueEvents
@@ -658,6 +697,20 @@ WwisePlatformDataStructure::WwisePlatformDataStructure(const WwiseDBSharedPlatfo
             }
         }
     }
+
+    // Add the necessary ref counts for the banks that are used by other banks who are outsourcing their media.
+    for (auto OutsourcedRefMedia : OutsourcedRefMedias)
+    {
+        WwiseOutsourcedRefMedia outsourcedRef = OutsourcedRefMedia.Value;
+        if (outsourcedRef.ReferenceCount > 0)
+        {
+            for (WwiseDatabaseLocalizableIdKey bankKey : outsourcedRef.SoundBankLocalizableIdKeys)
+            {
+                AddSoundBankCount(bankKey.Id, bankKey.LanguageId, outsourcedRef.ReferenceCount);
+            }
+        }
+    }
+ 
 }
 
 WwisePlatformDataStructure::WwisePlatformDataStructure(const WwisePlatformDataStructure& Rhs) :
@@ -708,7 +761,8 @@ WwisePlatformDataStructure::WwisePlatformDataStructure(const WwisePlatformDataSt
     Guids(Rhs.Guids),
     Names(Rhs.Names),
     MediaUsageCount(Rhs.MediaUsageCount),
-    SoundBankUsageCount(Rhs.SoundBankUsageCount)
+    SoundBankUsageCount(Rhs.SoundBankUsageCount),
+    MediaLanguageList(Rhs.MediaLanguageList)
 {}
 
 WwisePlatformDataStructure::WwisePlatformDataStructure(WwisePlatformDataStructure&& Rhs) :
@@ -759,7 +813,8 @@ WwisePlatformDataStructure::WwisePlatformDataStructure(WwisePlatformDataStructur
     Guids(std::move(Rhs.Guids)),
     Names(std::move(Rhs.Names)),
     MediaUsageCount(std::move(Rhs.MediaUsageCount)),
-    SoundBankUsageCount(std::move(Rhs.SoundBankUsageCount))
+    SoundBankUsageCount(std::move(Rhs.SoundBankUsageCount)),
+    MediaLanguageList(std::move(Rhs.MediaLanguageList))
 {}
 
 WwiseRootDataStructure& WwiseRootDataStructure::operator+=(WwiseRootDataStructure&& Rhs)
@@ -798,6 +853,9 @@ WwisePlatformDataStructure& WwisePlatformDataStructure::operator+=(WwisePlatform
     Switches.Append(std::move(Rhs.Switches));
     SwitchContainersByEvent.Append(std::move(Rhs.SwitchContainersByEvent));
     AudioDevices.Append(std::move(Rhs.AudioDevices));
+    MediaUsageCount.Append(std::move(Rhs.MediaUsageCount));
+    SoundBankUsageCount.Append(std::move(Rhs.SoundBankUsageCount));
+    MediaLanguageList.Append(std::move(Rhs.MediaLanguageList));
     return *this;
 }
 
@@ -805,21 +863,23 @@ bool WwisePlatformDataStructure::GetFromId(WwiseRefMedia& OutRef, WwiseDBShortId
 {
     if (InSoundBankId != 0)
     {
-        WwiseDatabaseMediaIdKey MediaId(InShortId, InSoundBankId);
+        WwiseDatabaseLocalizableIdKey MediaId(InShortId, InLanguageId, InSoundBankId);
         if (MediaFiles.Contains(MediaId))
         {
             OutRef = MediaFiles.FindChecked(MediaId);   
         }
     }
-    else
+
+    if (!OutRef.IsValid())
     {
         for (const auto& MediaFile : MediaFiles)
         {
-            WwiseDBPair<MediaIdKey, WwiseRefMedia> Pair(MediaFile);
-            if (Pair.GetFirst().MediaId == InShortId &&
+            WwiseDBPair<LocalizableMediaIdKey, WwiseRefMedia> Pair(MediaFile);
+            if (Pair.GetFirst().Id == InShortId &&
+                (Pair.GetFirst().LanguageId == InLanguageId || Pair.GetFirst().LanguageId == 0 || InLanguageId == 0) &&
                 Pair.GetSecond().GetMedia()->Location != WwiseMetadataMediaLocation::OtherBank)
             {
-                OutRef = MediaFiles.FindChecked(Pair.GetFirst());
+                OutRef = Pair.GetSecond();
                 break;
             }
         }
@@ -838,28 +898,27 @@ void WwisePlatformDataStructure::AddMediaRefsCount(const WwiseDBArray<WwiseMetad
 {
     for (const auto& MediaRef : InMediaRefs)
     {
-        const WwiseDatabaseMediaIdKey MediaId{ MediaRef.Id, 0 };
-        if (auto CountPtr = MediaUsageCount.Find(MediaId))
+        if (auto CountPtr = MediaUsageCount.Find(MediaRef.Id))
         {
             ++(*CountPtr);
         }
         else
         {
-            MediaUsageCount.Add(MediaId, 1);
+            MediaUsageCount.Add(MediaRef.Id, 1);
         }
     }
 }
 
-void WwisePlatformDataStructure::AddSoundBankCount(const uint32 InId, const uint32 InLanguageId)
+void WwisePlatformDataStructure::AddSoundBankCount(const uint32 InId, const uint32 InLanguageId, const uint32 InIncrement)
 {
     const WwiseDatabaseLocalizableIdKey SoundBankId{ InId, InLanguageId };
     if (auto CountPtr = SoundBankUsageCount.Find(SoundBankId))
     {
-        ++(*CountPtr);
+        (*CountPtr) += InIncrement;
     }
     else
     {
-        SoundBankUsageCount.Add(SoundBankId, 1);
+        SoundBankUsageCount.Add(SoundBankId, InIncrement);
     }
 }
 

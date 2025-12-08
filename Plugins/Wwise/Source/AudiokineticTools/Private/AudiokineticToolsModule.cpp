@@ -183,7 +183,12 @@ void FAudiokineticToolsModule::CreateAkViewportCommands()
 {
 	// Extend the viewport menu and add the Audiokinetic commands
 	{
+#ifdef UE_5_6_OR_LATER
+		UToolMenu* ViewportMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelViewportToolBar.Show");
+#else
 		UToolMenu* ViewportMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelViewportToolBar.Options");
+#endif
+
 		FToolMenuSection& AkSection = ViewportMenu->AddSection("Audiokinetic", LOCTEXT("AkLabel", "Audiokinetic"), FToolMenuInsert("Audiokinetic", EToolMenuInsertType::Default));
 
 		ToggleVizRoomsPortalsAction.ExecuteAction.BindStatic(&FAudiokineticToolsModule::ToggleVisualizeRoomsAndPortals);
@@ -489,7 +494,6 @@ void FAudiokineticToolsModule::OnAssetRegistryFilesLoaded()
 	UAkSettings* AkSettings = GetMutableDefault<UAkSettings>();
 	UAkSettingsPerUser* AkSettingsPerUser = GetMutableDefault<UAkSettingsPerUser>();
 	auto* CurrentProject = IProjectManager::Get().GetCurrentProject();
-	bool doModifyProject = true;
 
 	WwiseProjectInfo wwiseProjectInfo;
 	wwiseProjectInfo.Parse();
@@ -525,11 +529,6 @@ void FAudiokineticToolsModule::OnAssetRegistryFilesLoaded()
 	if (CurrentProject && AkSettings && AkSettingsPerUser)
 	{
 		VerifyGeneratedSoundBanksPath(AkSettings, AkSettingsPerUser);
-
-		if (doModifyProject)
-		{
-			AssetMigrationManager.SetStandardProjectSettings();
-		}
 	}
 }
 
