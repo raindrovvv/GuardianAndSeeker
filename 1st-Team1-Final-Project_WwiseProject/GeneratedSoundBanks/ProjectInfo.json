@@ -3,7 +3,7 @@
   "Project": {
    "Name": "1st-Team1-Final-Project_WwiseProject",
    "GUID": "{FD8E5CBE-14B1-4AA6-85FD-4808F9861E65}",
-   "Generator": "2024.1.4.8780"
+   "Generator": "2024.1.9.8920"
   },
   "CacheRoot": "../.cache",
   "Platforms": [
@@ -31,6 +31,6 @@
     "UseAsStandIn": "true"
    }
   ],
-  "FileHash": "{A9BFF9BD-4B3B-BBE0-20F4-75B768BB6FC1}"
+  "FileHash": "{65BF4986-C832-213B-CC9B-9B3D34F41649}"
  }
 }

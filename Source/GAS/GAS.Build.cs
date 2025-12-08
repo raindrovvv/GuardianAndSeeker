@@ -7,7 +7,11 @@ public class GAS : ModuleRules
 	public GAS(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
+
+		// UE 5.3+ 에서 상대 경로 include를 허용 (레거시 호환성)
+		// 예: #include "Sound/GS_AudioManager.h" 형태의 상대 경로 지원
+		bLegacyParentIncludePaths = true;
+
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core",
 			"CoreUObject",
@@ -19,12 +23,12 @@ public class GAS : ModuleRules
 			"Slate",
 			"UMG",
             "CoreOnline",
-            "Slate",
-			"SlateCore",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"OnlineSubsystemSteam",
 			"AkAudio",
+			"Wwise",
+			"WwiseSoundEngine",
             "Niagara",
             "PhysicsCore",
             "CommonUI",
