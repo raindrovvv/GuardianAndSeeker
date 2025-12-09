@@ -329,6 +329,14 @@ private:
 
 	FTimerHandle DetectionTimerHandle;
 
+	// 그룹 더블 클릭 감지
+	int32 LastPressedGroupIdx;
+	float LastGroupKeyPressTime;
+	FTimerHandle GroupDoubleClickTimerHandle;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	float DoubleClickTimeThreshold; // 더블 클릭 인식 시간 (기본 0.3초)
+
 	// 감지된 시커들 추적
 	UPROPERTY()
 	TArray<AGS_Seeker*> DetectedSeekers;
@@ -385,6 +393,13 @@ private:
 
 	// 화면 중앙과의 거리 계산 (0.0 = 중앙, 1.0 = 가장자리)
 	float CalculateSeekerDistanceFromScreenCenter(AGS_Seeker* Seeker);
+
+	// 그룹 더블 클릭 관련
+	FVector CalculateGroupCenterLocation(int32 GroupIdx) const;
+	void MoveCameraToGroupCenter(int32 GroupIdx);
+
+	UFUNCTION()
+	void ResetGroupDoubleClickState();
 
 	// 시커 근접도 업데이트 (서버 RPC)
 	UFUNCTION(Server, Unreliable)

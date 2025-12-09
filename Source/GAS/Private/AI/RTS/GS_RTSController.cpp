@@ -44,6 +44,11 @@ AGS_RTSController::AGS_RTSController()
 	CursorInitRetryCount = 0;
 	CurrentCursorPath = NAME_None;
 
+	// 그룹 더블 클릭 초기화
+	LastPressedGroupIdx = -1;
+	LastGroupKeyPressTime = 0.f;
+	DoubleClickTimeThreshold = 0.3f;
+
 	DefaultCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_RTSDefault"));
 	CommandCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_ETC"));
 	AttackCommandCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_AttackCommand"));
@@ -174,6 +179,7 @@ void AGS_RTSController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		GetWorldTimerManager().ClearTimer(AttackCursorTimerHandle);
 		GetWorldTimerManager().ClearTimer(DetectionTimerHandle);
 		GetWorldTimerManager().ClearTimer(CursorInitTimerHandle);
+		GetWorldTimerManager().ClearTimer(GroupDoubleClickTimerHandle);
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -1042,22 +1048,54 @@ void AGS_RTSController::OnShiftReleased(const FInputActionInstance& InputInstanc
 }
 
 
-// 유닛 그룹 저장 + 불러오기 
+// 유닛 그룹 저장 + 불러오기
 void AGS_RTSController::OnGroupKey(const FInputActionInstance& InputInstance, int32 GroupIdx)
 {
 	if (bCtrlDown) // 부대 저장
 	{
 		UnitGroups[GroupIdx].Units = UnitSelection;
+		return;
 	}
-	else // 부대 호출
-	{
-		if (!UnitGroups.IsValidIndex(GroupIdx))
-		{
-			return;
-		}
 
-		// 부대 호출 시에도 첫 번째 유닛만 소리 재생
+	// 부대 호출
+	if (!UnitGroups.IsValidIndex(GroupIdx))
+	{
+		return;
+	}
+
+	// 더블 클릭 감지
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	const bool bIsSameGroup = (LastPressedGroupIdx == GroupIdx);
+	const bool bWithinTimeWindow = (CurrentTime - LastGroupKeyPressTime) <= DoubleClickTimeThreshold;
+
+	if (bIsSameGroup && bWithinTimeWindow)
+	{
+		// 더블 클릭: 카메라 이동
+		MoveCameraToGroupCenter(GroupIdx);
+
+		// 상태 초기화
+		GetWorldTimerManager().ClearTimer(GroupDoubleClickTimerHandle);
+		LastPressedGroupIdx = -1;
+		LastGroupKeyPressTime = 0.f;
+	}
+	else
+	{
+		// 첫 번째 클릭: 그룹 선택
 		AddMultipleUnitsToSelection(UnitGroups[GroupIdx].Units);
+
+		// 더블 클릭 대기 상태
+		LastPressedGroupIdx = GroupIdx;
+		LastGroupKeyPressTime = CurrentTime;
+
+		// 타이머 시작 (0.3초 후 상태 초기화)
+		GetWorldTimerManager().ClearTimer(GroupDoubleClickTimerHandle);
+		GetWorldTimerManager().SetTimer(
+			GroupDoubleClickTimerHandle,
+			this,
+			&AGS_RTSController::ResetGroupDoubleClickState,
+			DoubleClickTimeThreshold,
+			false
+		);
 	}
 }
 
@@ -1113,6 +1151,64 @@ void AGS_RTSController::MoveCameraViaMinimap(const FVector& WorldLocation)
 		FVector NewLocation = FVector(WorldLocation.X, WorldLocation.Y, CameraActor->GetActorLocation().Z);
 		CameraActor->SetActorLocation(NewLocation);
 	}
+}
+
+// 그룹 중심 위치 계산
+FVector AGS_RTSController::CalculateGroupCenterLocation(int32 GroupIdx) const
+{
+	if (!UnitGroups.IsValidIndex(GroupIdx))
+	{
+		return FVector::ZeroVector;
+	}
+
+	const TArray<AGS_Monster*>& Units = UnitGroups[GroupIdx].Units;
+	if (Units.IsEmpty())
+	{
+		return FVector::ZeroVector;
+	}
+
+	// 유효한 유닛들의 위치 합산
+	FVector SumLocation = FVector::ZeroVector;
+	int32 ValidUnitCount = 0;
+
+	for (AGS_Monster* Unit : Units)
+	{
+		if (IsValid(Unit))
+		{
+			SumLocation += Unit->GetActorLocation();
+			++ValidUnitCount;
+		}
+	}
+
+	// 평균 위치 반환
+	if (ValidUnitCount > 0)
+	{
+		return SumLocation / static_cast<float>(ValidUnitCount);
+	}
+
+	return FVector::ZeroVector;
+}
+
+// 그룹 중심으로 카메라 이동
+void AGS_RTSController::MoveCameraToGroupCenter(int32 GroupIdx)
+{
+	const FVector GroupCenter = CalculateGroupCenterLocation(GroupIdx);
+
+	// 유효한 위치가 아니면 이동하지 않음
+	if (GroupCenter.IsZero())
+	{
+		return;
+	}
+
+	// 기존 미니맵 카메라 이동 함수 재사용
+	MoveCameraViaMinimap(GroupCenter);
+}
+
+// 더블 클릭 상태 초기화
+void AGS_RTSController::ResetGroupDoubleClickState()
+{
+	LastPressedGroupIdx = -1;
+	LastGroupKeyPressTime = 0.f;
 }
 
 // ==========================================
