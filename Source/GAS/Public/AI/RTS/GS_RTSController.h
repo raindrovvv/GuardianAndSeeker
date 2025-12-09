@@ -106,8 +106,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Resource")
 	FOnAetherCompReady OnAetherCompReady;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual AActor* GetViewTarget() const override;
-	
+
 	// 현재 선택된 유닛들
 	UFUNCTION(BlueprintCallable)
 	const TArray<AGS_Monster*>& GetUnitSelection() const { return UnitSelection; }
@@ -187,24 +189,37 @@ public:
 	UFUNCTION(BlueprintCallable)
 	ERTSCommand GetCurrentCommand() const { return CurrentCommand; }
 	
-	// Server
+	// 선택 동기화 RPC (클라이언트 → 서버)
 	UFUNCTION(Server, Reliable)
-	void Server_RTSMove(const TArray<AGS_Monster*>& Units, const FVector& Dest);
+	void Server_AddUnitToSelection(AGS_Monster* Unit);
 
 	UFUNCTION(Server, Reliable)
-	void Server_RTSAttackMove(const TArray<AGS_Monster*>& Units, const FVector& Dest);
+	void Server_RemoveUnitFromSelection(AGS_Monster* Unit);
 
 	UFUNCTION(Server, Reliable)
-	void Server_RTSAttack(const TArray<AGS_Monster*>& Units, AGS_Character* TargetActor);
+	void Server_ClearUnitSelection();
 
 	UFUNCTION(Server, Reliable)
-	void Server_RTSStop(const TArray<AGS_Monster*>& Units);
+	void Server_SetMultipleUnitsSelection(const TArray<AGS_Monster*>& Units);
+
+	// Server - 유닛 배열을 RPC로 전달하지 않고 서버에서 UnitSelection 직접 참조
+	UFUNCTION(Server, Reliable)
+	void Server_RTSMove(const FVector& Dest);
 
 	UFUNCTION(Server, Reliable)
-	void Server_RTSHold(const TArray<AGS_Monster*>& Units);
+	void Server_RTSAttackMove(const FVector& Dest);
 
 	UFUNCTION(Server, Reliable)
-	void Server_RTSSkill(const TArray<AGS_Monster*>& Units);
+	void Server_RTSAttack(AGS_Character* TargetActor);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RTSStop();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RTSHold();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RTSSkill();
 
 	// Client
 	// UFUNCTION(Client, Reliable)
@@ -242,6 +257,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void Tick(float DeltaTime) override;
 
@@ -262,8 +278,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Camera", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float EdgeScreenRatio;
 
-	UPROPERTY()
-	TArray<AGS_Monster*> UnitSelection; // 현재 선택된 유닛
+	UPROPERTY(Replicated)
+	TArray<AGS_Monster*> UnitSelection; // 현재 선택된 유닛 (서버 동기화)
 
 	UPROPERTY()
 	AGS_Seeker* SelectedSeeker; 
@@ -283,6 +299,10 @@ private:
 
 	bool bSeekerHovered;
 	bool bShowAttackCursor;
+	bool bCursorReady; // 커서 시스템 사용 가능 여부
+	int32 CursorInitRetryCount; // 재시도 횟수 (최대 10)
+	FName CurrentCursorPath; // 현재 설정된 커서 (캐싱용)
+	FTimerHandle CursorInitTimerHandle; // 커서 초기화 타이머
 	FName DefaultCursorPath;
 	FName CommandCursorPath;
 	FName AttackCommandCursorPath;
@@ -344,11 +364,20 @@ private:
 	void UpdateCursorForCommand();
 	void UpdateCursorForEdgeScroll();
 	void ShowAttackCursor();
-	
+
+	// 커서 초기화
+	UFUNCTION()
+	void InitializeCursor(); // 타이머 콜백
+	void TryInitializeCursorInTick(); // Tick 재시도
+
 	// 시커 감지 시스템
 	void UpdateSeekerDetection();
 	bool IsSeekerInCameraView(AGS_Seeker* Seeker);
 	void NotifySeekerDetection(AGS_Seeker* Seeker, bool bIsDetected);
+
+	// 시커 파괴 시 정리
+	UFUNCTION()
+	void OnTrackedSeekerDestroyed(AActor* DestroyedActor);
 
 	// 서버로 감지 상태를 알리는 RPC
 	UFUNCTION(Server, Reliable)

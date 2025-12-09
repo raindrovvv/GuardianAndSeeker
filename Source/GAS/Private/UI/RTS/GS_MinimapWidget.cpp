@@ -55,11 +55,7 @@ void UGS_MinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 void UGS_MinimapWidget::InitializeReferences()
 {
 	CachedRTSController = Cast<AGS_RTSController>(GetOwningPlayer());
-	if (!CachedRTSController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("[MinimapWidget] RTSController 캐싱 실패"));
-		return;
-	}
+	if (!CachedRTSController) return;
 
 	// RTSCamera 찾기
 	UWorld* World = GetWorld();
@@ -91,11 +87,6 @@ void UGS_MinimapWidget::InitializeReferences()
 				break;
 			}
 		}
-	}
-
-	if (!CachedRTSCamera)
-	{
-		UE_LOG(LogTemp, Error, TEXT("[MinimapWidget] RTSCamera 캐싱 실패"));
 	}
 }
 
@@ -282,11 +273,7 @@ void UGS_MinimapWidget::UpdateIconForUnit(AGS_Monster* Unit)
 			{
 				NewIconData.IconWidget->SetBrushFromTexture(*IconTexture);
 			}
-			else
-			{
-				// 기본 텍스처 사용
-				UE_LOG(LogTemp, Warning, TEXT("[MinimapWidget] 아이콘 텍스처 없음: %s"), *CharacterTypeName.ToString());
-			}
+
 		}
 
 		ActiveIcons.Add(Unit, NewIconData);
