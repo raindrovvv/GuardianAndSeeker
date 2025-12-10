@@ -970,7 +970,6 @@ void AGS_TrapBase::SetTrapAkComponent(UAkComponent* NewAkComponent)
 	// 유효성 체크 (서버 안정성)
 	if (!IsValid(NewAkComponent))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Attempted to set invalid TrapAkComponent - Actor: %s"), *GetName());
 		return;
 	}
 
