@@ -319,6 +319,9 @@ private:
 	TObjectPtr<USoundBase> MouseClickSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> CommandButtonSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
 	TObjectPtr<USoundBase> CommandMoveSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Sound")
@@ -400,6 +403,33 @@ private:
 
 	UFUNCTION()
 	void ResetGroupDoubleClickState();
+
+	// ==========================================
+	// RTS 명령 데칼 시스템
+	// ==========================================
+
+	/** 명령 타입별 데칼 머티리얼 맵 */
+	UPROPERTY(EditDefaultsOnly, Category = "RTS|CommandDecal")
+	TMap<ERTSCommand, UMaterialInterface*> CommandDecalMaterials;
+
+	/** 명령 데칼 크기 */
+	UPROPERTY(EditAnywhere, Category = "RTS|CommandDecal", meta = (ClampMin = "10.0", ClampMax = "200.0"))
+	FVector CommandDecalSize = FVector(60.0f, 60.0f, 60.0f);
+
+	/** 명령 데칼 수명 (초) */
+	UPROPERTY(EditAnywhere, Category = "RTS|CommandDecal", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float CommandDecalLifeSpan = 0.5f;
+
+	/** 명령 데칼 Z축 오프셋 (Z파이팅 방지) */
+	UPROPERTY(EditAnywhere, Category = "RTS|CommandDecal", meta = (ClampMin = "0.1", ClampMax = "10.0"))
+	float CommandDecalZOffset = 1.0f;
+
+	/**
+	 * RTS 명령 위치에 데칼을 스폰 (로컬 전용)
+	 * @param CommandType 명령 타입
+	 * @param Location 월드 위치
+	 */
+	void SpawnCommandDecal(ERTSCommand CommandType, const FVector& Location);
 
 	// 시커 근접도 업데이트 (서버 RPC)
 	UFUNCTION(Server, Unreliable)

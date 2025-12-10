@@ -66,6 +66,7 @@ AGS_RTSController::AGS_RTSController()
 	if (MouseClickSoundRef.Succeeded())
 	{
 		MouseClickSound = MouseClickSoundRef.Object;
+		CommandButtonSound = MouseClickSoundRef.Object; // 기본값으로 동일한 사운드 사용
 	}
 
 	static ConstructorHelpers::FObjectFinder<USoundBase> CommandMoveSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_MoveSound.UI_SFX_MoveSound"));
@@ -269,6 +270,12 @@ void AGS_RTSController::MoveSelectedUnits()
 {
 	CurrentCommand = ERTSCommand::Move;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	// 키보드 단축키 사운드 재생
+	if (CommandButtonSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
+	}
 }
 
 
@@ -281,6 +288,12 @@ void AGS_RTSController::AttackSelectedUnits()
 {
 	CurrentCommand = ERTSCommand::Attack;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	// 키보드 단축키 사운드 재생
+	if (CommandButtonSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
+	}
 }
 
 
@@ -294,6 +307,12 @@ void AGS_RTSController::StopSelectedUnits()
 	CurrentCommand = ERTSCommand::Stop;
 
 	Server_RTSStop();
+
+	// 키보드 단축키 사운드 재생
+	if (CommandButtonSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
+	}
 
 	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
 	CurrentCommand = ERTSCommand::None;
@@ -312,6 +331,12 @@ void AGS_RTSController::HoldSelectedUnits()
 
 	Server_RTSHold();
 
+	// 키보드 단축키 사운드 재생
+	if (CommandButtonSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
+	}
+
 	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
@@ -328,6 +353,12 @@ void AGS_RTSController::SkillSelectedUnits()
 	CurrentCommand = ERTSCommand::Skill;
 
 	Server_RTSSkill();
+
+	// 키보드 단축키 사운드 재생
+	if (CommandButtonSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
+	}
 
 	// 현재는 논타겟팅 스킬이므로 즉시 완료 처리 (우클릭 취소 사운드 방지)
 	// TODO: 타게팅 스킬 추가 시 스킬 타입별 분기 처리 필요
@@ -350,11 +381,8 @@ void AGS_RTSController::OnLeftMousePressed()
 		return;
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("--- OnLeftMousePressed: Command=%d"), static_cast<int32>(CurrentCommand));
-	
 	FHitResult Hit;
 	bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel2), true, Hit);
-	UE_LOG(LogTemp, Log, TEXT("  bHit=%d, Hit.Actor=%s"), bHit, *GetNameSafe(Hit.GetActor()));
 
 	// 명령 모드에 따라
 	switch (CurrentCommand)
@@ -362,6 +390,8 @@ void AGS_RTSController::OnLeftMousePressed()
 	case ERTSCommand::Move:
 		if (bHit)
 		{
+			SpawnCommandDecal(ERTSCommand::Move, Hit.Location);
+
 			Server_RTSMove(Hit.Location);
 			if (CommandMoveSound)
 			{
@@ -376,10 +406,12 @@ void AGS_RTSController::OnLeftMousePressed()
 
 			if (AGS_Character* Target = Cast<AGS_Character>(Hit.GetActor()))
 			{
+				SpawnCommandDecal(ERTSCommand::Attack, Target->GetActorLocation());
 				Server_RTSAttack(Target);
 			}
 			else
 			{
+				SpawnCommandDecal(ERTSCommand::Attack, Hit.Location);
 				Server_RTSAttackMove(Hit.Location);
 			}
 
@@ -457,6 +489,8 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 	{
 		return;
 	}
+
+	SpawnCommandDecal(ERTSCommand::Move, GroundHit.Location);
 
 	Server_RTSMove(GroundHit.Location);
 
@@ -1120,6 +1154,8 @@ void AGS_RTSController::OnCameraKey(const FInputActionInstance& InputInstance, i
 
 void AGS_RTSController::MoveAIViaMinimap(const FVector& WorldLocation)
 {
+	SpawnCommandDecal(ERTSCommand::Move, WorldLocation);
+
 	Server_RTSMove(WorldLocation);
 
 	if (CommandMoveSound)
@@ -1133,6 +1169,8 @@ void AGS_RTSController::MoveAIViaMinimap(const FVector& WorldLocation)
 
 void AGS_RTSController::AttackAIViaMinimap(const FVector& WorldLocation)
 {
+	SpawnCommandDecal(ERTSCommand::Attack, WorldLocation);
+
 	Server_RTSAttackMove(WorldLocation);
 
 	if (CommandAttackSound)
@@ -1209,6 +1247,55 @@ void AGS_RTSController::ResetGroupDoubleClickState()
 {
 	LastPressedGroupIdx = -1;
 	LastGroupKeyPressTime = 0.f;
+}
+
+// ==========================================
+// RTS 명령 데칼 시스템
+// ==========================================
+
+void AGS_RTSController::SpawnCommandDecal(ERTSCommand CommandType, const FVector& Location)
+{
+	// 로컬 컨트롤러 체크 (네트워크 안전성)
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	// None 명령은 데칼 표시 안 함
+	if (CommandType == ERTSCommand::None)
+	{
+		return;
+	}
+
+	// 월드 유효성 검사
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 머티리얼 검색
+	UMaterialInterface* const* FoundMaterial = CommandDecalMaterials.Find(CommandType);
+	if (!FoundMaterial || !(*FoundMaterial))
+	{
+		return;
+	}
+
+	// 데칼 스폰 위치 계산 (Z파이팅 방지 오프셋)
+	FVector DecalLocation = Location + FVector(0.0f, 0.0f, CommandDecalZOffset);
+
+	// 데칼 회전 (지면에 수평으로 투사)
+	FRotator DecalRotation = FRotator(-90.0f, 0.0f, 0.0f);
+
+	// 데칼 스폰
+	UGameplayStatics::SpawnDecalAtLocation(
+		World,
+		*FoundMaterial,
+		CommandDecalSize,
+		DecalLocation,
+		DecalRotation,
+		CommandDecalLifeSpan
+	);
 }
 
 // ==========================================
