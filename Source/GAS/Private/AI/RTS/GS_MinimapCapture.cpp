@@ -79,8 +79,6 @@ void AGS_MinimapCapture::InitializeSceneCapture()
 	if (RenderTarget)
 	{
 		SceneCaptureComponent->TextureTarget = RenderTarget;
-		UE_LOG(LogTemp, Warning, TEXT("[MinimapCapture] RenderTarget 할당 완료: %s (Size: %dx%d)"), 
-			*RenderTarget->GetName(), RenderTarget->SizeX, RenderTarget->SizeY);
 	}
 	else
 	{
