@@ -14,18 +14,24 @@
 #include "Components/Border.h"
 #include "Components/BorderSlot.h"
 #include "Components/SizeBox.h"
+#include "Blueprint/WidgetTree.h"
 
 void UGS_RTSSkillSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// UI 컴포넌트가 블루프린트에서 바인딩되지 않았으면 C++로 생성
-	if (!SkillButton || !SkillIcon || !CooldownOverlay || !CooldownText || !HotkeyText || !EtherCostText)
+	// 블루프린트에서 바인딩된 UI 컴포넌트 검증
+	if (!SkillButton)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillSlotWidget::NativeConstruct - Creating UI components dynamically"));
-		CreateUIComponents();
+		UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillSlotWidget::NativeConstruct - SkillButton is not bound! Please bind it in WBP"));
 	}
 
+	if (!SkillIcon)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillSlotWidget::NativeConstruct - SkillIcon is not bound"));
+	}
+
+	// 버튼 이벤트 바인딩
 	if (SkillButton)
 	{
 		SkillButton->OnClicked.AddDynamic(this, &UGS_RTSSkillSlotWidget::OnSkillButtonClicked);
@@ -36,145 +42,14 @@ void UGS_RTSSkillSlotWidget::NativeConstruct()
 	bIsOnCooldown = false;
 }
 
-void UGS_RTSSkillSlotWidget::CreateUIComponents()
-{
-	// SizeBox로 고정 크기 설정
-	USizeBox* RootSizeBox = NewObject<USizeBox>(this);
-	if (!RootSizeBox)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to create root size box"));
-		return;
-	}
-
-	// 슬롯 크기 설정 (64x64 픽셀)
-	RootSizeBox->SetWidthOverride(64.f);
-	RootSizeBox->SetHeightOverride(64.f);
-
-	// 루트 Overlay 생성
-	UOverlay* RootOverlay = NewObject<UOverlay>(this);
-	if (!RootOverlay)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to create root overlay"));
-		return;
-	}
-
-	// SizeBox에 Overlay 추가
-	RootSizeBox->AddChild(RootOverlay);
-
-	// 1. 스킬 버튼 생성 (배경) - 디버그용 밝은 노란색
-	SkillButton = NewObject<UButton>(this);
-	if (SkillButton)
-	{
-		// 버튼 배경색 설정 (디버그용 노란색)
-		SkillButton->SetBackgroundColor(FLinearColor(1.0f, 1.0f, 0.0f, 1.0f)); // 노란색
-
-		UOverlaySlot* ButtonSlot = RootOverlay->AddChildToOverlay(SkillButton);
-		if (ButtonSlot)
-		{
-			ButtonSlot->SetHorizontalAlignment(HAlign_Fill);
-			ButtonSlot->SetVerticalAlignment(VAlign_Fill);
-		}
-
-		// 스킬 아이콘을 버튼 안에 추가
-		SkillIcon = NewObject<UImage>(this);
-		if (SkillIcon)
-		{
-			// 기본 아이콘 색상 (디버그용 녹색)
-			SkillIcon->SetColorAndOpacity(FLinearColor(0.0f, 1.0f, 0.0f, 1.0f));
-			SkillButton->AddChild(SkillIcon);
-		}
-	}
-
-	// 2. 쿨다운 오버레이 (프로그레스 바)
-	CooldownOverlay = NewObject<UProgressBar>(this);
-	if (CooldownOverlay)
-	{
-		CooldownOverlay->SetPercent(0.f);
-		CooldownOverlay->SetVisibility(ESlateVisibility::Hidden);
-
-		UOverlaySlot* CooldownSlot = RootOverlay->AddChildToOverlay(CooldownOverlay);
-		if (CooldownSlot)
-		{
-			CooldownSlot->SetHorizontalAlignment(HAlign_Fill);
-			CooldownSlot->SetVerticalAlignment(VAlign_Fill);
-		}
-	}
-
-	// 3. 쿨다운 텍스트
-	CooldownText = NewObject<UTextBlock>(this);
-	if (CooldownText)
-	{
-		CooldownText->SetVisibility(ESlateVisibility::Hidden);
-		FSlateFontInfo FontInfo;
-		FontInfo.Size = 24;
-		CooldownText->SetFont(FontInfo);
-		CooldownText->SetJustification(ETextJustify::Center);
-
-		UOverlaySlot* TextSlot = RootOverlay->AddChildToOverlay(CooldownText);
-		if (TextSlot)
-		{
-			TextSlot->SetHorizontalAlignment(HAlign_Center);
-			TextSlot->SetVerticalAlignment(VAlign_Center);
-		}
-	}
-
-	// 4. 단축키 텍스트 (좌상단)
-	HotkeyText = NewObject<UTextBlock>(this);
-	if (HotkeyText)
-	{
-		FSlateFontInfo FontInfo;
-		FontInfo.Size = 14;
-		HotkeyText->SetFont(FontInfo);
-
-		UOverlaySlot* HotkeySlot = RootOverlay->AddChildToOverlay(HotkeyText);
-		if (HotkeySlot)
-		{
-			HotkeySlot->SetHorizontalAlignment(HAlign_Left);
-			HotkeySlot->SetVerticalAlignment(VAlign_Top);
-			HotkeySlot->SetPadding(FMargin(5.f, 5.f, 0.f, 0.f));
-		}
-	}
-
-	// 5. 에테르 비용 텍스트 (우하단)
-	EtherCostText = NewObject<UTextBlock>(this);
-	if (EtherCostText)
-	{
-		FSlateFontInfo FontInfo;
-		FontInfo.Size = 14;
-		EtherCostText->SetFont(FontInfo);
-
-		UOverlaySlot* CostSlot = RootOverlay->AddChildToOverlay(EtherCostText);
-		if (CostSlot)
-		{
-			CostSlot->SetHorizontalAlignment(HAlign_Right);
-			CostSlot->SetVerticalAlignment(VAlign_Bottom);
-			CostSlot->SetPadding(FMargin(0.f, 0.f, 5.f, 5.f));
-		}
-	}
-
-	// 루트 위젯 설정
-	if (UPanelWidget* RootWidget = Cast<UPanelWidget>(GetRootWidget()))
-	{
-		RootWidget->ClearChildren();
-		RootWidget->AddChild(RootSizeBox);
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillSlotWidget::CreateUIComponents - UI components created successfully (64x64)"));
-
-	// 디버그: 위젯 크기 확인
-	if (RootSizeBox)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("  └─ RootSizeBox: Width=%.1f, Height=%.1f"),
-			RootSizeBox->GetWidthOverride(), RootSizeBox->GetHeightOverride());
-	}
-}
+// CreateUIComponents 함수 제거 - 블루프린트에서 UI 계층 구조 생성
 
 void UGS_RTSSkillSlotWidget::NativeDestruct()
 {
 	if (SkillComponent.IsValid())
 	{
 		SkillComponent->OnSkillCooldownChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownChanged);
-		SkillComponent->OnEtherChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleEtherChanged);
+		SkillComponent->OnAetherChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleAetherChanged);
 	}
 
 	Super::NativeDestruct();
@@ -185,7 +60,7 @@ void UGS_RTSSkillSlotWidget::InitializeSlot(int32 InSlotIndex, UGS_RTSSkillCompo
 	if (SkillComponent.IsValid())
 	{
 		SkillComponent->OnSkillCooldownChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownChanged);
-		SkillComponent->OnEtherChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleEtherChanged);
+		SkillComponent->OnAetherChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleAetherChanged);
 	}
 
 	SlotIndex = InSlotIndex;
@@ -194,7 +69,7 @@ void UGS_RTSSkillSlotWidget::InitializeSlot(int32 InSlotIndex, UGS_RTSSkillCompo
 	if (SkillComponent.IsValid())
 	{
 		SkillComponent->OnSkillCooldownChanged.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownChanged);
-		SkillComponent->OnEtherChanged.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleEtherChanged);
+		SkillComponent->OnAetherChanged.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleAetherChanged);
 	}
 
 	RefreshSkillInfo();
@@ -226,9 +101,9 @@ void UGS_RTSSkillSlotWidget::RefreshSkillInfo()
 	}
 
 	// 에테르 비용 표시
-	if (EtherCostText)
+	if (AetherCostText)
 	{
-		EtherCostText->SetText(FText::AsNumber(FMath::RoundToInt(Skill->GetEtherCost())));
+		AetherCostText->SetText(FText::AsNumber(FMath::RoundToInt(Skill->GetAetherCost())));
 	}
 
 	// 초기 상태로 쿨다운 UI 숨김
@@ -244,7 +119,7 @@ void UGS_RTSSkillSlotWidget::RefreshSkillInfo()
 	}
 
 	// 사용 가능 여부 업데이트
-	HandleEtherChanged(SkillComponent->GetCurrentEther(), SkillComponent->GetMaxEther());
+	HandleAetherChanged(SkillComponent->GetCurrentAether(), SkillComponent->GetMaxAether());
 }
 
 void UGS_RTSSkillSlotWidget::UpdateCooldownDisplay(float CurrentCooldown, float MaxCooldown)
@@ -287,10 +162,10 @@ void UGS_RTSSkillSlotWidget::SetSkillAvailable(bool bAvailable)
 	}
 
 	// 비용 텍스트 색상 변경
-	if (EtherCostText)
+	if (AetherCostText)
 	{
 		FSlateColor Color = bAvailable ? FSlateColor(FLinearColor::White) : FSlateColor(FLinearColor::Red);
-		EtherCostText->SetColorAndOpacity(Color);
+		AetherCostText->SetColorAndOpacity(Color);
 	}
 }
 
@@ -329,7 +204,7 @@ void UGS_RTSSkillSlotWidget::HandleCooldownChanged(int32 InSkillIndex, float Rem
 	}
 }
 
-void UGS_RTSSkillSlotWidget::HandleEtherChanged(float CurrentEther, float MaxEther)
+void UGS_RTSSkillSlotWidget::HandleAetherChanged(float CurrentAether, float MaxAether)
 {
 	if (!SkillComponent.IsValid())
 	{
@@ -342,6 +217,6 @@ void UGS_RTSSkillSlotWidget::HandleEtherChanged(float CurrentEther, float MaxEth
 		return;
 	}
 
-	bool bCanAfford = CurrentEther >= Skill->GetEtherCost();
+	bool bCanAfford = CurrentAether >= Skill->GetAetherCost();
 	SetSkillAvailable(bCanAfford);
 }

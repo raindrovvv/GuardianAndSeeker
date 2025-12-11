@@ -28,7 +28,7 @@ public:
 
 	// 에테르 바 업데이트
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	void UpdateEtherBar(float CurrentEther, float MaxEther);
+	void UpdateAetherBar(float CurrentAether, float MaxAether);
 
 	// 특정 슬롯 업데이트
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
@@ -38,15 +38,12 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// C++로 UI 컴포넌트 생성
-	void CreateUIComponents();
-
-	// 에테르 바 UI (블루프린트에서 바인딩 또는 C++로 생성)
+	// 에테르 바 UI (블루프린트에서 바인딩)
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	UProgressBar* EtherProgressBar;
+	UProgressBar* AetherProgressBar;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	UTextBlock* EtherText;
+	UTextBlock* AetherText;
 
 	// 스킬 슬롯 컨테이너
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -66,7 +63,7 @@ protected:
 
 	// 에테르 변경 이벤트 핸들러
 	UFUNCTION()
-	void HandleEtherChanged(float CurrentEther, float MaxEther);
+	void HandleAetherChanged(float CurrentAether, float MaxAether);
 
 	// 스킬 쿨다운 변경 이벤트 핸들러
 	UFUNCTION()

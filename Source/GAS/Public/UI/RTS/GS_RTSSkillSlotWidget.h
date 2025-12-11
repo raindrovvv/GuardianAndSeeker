@@ -45,18 +45,15 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// C++로 UI 컴포넌트 생성
-	void CreateUIComponents();
-
-	// UI 컴포넌트 (블루프린트에서 바인딩 또는 C++로 생성)
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	// UI 컴포넌트 (블루프린트에서 바인딩)
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	UButton* SkillButton;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	UImage* SkillIcon;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	UTextBlock* EtherCostText;
+	UTextBlock* AetherCostText;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	UTextBlock* HotkeyText;
@@ -93,7 +90,7 @@ protected:
 
 	// 에테르 변경 이벤트 핸들러  
 	UFUNCTION()
-	void HandleEtherChanged(float CurrentEther, float MaxEther);
+	void HandleAetherChanged(float CurrentAether, float MaxAether);
 
 private:
 	void RefreshSkillInfo();

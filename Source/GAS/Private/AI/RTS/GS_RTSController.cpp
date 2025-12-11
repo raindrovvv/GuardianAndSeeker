@@ -150,33 +150,22 @@ void AGS_RTSController::BeginPlay()
 		// RTS 스킬 바 위젯 생성
 		if (RTSSkillComp)
 		{
-			// 위젯 클래스가 설정되지 않았으면 기본 C++ 클래스 사용
-			TSubclassOf<UGS_RTSSkillBarWidget> SkillBarClass = RTSSkillBarWidgetClass;
-			if (!SkillBarClass)
+			if (!RTSSkillBarWidgetClass)
 			{
-				SkillBarClass = UGS_RTSSkillBarWidget::StaticClass();
-				UE_LOG(LogTemp, Warning, TEXT("RTSSkillBarWidgetClass not set, using default C++ class"));
+				UE_LOG(LogTemp, Error, TEXT("RTSSkillBarWidgetClass is not set! Please set WBP_RTSSkillBarWidget in BP_RTSController"));
+				return;
 			}
 
-			SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, SkillBarClass);
+			SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
 			if (SkillBarWidget)
 			{
-				// 화면에 추가하기 전에 크기와 위치 설정
+				// 화면에 추가
 				SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
 
-				// Canvas Panel Slot으로 변환하여 위치 설정
-				if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(SkillBarWidget->Slot))
-				{
-					// 화면 하단 중앙에 배치
-					CanvasSlot->SetAnchors(FAnchors(0.5f, 1.0f, 0.5f, 1.0f)); // 하단 중앙
-					CanvasSlot->SetAlignment(FVector2D(0.5f, 1.0f)); // 중앙 정렬
-					CanvasSlot->SetPosition(FVector2D(0.f, -100.f)); // 하단에서 100픽셀 위
-
-					UE_LOG(LogTemp, Warning, TEXT("RTSSkillBarWidget positioned at bottom-center"));
-				}
-
+				// 초기화
 				SkillBarWidget->InitializeSkillBar(RTSSkillComp);
-				UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized"));
+
+				UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
 			}
 			else
 			{

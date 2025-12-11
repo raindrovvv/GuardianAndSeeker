@@ -28,9 +28,9 @@ UTexture2D* UGS_RTSSkillBase::GetSkillIcon() const
 	return SkillData ? SkillData->SkillIcon.Get() : nullptr;
 }
 
-float UGS_RTSSkillBase::GetEtherCost() const
+float UGS_RTSSkillBase::GetAetherCost() const
 {
-	return SkillData ? SkillData->EtherCost : 0.f;
+	return SkillData ? SkillData->AetherCost : 0.f;
 }
 
 float UGS_RTSSkillBase::GetCooldownTime() const
@@ -91,16 +91,13 @@ bool UGS_RTSSkillBase::CanActivate(UGS_RTSSkillComponent* SkillComponent) const
 	}
 
 	// 기본적으로 에테르 체크
-	return SkillComponent->GetCurrentEther() >= GetEtherCost();
+	return SkillComponent->GetCurrentAether() >= GetAetherCost();
 }
 
 void UGS_RTSSkillBase::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
 {
 	// 블루프린트 이벤트 호출
 	BP_OnSkillActivated(TargetLocation);
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillBase::ActivateSkill - %s at location %s"), 
-		*GetSkillName().ToString(), *TargetLocation.ToString());
 }
 
 AGS_RTSController* UGS_RTSSkillBase::GetRTSController() const

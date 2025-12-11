@@ -12,10 +12,10 @@ UGS_RTSSkillComponent::UGS_RTSSkillComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 
 	// 기본 에테르 설정
-	MaxEther = 100.f;
-	InitialEther = 100.f;
-	CurrentEther = 100.f;
-	EtherRegenRate = 2.f;  // 초당 2 회복
+	MaxAether = 100.f;
+	InitialAether = 100.f;
+	CurrentAether = 100.f;
+	AetherRegenRate = 2.f;  // 초당 2 회복
 
 	// 타겟팅 모드 초기화
 	bIsInTargetingMode = false;
@@ -30,7 +30,7 @@ void UGS_RTSSkillComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// 초기 에테르 설정
-	CurrentEther = InitialEther;
+	CurrentAether = InitialAether;
 
 	// 스킬 초기화
 	InitializeSkills();
@@ -38,11 +38,11 @@ void UGS_RTSSkillComponent::BeginPlay()
 	// 에테르 회복 시작 (서버에서만)
 	if (GetOwnerRole() == ROLE_Authority)
 	{
-		StartEtherRegen();
+		StartAetherRegen();
 	}
 
 	// 초기 UI 업데이트
-	OnEtherChanged.Broadcast(CurrentEther, MaxEther);
+	OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 }
 
 void UGS_RTSSkillComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -66,7 +66,7 @@ void UGS_RTSSkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UGS_RTSSkillComponent, CurrentEther);
+	DOREPLIFETIME(UGS_RTSSkillComponent, CurrentAether);
 }
 
 void UGS_RTSSkillComponent::InitializeSkills()
@@ -118,70 +118,68 @@ void UGS_RTSSkillComponent::InitializeSkills()
 			++ValidSkillCount;
 		}
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillComponent: Initialized %d / %d skills"), ValidSkillCount, SkillCount);
 }
 
-void UGS_RTSSkillComponent::StartEtherRegen()
+void UGS_RTSSkillComponent::StartAetherRegen()
 {
-	if (EtherRegenRate > 0.f)
+	if (AetherRegenRate > 0.f)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
-			EtherRegenTimer,
+			AetherRegenTimer,
 			this,
-			&UGS_RTSSkillComponent::RegenEther,
+			&UGS_RTSSkillComponent::RegenAether,
 			0.5f,  // 0.5초마다 회복
 			true
 		);
 	}
 }
 
-void UGS_RTSSkillComponent::RegenEther()
+void UGS_RTSSkillComponent::RegenAether()
 {
-	if (CurrentEther < MaxEther)
+	if (CurrentAether < MaxAether)
 	{
-		float RegenAmount = EtherRegenRate * 0.5f;  // 0.5초 간격이므로 절반
-		AddEther(RegenAmount);
+		float RegenAmount = AetherRegenRate * 0.5f;  // 0.5초 간격이므로 절반
+		AddAether(RegenAmount);
 	}
 }
 
-void UGS_RTSSkillComponent::OnRep_CurrentEther()
+void UGS_RTSSkillComponent::OnRep_CurrentAether()
 {
-	OnEtherChanged.Broadcast(CurrentEther, MaxEther);
+	OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 }
 
-bool UGS_RTSSkillComponent::ConsumeEther(float Amount)
+bool UGS_RTSSkillComponent::ConsumeAether(float Amount)
 {
 	if (Amount <= 0.f)
 	{
 		return true;
 	}
 
-	if (CurrentEther >= Amount)
+	if (CurrentAether >= Amount)
 	{
-		CurrentEther -= Amount;
-		OnEtherChanged.Broadcast(CurrentEther, MaxEther);
+		CurrentAether -= Amount;
+		OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 		return true;
 	}
 
 	return false;
 }
 
-void UGS_RTSSkillComponent::AddEther(float Amount)
+void UGS_RTSSkillComponent::AddAether(float Amount)
 {
 	if (Amount <= 0.f)
 	{
 		return;
 	}
 
-	CurrentEther = FMath::Min(CurrentEther + Amount, MaxEther);
-	OnEtherChanged.Broadcast(CurrentEther, MaxEther);
+	CurrentAether = FMath::Min(CurrentAether + Amount, MaxAether);
+	OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 }
 
-void UGS_RTSSkillComponent::SetEther(float Amount)
+void UGS_RTSSkillComponent::SetAether(float Amount)
 {
-	CurrentEther = FMath::Clamp(Amount, 0.f, MaxEther);
-	OnEtherChanged.Broadcast(CurrentEther, MaxEther);
+	CurrentAether = FMath::Clamp(Amount, 0.f, MaxAether);
+	OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 }
 
 bool UGS_RTSSkillComponent::TryActivateSkill(int32 SkillIndex)
@@ -225,7 +223,7 @@ bool UGS_RTSSkillComponent::CanActivateSkill(int32 SkillIndex) const
 	}
 
 	// 에테르 체크
-	if (CurrentEther < Skill->GetEtherCost())
+	if (CurrentAether < Skill->GetAetherCost())
 	{
 		return false;
 	}
@@ -278,8 +276,6 @@ void UGS_RTSSkillComponent::EnterSkillTargetingMode(int32 SkillIndex)
 	bIsInTargetingMode = true;
 	TargetingSkillIndex = SkillIndex;
 	OnSkillActivationStateChanged.Broadcast(SkillIndex, true);
-
-	UE_LOG(LogTemp, Log, TEXT("Entered skill targeting mode for skill %d"), SkillIndex);
 }
 
 void UGS_RTSSkillComponent::ExitSkillTargetingMode()
@@ -289,8 +285,6 @@ void UGS_RTSSkillComponent::ExitSkillTargetingMode()
 		OnSkillActivationStateChanged.Broadcast(TargetingSkillIndex, false);
 		bIsInTargetingMode = false;
 		TargetingSkillIndex = -1;
-
-		UE_LOG(LogTemp, Log, TEXT("Exited skill targeting mode"));
 	}
 }
 
@@ -319,9 +313,9 @@ void UGS_RTSSkillComponent::Server_ActivateSkill_Implementation(int32 SkillIndex
 	}
 
 	// 에테르 소비
-	if (!ConsumeEther(Skill->GetEtherCost()))
+	if (!ConsumeAether(Skill->GetAetherCost()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to consume ether for skill %d"), SkillIndex);
+		UE_LOG(LogTemp, Warning, TEXT("Failed to consume aether for skill %d"), SkillIndex);
 		return;
 	}
 
@@ -337,7 +331,7 @@ void UGS_RTSSkillComponent::Server_ActivateSkill_Implementation(int32 SkillIndex
 
 void UGS_RTSSkillComponent::Multicast_OnSkillActivated_Implementation(int32 SkillIndex)
 {
-	UE_LOG(LogTemp, Log, TEXT("Skill %d activated"), SkillIndex);
+	// 스킬 활성화 알림
 }
 
 void UGS_RTSSkillComponent::StartSkillCooldown(int32 SkillIndex)
@@ -368,9 +362,6 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 
 void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
 {
-	UE_LOG(LogTemp, Log, TEXT("=== RTS Skill Component Status ==="));
-	UE_LOG(LogTemp, Log, TEXT("Ether: %.1f / %.1f (Regen: %.1f/s)"), CurrentEther, MaxEther, EtherRegenRate);
-	
 	for (int32 i = 0; i < Skills.Num(); ++i)
 	{
 		UGS_RTSSkillBase* Skill = Skills[i];
@@ -378,7 +369,7 @@ void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
 		{
 			UE_LOG(LogTemp, Log, TEXT("Skill %d: %s - Cost: %.0f, CD: %.1f/%.1f"), 
 				i, *Skill->GetSkillName().ToString(), 
-				Skill->GetEtherCost(),
+				Skill->GetAetherCost(),
 				GetSkillCooldownRemaining(i),
 				Skill->GetCooldownTime());
 		}

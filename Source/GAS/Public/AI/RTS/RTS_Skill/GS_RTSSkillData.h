@@ -33,7 +33,7 @@ public:
     TObjectPtr<UTexture2D> SkillIcon;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Cost", meta=(ClampMin="0.0"))
-    float EtherCost = 0.f;
+    float AetherCost = 0.f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Cost", meta=(ClampMin="0.0"))
     float CooldownTime = 0.f;

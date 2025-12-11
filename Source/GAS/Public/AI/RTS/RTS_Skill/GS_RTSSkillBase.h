@@ -37,7 +37,7 @@ public:
 	UTexture2D* GetSkillIcon() const;
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	float GetEtherCost() const;
+	float GetAetherCost() const;
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
 	float GetCooldownTime() const;

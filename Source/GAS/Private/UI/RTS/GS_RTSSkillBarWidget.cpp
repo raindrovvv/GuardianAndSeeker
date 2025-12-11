@@ -17,143 +17,38 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/SizeBox.h"
+#include "Blueprint/WidgetTree.h"
 
 void UGS_RTSSkillBarWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// UI 컴포넌트가 블루프린트에서 바인딩되지 않았으면 C++로 생성
-	if (!EtherProgressBar || !EtherText || !SkillSlotContainer)
+	// 블루프린트에서 바인딩된 UI 컴포넌트 검증
+	if (!AetherProgressBar)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillBarWidget::NativeConstruct - Creating UI components dynamically"));
-		CreateUIComponents();
+		UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillBarWidget::NativeConstruct - AetherProgressBar is not bound! Please bind it in WBP"));
 	}
 
-	// 위젯 가시성 강제 설정 (디버그)
+	if (!AetherText)
+	{
+		UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillBarWidget::NativeConstruct - AetherText is not bound! Please bind it in WBP"));
+	}
+
+	if (!SkillSlotContainer)
+	{
+		UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillBarWidget::NativeConstruct - SkillSlotContainer is not bound! Please bind it in WBP"));
+	}
+
 	SetVisibility(ESlateVisibility::Visible);
-	UE_LOG(LogTemp, Warning, TEXT("RTSSkillBarWidget Visibility set to Visible"));
 }
 
-void UGS_RTSSkillBarWidget::CreateUIComponents()
-{
-	// 디버그용 배경 Border 생성 (빨간색으로 명확하게 보이게)
-	UBorder* DebugBorder = NewObject<UBorder>(this);
-	if (!DebugBorder)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to create debug border"));
-		return;
-	}
-
-	// 빨간색 배경 설정 (디버그용)
-	DebugBorder->SetBrushColor(FLinearColor(1.0f, 0.0f, 0.0f, 0.8f)); // 빨간색 반투명
-	DebugBorder->SetPadding(FMargin(10.f));
-
-	// 루트 VerticalBox 생성
-	UVerticalBox* RootVerticalBox = NewObject<UVerticalBox>(this);
-	if (!RootVerticalBox)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to create root vertical box"));
-		return;
-	}
-
-	// Border에 VerticalBox 추가
-	DebugBorder->AddChild(RootVerticalBox);
-
-	// 1. 에테르 바 섹션 생성
-	USizeBox* EtherBarSizeBox = NewObject<USizeBox>(this);
-	if (EtherBarSizeBox)
-	{
-		EtherBarSizeBox->SetWidthOverride(300.f); // 에테르 바 너비
-		EtherBarSizeBox->SetHeightOverride(40.f); // 에테르 바 높이
-
-		UVerticalBoxSlot* EtherSizeBoxSlot = RootVerticalBox->AddChildToVerticalBox(EtherBarSizeBox);
-		if (EtherSizeBoxSlot)
-		{
-			EtherSizeBoxSlot->SetPadding(FMargin(10.f, 5.f, 10.f, 5.f));
-			EtherSizeBoxSlot->SetHorizontalAlignment(HAlign_Center);
-			EtherSizeBoxSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
-		}
-
-		UBorder* EtherBarBorder = NewObject<UBorder>(this);
-		if (EtherBarBorder)
-		{
-			// 에테르 바 배경 색상 설정
-			FLinearColor BorderColor(0.1f, 0.1f, 0.1f, 0.8f);
-			EtherBarBorder->SetBrushColor(BorderColor);
-			EtherBarSizeBox->AddChild(EtherBarBorder);
-
-			// 에테르 바 오버레이 (프로그레스 바 + 텍스트)
-			UOverlay* EtherOverlay = NewObject<UOverlay>(this);
-			if (EtherOverlay)
-			{
-				EtherBarBorder->AddChild(EtherOverlay);
-
-				// 에테르 프로그레스 바
-				EtherProgressBar = NewObject<UProgressBar>(this);
-				if (EtherProgressBar)
-				{
-					EtherProgressBar->SetPercent(1.0f);
-					FLinearColor EtherColor(0.0f, 0.8f, 1.0f, 1.0f); // 청록색
-					EtherProgressBar->SetFillColorAndOpacity(EtherColor);
-
-					UOverlaySlot* ProgressSlot = EtherOverlay->AddChildToOverlay(EtherProgressBar);
-					if (ProgressSlot)
-					{
-						ProgressSlot->SetHorizontalAlignment(HAlign_Fill);
-						ProgressSlot->SetVerticalAlignment(VAlign_Fill);
-					}
-				}
-
-				// 에테르 텍스트
-				EtherText = NewObject<UTextBlock>(this);
-				if (EtherText)
-				{
-					EtherText->SetText(FText::FromString(TEXT("0 / 0")));
-					FSlateFontInfo FontInfo;
-					FontInfo.Size = 18;
-					EtherText->SetFont(FontInfo);
-					EtherText->SetJustification(ETextJustify::Center);
-					EtherText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-
-					UOverlaySlot* TextSlot = EtherOverlay->AddChildToOverlay(EtherText);
-					if (TextSlot)
-					{
-						TextSlot->SetHorizontalAlignment(HAlign_Center);
-						TextSlot->SetVerticalAlignment(VAlign_Center);
-					}
-				}
-			}
-		}
-	}
-
-	// 2. 스킬 슬롯 컨테이너 생성
-	SkillSlotContainer = NewObject<UHorizontalBox>(this);
-	if (SkillSlotContainer)
-	{
-		UVerticalBoxSlot* SkillContainerSlot = RootVerticalBox->AddChildToVerticalBox(SkillSlotContainer);
-		if (SkillContainerSlot)
-		{
-			SkillContainerSlot->SetPadding(FMargin(10.f, 5.f, 10.f, 10.f));
-			SkillContainerSlot->SetHorizontalAlignment(HAlign_Center);
-			SkillContainerSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
-		}
-	}
-
-	// 루트 위젯 설정
-	if (UPanelWidget* RootWidget = Cast<UPanelWidget>(GetRootWidget()))
-	{
-		RootWidget->ClearChildren();
-		RootWidget->AddChild(DebugBorder); // Border 추가 (VerticalBox는 이미 Border 안에 있음)
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillBarWidget::CreateUIComponents - UI components created with RED DEBUG BACKGROUND"));
-}
+// CreateUIComponents 함수 제거 - 블루프린트에서 UI 계층 구조 생성
 
 void UGS_RTSSkillBarWidget::NativeDestruct()
 {
 	if (SkillComponent.IsValid())
 	{
-		SkillComponent->OnEtherChanged.RemoveDynamic(this, &UGS_RTSSkillBarWidget::HandleEtherChanged);
+		SkillComponent->OnAetherChanged.RemoveDynamic(this, &UGS_RTSSkillBarWidget::HandleAetherChanged);
 		SkillComponent->OnSkillCooldownChanged.RemoveDynamic(this, &UGS_RTSSkillBarWidget::HandleSkillCooldownChanged);
 		SkillComponent->OnSkillActivationStateChanged.RemoveDynamic(this, &UGS_RTSSkillBarWidget::HandleSkillActivationStateChanged);
 	}
@@ -175,7 +70,7 @@ void UGS_RTSSkillBarWidget::InitializeSkillBar(UGS_RTSSkillComponent* InSkillCom
 	CreateSkillSlots();
 
 	// 초기 에테르 바 업데이트
-	UpdateEtherBar(SkillComponent->GetCurrentEther(), SkillComponent->GetMaxEther());
+	UpdateAetherBar(SkillComponent->GetCurrentAether(), SkillComponent->GetMaxAether());
 }
 
 void UGS_RTSSkillBarWidget::BindToSkillComponent()
@@ -185,7 +80,7 @@ void UGS_RTSSkillBarWidget::BindToSkillComponent()
 		return;
 	}
 
-	SkillComponent->OnEtherChanged.AddDynamic(this, &UGS_RTSSkillBarWidget::HandleEtherChanged);
+	SkillComponent->OnAetherChanged.AddDynamic(this, &UGS_RTSSkillBarWidget::HandleAetherChanged);
 	SkillComponent->OnSkillCooldownChanged.AddDynamic(this, &UGS_RTSSkillBarWidget::HandleSkillCooldownChanged);
 	SkillComponent->OnSkillActivationStateChanged.AddDynamic(this, &UGS_RTSSkillBarWidget::HandleSkillActivationStateChanged);
 }
@@ -194,98 +89,75 @@ void UGS_RTSSkillBarWidget::CreateSkillSlots()
 {
 	if (!SkillComponent.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Invalid SkillComponent"));
+		UE_LOG(LogTemp, Error, TEXT("CreateSkillSlots: SkillComponent is invalid"));
 		return;
 	}
 
-	// SkillSlotContainer가 없으면 생성
 	if (!SkillSlotContainer)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - SkillSlotContainer is null, creating dynamically"));
-		SkillSlotContainer = NewObject<UHorizontalBox>(this, UHorizontalBox::StaticClass());
-		if (SkillSlotContainer)
-		{
-			// 루트 위젯에 추가 (WidgetTree 사용)
-			if (UPanelWidget* RootWidget = Cast<UPanelWidget>(GetRootWidget()))
-			{
-				RootWidget->AddChild(SkillSlotContainer);
-			}
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Failed to create SkillSlotContainer"));
-			return;
-		}
+		UE_LOG(LogTemp, Error, TEXT("CreateSkillSlots: SkillSlotContainer is not bound! Please bind it in WBP_RTSSkillBarWidget"));
+		return;
 	}
 
-	// 위젯 클래스가 없으면 기본 C++ 클래스 사용
+	// 위젯 클래스 검증
 	TSubclassOf<UGS_RTSSkillSlotWidget> WidgetClass = SkillSlotWidgetClass;
 	if (!WidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - SkillSlotWidgetClass not set, using default C++ class"));
-		WidgetClass = UGS_RTSSkillSlotWidget::StaticClass();
+		UE_LOG(LogTemp, Error, TEXT("CreateSkillSlots: SkillSlotWidgetClass not set! Please set WBP_RTSSkillSlotWidget in WBP_RTSSkillBarWidget"));
+		return;
 	}
 
 	// 기존 슬롯 제거
 	SkillSlotContainer->ClearChildren();
 	SkillSlots.Empty();
 
-	// 스킬 개수만큼 슬롯 생성
+	// 스킬 개수 확인
 	int32 SkillCount = SkillComponent->GetSkillCount();
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Creating %d skill slots"), SkillCount);
+	if (SkillCount == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CreateSkillSlots: No skills to display"));
+		return;
+	}
 
+	// 슬롯 생성
 	for (int32 i = 0; i < SkillCount; ++i)
 	{
 		UGS_RTSSkillSlotWidget* SlotWidget = CreateWidget<UGS_RTSSkillSlotWidget>(this, WidgetClass);
-		if (SlotWidget)
+		if (!SlotWidget)
 		{
-			SlotWidget->InitializeSlot(i, SkillComponent.Get());
-
-			UHorizontalBoxSlot* BoxSlot = SkillSlotContainer->AddChildToHorizontalBox(SlotWidget);
-			if (BoxSlot)
-			{
-				BoxSlot->SetPadding(FMargin(5.f, 0.f, 5.f, 0.f));
-				BoxSlot->SetHorizontalAlignment(HAlign_Center);
-				BoxSlot->SetVerticalAlignment(VAlign_Center);
-				BoxSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic)); // 자동 크기 조정
-			}
-
-			SkillSlots.Add(SlotWidget);
-			UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Created slot %d (64x64)"), i);
+			UE_LOG(LogTemp, Error, TEXT("CreateSkillSlots: Failed to create slot widget %d"), i);
+			continue;
 		}
-		else
+
+		// 초기화
+		SlotWidget->InitializeSlot(i, SkillComponent.Get());
+
+		// HorizontalBox에 추가
+		UHorizontalBoxSlot* BoxSlot = SkillSlotContainer->AddChildToHorizontalBox(SlotWidget);
+		if (BoxSlot)
 		{
-			UE_LOG(LogTemp, Error, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Failed to create slot widget %d"), i);
+			BoxSlot->SetPadding(FMargin(5.f, 0.f, 5.f, 0.f));
+			BoxSlot->SetHorizontalAlignment(HAlign_Center);
+			BoxSlot->SetVerticalAlignment(VAlign_Center);
+			BoxSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
 		}
-	}
 
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkillBarWidget::CreateSkillSlots - Successfully created %d skill slots"), SkillSlots.Num());
-
-	// 디버그: SkillSlotContainer 자식 개수 확인
-	if (SkillSlotContainer)
-	{
-		int32 ChildCount = SkillSlotContainer->GetChildrenCount();
-		UE_LOG(LogTemp, Warning, TEXT("  └─ SkillSlotContainer now has %d children"), ChildCount);
-
-		if (ChildCount == 0)
-		{
-			UE_LOG(LogTemp, Error, TEXT("  ❌ ERROR: SkillSlotContainer is empty! Slots were not added!"));
-		}
+		SkillSlots.Add(SlotWidget);
 	}
 }
 
-void UGS_RTSSkillBarWidget::UpdateEtherBar(float CurrentEther, float MaxEther)
+void UGS_RTSSkillBarWidget::UpdateAetherBar(float CurrentAether, float MaxAether)
 {
-	if (EtherProgressBar)
+	if (AetherProgressBar)
 	{
-		float Percent = MaxEther > 0.f ? CurrentEther / MaxEther : 0.f;
-		EtherProgressBar->SetPercent(Percent);
+		float Percent = MaxAether > 0.f ? CurrentAether / MaxAether : 0.f;
+		AetherProgressBar->SetPercent(Percent);
 	}
 
-	if (EtherText)
+	if (AetherText)
 	{
-		FString EtherString = FString::Printf(TEXT("%.0f / %.0f"), CurrentEther, MaxEther);
-		EtherText->SetText(FText::FromString(EtherString));
+		FString AetherString = FString::Printf(TEXT("%.0f / %.0f"), CurrentAether, MaxAether);
+		AetherText->SetText(FText::FromString(AetherString));
 	}
 }
 
@@ -305,9 +177,9 @@ void UGS_RTSSkillBarWidget::UpdateSkillSlot(int32 SlotIndex)
 	}
 }
 
-void UGS_RTSSkillBarWidget::HandleEtherChanged(float CurrentEther, float MaxEther)
+void UGS_RTSSkillBarWidget::HandleAetherChanged(float CurrentAether, float MaxAether)
 {
-	UpdateEtherBar(CurrentEther, MaxEther);
+	UpdateAetherBar(CurrentAether, MaxAether);
 }
 
 void UGS_RTSSkillBarWidget::HandleSkillCooldownChanged(int32 SkillIndex, float RemainingCooldown, float MaxCooldown)
