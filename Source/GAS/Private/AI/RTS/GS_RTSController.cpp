@@ -21,6 +21,9 @@
 #include "System/GameMode/GS_InGameGM.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "AI/RTS/RTS_Skill/GS_RTSSkillComponent.h"
+#include "UI/RTS/GS_RTSSkillBarWidget.h"
+#include "Components/CanvasPanelSlot.h"
 
 
 
@@ -58,8 +61,14 @@ AGS_RTSController::AGS_RTSController()
 	ScrollLeftCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Scroll_L"));
 	ScrollRightCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Scroll_R"));
 
+	//[RTS Skill] 스킬 타겟팅 커서 경로
+	SkillTargetingCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_SkillTarget"));
+
 	//[Aether] AetherComp 연결
 	AetherComp = CreateDefaultSubobject<UGS_AetherComp>(TEXT("AetherComp"));
+
+	//[RTS Skill] RTSSkillComp 생성
+	RTSSkillComp = CreateDefaultSubobject<UGS_RTSSkillComponent>(TEXT("RTSSkillComp"));
 
 	// Sound
 	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_ClickSound.UI_SFX_ClickSound"));
@@ -136,6 +145,36 @@ void AGS_RTSController::BeginPlay()
 			{
 				RTSWidget->AddToViewport();
 			}
+		}
+
+		// RTS 스킬 바 위젯 생성
+		if (RTSSkillComp)
+		{
+			if (!RTSSkillBarWidgetClass)
+			{
+				UE_LOG(LogTemp, Error, TEXT("RTSSkillBarWidgetClass is not set! Please set WBP_RTSSkillBarWidget in BP_RTSController"));
+				return;
+			}
+
+			SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
+			if (SkillBarWidget)
+			{
+				// 화면에 추가
+				SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
+
+				// 초기화
+				SkillBarWidget->InitializeSkillBar(RTSSkillComp);
+
+				UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to create RTSSkillBarWidget"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("RTSSkillComp is null, cannot create skill bar"));
 		}
 	}
 
@@ -224,6 +263,15 @@ void AGS_RTSController::SetupInputComponent()
 			if (CameraKeyActions[i])
 			{
 				EnhancedInputComponent->BindAction(CameraKeyActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnCameraKey, i);
+			}
+		}
+
+		//[RTS Skill] 1-4 키 바인딩
+		for (int32 i = 0; i < RTSSkillKeyActions.Num(); ++i)
+		{
+			if (RTSSkillKeyActions[i])
+			{
+				EnhancedInputComponent->BindAction(RTSSkillKeyActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnRTSSkillKey, i);
 			}
 		}
 	}
@@ -369,18 +417,29 @@ void AGS_RTSController::SkillSelectedUnits()
 
 void AGS_RTSController::OnLeftMousePressed()
 {
+	//[RTS Skill] 타겟팅 모드 체크 (최우선)
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		FHitResult Hit;
+		if (GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel2), true, Hit))
+		{
+			HandleSkillTargetingClick(Hit.Location);
+		}
+		return; // 다른 입력 처리 방지
+	}
+
 	if (bCtrlDown && !bShiftDown)
 	{
 		SelectOnCtrlClick();
 		return;
 	}
-	
+
 	if (bShiftDown)
 	{
 		ToggleOnShiftClick();
 		return;
 	}
-	
+
 	FHitResult Hit;
 	bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel2), true, Hit);
 
@@ -471,6 +530,18 @@ void AGS_RTSController::OnLeftMouseReleased()
 
 void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 {
+	//[RTS Skill] 타겟팅 모드 취소 (최우선)
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		CancelGuardianSkillTargeting();
+
+		if (CommandCancelSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+		}
+		return;
+	}
+
 	// 커맨드 모드 중이면 취소
 	if (CurrentCommand != ERTSCommand::None)
 	{
@@ -521,6 +592,18 @@ void AGS_RTSController::Client_StartGame_Implementation()
 
 void AGS_RTSController::OnEscapeButtonClicked()
 {
+	//[RTS Skill] 타겟팅 모드 취소 우선
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		CancelGuardianSkillTargeting();
+
+		if (CommandCancelSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+		}
+		return;
+	}
+
 	if (CurrentCommand != ERTSCommand::None)
 	{
 		CurrentCommand = ERTSCommand::None;
@@ -716,7 +799,14 @@ void AGS_RTSController::UpdateCursorForCommand()
 	{
 		return;
 	}
-	
+
+	//[RTS Skill] 타겟팅 모드 커서
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		SetRTSCursor(SkillTargetingCursorPath);
+		return;
+	}
+
 	switch (CurrentCommand)
 	{
 	case ERTSCommand::Attack:
@@ -1844,5 +1934,55 @@ void AGS_RTSController::Client_StopBossBGM_Implementation()
 		{
 			AudioManager->EndBossSequenceLocal(this, 2.0f);
 		}
+	}
+}
+
+// ==========================================
+// Guardian RTS 스킬 시스템
+// ==========================================
+
+void AGS_RTSController::OnRTSSkillKey(const FInputActionInstance& InputInstance, int32 SkillIndex)
+{
+	ActivateGuardianSkill(SkillIndex);
+}
+
+void AGS_RTSController::ActivateGuardianSkill(int32 SkillIndex)
+{
+	if (!RTSSkillComp)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[RTSController] RTSSkillComp is null"));
+		return;
+	}
+
+	// 스킬 발동 시도 (타겟팅 필요 시 EnterSkillTargetingMode 자동 호출됨)
+	if (!RTSSkillComp->TryActivateSkill(SkillIndex))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[RTSController] Failed to activate skill %d"), SkillIndex);
+	}
+}
+
+void AGS_RTSController::HandleSkillTargetingClick(const FVector& TargetLocation)
+{
+	if (!RTSSkillComp || !RTSSkillComp->IsInSkillTargetingMode())
+	{
+		return;
+	}
+
+	// 스킬 실행
+	RTSSkillComp->ExecuteSkillAtLocation(TargetLocation);
+
+	UE_LOG(LogTemp, Log, TEXT("[RTSController] Guardian skill executed at %s"), *TargetLocation.ToString());
+}
+
+bool AGS_RTSController::IsInGuardianSkillTargetingMode() const
+{
+	return RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode();
+}
+
+void AGS_RTSController::CancelGuardianSkillTargeting()
+{
+	if (RTSSkillComp)
+	{
+		RTSSkillComp->ExitSkillTargetingMode();
 	}
 }
