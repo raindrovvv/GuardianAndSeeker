@@ -14,6 +14,8 @@ class AGS_Monster;
 class AGS_Character;
 class UInputMappingContext;
 class UInputAction;
+class UGS_RTSSkillComponent;
+class UGS_RTSSkillBarWidget;
 
 // 지정된 부대 
 USTRUCT(BlueprintType)
@@ -79,6 +81,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
 	TArray<UInputAction*> CameraKeyActions;
+
+	// 가디언 스킬 입력 (1, 2, 3, 4 키)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	TArray<UInputAction*> GuardianSkillActions;
 
 	// 선택 변경 델리게이트
 	UPROPERTY(BlueprintAssignable, Category="Selection")
@@ -214,6 +220,19 @@ public:
 	UFUNCTION()
 	void HandleSeekerHover(bool bIsHover);
 
+	// 가디언 스킬 시스템
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UGS_RTSSkillComponent* GetRTSSkillComponent() const { return RTSSkillComponent; }
+
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	void TryActivateGuardianSkill(int32 SkillIndex);
+
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	void CancelGuardianSkillTargeting();
+
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	bool IsInSkillTargetingMode() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -252,6 +271,18 @@ private:
 	UPROPERTY(EditAnywhere, Category="UI")
 	TSubclassOf<UUserWidget> RTSWidgetClass;
 
+	// 가디언 스킬 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="RTS|Skill")
+	UGS_RTSSkillComponent* RTSSkillComponent;
+
+	// 스킬 바 위젯 클래스
+	UPROPERTY(EditDefaultsOnly, Category="RTS|Skill|UI")
+	TSubclassOf<UGS_RTSSkillBarWidget> SkillBarWidgetClass;
+
+	// 스킬 바 위젯 인스턴스
+	UPROPERTY()
+	UGS_RTSSkillBarWidget* SkillBarWidget;
+
 	bool bSeekerHovered;
 	bool bShowAttackCursor;
 	FName DefaultCursorPath;
@@ -285,4 +316,12 @@ private:
 	void UpdateCursorForCommand();
 	void UpdateCursorForEdgeScroll();
 	void ShowAttackCursor();
+
+	// 가디언 스킬 관련
+	void InitializeRTSSkillComponent();
+	void CreateSkillBarWidget();
+	void OnGuardianSkillKey(const FInputActionInstance& InputInstance, int32 SkillIndex);
+	void HandleSkillTargetingClick(const FVector& TargetLocation);
+
+	FName SkillTargetCursorPath;
 };

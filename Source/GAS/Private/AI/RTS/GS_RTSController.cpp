@@ -8,6 +8,8 @@
 #include "AI/GS_AIController.h"
 #include "AI/RTS/GS_RTSCamera.h"
 #include "AI/RTS/GS_RTSHUD.h"
+#include "AI/RTS/Skill/GS_RTSSkillComponent.h"
+#include "AI/RTS/Skill/GS_RTSSkillBase.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "AkGameplayStatics.h"
@@ -17,6 +19,7 @@
 #include "Character/Skill/Monster/GS_MonsterSkillBase.h"
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
+#include "UI/RTS/GS_RTSSkillBarWidget.h"
 #include "Sound/GS_AudioManager.h"
 #include "System/GameMode/GS_InGameGM.h"
 
@@ -46,6 +49,10 @@ AGS_RTSController::AGS_RTSController()
 	ScrollDownCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Scroll_D"));
 	ScrollLeftCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Scroll_L"));
 	ScrollRightCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Scroll_R"));
+	SkillTargetCursorPath = FName(TEXT("UI/RTS/Cursor/Icon_Cursor_Skill"));
+
+	// 스킬 컴포넌트 생성
+	RTSSkillComponent = CreateDefaultSubobject<UGS_RTSSkillComponent>(TEXT("RTSSkillComponent"));
 }
 
 void AGS_RTSController::BeginPlay()
@@ -85,7 +92,13 @@ void AGS_RTSController::BeginPlay()
 				RTSWidget->AddToViewport();
 			}
 		}
+
+		// 스킬 바 위젯 생성
+		CreateSkillBarWidget();
 	}
+	
+	// 스킬 컴포넌트 초기화
+	InitializeRTSSkillComponent();
 	
 	Server_NotifyPlayerIsReady();
 }
@@ -128,6 +141,15 @@ void AGS_RTSController::SetupInputComponent()
 			if (CameraKeyActions[i])
 			{
 				EnhancedInputComponent->BindAction(CameraKeyActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnCameraKey, i);
+			}
+		}
+
+		// 가디언 스킬 키 바인딩 (1, 2, 3, 4)
+		for (int32 i = 0; i < GuardianSkillActions.Num(); ++i)
+		{
+			if (GuardianSkillActions[i])
+			{
+				EnhancedInputComponent->BindAction(GuardianSkillActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnGuardianSkillKey, i);
 			}
 		}
 	}
@@ -256,6 +278,17 @@ void AGS_RTSController::SkillSelectedUnits()
 
 void AGS_RTSController::OnLeftMousePressed()
 {
+	// 가디언 스킬 타겟팅 모드인 경우 스킬 발동
+	if (IsInSkillTargetingMode())
+	{
+		FHitResult SkillHit;
+		if (GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel2), true, SkillHit))
+		{
+			HandleSkillTargetingClick(SkillHit.Location);
+		}
+		return;
+	}
+
 	if (bCtrlDown && !bShiftDown)
 	{
 		SelectOnCtrlClick();
@@ -327,6 +360,13 @@ void AGS_RTSController::OnLeftMouseReleased()
 
 void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 {
+	// 가디언 스킬 타겟팅 모드 중이면 취소
+	if (IsInSkillTargetingMode())
+	{
+		CancelGuardianSkillTargeting();
+		return;
+	}
+
 	// 커맨드 모드 중이면 취소
 	if (CurrentCommand != ERTSCommand::None)
 	{
@@ -1069,4 +1109,109 @@ bool AGS_RTSController::IsSelectable(AGS_Monster* Monster) const
 void AGS_RTSController::OnSelectedUnitDead(AGS_Monster* Monster)
 {
 	RemoveUnitFromSelection(Monster);
+}
+
+// ======== 가디언 스킬 시스템 ========
+
+void AGS_RTSController::InitializeRTSSkillComponent()
+{
+	if (RTSSkillComponent)
+	{
+		UE_LOG(LogTemp, Log, TEXT("AGS_RTSController: RTS Skill Component initialized"));
+	}
+}
+
+void AGS_RTSController::CreateSkillBarWidget()
+{
+	if (!SkillBarWidgetClass || !RTSSkillComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AGS_RTSController: Cannot create skill bar widget - missing class or component"));
+		return;
+	}
+
+	SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, SkillBarWidgetClass);
+	if (SkillBarWidget)
+	{
+		SkillBarWidget->AddToViewport(1);  // RTS Widget 위에 표시
+		SkillBarWidget->InitializeSkillBar(RTSSkillComponent);
+		UE_LOG(LogTemp, Log, TEXT("AGS_RTSController: Skill bar widget created"));
+	}
+}
+
+void AGS_RTSController::TryActivateGuardianSkill(int32 SkillIndex)
+{
+	if (!RTSSkillComponent)
+	{
+		return;
+	}
+
+	// 이미 타겟팅 모드인 경우
+	if (RTSSkillComponent->IsInSkillTargetingMode())
+	{
+		// 같은 스킬을 다시 누르면 취소
+		if (RTSSkillComponent->GetTargetingSkillIndex() == SkillIndex)
+		{
+			CancelGuardianSkillTargeting();
+			return;
+		}
+	}
+
+	// 스킬 활성화 시도
+	if (RTSSkillComponent->TryActivateSkill(SkillIndex))
+	{
+		// 타겟팅 모드에 진입했으면 커서 변경
+		if (RTSSkillComponent->IsInSkillTargetingMode())
+		{
+			SetRTSCursor(SkillTargetCursorPath);
+			
+			if (CommandButtonSound)
+			{
+				UAkGameplayStatics::PostEvent(CommandButtonSound, this, 0, FOnAkPostEventCallback());
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("AGS_RTSController: Cannot activate skill %d"), SkillIndex);
+	}
+}
+
+void AGS_RTSController::CancelGuardianSkillTargeting()
+{
+	if (!RTSSkillComponent)
+	{
+		return;
+	}
+
+	if (RTSSkillComponent->IsInSkillTargetingMode())
+	{
+		RTSSkillComponent->ExitSkillTargetingMode();
+		SetRTSCursor(DefaultCursorPath);
+
+		if (CommandCancelSound)
+		{
+			UAkGameplayStatics::PostEvent(CommandCancelSound, this, 0, FOnAkPostEventCallback());
+		}
+	}
+}
+
+bool AGS_RTSController::IsInSkillTargetingMode() const
+{
+	return RTSSkillComponent && RTSSkillComponent->IsInSkillTargetingMode();
+}
+
+void AGS_RTSController::OnGuardianSkillKey(const FInputActionInstance& InputInstance, int32 SkillIndex)
+{
+	TryActivateGuardianSkill(SkillIndex);
+}
+
+void AGS_RTSController::HandleSkillTargetingClick(const FVector& TargetLocation)
+{
+	if (!RTSSkillComponent || !RTSSkillComponent->IsInSkillTargetingMode())
+	{
+		return;
+	}
+
+	RTSSkillComponent->ExecuteSkillAtLocation(TargetLocation);
+	SetRTSCursor(DefaultCursorPath);
 }
