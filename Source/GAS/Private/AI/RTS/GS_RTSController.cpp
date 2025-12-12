@@ -1464,6 +1464,9 @@ void AGS_RTSController::Server_RTSMove_Implementation(const FVector& Dest)
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
@@ -1574,10 +1577,14 @@ void AGS_RTSController::Server_RTSStop_Implementation()
 		{
 			AIController->StopMovement();
 
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
 				BlackboardComp->SetValueAsEnum(AGS_AIController::CommandKey, static_cast<uint8>(ERTSCommand::None));
+				BlackboardComp->ClearValue(AGS_AIController::TargetActorKey);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
 				// 첫 번째 유닛만 정지 소리 재생
@@ -1606,10 +1613,14 @@ void AGS_RTSController::Server_RTSHold_Implementation()
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
 				BlackboardComp->SetValueAsEnum(AGS_AIController::CommandKey, static_cast<uint8>(ERTSCommand::Hold));
+				BlackboardComp->ClearValue(AGS_AIController::TargetActorKey);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
 				// 첫 번째 유닛만 정지 소리 재생

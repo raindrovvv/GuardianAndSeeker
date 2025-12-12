@@ -6,6 +6,7 @@
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Component/GS_StatComp.h"
 #include "AI/GS_AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -78,7 +79,23 @@ void UGS_RTSSkill_SummonElite::SpawnEliteMonsterAtLocation(const FVector& Locati
 
 	if (SpawnedMonster)
 	{
+		// 몬스터 팀으로 설정 (TeamId = 2)
+		// IsEnemy 로직에서 몬스터는 시커(TeamId=1)만 공격하도록 설정됨
+		SpawnedMonster->TeamId = FGenericTeamId(2);
+
 		SpawnedMonster->SpawnDefaultController();
+
+		// 소환 직후 초기 타겟 클리어 (아군 몬스터를 타겟하지 않도록)
+		if (AGS_AIController* AIController = Cast<AGS_AIController>(SpawnedMonster->GetController()))
+		{
+			AIController->ClearCurrentTarget();
+
+			if (UBlackboardComponent* BBComp = AIController->GetBlackboardComponent())
+			{
+				BBComp->ClearValue(AGS_AIController::TargetActorKey);
+				BBComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
+			}
+		}
 
 		if (UGS_StatComp* StatComp = SpawnedMonster->GetStatComp())
 		{

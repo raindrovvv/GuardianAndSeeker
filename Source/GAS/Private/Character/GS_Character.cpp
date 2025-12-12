@@ -382,7 +382,22 @@ FGenericTeamId AGS_Character::GetGenericTeamId() const
 
 bool AGS_Character::IsEnemy(const AGS_Character* Other) const
 {
-	return Other && GetGenericTeamId()!= Other->GetGenericTeamId();
+	if (!Other)
+	{
+		return false;
+	}
+
+	const FGenericTeamId MyTeamId = GetGenericTeamId();
+	const FGenericTeamId OtherTeamId = Other->GetGenericTeamId();
+
+	// 몬스터(TeamId=2)는 시커(TeamId=1)만 공격
+	if (MyTeamId == FGenericTeamId(2))
+	{
+		return OtherTeamId == FGenericTeamId(1);
+	}
+
+	// 다른 팀은 기존 로직 유지 (다른 TeamId = 적)
+	return MyTeamId != OtherTeamId;
 }
 
 AGS_Weapon* AGS_Character::GetWeaponByIndex(int32 Index) const
