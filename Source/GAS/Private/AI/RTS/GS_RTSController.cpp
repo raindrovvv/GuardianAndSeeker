@@ -1304,7 +1304,7 @@ void AGS_RTSController::SpawnCommandDecal(ERTSCommand CommandType, const FVector
 
 void AGS_RTSController::Server_AddUnitToSelection_Implementation(AGS_Monster* Unit)
 {
-	if (!IsValid(Unit) || !IsSelectable(Unit))
+	if (!IsValid(Unit) || !CheckMonsterSelectable(Unit))
 	{
 		return;
 	}
@@ -1344,7 +1344,7 @@ void AGS_RTSController::Server_SetMultipleUnitsSelection_Implementation(const TA
 			break;
 		}
 
-		if (!IsValid(Unit) || !IsSelectable(Unit))
+		if (!IsValid(Unit) || !CheckMonsterSelectable(Unit))
 		{
 			continue;
 		}
