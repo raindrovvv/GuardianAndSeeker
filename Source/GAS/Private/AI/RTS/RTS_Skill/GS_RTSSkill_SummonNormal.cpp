@@ -13,45 +13,70 @@ UGS_RTSSkill_SummonNormal::UGS_RTSSkill_SummonNormal()
 {
 }
 
-void UGS_RTSSkill_SummonNormal::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
+FVector UGS_RTSSkill_SummonNormal::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
 {
 	Super::ActivateSkill(SkillComponent, TargetLocation);
 
 	// 서버에서만 실행
 	if (!SkillComponent || !SkillComponent->GetOwner()->HasAuthority())
 	{
+		return TargetLocation;
+	}
+
+	return SpawnMonsterAtLocation(TargetLocation);
+}
+
+void UGS_RTSSkill_SummonNormal::PlayCastEffects(const FVector& TargetLocation)
+{
+	const UGS_RTSSkillData_Summon* SummonData = GetSummonData();
+	if (!SummonData)
+	{
+		Super::PlayCastEffects(TargetLocation);
 		return;
 	}
 
-	SpawnMonsterAtLocation(TargetLocation);
+	// 클라이언트에서는 NavMesh 접근이 제한적일 수 있으므로 
+	// 타겟 위치에 바로 VFX와 사운드를 재생합니다.
+	const FVector SpawnLocation = TargetLocation + FVector(0.f, 0.f, SummonData->SpawnHeightOffset);
+
+	if (SummonData->SummonVFX)
+	{
+		PlaySkillVFX(SummonData->SummonVFX, SpawnLocation);
+	}
+
+	UAkAudioEvent* SoundToPlay = SelectSoundEvent(SummonData->SummonSound_TPS, SummonData->SummonSound_RTS);
+	if (SoundToPlay)
+	{
+		PlaySkillSound(SoundToPlay, SpawnLocation);
+	}
 }
 
-void UGS_RTSSkill_SummonNormal::SpawnMonsterAtLocation(const FVector& Location)
+FVector UGS_RTSSkill_SummonNormal::SpawnMonsterAtLocation(const FVector& Location)
 {
 	UWorld* World = GetSkillWorld();
 	if (!World)
 	{
-		return;
+		return Location;
 	}
 
 	const UGS_RTSSkillData_Summon* SummonData = GetSummonData();
 	if (!SummonData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkill_SummonNormal: Missing summon data asset"));
-		return;
+		return Location;
 	}
 
 	if (SummonData->MonsterClasses.Num() == 0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkill_SummonNormal: No monster classes configured!"));
-		return;
+		return Location;
 	}
 
 	FVector ValidLocation;
 	if (!FindValidSpawnLocation(Location, ValidLocation))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkill_SummonNormal: Could not find valid spawn location"));
-		return;
+		return Location;
 	}
 
 	const int32 RandomIndex = FMath::RandRange(0, SummonData->MonsterClasses.Num() - 1);
@@ -60,7 +85,7 @@ void UGS_RTSSkill_SummonNormal::SpawnMonsterAtLocation(const FVector& Location)
 	if (!MonsterClass)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkill_SummonNormal: Invalid monster class at index %d"), RandomIndex);
-		return;
+		return Location;
 	}
 
 	const FVector SpawnLocation = ValidLocation + FVector(0.f, 0.f, SummonData->SpawnHeightOffset);
@@ -96,23 +121,14 @@ void UGS_RTSSkill_SummonNormal::SpawnMonsterAtLocation(const FVector& Location)
 			}
 		}
 
-		if (SummonData->SummonVFX)
-		{
-			PlaySkillVFX(SummonData->SummonVFX, SpawnLocation);
-		}
-
-		if (SummonData->SummonSound)
-		{
-			PlaySkillSound(SummonData->SummonSound, SpawnLocation);
-		}
-
-		UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_SummonNormal: Spawned monster %s at %s"),
-			*SpawnedMonster->GetName(), *SpawnLocation.ToString());
+		return SpawnLocation;
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkill_SummonNormal: Failed to spawn monster"));
 	}
+
+	return Location;
 }
 
 bool UGS_RTSSkill_SummonNormal::FindValidSpawnLocation(const FVector& DesiredLocation, FVector& OutValidLocation) const

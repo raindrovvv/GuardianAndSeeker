@@ -22,12 +22,13 @@ class GAS_API UGS_RTSSkill_SummonElite : public UGS_RTSSkillBase
 public:
 	UGS_RTSSkill_SummonElite();
 
-	virtual void ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual void PlayCastEffects(const FVector& TargetLocation) override;
 
 protected:
 	const UGS_RTSSkillData_Summon* GetSummonData() const;
 
 private:
-	void SpawnEliteMonsterAtLocation(const FVector& Location);
+	FVector SpawnEliteMonsterAtLocation(const FVector& Location);
 	bool FindValidSpawnLocation(const FVector& DesiredLocation, FVector& OutValidLocation) const;
 };

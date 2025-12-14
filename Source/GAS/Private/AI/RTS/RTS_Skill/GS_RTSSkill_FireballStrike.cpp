@@ -17,17 +17,19 @@ UGS_RTSSkill_FireballStrike::UGS_RTSSkill_FireballStrike()
 	PendingTargetLocation = FVector::ZeroVector;
 }
 
-void UGS_RTSSkill_FireballStrike::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
+FVector UGS_RTSSkill_FireballStrike::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
 {
 	Super::ActivateSkill(SkillComponent, TargetLocation);
 
 	// 서버에서만 실행
 	if (!SkillComponent || !SkillComponent->GetOwner()->HasAuthority())
 	{
-		return;
+		return TargetLocation;
 	}
 
 	ShowWarningAndSpawnFireball(TargetLocation);
+
+	return TargetLocation;
 }
 
 void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& TargetLocation)
@@ -45,7 +47,8 @@ void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& Tar
 		return;
 	}
 
-	if (USoundBase* CastSound = GetCastSound())
+	// CastSound는 Base의 GetCastSound에서 이미 TPS/RTS 분기 처리됨
+	if (UAkAudioEvent* CastSound = GetCastSound())
 	{
 		PlaySkillSound(CastSound, TargetLocation);
 	}
@@ -89,8 +92,6 @@ void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& Tar
 			false
 		);
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_FireballStrike: Warning shown, fireball will spawn in %.1f seconds"), WarningDuration);
 }
 
 void UGS_RTSSkill_FireballStrike::SpawnFireball()
@@ -127,19 +128,17 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 			SpawnParams
 		);
 
-		if (Fireball)
+	if (Fireball)
+	{
+		if (UProjectileMovementComponent* ProjectileMovement = Fireball->FindComponentByClass<UProjectileMovementComponent>())
 		{
-			if (UProjectileMovementComponent* ProjectileMovement = Fireball->FindComponentByClass<UProjectileMovementComponent>())
-			{
-				ProjectileMovement->InitialSpeed = FallSpeed;
-				ProjectileMovement->MaxSpeed = FallSpeed;
-				ProjectileMovement->Velocity = FVector(0.f, 0.f, -FallSpeed);
-			}
-
-			UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_FireballStrike: Spawned fireball projectile at %s"), *SpawnLocation.ToString());
+			ProjectileMovement->InitialSpeed = FallSpeed;
+			ProjectileMovement->MaxSpeed = FallSpeed;
+			ProjectileMovement->Velocity = FVector(0.f, 0.f, -FallSpeed);
 		}
+	}
 
-		return;
+	return;
 	}
 
 	if (FireballData->TrailVFX)
@@ -147,9 +146,10 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 		PlaySkillVFX(FireballData->TrailVFX, SpawnLocation);
 	}
 
-	if (FireballData->FallSound)
+	UAkAudioEvent* FallSound = SelectSoundEvent(FireballData->FallSound_TPS, FireballData->FallSound_RTS);
+	if (FallSound)
 	{
-		PlaySkillSound(FireballData->FallSound, TargetLocation);
+		PlaySkillSound(FallSound, TargetLocation);
 	}
 
 	const float FallTime = (!FMath::IsNearlyZero(FallSpeed)) ? FallStartHeight / FallSpeed : 0.f;
@@ -182,9 +182,10 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 				WeakThis->PlaySkillVFX(FireballDataInner->ExplosionVFX, TargetLocation);
 			}
 
-			if (FireballDataInner->ExplosionSound)
+			UAkAudioEvent* ExpSound = WeakThis->SelectSoundEvent(FireballDataInner->ExplosionSound_TPS, FireballDataInner->ExplosionSound_RTS);
+			if (ExpSound)
 			{
-				WeakThis->PlaySkillSound(FireballDataInner->ExplosionSound, TargetLocation);
+				WeakThis->PlaySkillSound(ExpSound, TargetLocation);
 			}
 
 			TArray<FOverlapResult> OverlapResults;
@@ -217,8 +218,7 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 							FDamageEvent DamageEvent;
 							HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
 
-							UE_LOG(LogTemp, Log, TEXT("Fireball hit %s for %.1f damage"),
-								*HitCharacter->GetName(), FinalDamage);
+							HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
 						}
 					}
 				}
@@ -227,9 +227,6 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 		FallTime,
 		false
 	);
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_FireballStrike: Direct explosion scheduled at %s in %.2f seconds"),
-		*TargetLocation.ToString(), FallTime);
 }
 
 const UGS_RTSSkillData_Fireball* UGS_RTSSkill_FireballStrike::GetFireballData() const

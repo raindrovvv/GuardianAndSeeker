@@ -157,5 +157,5 @@ private:
 	void Server_ActivateSkill(int32 SkillIndex, const FVector& TargetLocation);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnSkillActivated(int32 SkillIndex);
+	void Multicast_OnSkillActivated(int32 SkillIndex, const FVector& TargetLocation);
 };

@@ -24,7 +24,7 @@ public:
 	UGS_RTSSkill_ObscureVision();
 
 	// 즉시 발동 스킬이므로 타겟 위치 불필요
-	virtual void ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
 	virtual bool CanActivate(UGS_RTSSkillComponent* SkillComponent) const override;
 
 protected:

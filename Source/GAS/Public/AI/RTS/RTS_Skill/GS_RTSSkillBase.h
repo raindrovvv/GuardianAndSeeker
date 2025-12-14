@@ -5,12 +5,14 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "GS_RTSSkillTypes.h"
+#include "AkGameplayStatics.h"
+#include "AkAudioEvent.h"
 #include "GS_RTSSkillBase.generated.h"
 
 class UGS_RTSSkillComponent;
 class AGS_RTSController;
 class UGS_RTSSkillData;
-class UParticleSystem;
+class UNiagaraSystem;
 class USoundBase;
 class UTexture2D;
 
@@ -58,10 +60,10 @@ public:
 	float GetEffectDuration() const;
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	UParticleSystem* GetActivationVFX() const;
+	UNiagaraSystem* GetActivationVFX() const;
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	USoundBase* GetCastSound() const;
+	class UAkAudioEvent* GetCastSound() const;
 
 	// 스킬 발동 가능 여부 체크
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
@@ -69,7 +71,10 @@ public:
 
 	// 스킬 발동
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	virtual void ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation);
+	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation);
+
+	// VFX/SFX 재생 (멀티캐스트에서 호출)
+	virtual void PlayCastEffects(const FVector& TargetLocation);
 
 	// 스킬 초기화 (컴포넌트에서 호출)
 	virtual void Initialize(UGS_RTSSkillComponent* OwnerComponent);
@@ -98,14 +103,18 @@ protected:
 	AGS_RTSController* GetRTSController() const;
 	UWorld* GetSkillWorld() const;
 
+	// 사운드 관련 헬퍼
+	bool IsRTSMode() const;
+	class UAkAudioEvent* SelectSoundEvent(class UAkAudioEvent* TPSSound, class UAkAudioEvent* RTSSound) const;
+
 	// 블루프린트에서 오버라이드 가능한 이벤트
 	UFUNCTION(BlueprintImplementableEvent, Category="RTS|Skill", meta=(DisplayName="On Skill Activated"))
 	void BP_OnSkillActivated(const FVector& TargetLocation);
 
 	// VFX/SFX 재생 헬퍼
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	void PlaySkillVFX(UParticleSystem* ParticleSystem, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator);
+	void PlaySkillVFX(UNiagaraSystem* NiagaraSystem, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator);
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
-	void PlaySkillSound(USoundBase* Sound, const FVector& Location);
+	void PlaySkillSound(class UAkAudioEvent* Sound, const FVector& Location);
 };

@@ -6,7 +6,7 @@
 #include "GS_RTSSkillData.generated.h"
 
 class UGS_RTSSkillBase;
-class UParticleSystem;
+class UNiagaraSystem;
 class USoundBase;
 class UTexture2D;
 class AGS_Monster;
@@ -57,10 +57,13 @@ public:
     TSubclassOf<UGS_RTSSkillBase> SkillClass;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|VFX")
-    TObjectPtr<UParticleSystem> ActivationVFX;
+    TObjectPtr<UNiagaraSystem> ActivationVFX;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
-    TObjectPtr<USoundBase> CastSound;
+    TObjectPtr<class UAkAudioEvent> CastSound_TPS;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
+    TObjectPtr<class UAkAudioEvent> CastSound_RTS;
 };
 
 /**
@@ -82,10 +85,13 @@ public:
     float StatMultiplier = 1.f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Summon")
-    TObjectPtr<UParticleSystem> SummonVFX;
+    TObjectPtr<UNiagaraSystem> SummonVFX;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Summon")
-    TObjectPtr<USoundBase> SummonSound;
+    TObjectPtr<class UAkAudioEvent> SummonSound_TPS;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Summon")
+    TObjectPtr<class UAkAudioEvent> SummonSound_RTS;
 };
 
 /**
@@ -113,16 +119,22 @@ public:
     TObjectPtr<UMaterialInterface> WarningDecalMaterial;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|VFX")
-    TObjectPtr<UParticleSystem> TrailVFX;
+    TObjectPtr<UNiagaraSystem> TrailVFX;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|VFX")
-    TObjectPtr<UParticleSystem> ExplosionVFX;
+    TObjectPtr<UNiagaraSystem> ExplosionVFX;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
-    TObjectPtr<USoundBase> FallSound;
+    TObjectPtr<class UAkAudioEvent> FallSound_TPS;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
-    TObjectPtr<USoundBase> ExplosionSound;
+    TObjectPtr<class UAkAudioEvent> FallSound_RTS;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
+    TObjectPtr<class UAkAudioEvent> ExplosionSound_TPS;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
+    TObjectPtr<class UAkAudioEvent> ExplosionSound_RTS;
 };
 
 /**
@@ -135,7 +147,10 @@ class GAS_API UGS_RTSSkillData_ObscureVision : public UGS_RTSSkillData
 
 public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
-    TObjectPtr<USoundBase> ObscureActivateSound;
+    TObjectPtr<class UAkAudioEvent> ObscureActivateSound_TPS;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Sound")
+    TObjectPtr<class UAkAudioEvent> ObscureActivateSound_RTS;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Skill|Debuff")
     TSubclassOf<UGS_DebuffObscure> ObscureDebuffClass;

@@ -5,7 +5,9 @@
 #include "AI/RTS/RTS_Skill/GS_RTSSkillData.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "Kismet/GameplayStatics.h"
-#include "Particles/ParticleSystemComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 UGS_RTSSkillBase::UGS_RTSSkillBase()
 	: SkillSlotIndex(-1)
@@ -63,14 +65,18 @@ float UGS_RTSSkillBase::GetEffectDuration() const
 	return SkillData ? SkillData->EffectDuration : 0.f;
 }
 
-UParticleSystem* UGS_RTSSkillBase::GetActivationVFX() const
+UNiagaraSystem* UGS_RTSSkillBase::GetActivationVFX() const
 {
 	return SkillData ? SkillData->ActivationVFX.Get() : nullptr;
 }
 
-USoundBase* UGS_RTSSkillBase::GetCastSound() const
+UAkAudioEvent* UGS_RTSSkillBase::GetCastSound() const
 {
-	return SkillData ? SkillData->CastSound.Get() : nullptr;
+	if (!SkillData)
+	{
+		return nullptr;
+	}
+	return SelectSoundEvent(SkillData->CastSound_TPS, SkillData->CastSound_RTS);
 }
 
 void UGS_RTSSkillBase::SetSkillData(UGS_RTSSkillData* InSkillData)
@@ -94,10 +100,26 @@ bool UGS_RTSSkillBase::CanActivate(UGS_RTSSkillComponent* SkillComponent) const
 	return SkillComponent->GetCurrentAether() >= GetAetherCost();
 }
 
-void UGS_RTSSkillBase::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
+FVector UGS_RTSSkillBase::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
 {
 	// 블루프린트 이벤트 호출
 	BP_OnSkillActivated(TargetLocation);
+
+	// 기본적으로는 타겟 위치 그대로 반환
+	return TargetLocation;
+}
+
+void UGS_RTSSkillBase::PlayCastEffects(const FVector& TargetLocation)
+{
+	if (UNiagaraSystem* VFX = GetActivationVFX())
+	{
+		PlaySkillVFX(VFX, TargetLocation);
+	}
+
+	if (UAkAudioEvent* Sound = GetCastSound())
+	{
+		PlaySkillSound(Sound, TargetLocation);
+	}
 }
 
 AGS_RTSController* UGS_RTSSkillBase::GetRTSController() const
@@ -118,29 +140,65 @@ UWorld* UGS_RTSSkillBase::GetSkillWorld() const
 	return nullptr;
 }
 
-void UGS_RTSSkillBase::PlaySkillVFX(UParticleSystem* ParticleSystem, const FVector& Location, const FRotator& Rotation)
+void UGS_RTSSkillBase::PlaySkillVFX(UNiagaraSystem* NiagaraSystem, const FVector& Location, const FRotator& Rotation)
 {
-	if (!ParticleSystem)
+	if (!NiagaraSystem)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("PlaySkillVFX: NiagaraSystem is null"));
 		return;
 	}
 
 	UWorld* World = GetSkillWorld();
 	if (!World)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("PlaySkillVFX: World is null"));
 		return;
 	}
 
-	UGameplayStatics::SpawnEmitterAtLocation(
+	// 기본 파라미터로 스폰 시도
+	UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		World,
-		ParticleSystem,
+		NiagaraSystem,
 		Location,
-		Rotation,
-		true
+		Rotation
 	);
 }
 
-void UGS_RTSSkillBase::PlaySkillSound(USoundBase* Sound, const FVector& Location)
+// ... (Existing implementation of GetRTSController and GetSkillWorld) ...
+
+bool UGS_RTSSkillBase::IsRTSMode() const
+{
+	UWorld* World = GetSkillWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(World, 0);
+	if (!LocalPC)
+	{
+		return false;
+	}
+
+	// LocalPC가 RTS 컨트롤러인지 확인
+	return Cast<AGS_RTSController>(LocalPC) != nullptr;
+}
+
+UAkAudioEvent* UGS_RTSSkillBase::SelectSoundEvent(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const
+{
+	if (IsRTSMode())
+	{
+		// RTS 모드이고 RTS 사운드가 있으면 사용, 없으면 TPS 사운드 폴백
+		return RTSSound ? RTSSound : TPSSound;
+	}
+	else
+	{
+		// TPS 모드이면 TPS 사운드 사용
+		return TPSSound;
+	}
+}
+
+void UGS_RTSSkillBase::PlaySkillSound(UAkAudioEvent* Sound, const FVector& Location)
 {
 	if (!Sound)
 	{
@@ -153,9 +211,10 @@ void UGS_RTSSkillBase::PlaySkillSound(USoundBase* Sound, const FVector& Location
 		return;
 	}
 
-	UGameplayStatics::PlaySoundAtLocation(
-		World,
+	UAkGameplayStatics::PostEventAtLocation(
 		Sound,
-		Location
+		Location,
+		FRotator::ZeroRotator,
+		World
 	);
 }

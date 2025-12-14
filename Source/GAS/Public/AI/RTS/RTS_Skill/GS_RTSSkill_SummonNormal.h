@@ -21,14 +21,15 @@ class GAS_API UGS_RTSSkill_SummonNormal : public UGS_RTSSkillBase
 public:
 	UGS_RTSSkill_SummonNormal();
 
-	virtual void ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual void PlayCastEffects(const FVector& TargetLocation) override;
 
 protected:
 	const UGS_RTSSkillData_Summon* GetSummonData() const;
 
 private:
 	// 소환 실행 (서버에서만)
-	void SpawnMonsterAtLocation(const FVector& Location);
+	FVector SpawnMonsterAtLocation(const FVector& Location);
 
 	// 유효한 소환 위치 찾기
 	bool FindValidSpawnLocation(const FVector& DesiredLocation, FVector& OutValidLocation) const;

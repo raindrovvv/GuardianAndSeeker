@@ -20,7 +20,7 @@ class GAS_API UGS_RTSSkill_FireballStrike : public UGS_RTSSkillBase
 public:
 	UGS_RTSSkill_FireballStrike();
 
-	virtual void ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
 
 protected:
 	const UGS_RTSSkillData_Fireball* GetFireballData() const;
