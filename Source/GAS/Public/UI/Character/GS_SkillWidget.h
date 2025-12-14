@@ -21,7 +21,7 @@ public:
 	virtual void NativeConstruct() override;
 	
 	//skill image and reset cool time 
-	void Initialize(UGS_SkillBase* Skill);
+	void InitSkill(UGS_SkillBase* Skill);
 
 	UFUNCTION()
 	void OnSkillCoolTimeChanged(ESkillSlot InSkillSlot, float InCurrentCoolTime) const;

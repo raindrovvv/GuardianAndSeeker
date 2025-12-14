@@ -18,7 +18,7 @@ AGS_LobbyDisplayActor::AGS_LobbyDisplayActor()
     bReplicates = true;
 
     bAlwaysRelevant = true;
-    NetUpdateFrequency = 1;
+    SetNetUpdateFrequency(1);
 
     UserInfoWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("UserIDWidget"));
     UserInfoWidgetComponent->SetupAttachment(RootComponent);

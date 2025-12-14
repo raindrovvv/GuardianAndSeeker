@@ -18,9 +18,9 @@
 
 UGS_GameInstance::UGS_GameInstance()
     : DefaultLobbyMapName(TEXT("/Game/Maps/CustomLobbyLevel"))
-    , MainMenuMapPath(TEXT("/Game/Maps/MainLevel"))
 	, DefaultLobbyGameModePath(TEXT("/Game/System/BP_GS_CustomLobbyGM.BP_GS_CustomLobbyGM_C"))
-	, DefaultMaxLobbyPlayers(5)
+    , DefaultMaxLobbyPlayers(5)
+    , MainMenuMapPath(TEXT("/Game/Maps/MainLevel"))
 {
     RemainingTime = 900.f;
 
@@ -443,7 +443,7 @@ void UGS_GameInstance::GSFindSession(APlayerController* RequestingPlayer)
     SessionSearchSettings = MakeShareable(new FOnlineSessionSearch());
     SessionSearchSettings->MaxSearchResults = 7777;
     SessionSearchSettings->bIsLanQuery = false;
-    SessionSearchSettings->QuerySettings.SearchParams.Remove(SEARCH_PRESENCE);
+    SessionSearchSettings->QuerySettings.SearchParams.Remove(SEARCH_PRESENCE); // SEARCH_LOBBIES
 	SessionSearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString("IINGSSpartaFinal"), EOnlineComparisonOp::Equals);
     UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::FindSession - SearchSettings: MaxResults=%d, LANQuery=%s, PresenceQuery=%s"),
         SessionSearchSettings->MaxSearchResults, SessionSearchSettings->bIsLanQuery ? TEXT("true") : TEXT("false"), TEXT("true"));

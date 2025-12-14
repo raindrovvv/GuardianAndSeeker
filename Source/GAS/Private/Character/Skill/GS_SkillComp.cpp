@@ -564,7 +564,7 @@ void UGS_SkillComp::InitializeSkillWidget(UGS_SkillWidget* InSkillWidget)
 		
 		if (SkillMap.Contains(Slot))
 		{
-			InSkillWidget->Initialize(SkillMap[Slot]);
+			InSkillWidget->InitSkill(SkillMap[Slot]);
 			
 			OnSkillCooldownChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnSkillCoolTimeChanged);
 			OnHealCountChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnHealCountChanged);
