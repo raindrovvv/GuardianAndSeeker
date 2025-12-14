@@ -367,8 +367,8 @@ private:
 	
 	// 명령 가능한 유닛들
 	void GatherCommandableUnits(TArray<AGS_Monster*>& Out) const;
-	bool IsSelectable(AGS_Monster* Monster) const;
-
+	bool CheckMonsterSelectable(AGS_Monster* Monster) const;
+	
 	UFUNCTION()
 	void OnSelectedUnitDead(AGS_Monster* Monster);
 

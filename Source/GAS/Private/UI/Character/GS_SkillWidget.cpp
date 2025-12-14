@@ -28,7 +28,7 @@ void UGS_SkillWidget::NativeConstruct()
 	}
 }
 
-void UGS_SkillWidget::Initialize(UGS_SkillBase* Skill)
+void UGS_SkillWidget::InitSkill(UGS_SkillBase* Skill)
 {
 	if (Skill)
 	{

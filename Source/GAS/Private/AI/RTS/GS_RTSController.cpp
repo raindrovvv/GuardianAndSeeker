@@ -826,7 +826,7 @@ void AGS_RTSController::SelectOnCtrlClick()
 	}
 
 	AGS_Monster* Monster = Cast<AGS_Monster>(Hit.GetActor());
-	if (!Monster || !IsSelectable(Monster))
+	if (!Monster || !CheckMonsterSelectable(Monster))
 	{
 		return;
 	}
@@ -886,7 +886,7 @@ void AGS_RTSController::ToggleOnShiftClick()
 
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(ShiftHit.GetActor()))
 	{
-		if (!IsSelectable(Monster))
+		if (!CheckMonsterSelectable(Monster))
 		{
 			return;
 		}
@@ -905,7 +905,7 @@ void AGS_RTSController::ToggleOnShiftClick()
 
 void AGS_RTSController::AddUnitToSelection(AGS_Monster* Unit)
 {
-	if (!Unit || !IsSelectable(Unit))
+	if (!Unit || !CheckMonsterSelectable(Unit))
 	{
 		return;
 	}
@@ -966,7 +966,7 @@ void AGS_RTSController::AddMultipleUnitsToSelection(const TArray<AGS_Monster*>& 
 			continue;
 		}
 
-		if (!IsSelectable(Unit))
+		if (!CheckMonsterSelectable(Unit))
 		{
 			continue;
 		}
@@ -1588,7 +1588,7 @@ void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
 	}
 }
 
-bool AGS_RTSController::IsSelectable(AGS_Monster* Monster) const
+bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 {
 	if (!IsValid(Monster))
 	{
