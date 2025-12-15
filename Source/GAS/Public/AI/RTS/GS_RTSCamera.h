@@ -55,6 +55,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
 	FLinearColor CloudFogColor = FLinearColor(0.8f, 0.9f, 1.0f, 1.0f);
 
+	// --- Niagara Cloud Effect ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	class UNiagaraSystem* CloudNiagaraSystem;
+
+	// --- Cloud Wind Sound ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	USoundBase* CloudWindSound;
+
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
@@ -62,7 +70,15 @@ private:
 	UPROPERTY(Transient)
 	UMaterialInstanceDynamic* CloudMaterialInstance;
 
+	UPROPERTY(Transient)
+	class UNiagaraComponent* CloudNiagaraComponent;
+
+	UPROPERTY(Transient)
+	UAudioComponent* CloudWindAudioComponent;
+
 	void UpdateCloudMaterialParameters();
+	void UpdateCloudNiagaraParameters();
+	void UpdateCloudSoundParameters();
 
 private:
 	// 캐싱된 뷰 경계

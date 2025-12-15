@@ -9,6 +9,11 @@
 #include "Math/Vector.h"
 #include "Math/Vector2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraSystem.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AGS_RTSCamera::AGS_RTSCamera()
@@ -22,6 +27,7 @@ void AGS_RTSCamera::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Post Process Setup
 	if (CloudMaterialBase)
 	{
 		CloudMaterialInstance = UMaterialInstanceDynamic::Create(CloudMaterialBase, this);
@@ -33,6 +39,41 @@ void AGS_RTSCamera::BeginPlay()
 			{
 				CameraComp->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, CloudMaterialInstance));
 			}
+		}
+	}
+
+	// Niagara Setup
+	if (CloudNiagaraSystem)
+	{
+		CloudNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			CloudNiagaraSystem,
+			GetCameraComponent(),
+			NAME_None,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			EAttachLocation::SnapToTarget,
+			true
+		);
+	}
+
+	// Sound Setup
+	if (CloudWindSound)
+	{
+		CloudWindAudioComponent = UGameplayStatics::SpawnSound2D(
+			this,
+			CloudWindSound,
+			0.0f, // Start with 0 volume
+			1.0f,
+			0.0f,
+			nullptr,
+			true,
+			true
+		);
+
+		if (CloudWindAudioComponent)
+		{
+			CloudWindAudioComponent->bAutoDestroy = false; 
+			CloudWindAudioComponent->Play();
 		}
 	}
 }
@@ -53,10 +94,48 @@ void AGS_RTSCamera::UpdateCloudMaterialParameters()
 	}
 }
 
+void AGS_RTSCamera::UpdateCloudNiagaraParameters()
+{
+	if (CloudNiagaraComponent && GetCameraComponent())
+	{
+		FVector CamLoc = GetCameraComponent()->GetComponentLocation();
+		float CurrentZ = CamLoc.Z;
+
+		// Calculate Alpha based on height (Same logic as Material)
+		float Alpha = FMath::GetMappedRangeValueClamped(
+			FVector2D(CloudHeightMin, CloudHeightMax),
+			FVector2D(0.0f, 1.0f),
+			CurrentZ
+		);
+
+		CloudNiagaraComponent->SetVariableFloat(FName("CloudAlpha"), Alpha);
+	}
+}
+
+void AGS_RTSCamera::UpdateCloudSoundParameters()
+{
+	if (CloudWindAudioComponent && GetCameraComponent())
+	{
+		FVector CamLoc = GetCameraComponent()->GetComponentLocation();
+		float CurrentZ = CamLoc.Z;
+
+		// Calculate Volume Alpha
+		float VolumeAlpha = FMath::GetMappedRangeValueClamped(
+			FVector2D(CloudHeightMin, CloudHeightMax),
+			FVector2D(0.0f, 1.0f),
+			CurrentZ
+		);
+
+		CloudWindAudioComponent->SetVolumeMultiplier(VolumeAlpha);
+	}
+}
+
 // Called every frame
 void AGS_RTSCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	UpdateCloudNiagaraParameters();
+	UpdateCloudSoundParameters();
 }
 
 UCameraComponent* AGS_RTSCamera::GetCameraComponent() const
