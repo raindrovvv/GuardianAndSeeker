@@ -135,7 +135,7 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
         {
             if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
             {
-                if (!Cast<AGS_Monster>(ActorClassToSpawn))
+                if (!ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -224,7 +224,7 @@ void AGS_InGameGM::OnNavMeshBuildComplete()
         {
             if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
             {
-                if (Cast<AGS_Monster>(ActorClassToSpawn))
+                if (ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

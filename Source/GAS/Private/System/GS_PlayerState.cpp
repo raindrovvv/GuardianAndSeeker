@@ -15,9 +15,9 @@ AGS_PlayerState::AGS_PlayerState()
     : CurrentPlayerRole(EPlayerRole::PR_Seeker)
     , CurrentSeekerJob(ESeekerJob::Merci)
     , CurrentGuardianJob(EGuardianJob::Drakhar)
-    , CurrentGameResult(EGameResult::GR_InProgress)
     , bIsReady(false)
 	, CurrentHealth(99999.f)
+    , CurrentGameResult(EGameResult::GR_InProgress)
 	, BoundStatComp(nullptr)
 {
     bReplicates = true;
