@@ -24,11 +24,14 @@ AGS_AIController::AGS_AIController(const FObjectInitializer& ObjectInitializer)
 {
 	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
+
+	// DetectionByAffiliation 설정을 ConfigureSense 전에 해야 함
+	SightConfig->DetectionByAffiliation.bDetectEnemies   = true;
+	SightConfig->DetectionByAffiliation.bDetectNeutrals  = false;
+	SightConfig->DetectionByAffiliation.bDetectFriendlies= false;
+
 	PerceptionComponent->ConfigureSense(*SightConfig);
-	
-    SightConfig->DetectionByAffiliation.bDetectEnemies   = true;
-    SightConfig->DetectionByAffiliation.bDetectNeutrals  = false;
-    SightConfig->DetectionByAffiliation.bDetectFriendlies= false;
+	PerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 }
 
 void AGS_AIController::BeginPlay()
@@ -87,6 +90,46 @@ FGenericTeamId AGS_AIController::GetGenericTeamId() const
 	return FGenericTeamId::NoTeam;
 }
 
+ETeamAttitude::Type AGS_AIController::GetTeamAttitudeTowards(const AActor& Other) const
+{
+	const IGenericTeamAgentInterface* OtherTeamAgent = Cast<IGenericTeamAgentInterface>(&Other);
+	if (!OtherTeamAgent)
+	{
+		return ETeamAttitude::Neutral;
+	}
+
+	const FGenericTeamId MyTeamId = GetGenericTeamId();
+	const FGenericTeamId OtherTeamId = OtherTeamAgent->GetGenericTeamId();
+
+	// 몬스터(TeamId=2)의 특수 로직
+	if (MyTeamId == FGenericTeamId(2))
+	{
+		if (OtherTeamId == FGenericTeamId(2))
+		{
+			// 몬스터끼리는 아군
+			return ETeamAttitude::Friendly;
+		}
+		else if (OtherTeamId == FGenericTeamId(1))
+		{
+			// 시커는 적
+			return ETeamAttitude::Hostile;
+		}
+		else
+		{
+			// 가디언(TeamId=0) 등은 중립
+			return ETeamAttitude::Neutral;
+		}
+	}
+
+	// 다른 팀들은 기본 로직 (같은 팀 = 아군, 다른 팀 = 적)
+	if (MyTeamId == OtherTeamId)
+	{
+		return ETeamAttitude::Friendly;
+	}
+
+	return ETeamAttitude::Hostile;
+}
+
 void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	if (Blackboard->GetValueAsBool(DebuffLockedKey))
@@ -132,6 +175,12 @@ void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimul
 
 	for (AActor* Target : Targets)
 	{
+		// 적(Hostile)만 타겟으로 설정 (아군 몬스터 공격 방지)
+		if (!Target || GetTeamAttitudeTowards(*Target) != ETeamAttitude::Hostile)
+		{
+			continue;
+		}
+
 		// 죽은 캐릭터는 타겟에서 제외
 		/*if (AGS_Character* CandidateChar = Cast<AGS_Character>(Target))
 		{

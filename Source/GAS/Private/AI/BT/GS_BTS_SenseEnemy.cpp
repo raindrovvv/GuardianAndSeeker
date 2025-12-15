@@ -6,6 +6,8 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
+#include "GenericTeamAgentInterface.h"
+#include "AI/RTS/RTSCommand.h"
 
 UGS_BTS_SenseEnemy::UGS_BTS_SenseEnemy()
 {
@@ -28,21 +30,40 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	{
 		return;
 	}
-	
+
 	if (Blackboard->GetValueAsBool(AGS_AIController::TargetLockedKey))
 	{
 		return;
 	}
 
+	// Move 명령 중에만 적을 감지하지 않음 (Hold는 적 감지해야 함)
+	const uint8 CurrentCommand = Blackboard->GetValueAsEnum(AGS_AIController::CommandKey);
+	if (CurrentCommand == static_cast<uint8>(ERTSCommand::Move))
+	{
+		// Move 중에는 목적지로 이동만 (적 감지 안 함)
+		return;
+	}
+
 	TArray<AActor*> Targets;
 	AIController->PerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), Targets);
-	if (Targets.IsEmpty()) 
+
+	// 적(Hostile)만 필터링
+	TArray<AActor*> HostileTargets;
+	for (AActor* Target : Targets)
+	{
+		if (Target && AIController->GetTeamAttitudeTowards(*Target) == ETeamAttitude::Hostile)
+		{
+			HostileTargets.Add(Target);
+		}
+	}
+
+	if (HostileTargets.IsEmpty())
 	{
 		if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) != nullptr)
 		{
 			AIController->ClearCurrentTarget();
 		}
-		
+
 		return;
 	}
 
@@ -51,7 +72,7 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	float ClosestDist = TNumericLimits<float>::Max();
 	AActor* NearestTarget = nullptr;
 
-	for (AActor* Target : Targets)
+	for (AActor* Target : HostileTargets)
 	{
 		const float Dist = FVector::DistSquared(ControlledPawn->GetActorLocation(),	Target->GetActorLocation());
 		if (Dist < ClosestDist)

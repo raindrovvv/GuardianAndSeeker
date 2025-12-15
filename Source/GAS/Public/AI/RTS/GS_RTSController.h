@@ -17,6 +17,7 @@ class AGS_Seeker;
 class UInputMappingContext;
 class UInputAction;
 class UGS_AetherComp;
+class UGS_RTSSkillComponent;
 
 // 지정된 부대 
 USTRUCT(BlueprintType)
@@ -86,6 +87,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
 	TArray<UInputAction*> CameraKeyActions;
 
+	// Guardian RTS 스킬 입력 (1-4 키)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	TArray<UInputAction*> RTSSkillKeyActions;
+
 	// 선택 변경 델리게이트
 	UPROPERTY(BlueprintAssignable, Category="Selection")
 	FOnSelectionChanged OnSelectionChanged;
@@ -105,6 +110,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Resource")
 	FOnAetherCompReady OnAetherCompReady;
+
+	// Guardian RTS 스킬 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Skill")
+	TObjectPtr<UGS_RTSSkillComponent> RTSSkillComp;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -146,6 +155,17 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="RTS")
 	void SkillSelectedUnits();
+
+	// Guardian RTS 스킬 발동 (1-4 키)
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	void ActivateGuardianSkill(int32 SkillIndex);
+
+	// 타겟팅 모드 관련
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	bool IsInGuardianSkillTargetingMode() const;
+
+	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	void CancelGuardianSkillTargeting();
 
 	// 마우스 클릭 처리
 	void OnLeftMousePressed();
@@ -297,6 +317,14 @@ private:
 	UPROPERTY(EditAnywhere, Category="UI")
 	TSubclassOf<UUserWidget> RTSWidgetClass;
 
+	// RTS 스킬 바 위젯 클래스
+	UPROPERTY(EditDefaultsOnly, Category="UI|RTS Skill")
+	TSubclassOf<class UGS_RTSSkillBarWidget> RTSSkillBarWidgetClass;
+
+	// 생성된 스킬 바 위젯 인스턴스
+	UPROPERTY()
+	UGS_RTSSkillBarWidget* SkillBarWidget;
+
 	bool bSeekerHovered;
 	bool bShowAttackCursor;
 	bool bCursorReady; // 커서 시스템 사용 가능 여부
@@ -311,6 +339,7 @@ private:
 	FName ScrollDownCursorPath;
 	FName ScrollLeftCursorPath;
 	FName ScrollRightCursorPath;
+	FName SkillTargetingCursorPath;
 
 	UPROPERTY()
 	FTimerHandle AttackCursorTimerHandle;
@@ -403,6 +432,12 @@ private:
 
 	UFUNCTION()
 	void ResetGroupDoubleClickState();
+
+	// Guardian RTS 스킬 입력 핸들러
+	void OnRTSSkillKey(const FInputActionInstance& InputInstance, int32 SkillIndex);
+
+	// 타겟팅 모드 처리
+	void HandleSkillTargetingClick(const FVector& TargetLocation);
 
 	// ==========================================
 	// RTS 명령 데칼 시스템
