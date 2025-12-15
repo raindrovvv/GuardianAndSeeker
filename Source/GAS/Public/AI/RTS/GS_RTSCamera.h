@@ -42,6 +42,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	FBox2D GetSimpleViewBounds() const;
 
+	// --- Cloud Fog Effect ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	UMaterialInterface* CloudMaterialBase;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	float CloudHeightMin = 1000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	float CloudHeightMax = 3000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
+	FLinearColor CloudFogColor = FLinearColor(0.8f, 0.9f, 1.0f, 1.0f);
+
+protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
+
+private:
+	UPROPERTY(Transient)
+	UMaterialInstanceDynamic* CloudMaterialInstance;
+
+	void UpdateCloudMaterialParameters();
+
 private:
 	// 캐싱된 뷰 경계
 	mutable FBox2D CachedViewBounds;

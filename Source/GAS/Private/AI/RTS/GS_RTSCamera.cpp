@@ -8,6 +8,7 @@
 #include "Math/Box2D.h"
 #include "Math/Vector.h"
 #include "Math/Vector2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 // Sets default values
 AGS_RTSCamera::AGS_RTSCamera()
@@ -21,6 +22,35 @@ void AGS_RTSCamera::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (CloudMaterialBase)
+	{
+		CloudMaterialInstance = UMaterialInstanceDynamic::Create(CloudMaterialBase, this);
+		if (CloudMaterialInstance)
+		{
+			UpdateCloudMaterialParameters();
+
+			if (UCameraComponent* CameraComp = GetCameraComponent())
+			{
+				CameraComp->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, CloudMaterialInstance));
+			}
+		}
+	}
+}
+
+void AGS_RTSCamera::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	UpdateCloudMaterialParameters();
+}
+
+void AGS_RTSCamera::UpdateCloudMaterialParameters()
+{
+	if (CloudMaterialInstance)
+	{
+		CloudMaterialInstance->SetScalarParameterValue(FName("CloudHeightMin"), CloudHeightMin);
+		CloudMaterialInstance->SetScalarParameterValue(FName("CloudHeightMax"), CloudHeightMax);
+		CloudMaterialInstance->SetVectorParameterValue(FName("CloudFogColor"), CloudFogColor);
+	}
 }
 
 // Called every frame
