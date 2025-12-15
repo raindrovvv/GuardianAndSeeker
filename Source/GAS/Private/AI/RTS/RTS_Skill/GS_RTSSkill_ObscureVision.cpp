@@ -41,20 +41,20 @@ bool UGS_RTSSkill_ObscureVision::CanActivate(UGS_RTSSkillComponent* SkillCompone
 	return false;  // 살아있는 시커 없음
 }
 
-void UGS_RTSSkill_ObscureVision::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
+FVector UGS_RTSSkill_ObscureVision::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
 {
 	Super::ActivateSkill(SkillComponent, TargetLocation);
 
 	// 서버에서만 실행
 	if (!SkillComponent || !SkillComponent->GetOwner()->HasAuthority())
 	{
-		return;
+		return TargetLocation;
 	}
 
 	ApplyObscureToAllSeekers();
 
 	// 시전 VFX (RTS 화면에서 보여줄 이펙트)
-	if (UParticleSystem* ActivationVFX = GetActivationVFX())
+	if (UNiagaraSystem* ActivationVFX = GetActivationVFX())
 	{
 		if (AGS_RTSController* RTSController = GetRTSController())
 		{
@@ -64,13 +64,21 @@ void UGS_RTSSkill_ObscureVision::ActivateSkill(UGS_RTSSkillComponent* SkillCompo
 	}
 
 	// 시전 사운드 재생
-	if (USoundBase* CastSound = GetCastSound())
+	if (UAkAudioEvent* CastSound = GetCastSound())
 	{
 		if (UWorld* World = GetSkillWorld())
 		{
-			UGameplayStatics::PlaySound2D(World, CastSound);
+			// RTS 컨트롤러의 Pawn 위치나 ZeroVector에서 재생
+			FVector SoundLocation = FVector::ZeroVector;
+			if (AGS_RTSController* RTSController = GetRTSController())
+			{
+				SoundLocation = RTSController->GetPawn() ? RTSController->GetPawn()->GetActorLocation() : FVector::ZeroVector;
+			}
+			UAkGameplayStatics::PostEventAtLocation(CastSound, SoundLocation, FRotator::ZeroRotator, World);
 		}
 	}
+
+	return TargetLocation;
 }
 
 void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
@@ -82,7 +90,12 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 	}
 
 	const UGS_RTSSkillData_ObscureVision* ObscureData = GetObscureVisionData();
-	USoundBase* ActivateSound = ObscureData ? ObscureData->ObscureActivateSound.Get() : nullptr;
+	UAkAudioEvent* ActivateSound = nullptr;
+	if (ObscureData)
+	{
+		ActivateSound = SelectSoundEvent(ObscureData->ObscureActivateSound_TPS, ObscureData->ObscureActivateSound_RTS);
+	}
+
 	const float ObscureDuration = GetEffectDuration();
 
 	int32 AffectedCount = 0;
@@ -103,9 +116,6 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 			// 기존 DebuffComp를 통해 디버프 적용
 			DebuffComp->ApplyDebuff(EDebuffType::Obscure, nullptr);
 			++AffectedCount;
-
-			UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_ObscureVision: Applied Obscure debuff via DebuffComp to %s"), 
-				*Seeker->GetName());
 		}
 		else
 		{
@@ -128,7 +138,6 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 			);
 
 			++AffectedCount;
-			UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_ObscureVision: Applied direct vision obscure to %s"), *Seeker->GetName());
 		}
 
 		// 개별 시커에게 활성화 사운드 재생
@@ -137,8 +146,6 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 			PlaySkillSound(ActivateSound, Seeker->GetActorLocation());
 		}
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("UGS_RTSSkill_ObscureVision: Affected %d seekers"), AffectedCount);
 }
 
 const UGS_RTSSkillData_ObscureVision* UGS_RTSSkill_ObscureVision::GetObscureVisionData() const

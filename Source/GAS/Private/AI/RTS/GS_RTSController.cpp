@@ -916,7 +916,7 @@ void AGS_RTSController::SelectOnCtrlClick()
 	}
 
 	AGS_Monster* Monster = Cast<AGS_Monster>(Hit.GetActor());
-	if (!Monster || !IsSelectable(Monster))
+	if (!Monster || !CheckMonsterSelectable(Monster))
 	{
 		return;
 	}
@@ -976,7 +976,7 @@ void AGS_RTSController::ToggleOnShiftClick()
 
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(ShiftHit.GetActor()))
 	{
-		if (!IsSelectable(Monster))
+		if (!CheckMonsterSelectable(Monster))
 		{
 			return;
 		}
@@ -995,7 +995,7 @@ void AGS_RTSController::ToggleOnShiftClick()
 
 void AGS_RTSController::AddUnitToSelection(AGS_Monster* Unit)
 {
-	if (!Unit || !IsSelectable(Unit))
+	if (!Unit || !CheckMonsterSelectable(Unit))
 	{
 		return;
 	}
@@ -1056,7 +1056,7 @@ void AGS_RTSController::AddMultipleUnitsToSelection(const TArray<AGS_Monster*>& 
 			continue;
 		}
 
-		if (!IsSelectable(Unit))
+		if (!CheckMonsterSelectable(Unit))
 		{
 			continue;
 		}
@@ -1394,7 +1394,7 @@ void AGS_RTSController::SpawnCommandDecal(ERTSCommand CommandType, const FVector
 
 void AGS_RTSController::Server_AddUnitToSelection_Implementation(AGS_Monster* Unit)
 {
-	if (!IsValid(Unit) || !IsSelectable(Unit))
+	if (!IsValid(Unit) || !CheckMonsterSelectable(Unit))
 	{
 		return;
 	}
@@ -1434,7 +1434,7 @@ void AGS_RTSController::Server_SetMultipleUnitsSelection_Implementation(const TA
 			break;
 		}
 
-		if (!IsValid(Unit) || !IsSelectable(Unit))
+		if (!IsValid(Unit) || !CheckMonsterSelectable(Unit))
 		{
 			continue;
 		}
@@ -1464,6 +1464,9 @@ void AGS_RTSController::Server_RTSMove_Implementation(const FVector& Dest)
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
@@ -1574,10 +1577,14 @@ void AGS_RTSController::Server_RTSStop_Implementation()
 		{
 			AIController->StopMovement();
 
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
 				BlackboardComp->SetValueAsEnum(AGS_AIController::CommandKey, static_cast<uint8>(ERTSCommand::None));
+				BlackboardComp->ClearValue(AGS_AIController::TargetActorKey);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
 				// 첫 번째 유닛만 정지 소리 재생
@@ -1606,10 +1613,14 @@ void AGS_RTSController::Server_RTSHold_Implementation()
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
+			// 기존 타겟을 명시적으로 클리어
+			AIController->ClearCurrentTarget();
+
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
 			{
 				BlackboardComp->ClearValue(AGS_AIController::CommandKey);
 				BlackboardComp->SetValueAsEnum(AGS_AIController::CommandKey, static_cast<uint8>(ERTSCommand::Hold));
+				BlackboardComp->ClearValue(AGS_AIController::TargetActorKey);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
 				// 첫 번째 유닛만 정지 소리 재생
@@ -1678,7 +1689,7 @@ void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
 	}
 }
 
-bool AGS_RTSController::IsSelectable(AGS_Monster* Monster) const
+bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 {
 	if (!IsValid(Monster))
 	{

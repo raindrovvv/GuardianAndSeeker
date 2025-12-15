@@ -29,7 +29,7 @@ void UGS_BuildingIconSlotWidget::SetButtonImage()
 	const FGS_PlaceableObjectsRow* RowPtr = Data.GetRow<FGS_PlaceableObjectsRow>(Data.RowName.ToString());
 	if (nullptr != RowPtr)
 	{
-		TObjectPtr<UTexture> Icon = *RowPtr->Icon;
+		TObjectPtr<UTexture> Icon = RowPtr->Icon;
 		FButtonStyle ButtonStyle = TempBtn->GetStyle();
 		ButtonStyle.Normal.SetResourceObject(Icon);
 		ButtonStyle.Normal.ImageSize = FVector2D(100, 100);

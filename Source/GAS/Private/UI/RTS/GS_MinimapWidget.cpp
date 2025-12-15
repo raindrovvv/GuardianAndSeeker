@@ -218,7 +218,7 @@ UImage* UGS_MinimapWidget::AcquireIconWidget()
 	if (IconContainer)
 	{
 		UImage* NewIcon = NewObject<UImage>(IconContainer);
-		NewIcon->SetBrushSize(IconSize);
+		NewIcon->SetDesiredSizeOverride(IconSize);
 
 		UCanvasPanelSlot* CanvasSlot = IconContainer->AddChildToCanvas(NewIcon);
 		if (CanvasSlot)
