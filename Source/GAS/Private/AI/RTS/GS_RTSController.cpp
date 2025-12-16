@@ -24,6 +24,10 @@
 #include "AI/RTS/RTS_Skill/GS_RTSSkillComponent.h"
 #include "UI/RTS/GS_RTSSkillBarWidget.h"
 #include "Components/CanvasPanelSlot.h"
+#include "AI/RTS/GS_RTSAttackNotificationManager.h"
+#include "UI/RTS/GS_RTSAttackWarningWidget.h"
+#include "UI/RTS/GS_MinimapWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 
 
 
@@ -70,6 +74,9 @@ AGS_RTSController::AGS_RTSController()
 	//[RTS Skill] RTSSkillComp 생성
 	RTSSkillComp = CreateDefaultSubobject<UGS_RTSSkillComponent>(TEXT("RTSSkillComp"));
 
+	// Create AttackNotificationManager component
+	AttackNotificationManager = CreateDefaultSubobject<UGS_RTSAttackNotificationManager>(TEXT("AttackNotificationManager"));
+
 	// Sound
 	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_ClickSound.UI_SFX_ClickSound"));
 	if (MouseClickSoundRef.Succeeded())
@@ -113,7 +120,9 @@ AActor* AGS_RTSController::GetViewTarget() const
 void AGS_RTSController::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!HasAuthority() && IsLocalController())
+	
+	// UI 및 로컬 설정 (Client 및 Listen Server Host 모두 실행)
+	if (IsLocalController())
 	{
 		// 타이머로 커서 및 입력 모드 초기화 (150ms 지연)
 		// 뷰포트 초기화 이슈 방지를 위해 지연 실행
@@ -153,28 +162,73 @@ void AGS_RTSController::BeginPlay()
 			if (!RTSSkillBarWidgetClass)
 			{
 				UE_LOG(LogTemp, Error, TEXT("RTSSkillBarWidgetClass is not set! Please set WBP_RTSSkillBarWidget in BP_RTSController"));
-				return;
-			}
-
-			SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
-			if (SkillBarWidget)
-			{
-				// 화면에 추가
-				SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
-
-				// 초기화
-				SkillBarWidget->InitializeSkillBar(RTSSkillComp);
-
-				UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
+				// return; // 중단하지 않고 계속 진행
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to create RTSSkillBarWidget"));
+				SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
+				if (SkillBarWidget)
+				{
+					// 화면에 추가
+					SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
+
+					// 초기화
+					SkillBarWidget->InitializeSkillBar(RTSSkillComp);
+
+					UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("Failed to create RTSSkillBarWidget"));
+				}
 			}
 		}
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("RTSSkillComp is null, cannot create skill bar"));
+		}
+
+		// Create attack warning widget
+		if (AttackWarningWidgetClass && AttackNotificationManager)
+		{
+			UGS_RTSAttackWarningWidget* WarningWidget = CreateWidget<UGS_RTSAttackWarningWidget>(this, AttackWarningWidgetClass);
+			if (WarningWidget)
+			{
+				WarningWidget->AddToViewport(15); // Higher Z-order than skill bar (which is 10)
+				AttackNotificationManager->SetWarningWidget(WarningWidget);
+
+				UE_LOG(LogTemp, Log, TEXT("RTSAttackWarningWidget created successfully"));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to create RTSAttackWarningWidget"));
+			}
+		}
+		else if (!AttackWarningWidgetClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("AttackWarningWidgetClass is NOT set in BP_RTSController! Attack warning will not appear."));
+		}
+
+		// Auto-connect minimap widget to AttackNotificationManager
+		if (AttackNotificationManager)
+		{
+			// Find minimap widget in viewport
+			TArray<UUserWidget*> FoundWidgets;
+			UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FoundWidgets, UGS_MinimapWidget::StaticClass(), false);
+
+			if (FoundWidgets.Num() > 0)
+			{
+				UGS_MinimapWidget* MinimapWidget = Cast<UGS_MinimapWidget>(FoundWidgets[0]);
+				if (MinimapWidget)
+				{
+					AttackNotificationManager->SetMinimapWidget(MinimapWidget);
+					UE_LOG(LogTemp, Log, TEXT("Minimap auto-connected to AttackNotificationManager"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("MinimapWidget not found - attack warnings will not show on minimap"));
+			}
 		}
 	}
 
@@ -198,8 +252,8 @@ void AGS_RTSController::BeginPlay()
 		AetherComp->InitializeMaxAmount(AetherComp->GetMaxAmount());
 	}
 	
-	// 시커 감지 타이머 시작 (로컬 컨트롤러만)
-	if (!HasAuthority() && IsLocalController())
+	// 시커 감지 타이머 시작
+	if (IsLocalController())
 	{
 		GetWorldTimerManager().SetTimer(
 			DetectionTimerHandle,
@@ -273,6 +327,12 @@ void AGS_RTSController::SetupInputComponent()
 			{
 				EnhancedInputComponent->BindAction(RTSSkillKeyActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnRTSSkillKey, i);
 			}
+		}
+
+		// 스페이스바로 마지막 공격 위치로 카메라 이동
+		if (JumpToAttackAction)
+		{
+			EnhancedInputComponent->BindAction(JumpToAttackAction, ETriggerEvent::Started, this, &AGS_RTSController::OnJumpToLastAttack);
 		}
 	}
 }
@@ -1772,6 +1832,7 @@ void AGS_RTSController::UpdateSeekerDetection()
 	for (TActorIterator<AGS_Seeker> It(GetWorld()); It; ++It)
 	{
 		AGS_Seeker* Seeker = *It;
+		
 		if (IsValid(Seeker) && !Seeker->IsDead())
 		{
 			if (IsSeekerInCameraView(Seeker))
@@ -1821,20 +1882,30 @@ void AGS_RTSController::UpdateSeekerDetection()
 
 bool AGS_RTSController::IsSeekerInCameraView(AGS_Seeker* Seeker)
 {
-	if (!CameraActor || !Seeker)
+	if (!Seeker)
 	{
 		return false;
 	}
 
-	// 카메라 시야 경계 계산
-	FBox2D ViewBounds = CameraActor->GetSimpleViewBounds();
+	FVector2D ScreenLocation;
+	bool bProjected = ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation);
 
-	// 시커의 위치를 2D로 변환
-	FVector SeekerLocation = Seeker->GetActorLocation();
-	FVector2D Seeker2DLocation(SeekerLocation.X, SeekerLocation.Y);
+	if (!bProjected)
+	{
+		return false;
+	}
 
-	// 시커가 카메라 시야 안에 있는지 확인
-	return ViewBounds.IsInside(Seeker2DLocation);
+	int32 SizeX, SizeY;
+	GetViewportSize(SizeX, SizeY);
+
+	if (SizeX <= 0 || SizeY <= 0)
+	{
+		return false;
+	}
+
+	// 화면 영역 내에 있는지 확인
+	return ScreenLocation.X >= 0 && ScreenLocation.X <= SizeX &&
+		   ScreenLocation.Y >= 0 && ScreenLocation.Y <= SizeY;
 }
 
 void AGS_RTSController::NotifySeekerDetection(AGS_Seeker* Seeker, bool bIsDetected)
@@ -1867,44 +1938,41 @@ void AGS_RTSController::Server_NotifySeekerDetection_Implementation(AGS_Seeker* 
         return;
     }
 
-    // 서버 검증: 기본적인 거리 기반 검증
-    // 서버는 카메라 정보가 없으므로 세밀한 시야각 검증 불가. 대신 최대 거리 내에 있는지만 확인
-    if (CameraActor)
-    {
-        const float MaxDetectionDistance = 5000.0f; // 최대 감지 거리
-        float DistanceToSeeker = FVector::Dist(CameraActor->GetActorLocation(), Seeker->GetActorLocation());
-
-        if (bIsDetected && DistanceToSeeker > MaxDetectionDistance)
-        {
-            return; // 너무 먼 거리의 감지 요청은 무시
-        }
-    }
-
     // 클라이언트의 판단을 신뢰하여 상태 변경
     Seeker->OnDetectedByGuardian(bIsDetected);
 }
 
 float AGS_RTSController::CalculateSeekerDistanceFromScreenCenter(AGS_Seeker* Seeker)
 {
-	if (!CameraActor || !Seeker)
+	if (!Seeker)
 	{
 		return 1.0f; // 최대 거리 반환
 	}
 
-	// 화면 경계 가져오기
-	FBox2D ViewBounds = CameraActor->GetSimpleViewBounds();
-	FVector2D Center = ViewBounds.GetCenter();
+	FVector2D ScreenLocation;
+	bool bProjected = ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation);
 
-	// 시커의 2D 위치
-	FVector SeekerLocation = Seeker->GetActorLocation();
-	FVector2D Seeker2D(SeekerLocation.X, SeekerLocation.Y);
+	if (!bProjected)
+	{
+		return 1.0f;
+	}
 
-	// 화면 크기 계산
-	FVector2D ViewSize = ViewBounds.GetSize();
-	float MaxDistance = ViewSize.Size() * 0.5f; // 대각선 거리의 절반
+	int32 SizeX, SizeY;
+	GetViewportSize(SizeX, SizeY);
+
+	if (SizeX <= 0 || SizeY <= 0)
+	{
+		return 1.0f;
+	}
+
+	// 화면 중앙 좌표
+	FVector2D Center(SizeX * 0.5f, SizeY * 0.5f);
 
 	// 중앙으로부터의 거리 계산
-	float Distance = FVector2D::Distance(Center, Seeker2D);
+	float Distance = FVector2D::Distance(Center, ScreenLocation);
+
+	// 최대 거리 (중앙에서 코너까지)
+	float MaxDistance = Center.Size();
 
 	// 0.0 (중앙) ~ 1.0 (가장자리)로 정규화
 	float NormalizedDistance = FMath::Clamp(Distance / MaxDistance, 0.0f, 1.0f);
@@ -1995,5 +2063,19 @@ void AGS_RTSController::CancelGuardianSkillTargeting()
 	if (RTSSkillComp)
 	{
 		RTSSkillComp->ExitSkillTargetingMode();
+	}
+}
+
+void AGS_RTSController::OnJumpToLastAttack(const FInputActionValue& Value)
+{
+	if (!AttackNotificationManager)
+	{
+		return;
+	}
+
+	FVector AttackLocation = AttackNotificationManager->GetLastAttackLocation();
+	if (!AttackLocation.IsZero())
+	{
+		MoveCameraViaMinimap(AttackLocation);
 	}
 }

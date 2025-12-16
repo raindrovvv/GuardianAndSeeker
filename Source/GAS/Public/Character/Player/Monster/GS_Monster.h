@@ -15,6 +15,7 @@ class UGS_MonsterAnimInstance;
 class UGS_VFXComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterDead, AGS_Monster*, DeadUnit);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMonsterAttacked, AGS_Monster*, AttackedUnit, FVector, AttackLocation);
 
 UCLASS()
 class GAS_API AGS_Monster : public AGS_Character
@@ -41,6 +42,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Dead")
 	FOnMonsterDead OnMonsterDead;
+
+	UPROPERTY(BlueprintAssignable, Category="RTS|Notification")
+	FOnMonsterAttacked OnMonsterAttacked;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Skill")
 	TObjectPtr<UWidgetComponent> SkillCooldownWidgetComp;
@@ -116,12 +120,18 @@ protected:
 	UFUNCTION()
 	void HandleSkillCooldownChanged(float InCurrentCoolTime, float InMaxCoolTime);
 
+	UFUNCTION()
+	void HandleHPChanged(UGS_StatComp* InStatComp);
+
 	virtual FLinearColor GetCurrentDecalColor() override;
 	virtual void UpdateDecal() override;
 	virtual bool ShowDecal() override;
 	
 private:
 	bool bIsSelected;
+
+	/** Tracks previous HP for damage detection (not healing) */
+	float LastKnownHP;
 
 	void UpdateSkillCooldownWidget();
 };
