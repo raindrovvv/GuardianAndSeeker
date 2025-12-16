@@ -26,6 +26,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
+#include "System/GameState/GS_InGameGS.h"
 
 
 AGS_Monster::AGS_Monster()
@@ -110,6 +111,15 @@ void AGS_Monster::BeginPlay()
 	{
 		AkComponent->OcclusionRefreshInterval = 0.0f;
 	}
+
+	// Register to GameState for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
+		{
+			GS->RegisterMonster(this);
+		}
+	}
 }
 
 void AGS_Monster::Tick(float DeltaSeconds)
@@ -168,6 +178,15 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (SkillCooldownWidgetComp->GetBodySetup())
 	{
 		SkillCooldownWidgetComp->DestroyPhysicsState();
+	}
+
+	// Unregister from GameState
+	if (UWorld* World = GetWorld())
+	{
+		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
+		{
+			GS->UnregisterMonster(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);

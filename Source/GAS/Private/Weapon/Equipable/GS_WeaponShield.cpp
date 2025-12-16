@@ -27,7 +27,7 @@ AGS_WeaponShield::AGS_WeaponShield()
 	bReplicates = true;
 
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	// Set SKM
 	ShieldMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ShieldMeshComponent"));
@@ -167,27 +167,10 @@ void AGS_WeaponShield::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	AttackHitActors.Empty();
 	DefenseHitActors.Empty();
 
-	// Tick 비활성화
-	SetActorTickEnabled(false);
-
 	Super::EndPlay(EndPlayReason);
 }
 
-// Called every frame
-void AGS_WeaponShield::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-	
-	// 주기적으로 히트 액터 목록 정리 (메모리 누수 방지)
-	static float CleanupTimer = 0.0f;
-	CleanupTimer += DeltaTime;
-	if (CleanupTimer >= 1.5f) // 1.5초로 단축하여 연속 공격 시 가드 이펙트가 다시 나올 수 있도록 함
-	{
-		CleanupTimer = 0.0f;
-		AttackHitActors.Empty();
-		//DefenseHitActors.Empty();
-	}
-}
+
 
 void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
 	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -608,9 +591,6 @@ void AGS_WeaponShield::EnableAttackHit()
 	
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	AttackHitActors.Empty();
-	
-	// 콜리전 활성화 시에만 Tick 활성화
-	SetActorTickEnabled(true);
 }
 
 void AGS_WeaponShield::DisableAttackHit()
@@ -625,22 +605,6 @@ void AGS_WeaponShield::DisableAttackHit()
 	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	}
-	
-	// DefenseHitBox 상태를 안전하게 확인하여 Tick 상태 결정
-	bool bShouldDisableTick = true;
-	if (DefenseHitBox && IsValid(DefenseHitBox) && !DefenseHitBox->IsBeingDestroyed())
-	{
-		if (DefenseHitBox->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
-		{
-			bShouldDisableTick = false;
-		}
-	}
-
-	// 모든 콜리전이 비활성화된 경우에만 Tick 비활성화
-	if (bShouldDisableTick)
-	{
-		SetActorTickEnabled(false);
 	}
 }
 
@@ -662,22 +626,6 @@ void AGS_WeaponShield::ServerDisableAttackHit_Implementation()
 	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	}
-	
-	// DefenseHitBox 상태를 안전하게 확인하여 Tick 상태 결정
-	bool bShouldDisableTick = true;
-	if (DefenseHitBox && IsValid(DefenseHitBox) && !DefenseHitBox->IsBeingDestroyed())
-	{
-		if (DefenseHitBox->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
-		{
-			bShouldDisableTick = false;
-		}
-	}
-
-	// 모든 콜리전이 비활성화된 경우에만 Tick 비활성화
-	if (bShouldDisableTick)
-	{
-		SetActorTickEnabled(false);
 	}
 }
 
@@ -703,9 +651,6 @@ void AGS_WeaponShield::ServerEnableAttackHit_Implementation()
 	
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	AttackHitActors.Empty();
-	
-	// 콜리전 활성화 시에만 Tick 활성화
-	SetActorTickEnabled(true);
 		
 	// 안전장치: 3초 후에 자동으로 비활성화 (AnimNotify가 실행되지 않을 경우 대비)
 	ClearSafetyTimer();
@@ -750,22 +695,6 @@ void AGS_WeaponShield::ServerDisableHit_Implementation()
 	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	}
-
-	// DefenseHitBox도 동시에 체크하여 Tick 상태 결정
-	bool bShouldDisableTick = true;
-	if (DefenseHitBox && IsValid(DefenseHitBox) && !DefenseHitBox->IsBeingDestroyed())
-	{
-		if (DefenseHitBox->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
-		{
-			bShouldDisableTick = false;
-		}
-	}
-
-	// 모든 콜리전이 비활성화된 경우에만 Tick 비활성화
-	if (bShouldDisableTick)
-	{
-		SetActorTickEnabled(false);
 	}
 
 	// 안전장치 타이머 정리

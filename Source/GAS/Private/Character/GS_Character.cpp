@@ -29,7 +29,7 @@
 
 AGS_Character::AGS_Character()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	StatComp = CreateDefaultSubobject<UGS_StatComp>(TEXT("StatComp"));
 	DebuffComp = CreateDefaultSubobject<UGS_DebuffComp>(TEXT("DebuffComp"));
@@ -42,6 +42,8 @@ AGS_Character::AGS_Character()
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HPTextWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 	HPTextWidgetComp->SetVisibility(false);
+	//HPTextWidgetComp->SetDrawAtDesiredSize(true);
+	HPTextWidgetComp->SetCullDistance(2000.0f);
 
 	SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
 	SelectionDecal->SetupAttachment(RootComponent);

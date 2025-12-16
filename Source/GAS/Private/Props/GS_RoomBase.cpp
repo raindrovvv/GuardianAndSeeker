@@ -2,7 +2,7 @@
 
 AGS_RoomBase::AGS_RoomBase()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 
 	Floor = CreateDefaultSubobject<UStaticMeshComponent>("Floor");

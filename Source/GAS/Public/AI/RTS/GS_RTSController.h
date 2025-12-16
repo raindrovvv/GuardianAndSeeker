@@ -411,6 +411,10 @@ private:
 	
 	// 명령 가능한 유닛들
 	void GatherCommandableUnits(TArray<AGS_Monster*>& Out) const;
+
+	// 최적화: 재사용을 위한 캐시된 유닛 배열 (mutable: const 함수에서도 수정 가능)
+	mutable TArray<AGS_Monster*> CachedCommandableUnits;
+
 	bool CheckMonsterSelectable(AGS_Monster* Monster) const;
 	
 	UFUNCTION()

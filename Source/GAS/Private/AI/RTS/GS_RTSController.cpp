@@ -17,6 +17,7 @@
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "Sound/GS_AudioManager.h"
+#include "System/GameState/GS_InGameGS.h"
 #include "ResourceSystem/Aether/GS_AetherExtractor.h"
 #include "System/GameMode/GS_InGameGM.h"
 #include "Kismet/GameplayStatics.h"
@@ -984,24 +985,56 @@ void AGS_RTSController::SelectOnCtrlClick()
 	ECharacterType MonsterType = Monster->GetCharacterType();
 	TArray<AGS_Monster*> SameTypeUnits;
 	
-	// 월드에 있는 모든 몬스터를 순회 
-	for (TActorIterator<AGS_Monster> It(GetWorld()); It; ++It)
+	// 최적화: GameState의 LiveMonsters 배열 사용하여 순회 (TActorIterator 대체)
+	const TArray<AGS_Monster*>* LiveMonsters = nullptr;
+	if (AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>())
 	{
-		AGS_Monster* CurrentMonster = *It;
-		if (CurrentMonster->GetCharacterType() != MonsterType)
+		LiveMonsters = &GS->LiveMonsters;
+	}
+
+	if (LiveMonsters)
+	{
+		for (AGS_Monster* CurrentMonster : *LiveMonsters)
 		{
-			continue;
+			if (!IsValid(CurrentMonster) || CurrentMonster->GetCharacterType() != MonsterType)
+			{
+				continue;
+			}
+
+			// 월드 좌표를 스크린 좌표로 투영
+			FVector WorldLoc = CurrentMonster->GetActorLocation();
+			FVector2D ScreenPos;
+			
+			// 1차 거리 필터링 (화면 밖의 너무 먼 유닛은 투영 연산조차 하지 않도록 최적화 가능하지만, 
+			// 현재는 ProjectWorldLocationToScreen으로 정확도 유지)
+			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
+
+			// HUD 제외 카메라 뷰에서만 보이는 몬스터만 선택되도록 
+			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
+			{
+				SameTypeUnits.Add(CurrentMonster);
+			}
 		}
-
-		// 월드 좌표를 스크린 좌표로 투영
-		FVector WorldLoc = CurrentMonster->GetActorLocation();
-		FVector2D ScreenPos;
-		bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
-
-		// HUD 제외 카메라 뷰에서만 보이는 몬스터만 선택되도록 
-		if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY*0.77)
+	}
+	else
+	{
+		// Fallback: GameState가 없을 경우 기존 방식 (안전장치)
+		for (TActorIterator<AGS_Monster> It(GetWorld()); It; ++It)
 		{
-			SameTypeUnits.Add(CurrentMonster);
+			AGS_Monster* CurrentMonster = *It;
+			if (CurrentMonster->GetCharacterType() != MonsterType)
+			{
+				continue;
+			}
+
+			FVector WorldLoc = CurrentMonster->GetActorLocation();
+			FVector2D ScreenPos;
+			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
+
+			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
+			{
+				SameTypeUnits.Add(CurrentMonster);
+			}
 		}
 	}
 
@@ -1099,7 +1132,7 @@ void AGS_RTSController::AddMultipleUnitsToSelection(const TArray<AGS_Monster*>& 
 			Unit->SetSelected(false);
 		}
 	}
-	UnitSelection.Empty();
+	UnitSelection.Reset();
 
 	// 새 유닛 선택
 	int32 AddedCount = 0;
@@ -1199,7 +1232,7 @@ void AGS_RTSController::ClearUnitSelection()
 		}
 	}
 
-	UnitSelection.Empty();
+	UnitSelection.Reset();
 	OnSelectionChanged.Broadcast(UnitSelection);
 	OnSelectedUnitsSkillChanged.Broadcast(HasAnySelectedUnitSkill());
 
@@ -1738,17 +1771,6 @@ bool AGS_RTSController::HasAnySelectedUnitSkill() const
 	return false; 
 }
 
-void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
-{
-	for (AGS_Monster* Unit : UnitSelection)
-	{
-		if (IsValid(Unit) && Unit->IsCommandable())
-		{
-			Out.Add(Unit);
-		}
-	}
-}
-
 bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 {
 	if (!IsValid(Monster))
@@ -1765,6 +1787,24 @@ bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 	}
 	
 	return Monster->IsSelectable();
+}
+
+void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
+{
+	// 캐시 배열 초기화 (메모리는 유지하고 개수만 0으로)
+	CachedCommandableUnits.Reset();
+
+	// 현재 선택된 유닛 중에서 명령 가능한 유닛만 수집
+	for (AGS_Monster* Unit : UnitSelection)
+	{
+		if (IsValid(Unit) && Unit->IsCommandable())
+		{
+			CachedCommandableUnits.Add(Unit);
+		}
+	}
+
+	// 결과 복사 (Out 배열의 메모리가 충분하다면 복사 비용은 크지 않음)
+	Out = CachedCommandableUnits;
 }
 
 void AGS_RTSController::OnSelectedUnitDead(AGS_Monster* Monster)

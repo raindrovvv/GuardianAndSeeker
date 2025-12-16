@@ -17,6 +17,22 @@ AGS_InGameGS::AGS_InGameGS()
 	bDungeonDataReady = false;
 }
 
+void AGS_InGameGS::RegisterMonster(AGS_Monster* Monster)
+{
+	if (Monster && !LiveMonsters.Contains(Monster))
+	{
+		LiveMonsters.Add(Monster);
+	}
+}
+
+void AGS_InGameGS::UnregisterMonster(AGS_Monster* Monster)
+{
+	if (Monster)
+	{
+		LiveMonsters.Remove(Monster);
+	}
+}
+
 void AGS_InGameGS::SetDungeonData(int32 InTotalRoomCount)
 {
 	UE_LOG(LogTemp, Warning, TEXT("[방 숨김] SetDungeonData 호출"));

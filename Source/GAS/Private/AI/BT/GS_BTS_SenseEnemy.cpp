@@ -13,6 +13,10 @@ UGS_BTS_SenseEnemy::UGS_BTS_SenseEnemy()
 {
 	NodeName = TEXT("Sense Enemy");
 	bNotifyTick = true;
+	
+	// AI 감지 최적화: 0.5초마다 실행
+	Interval = 0.5f;
+	RandomDeviation = 0.1f;
 }
 
 void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
