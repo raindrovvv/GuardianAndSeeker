@@ -5,7 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Props/Item/EmberChest/EEmberRewardType.h"
-#include "Props/Item/EmberChest/GS_EmberChestDataAsset.h" // FEmberRewardConfig 정의 필요
+#include "Props/Item/EmberChest/GS_EmberChestDataAsset.h"
+#include "Interface/GS_InteractableInterface.h"
 #include "GS_EmberChest.generated.h"
 
 class USphereComponent;
@@ -19,7 +20,7 @@ class AGS_Seeker;
  * 시커만 획득 가능하며, 버프/포션/장비강화 등의 보상 제공
  */
 UCLASS()
-class GAS_API AGS_EmberChest : public AActor
+class GAS_API AGS_EmberChest : public AActor, public IGS_InteractableInterface
 {
 	GENERATED_BODY()
 
@@ -73,6 +74,29 @@ public:
 	class UAkAudioEvent* CollectedSound;
 
 	// ========================
+	// 상호작용 설정
+	// ========================
+
+	/** 상호작용 소요 시간 (초) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ember Chest|Interaction")
+	float InteractionDuration = 2.0f;
+
+	/** 상호작용 UI 텍스트 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ember Chest|Interaction")
+	FText InteractionText = NSLOCTEXT("EmberChest", "Interact", "획득");
+
+	// ========================
+	// IInteractable 인터페이스 구현
+	// ========================
+
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual float GetInteractionDuration_Implementation() const override;
+	virtual void BeginInteract_Implementation(AActor* Interactor) override;
+	virtual void EndInteract_Implementation(AActor* Interactor, bool bCompleted) override;
+	virtual FText GetInteractionText_Implementation() const override;
+	virtual int32 GetInteractionPriority_Implementation() const override;
+
+	// ========================
 	// 공개 함수
 	// ========================
 
@@ -86,12 +110,16 @@ public:
 
 protected:
 	// ========================
-	// 오버랩 이벤트
+	// 오버랩 이벤트 (상호작용 범위 감지용)
 	// ========================
 
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	// ========================
 	// 상태 전환
@@ -148,4 +176,7 @@ private:
 
 	/** 버프 제거 타이머 핸들 맵 (Seeker별) */
 	TMap<AGS_Seeker*, FTimerHandle> BuffRemovalTimers;
+
+	/** 현재 상호작용 중인 시커 (WeakPtr로 안전하게 참조) */
+	TWeakObjectPtr<AGS_Seeker> CurrentInteractor;
 };

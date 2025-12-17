@@ -45,6 +45,7 @@ void AGS_EmberChest::BeginPlay()
 
 	// 오버랩 이벤트 바인딩
 	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AGS_EmberChest::OnOverlapBegin);
+	CollisionSphere->OnComponentEndOverlap.AddDynamic(this, &AGS_EmberChest::OnOverlapEnd);
 
 	// 서버에서만 상태 초기화
 	if (HasAuthority())
@@ -115,23 +116,35 @@ void AGS_EmberChest::StartLifetimeTimer(float Lifetime)
 void AGS_EmberChest::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// 시커만 상호작용 가능
+	// 시커만 상호작용 범위에 들어옴
 	AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 	if (!Seeker)
 	{
 		return;
 	}
 
-	// 대기 상태에서만 획득 가능
+	// 대기 상태에서만 상호작용 가능
 	if (CurrentState != EEmberChestState::Idle)
 	{
 		return;
 	}
 
-	// 서버에서 보상 지급
-	if (HasAuthority())
+	// 로컬 플레이어에게 상호작용 가능 알림 (컨트롤러에서 처리)
+}
+
+void AGS_EmberChest::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
+	if (!Seeker)
 	{
-		ServerGrantReward(Seeker);
+		return;
+	}
+
+	// 상호작용 중인 시커가 범위를 볷어남 -> 취소
+	if (CurrentInteractor.Get() == Seeker)
+	{
+		EndInteract_Implementation(Seeker, false);
 	}
 }
 
@@ -341,3 +354,91 @@ void AGS_EmberChest::OnLifetimeExpired()
 		SetLifeSpan(1.0f);
 	}
 }
+
+// ============================================
+// IInteractable 인터페이스 구현
+// ============================================
+
+bool AGS_EmberChest::CanInteract_Implementation(AActor* Interactor) const
+{
+	// 시커만 상호작용 가능
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(Interactor);
+	if (!Seeker)
+	{
+		return false;
+	}
+
+	// 대기 상태에서만 상호작용 가능
+	if (CurrentState != EEmberChestState::Idle)
+	{
+		return false;
+	}
+
+	// 이미 다른 시커가 상호작용 중이면 불가
+	if (CurrentInteractor.IsValid() && CurrentInteractor.Get() != Seeker)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+float AGS_EmberChest::GetInteractionDuration_Implementation() const
+{
+	return InteractionDuration;
+}
+
+void AGS_EmberChest::BeginInteract_Implementation(AActor* Interactor)
+{
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(Interactor);
+	if (!Seeker || !CanInteract_Implementation(Interactor))
+	{
+		return;
+	}
+
+	CurrentInteractor = Seeker;
+
+	CurrentInteractor = Seeker;
+}
+
+void AGS_EmberChest::EndInteract_Implementation(AActor* Interactor, bool bCompleted)
+{
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(Interactor);
+	if (!Seeker)
+	{
+		return;
+	}
+
+	// 서버에서 호출 시 CurrentInteractor 체크 스킵 (Server RPC로 호출됨)
+	if (!HasAuthority())
+	{
+		// 클라이언트에서는 CurrentInteractor 체크
+		if (CurrentInteractor.Get() != Seeker)
+		{
+			return;
+		}
+	}
+
+	CurrentInteractor.Reset();
+
+	if (bCompleted)
+	{
+		// 상호작용 완료 -> 보상 지급 (서버에서만)
+		if (HasAuthority())
+		{
+			ServerGrantReward(Seeker);
+		}
+	}
+}
+
+FText AGS_EmberChest::GetInteractionText_Implementation() const
+{
+	return InteractionText;
+}
+
+int32 AGS_EmberChest::GetInteractionPriority_Implementation() const
+{
+	// 우선순위: 아군 구조(100) > 보물상자(50) > 기타
+	return 50;
+}
+

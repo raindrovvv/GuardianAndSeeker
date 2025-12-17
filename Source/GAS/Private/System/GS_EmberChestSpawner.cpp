@@ -30,7 +30,6 @@ void UGS_EmberChestSpawner::BeginPlay()
 				if (NavBounds.IsValid)
 				{
 					SpawnOrigin = NavBounds.GetCenter();
-					UE_LOG(LogTemp, Log, TEXT("[EmberChestSpawner] SpawnOrigin 자동 설정: %s"), *SpawnOrigin.ToString());
 				}
 			}
 		}
@@ -83,8 +82,6 @@ void UGS_EmberChestSpawner::StartSpawning()
 
 	bSpawningEnabled = true;
 	ScheduleNextSpawn();
-
-	UE_LOG(LogTemp, Log, TEXT("[EmberChestSpawner] 스폰 시스템 시작"));
 }
 
 void UGS_EmberChestSpawner::StopSpawning()
@@ -97,10 +94,7 @@ void UGS_EmberChestSpawner::StopSpawning()
 		if (World->GetTimerManager().IsTimerActive(SpawnTimerHandle))
 		{
 			World->GetTimerManager().ClearTimer(SpawnTimerHandle);
-		}
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("[EmberChestSpawner] 스폰 시스템 중지"));
 }
 
 
@@ -134,8 +128,6 @@ void UGS_EmberChestSpawner::OnSpawnTimerFired()
 	// 최대 수 체크
 	if (SpawnerDataAsset && ActiveChests.Num() >= SpawnerDataAsset->MaxActiveChests)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[EmberChestSpawner] 최대 상자 수 도달 (%d), 스폰 스킵"),
-			SpawnerDataAsset->MaxActiveChests);
 		ScheduleNextSpawn();
 		return;
 	}
@@ -275,10 +267,6 @@ AGS_EmberChest* UGS_EmberChestSpawner::SpawnChestInternal(FVector Location)
 
 		// 활성 목록에 추가
 		ActiveChests.Add(NewChest);
-
-		UE_LOG(LogTemp, Log, TEXT("[EmberChestSpawner] 상자 스폰 완료 - 위치: %s, 보상: %s"),
-			*Location.ToString(),
-			*UEnum::GetValueAsString(RandomReward.RewardType));
 	}
 
 	return NewChest;
