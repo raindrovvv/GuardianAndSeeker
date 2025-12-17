@@ -40,6 +40,13 @@ public:
 	void RegisterMonster(class AGS_Monster* Monster);
 	void UnregisterMonster(class AGS_Monster* Monster);
 
+	// ============================================
+	// Ember Chest Spawner
+	// ============================================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ember Chest")
+	class UGS_EmberChestSpawner* EmberChestSpawner;
+
+
 protected:
 	// 나중에 로딩 시스템의 기반이 될, 서버가 생성한 총 방의 개수입니다.
 	UPROPERTY(Replicated)

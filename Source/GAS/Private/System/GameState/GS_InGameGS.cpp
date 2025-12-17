@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Props/GS_RoomBase.h"
 #include "System/GS_PlayerState.h"
+#include "System/GS_EmberChestSpawner.h"
 
 AGS_InGameGS::AGS_InGameGS()
 {
@@ -15,7 +16,11 @@ AGS_InGameGS::AGS_InGameGS()
 	CurrentTime = 0.0f;
 	LastServerTimeUpdate = 0.0f;
 	bDungeonDataReady = false;
+
+	// 불씨 보물상자 스폰 관리자 생성
+	EmberChestSpawner = CreateDefaultSubobject<UGS_EmberChestSpawner>(TEXT("EmberChestSpawner"));
 }
+
 
 void AGS_InGameGS::RegisterMonster(AGS_Monster* Monster)
 {
