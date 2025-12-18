@@ -144,6 +144,7 @@ public:
 
 	// Replication Set
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnRep_IsDead() override;
 
 	// === Audio Functions ===
 	UFUNCTION(NetMulticast, Reliable)
@@ -318,6 +319,9 @@ public:
 	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 protected:
+	// 빈사 경고음 재생 제어용
+	int32 LastDyingWarningSecond = -1;
+
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -678,6 +682,8 @@ private:
 	/** 남은 빈사 시간 (초) */
 	UPROPERTY(Replicated)
 	float DyingTimeRemaining = 0.0f;
+
+	float DyingVisualUpdateTimer = 0.0f; // 시각 효과 업데이트 주기 조절용
 
 	/** 최대 빈사 시간 (90초) */
 	UPROPERTY(EditDefaultsOnly, Category = "Dying", meta = (ClampMin = "10.0", ClampMax = "300.0"))

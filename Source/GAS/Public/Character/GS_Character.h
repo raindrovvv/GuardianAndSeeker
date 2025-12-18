@@ -246,9 +246,11 @@ private:
 	UFUNCTION()
 	void OnRep_CharacterSpeed();
 
+protected:
 	UFUNCTION()
-	void OnRep_IsDead();
+	virtual void OnRep_IsDead();
 
+private:
 	void SpawnAndAttachWeapons();
 	
 	void SetHovered(bool bHovered);

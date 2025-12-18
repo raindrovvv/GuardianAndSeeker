@@ -194,16 +194,23 @@ void AGS_Seeker::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 빈사 상태 업데이트 (서버에서만)
-	if (HasAuthority() && bIsInDyingState)
+	// 빈사 상태 업데이트
+	if (bIsInDyingState)
 	{
-		UpdateDyingState(DeltaTime);
-	}
+		// 서버: 타이머 로직 처리
+		if (HasAuthority())
+		{
+			UpdateDyingState(DeltaTime);
+		}
 
-	// 빈사 상태 화면 효과 업데이트 (로컬 플레이어만)
-	if (IsLocallyControlled() && bIsInDyingState)
-	{
-		UpdateDyingPostProcessEffect();
+		// 로컬 전용 포스트 프로세스 효과
+		if (IsLocallyControlled())
+		{
+			UpdateDyingPostProcessEffect();
+		}
+
+		// 비주얼 및 경고 사운드 업데이트 (모든 클라이언트)
+		UpdateDyingFlameVisuals(DyingTimeRemaining);
 	}
 }
 
@@ -1278,18 +1285,8 @@ void AGS_Seeker::UpdateDyingState(float DeltaTime)
 		UpdateReviveProgress(DeltaTime);
 	}
 
-	// 불꽃 크기 업데이트 (타이머와 연동)
-	UpdateDyingFlameVisuals(DyingTimeRemaining);
-
-	// 위험 구간 사운드 (10초 이하, 한 번만 재생)
-	if (DyingTimeRemaining <= 10.0f && !bDangerSoundPlayed)
-	{
-		bDangerSoundPlayed = true;
-		if (SeekerAudioComponent && DyingFlameDangerSound)
-		{
-			SeekerAudioComponent->PlayGenericSound(DyingFlameDangerSound);
-		}
-	}
+	// 빈사 상태 로직 (서버 사이드: 진행도 및 타이머만 관리)
+	// 비주얼 및 경고음은 Tick -> UpdateDyingFlameVisuals (로컬) 에서 처리됨
 }
 
 void AGS_Seeker::UpdateDyingPostProcessEffect()
@@ -1576,6 +1573,17 @@ void AGS_Seeker::OnRep_IsInDyingState()
 	OnDyingStateChanged.Broadcast(bIsInDyingState, DyingTimeRemaining);
 }
 
+void AGS_Seeker::OnRep_IsDead()
+{
+	Super::OnRep_IsDead();
+
+	// 사망 시 고통 소리(LowHP Pain) 즉시 중지 (클라이언트 동기화)
+	if (SeekerAudioComponent && IsDead())
+	{
+		SeekerAudioComponent->StopLowHPPainSound();
+	}
+}
+
 void AGS_Seeker::OnRep_IsBeingRevived()
 {
 	// 구조 상태 변화 시 UI 업데이트 등 처리
@@ -1607,10 +1615,11 @@ void AGS_Seeker::ActivateDyingFlameEffects()
 		DyingMagicCircleComp->Activate();
 	}
 
-	// 불꽃 발동 사운드 재생 (로컬 플레이어 전용)
-	if (SeekerAudioComponent && DyingFlameActivationSound)
+	// 불꽃 발동 사운드 재생 (Spawn + Loop)
+	if (SeekerAudioComponent)
 	{
-		SeekerAudioComponent->PlayGenericSound(DyingFlameActivationSound);
+		SeekerAudioComponent->PlayDyingFlameSpawnSound();
+		SeekerAudioComponent->PlayDyingFlameLoopSound();
 	}
 }
 
@@ -1625,6 +1634,13 @@ void AGS_Seeker::DeactivateDyingFlameEffects()
 	if (DyingMagicCircleComp && DyingMagicCircleComp->IsActive())
 	{
 		DyingMagicCircleComp->Deactivate();
+	}
+
+	// 불꽃 사운드 정리 (Loop Stop + End Sound)
+	if (SeekerAudioComponent)
+	{
+		SeekerAudioComponent->StopDyingFlameLoopSound();
+		SeekerAudioComponent->PlayDyingFlameEndSound();
 	}
 }
 
@@ -1645,34 +1661,32 @@ void AGS_Seeker::UpdateDyingFlameVisuals(float TimeRemaining)
 	{
 		// Niagara 파라미터로 크기 조절 (에셋에 "FlameScale" 파라미터 필요)
 		DyingFlameEffectComp->SetFloatParameter(FName("FlameScale"), FlameScale);
-
-		// 색상 변화: 푸른색(안전) → 빨간색(위험)
-		// TimeRatio가 높으면(시간 많이 남음) 푸른색, 낮으면(시간 얼마 안 남음) 빨간색
-		FLinearColor FlameColor;
-		if (TimeRatio > 0.3f)
-		{
-			// 안전 구간: 푸른색
-			FlameColor = FLinearColor(0.2f, 0.5f, 1.0f, 1.0f); // Blue
-		}
-		else
-		{
-			// 위험 구간: 푸른색 → 빨간색 보간
-			float DangerRatio = 1.0f - (TimeRatio / 0.3f); // 0~1로 정규화
-			FlameColor = FLinearColor::LerpUsingHSV(
-				FLinearColor(0.2f, 0.5f, 1.0f, 1.0f), // Blue
-				FLinearColor(1.0f, 0.2f, 0.2f, 1.0f), // Red
-				DangerRatio
-			);
-		}
-
-		// Niagara 파라미터로 색상 조절 (에셋에 "FlameColor" 파라미터 필요)
-		DyingFlameEffectComp->SetColorParameter(FName("FlameColor"), FlameColor);
 	}
 
 	if (DyingMagicCircleComp)
 	{
-		// 마법진 크기도 동일하게 조절
+		// 마법진 크기도 동일하게 조절 (에셋에 "CircleScale" 파라미터 필요)
 		DyingMagicCircleComp->SetFloatParameter(FName("CircleScale"), FlameScale);
+	}
+
+	// 10초 이하일 때 UI 경고음 재생 (한 번만)
+	if (IsLocallyControlled() && TimeRemaining <= 10.0f && TimeRemaining > 0.0f)
+	{
+		// 아직 재생하지 않았을 때만 재생 (-1: 미재생 상태)
+		if (LastDyingWarningSecond == -1)
+		{
+			if (SeekerAudioComponent)
+			{
+				SeekerAudioComponent->PlayDyingTimerWarningSound();
+			}
+			// 재생 완료 표시
+			LastDyingWarningSecond = 1; 
+		}
+	}
+	else if (TimeRemaining > 10.0f)
+	{
+		// 10초 넘어가면 리셋 (구조 등으로 인해 시간이 늘어난 경우)
+		LastDyingWarningSecond = -1;
 	}
 }
 
