@@ -175,8 +175,26 @@ void AGS_EmberChest::OnMaterializingComplete()
 
 void AGS_EmberChest::ServerGrantReward_Implementation(AGS_Seeker* Seeker)
 {
-	if (!Seeker || CurrentState != EEmberChestState::Idle)
+	// 기본 유효성 검사
+	if (!Seeker || CurrentState != EEmberChestState::Idle || !IsValid(this))
 	{
+		return;
+	}
+
+	// 거리 검증 (치트 방지) - 상호작용 반경 + 오차 범위(50cm)
+	float ValidRadius = 150.0f;
+	if (ChestDataAsset)
+	{
+		ValidRadius = ChestDataAsset->InteractionRadius;
+	}
+	// 오차 허용 (네트워크 지연 고려)
+	const float Tolerance = 100.0f; 
+	const float MaxDistanceSq = FMath::Square(ValidRadius + Tolerance);
+
+	if (FVector::DistSquared(GetActorLocation(), Seeker->GetActorLocation()) > MaxDistanceSq)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[EmberChest] ServerGrantReward: Distance check failed for %s. (Distance: %f, Max: %f)"), 
+			*Seeker->GetName(), FVector::Dist(GetActorLocation(), Seeker->GetActorLocation()), ValidRadius + Tolerance);
 		return;
 	}
 

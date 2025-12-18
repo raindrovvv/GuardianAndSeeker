@@ -93,4 +93,13 @@ private:
 
 	// 캐시 무효화 체크
 	bool HasCameraChanged() const;
+
+	// Optimization for Tick
+	float LastCameraZ = 0.0f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCameraComponent> CachedCameraComp;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USpringArmComponent> CachedSpringArmComp;
 };

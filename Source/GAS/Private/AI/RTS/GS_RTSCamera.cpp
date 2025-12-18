@@ -76,6 +76,10 @@ void AGS_RTSCamera::BeginPlay()
 			CloudWindAudioComponent->Play();
 		}
 	}
+
+	// Cache components
+	CachedCameraComp = FindComponentByClass<UCameraComponent>();
+	CachedSpringArmComp = FindComponentByClass<USpringArmComponent>();
 }
 
 void AGS_RTSCamera::OnConstruction(const FTransform& Transform)
@@ -134,19 +138,37 @@ void AGS_RTSCamera::UpdateCloudSoundParameters()
 void AGS_RTSCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	UpdateCloudNiagaraParameters();
-	UpdateCloudSoundParameters();
+
+	// Only update effects if camera height changed significantly
+	if (GetCameraComponent())
+	{
+		float CurrentZ = GetCameraComponent()->GetComponentLocation().Z;
+		if (!FMath::IsNearlyEqual(CurrentZ, LastCameraZ, 1.0f)) // 1cm tolerance
+		{
+			LastCameraZ = CurrentZ;
+			UpdateCloudNiagaraParameters();
+			UpdateCloudSoundParameters();
+		}
+	}
 }
 
 UCameraComponent* AGS_RTSCamera::GetCameraComponent() const
 {
-	// 기존 블루프린트에서 추가된 카메라 컴포넌트 찾기
+	if (CachedCameraComp)
+	{
+		return CachedCameraComp;
+	}
+	// Fallback or lazy load (FindComponentByClass is non-const, so cast away constness if needed, but FindComponentByClass is const-safe usually)
+	// Just return result of FindComponent directly if cache missing, but better to update cache if possible (can't in const function without mutable)
 	return FindComponentByClass<UCameraComponent>();
 }
 
 USpringArmComponent* AGS_RTSCamera::GetSpringArmComponent() const
 {
-	// 기존 블루프린트에서 추가된 스프링 암 컴포넌트 찾기
+	if (CachedSpringArmComp)
+	{
+		return CachedSpringArmComp;
+	}
 	return FindComponentByClass<USpringArmComponent>();
 }
 
