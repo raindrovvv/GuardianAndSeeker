@@ -94,6 +94,7 @@ void UGS_EmberChestSpawner::StopSpawning()
 		if (World->GetTimerManager().IsTimerActive(SpawnTimerHandle))
 		{
 			World->GetTimerManager().ClearTimer(SpawnTimerHandle);
+		}
 	}
 }
 

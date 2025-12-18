@@ -1620,6 +1620,16 @@ void AGS_RTSController::Server_RTSAttack_Implementation(AGS_Character* TargetAct
 		return;
 	}
 
+	// 빈사 상태인 시커는 공격 대상이 될 수 없음 -> 해당 위치로 Attack Move
+	if (AGS_Seeker* SeekerTarget = Cast<AGS_Seeker>(TargetActor))
+	{
+		if (SeekerTarget->IsInDyingState())
+		{
+			Server_RTSAttackMove(SeekerTarget->GetActorLocation());
+			return;
+		}
+	}
+
 	// 서버에서 직접 명령 가능한 유닛 수집
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);

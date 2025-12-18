@@ -8,6 +8,7 @@
 #include "Perception/AISense_Sight.h"
 #include "GenericTeamAgentInterface.h"
 #include "AI/RTS/RTSCommand.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
 
 UGS_BTS_SenseEnemy::UGS_BTS_SenseEnemy()
 {
@@ -51,12 +52,20 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	TArray<AActor*> Targets;
 	AIController->PerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), Targets);
 
-	// 적(Hostile)만 필터링
+	// 적(Hostile)만 필터링 + 빈사 상태 시커 제외
 	TArray<AActor*> HostileTargets;
 	for (AActor* Target : Targets)
 	{
 		if (Target && AIController->GetTeamAttitudeTowards(*Target) == ETeamAttitude::Hostile)
 		{
+			// 빈사 상태인 시커는 타겟에서 제외
+			if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Target))
+			{
+				if (Seeker->IsInDyingState())
+				{
+					continue; // 빈사 상태면 스킵
+				}
+			}
 			HostileTargets.Add(Target);
 		}
 	}
