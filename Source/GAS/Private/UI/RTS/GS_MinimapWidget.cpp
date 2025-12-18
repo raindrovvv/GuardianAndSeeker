@@ -12,6 +12,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "EngineUtils.h"
+#include "AI/RTS/GS_RTSAttackNotificationManager.h"
 
 UGS_MinimapWidget::UGS_MinimapWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -48,6 +49,9 @@ void UGS_MinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 	// Geometry 캐싱 (좌표 변환에 필요)
 	CachedMinimapGeometry = MyGeometry;
 	bGeometryCached = true;
+
+	// Update attack warnings
+	UpdateAttackWarnings(InDeltaTime);
 }
 
 // ========== Core Functions ==========
@@ -86,6 +90,13 @@ void UGS_MinimapWidget::InitializeReferences()
 
 				break;
 			}
+		}
+
+		// Register self to AttackNotificationManager if available
+		if (CachedRTSController->AttackNotificationManager)
+		{
+			CachedRTSController->AttackNotificationManager->SetMinimapWidget(this);
+			//UE_LOG(LogTemp, Log, TEXT("[MinimapWidget] Registered self to AttackNotificationManager"));
 		}
 	}
 }
@@ -621,4 +632,95 @@ void UGS_MinimapWidget::CalculateViewBoxScreenRect(const FBox2D& ViewBounds, FVe
 
 	OutSize.X = MaxScreen.X - MinScreen.X;
 	OutSize.Y = MinScreen.Y - MaxScreen.Y; // Bottom Y - Top Y
+}
+
+// ========== Attack Warning System ==========
+
+void UGS_MinimapWidget::ShowAttackWarning(const FVector& WorldLocation)
+{
+	if (!bGeometryCached)
+	{
+		return;
+	}
+
+	// Limit max warnings
+	if (ActiveAttackWarnings.Num() >= 5)
+	{
+		// Remove oldest
+		if (ActiveAttackWarnings[0].IconWidget)
+		{
+			ReleaseIconWidget(ActiveAttackWarnings[0].IconWidget);
+		}
+		ActiveAttackWarnings.RemoveAt(0);
+	}
+
+	// Acquire icon from pool
+	UImage* WarningIcon = AcquireIconWidget();
+	if (!WarningIcon)
+	{
+		return;
+	}
+
+	// Set texture
+	if (AttackWarningIconTexture)
+	{
+		WarningIcon->SetBrushFromTexture(AttackWarningIconTexture);
+	}
+
+	// Position on minimap
+	FVector2D NormalizedPos = WorldToMinimapNormalized(WorldLocation);
+	FVector2D ScreenPos = NormalizedPos * CachedMinimapGeometry.GetLocalSize();
+
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(WarningIcon->Slot))
+	{
+		CanvasSlot->SetPosition(ScreenPos - (AttackWarningIconSize * 0.5f));
+		CanvasSlot->SetSize(AttackWarningIconSize);
+		CanvasSlot->SetZOrder(20); // Above unit icons
+	}
+
+	WarningIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
+	WarningIcon->SetRenderOpacity(1.0f);
+
+	// Add to active warnings (2.5s duration)
+	FGS_MinimapAttackWarning Warning;
+	Warning.IconWidget = WarningIcon;
+	Warning.WorldLocation = WorldLocation;
+	Warning.ExpirationTime = GetWorld()->GetTimeSeconds() + 2.5f;
+	ActiveAttackWarnings.Add(Warning);
+}
+
+void UGS_MinimapWidget::UpdateAttackWarnings(float DeltaTime)
+{
+	if (ActiveAttackWarnings.IsEmpty())
+	{
+		return;
+	}
+
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+
+	for (int32 i = ActiveAttackWarnings.Num() - 1; i >= 0; --i)
+	{
+		FGS_MinimapAttackWarning& Warning = ActiveAttackWarnings[i];
+
+		if (!Warning.IconWidget)
+		{
+			ActiveAttackWarnings.RemoveAt(i);
+			continue;
+		}
+
+		// Fade out in last 0.5 seconds
+		float TimeRemaining = Warning.ExpirationTime - CurrentTime;
+		if (TimeRemaining < 0.5f && TimeRemaining > 0.0f)
+		{
+			float Opacity = TimeRemaining / 0.5f;
+			Warning.IconWidget->SetRenderOpacity(Opacity);
+		}
+
+		// Remove expired
+		if (CurrentTime >= Warning.ExpirationTime)
+		{
+			ReleaseIconWidget(Warning.IconWidget);
+			ActiveAttackWarnings.RemoveAt(i);
+		}
+	}
 }

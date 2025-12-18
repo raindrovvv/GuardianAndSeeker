@@ -17,6 +17,7 @@
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "Sound/GS_AudioManager.h"
+#include "System/GameState/GS_InGameGS.h"
 #include "ResourceSystem/Aether/GS_AetherExtractor.h"
 #include "System/GameMode/GS_InGameGM.h"
 #include "Kismet/GameplayStatics.h"
@@ -24,6 +25,10 @@
 #include "AI/RTS/RTS_Skill/GS_RTSSkillComponent.h"
 #include "UI/RTS/GS_RTSSkillBarWidget.h"
 #include "Components/CanvasPanelSlot.h"
+#include "AI/RTS/GS_RTSAttackNotificationManager.h"
+#include "UI/RTS/GS_RTSAttackWarningWidget.h"
+#include "UI/RTS/GS_MinimapWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 
 
 
@@ -70,6 +75,9 @@ AGS_RTSController::AGS_RTSController()
 	//[RTS Skill] RTSSkillComp 생성
 	RTSSkillComp = CreateDefaultSubobject<UGS_RTSSkillComponent>(TEXT("RTSSkillComp"));
 
+	// Create AttackNotificationManager component
+	AttackNotificationManager = CreateDefaultSubobject<UGS_RTSAttackNotificationManager>(TEXT("AttackNotificationManager"));
+
 	// Sound
 	static ConstructorHelpers::FObjectFinder<USoundBase> MouseClickSoundRef(TEXT("/Game/WwiseAudio/Audio/UI/UI_SFX_ClickSound.UI_SFX_ClickSound"));
 	if (MouseClickSoundRef.Succeeded())
@@ -113,7 +121,9 @@ AActor* AGS_RTSController::GetViewTarget() const
 void AGS_RTSController::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!HasAuthority() && IsLocalController())
+	
+	// UI 및 로컬 설정 (Client 및 Listen Server Host 모두 실행)
+	if (IsLocalController())
 	{
 		// 타이머로 커서 및 입력 모드 초기화 (150ms 지연)
 		// 뷰포트 초기화 이슈 방지를 위해 지연 실행
@@ -153,28 +163,73 @@ void AGS_RTSController::BeginPlay()
 			if (!RTSSkillBarWidgetClass)
 			{
 				UE_LOG(LogTemp, Error, TEXT("RTSSkillBarWidgetClass is not set! Please set WBP_RTSSkillBarWidget in BP_RTSController"));
-				return;
-			}
-
-			SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
-			if (SkillBarWidget)
-			{
-				// 화면에 추가
-				SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
-
-				// 초기화
-				SkillBarWidget->InitializeSkillBar(RTSSkillComp);
-
-				UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
+				// return; // 중단하지 않고 계속 진행
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to create RTSSkillBarWidget"));
+				SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
+				if (SkillBarWidget)
+				{
+					// 화면에 추가
+					SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
+
+					// 초기화
+					SkillBarWidget->InitializeSkillBar(RTSSkillComp);
+
+					UE_LOG(LogTemp, Log, TEXT("RTSSkillBarWidget created and initialized successfully"));
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("Failed to create RTSSkillBarWidget"));
+				}
 			}
 		}
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("RTSSkillComp is null, cannot create skill bar"));
+		}
+
+		// Create attack warning widget
+		if (AttackWarningWidgetClass && AttackNotificationManager)
+		{
+			UGS_RTSAttackWarningWidget* WarningWidget = CreateWidget<UGS_RTSAttackWarningWidget>(this, AttackWarningWidgetClass);
+			if (WarningWidget)
+			{
+				WarningWidget->AddToViewport(15); // Higher Z-order than skill bar (which is 10)
+				AttackNotificationManager->SetWarningWidget(WarningWidget);
+
+				UE_LOG(LogTemp, Log, TEXT("RTSAttackWarningWidget created successfully"));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to create RTSAttackWarningWidget"));
+			}
+		}
+		else if (!AttackWarningWidgetClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("AttackWarningWidgetClass is NOT set in BP_RTSController! Attack warning will not appear."));
+		}
+
+		// Auto-connect minimap widget to AttackNotificationManager
+		if (AttackNotificationManager)
+		{
+			// Find minimap widget in viewport
+			TArray<UUserWidget*> FoundWidgets;
+			UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FoundWidgets, UGS_MinimapWidget::StaticClass(), false);
+
+			if (FoundWidgets.Num() > 0)
+			{
+				UGS_MinimapWidget* MinimapWidget = Cast<UGS_MinimapWidget>(FoundWidgets[0]);
+				if (MinimapWidget)
+				{
+					AttackNotificationManager->SetMinimapWidget(MinimapWidget);
+					UE_LOG(LogTemp, Log, TEXT("Minimap auto-connected to AttackNotificationManager"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("MinimapWidget not found - attack warnings will not show on minimap"));
+			}
 		}
 	}
 
@@ -198,8 +253,8 @@ void AGS_RTSController::BeginPlay()
 		AetherComp->InitializeMaxAmount(AetherComp->GetMaxAmount());
 	}
 	
-	// 시커 감지 타이머 시작 (로컬 컨트롤러만)
-	if (!HasAuthority() && IsLocalController())
+	// 시커 감지 타이머 시작
+	if (IsLocalController())
 	{
 		GetWorldTimerManager().SetTimer(
 			DetectionTimerHandle,
@@ -273,6 +328,12 @@ void AGS_RTSController::SetupInputComponent()
 			{
 				EnhancedInputComponent->BindAction(RTSSkillKeyActions[i], ETriggerEvent::Started, this, &AGS_RTSController::OnRTSSkillKey, i);
 			}
+		}
+
+		// 스페이스바로 마지막 공격 위치로 카메라 이동
+		if (JumpToAttackAction)
+		{
+			EnhancedInputComponent->BindAction(JumpToAttackAction, ETriggerEvent::Started, this, &AGS_RTSController::OnJumpToLastAttack);
 		}
 	}
 }
@@ -924,24 +985,56 @@ void AGS_RTSController::SelectOnCtrlClick()
 	ECharacterType MonsterType = Monster->GetCharacterType();
 	TArray<AGS_Monster*> SameTypeUnits;
 	
-	// 월드에 있는 모든 몬스터를 순회 
-	for (TActorIterator<AGS_Monster> It(GetWorld()); It; ++It)
+	// 최적화: GameState의 LiveMonsters 배열 사용하여 순회 (TActorIterator 대체)
+	const TArray<AGS_Monster*>* LiveMonsters = nullptr;
+	if (AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>())
 	{
-		AGS_Monster* CurrentMonster = *It;
-		if (CurrentMonster->GetCharacterType() != MonsterType)
+		LiveMonsters = &GS->LiveMonsters;
+	}
+
+	if (LiveMonsters)
+	{
+		for (AGS_Monster* CurrentMonster : *LiveMonsters)
 		{
-			continue;
+			if (!IsValid(CurrentMonster) || CurrentMonster->GetCharacterType() != MonsterType)
+			{
+				continue;
+			}
+
+			// 월드 좌표를 스크린 좌표로 투영
+			FVector WorldLoc = CurrentMonster->GetActorLocation();
+			FVector2D ScreenPos;
+			
+			// 1차 거리 필터링 (화면 밖의 너무 먼 유닛은 투영 연산조차 하지 않도록 최적화 가능하지만, 
+			// 현재는 ProjectWorldLocationToScreen으로 정확도 유지)
+			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
+
+			// HUD 제외 카메라 뷰에서만 보이는 몬스터만 선택되도록 
+			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
+			{
+				SameTypeUnits.Add(CurrentMonster);
+			}
 		}
-
-		// 월드 좌표를 스크린 좌표로 투영
-		FVector WorldLoc = CurrentMonster->GetActorLocation();
-		FVector2D ScreenPos;
-		bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
-
-		// HUD 제외 카메라 뷰에서만 보이는 몬스터만 선택되도록 
-		if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY*0.77)
+	}
+	else
+	{
+		// Fallback: GameState가 없을 경우 기존 방식 (안전장치)
+		for (TActorIterator<AGS_Monster> It(GetWorld()); It; ++It)
 		{
-			SameTypeUnits.Add(CurrentMonster);
+			AGS_Monster* CurrentMonster = *It;
+			if (CurrentMonster->GetCharacterType() != MonsterType)
+			{
+				continue;
+			}
+
+			FVector WorldLoc = CurrentMonster->GetActorLocation();
+			FVector2D ScreenPos;
+			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
+
+			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
+			{
+				SameTypeUnits.Add(CurrentMonster);
+			}
 		}
 	}
 
@@ -1039,7 +1132,7 @@ void AGS_RTSController::AddMultipleUnitsToSelection(const TArray<AGS_Monster*>& 
 			Unit->SetSelected(false);
 		}
 	}
-	UnitSelection.Empty();
+	UnitSelection.Reset();
 
 	// 새 유닛 선택
 	int32 AddedCount = 0;
@@ -1139,7 +1232,7 @@ void AGS_RTSController::ClearUnitSelection()
 		}
 	}
 
-	UnitSelection.Empty();
+	UnitSelection.Reset();
 	OnSelectionChanged.Broadcast(UnitSelection);
 	OnSelectedUnitsSkillChanged.Broadcast(HasAnySelectedUnitSkill());
 
@@ -1527,6 +1620,16 @@ void AGS_RTSController::Server_RTSAttack_Implementation(AGS_Character* TargetAct
 		return;
 	}
 
+	// 빈사 상태인 시커는 공격 대상이 될 수 없음 -> 해당 위치로 Attack Move
+	if (AGS_Seeker* SeekerTarget = Cast<AGS_Seeker>(TargetActor))
+	{
+		if (SeekerTarget->IsInDyingState())
+		{
+			Server_RTSAttackMove(SeekerTarget->GetActorLocation());
+			return;
+		}
+	}
+
 	// 서버에서 직접 명령 가능한 유닛 수집
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
@@ -1678,17 +1781,6 @@ bool AGS_RTSController::HasAnySelectedUnitSkill() const
 	return false; 
 }
 
-void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
-{
-	for (AGS_Monster* Unit : UnitSelection)
-	{
-		if (IsValid(Unit) && Unit->IsCommandable())
-		{
-			Out.Add(Unit);
-		}
-	}
-}
-
 bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 {
 	if (!IsValid(Monster))
@@ -1705,6 +1797,24 @@ bool AGS_RTSController::CheckMonsterSelectable(AGS_Monster* Monster) const
 	}
 	
 	return Monster->IsSelectable();
+}
+
+void AGS_RTSController::GatherCommandableUnits(TArray<AGS_Monster*>& Out) const
+{
+	// 캐시 배열 초기화 (메모리는 유지하고 개수만 0으로)
+	CachedCommandableUnits.Reset();
+
+	// 현재 선택된 유닛 중에서 명령 가능한 유닛만 수집
+	for (AGS_Monster* Unit : UnitSelection)
+	{
+		if (IsValid(Unit) && Unit->IsCommandable())
+		{
+			CachedCommandableUnits.Add(Unit);
+		}
+	}
+
+	// 결과 복사 (Out 배열의 메모리가 충분하다면 복사 비용은 크지 않음)
+	Out = CachedCommandableUnits;
 }
 
 void AGS_RTSController::OnSelectedUnitDead(AGS_Monster* Monster)
@@ -1772,6 +1882,7 @@ void AGS_RTSController::UpdateSeekerDetection()
 	for (TActorIterator<AGS_Seeker> It(GetWorld()); It; ++It)
 	{
 		AGS_Seeker* Seeker = *It;
+		
 		if (IsValid(Seeker) && !Seeker->IsDead())
 		{
 			if (IsSeekerInCameraView(Seeker))
@@ -1821,20 +1932,30 @@ void AGS_RTSController::UpdateSeekerDetection()
 
 bool AGS_RTSController::IsSeekerInCameraView(AGS_Seeker* Seeker)
 {
-	if (!CameraActor || !Seeker)
+	if (!Seeker)
 	{
 		return false;
 	}
 
-	// 카메라 시야 경계 계산
-	FBox2D ViewBounds = CameraActor->GetSimpleViewBounds();
+	FVector2D ScreenLocation;
+	bool bProjected = ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation);
 
-	// 시커의 위치를 2D로 변환
-	FVector SeekerLocation = Seeker->GetActorLocation();
-	FVector2D Seeker2DLocation(SeekerLocation.X, SeekerLocation.Y);
+	if (!bProjected)
+	{
+		return false;
+	}
 
-	// 시커가 카메라 시야 안에 있는지 확인
-	return ViewBounds.IsInside(Seeker2DLocation);
+	int32 SizeX, SizeY;
+	GetViewportSize(SizeX, SizeY);
+
+	if (SizeX <= 0 || SizeY <= 0)
+	{
+		return false;
+	}
+
+	// 화면 영역 내에 있는지 확인
+	return ScreenLocation.X >= 0 && ScreenLocation.X <= SizeX &&
+		   ScreenLocation.Y >= 0 && ScreenLocation.Y <= SizeY;
 }
 
 void AGS_RTSController::NotifySeekerDetection(AGS_Seeker* Seeker, bool bIsDetected)
@@ -1867,44 +1988,41 @@ void AGS_RTSController::Server_NotifySeekerDetection_Implementation(AGS_Seeker* 
         return;
     }
 
-    // 서버 검증: 기본적인 거리 기반 검증
-    // 서버는 카메라 정보가 없으므로 세밀한 시야각 검증 불가. 대신 최대 거리 내에 있는지만 확인
-    if (CameraActor)
-    {
-        const float MaxDetectionDistance = 5000.0f; // 최대 감지 거리
-        float DistanceToSeeker = FVector::Dist(CameraActor->GetActorLocation(), Seeker->GetActorLocation());
-
-        if (bIsDetected && DistanceToSeeker > MaxDetectionDistance)
-        {
-            return; // 너무 먼 거리의 감지 요청은 무시
-        }
-    }
-
     // 클라이언트의 판단을 신뢰하여 상태 변경
     Seeker->OnDetectedByGuardian(bIsDetected);
 }
 
 float AGS_RTSController::CalculateSeekerDistanceFromScreenCenter(AGS_Seeker* Seeker)
 {
-	if (!CameraActor || !Seeker)
+	if (!Seeker)
 	{
 		return 1.0f; // 최대 거리 반환
 	}
 
-	// 화면 경계 가져오기
-	FBox2D ViewBounds = CameraActor->GetSimpleViewBounds();
-	FVector2D Center = ViewBounds.GetCenter();
+	FVector2D ScreenLocation;
+	bool bProjected = ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation);
 
-	// 시커의 2D 위치
-	FVector SeekerLocation = Seeker->GetActorLocation();
-	FVector2D Seeker2D(SeekerLocation.X, SeekerLocation.Y);
+	if (!bProjected)
+	{
+		return 1.0f;
+	}
 
-	// 화면 크기 계산
-	FVector2D ViewSize = ViewBounds.GetSize();
-	float MaxDistance = ViewSize.Size() * 0.5f; // 대각선 거리의 절반
+	int32 SizeX, SizeY;
+	GetViewportSize(SizeX, SizeY);
+
+	if (SizeX <= 0 || SizeY <= 0)
+	{
+		return 1.0f;
+	}
+
+	// 화면 중앙 좌표
+	FVector2D Center(SizeX * 0.5f, SizeY * 0.5f);
 
 	// 중앙으로부터의 거리 계산
-	float Distance = FVector2D::Distance(Center, Seeker2D);
+	float Distance = FVector2D::Distance(Center, ScreenLocation);
+
+	// 최대 거리 (중앙에서 코너까지)
+	float MaxDistance = Center.Size();
 
 	// 0.0 (중앙) ~ 1.0 (가장자리)로 정규화
 	float NormalizedDistance = FMath::Clamp(Distance / MaxDistance, 0.0f, 1.0f);
@@ -1995,5 +2113,19 @@ void AGS_RTSController::CancelGuardianSkillTargeting()
 	if (RTSSkillComp)
 	{
 		RTSSkillComp->ExitSkillTargetingMode();
+	}
+}
+
+void AGS_RTSController::OnJumpToLastAttack(const FInputActionValue& Value)
+{
+	if (!AttackNotificationManager)
+	{
+		return;
+	}
+
+	FVector AttackLocation = AttackNotificationManager->GetLastAttackLocation();
+	if (!AttackLocation.IsZero())
+	{
+		MoveCameraViaMinimap(AttackLocation);
 	}
 }

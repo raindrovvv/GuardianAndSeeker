@@ -319,13 +319,13 @@ void UGS_RTSSkillComponent::Server_ActivateSkill_Implementation(int32 SkillIndex
 		return;
 	}
 
-	// 스킬 발동 (실제 발동 위치를 받아옴)
+	// 스킬 발동
 	FVector ActualLocation = Skill->ActivateSkill(this, TargetLocation);
 
 	// 쿨다운 시작
 	StartSkillCooldown(SkillIndex);
 
-	// 멀티캐스트로 모든 클라이언트에 알림 (실제 위치 전달)
+	// 멀티캐스트로 모든 클라이언트에 알림
 	Multicast_OnSkillActivated(SkillIndex, ActualLocation);
 }
 

@@ -2066,8 +2066,16 @@ void UGS_SeekerAudioComponent::OnLowHPPainCheck()
     }
 
     // HP 0 이하 시 중지 (사망 판정)
+    // 단, 빈사 상태(Downed)일 때는 고통 소리를 계속 재생함
     if (CurrentHP <= KINDA_SMALL_NUMBER)
     {
+        if (OwnerSeeker && OwnerSeeker->IsInDyingState())
+        {
+            // 빈사 상태일 때는 0% HP 기준으로 볼륨 업데이트 후 계속 재생
+            UpdateLowHPPainVolume(CurrentHP, MaxHP);
+            return;
+        }
+
         StopLowHPPainSound();
         return;
     }
@@ -2098,4 +2106,66 @@ void UGS_SeekerAudioComponent::ForceStopLowHPPainSound()
     LowHPPainPlayingID = AK_INVALID_PLAYING_ID;
     LastLowHPVolumeRatio = -1.0f;
     LastLowHPFilterRatio = -1.0f;
+}
+
+// =========================
+// 빈사 상태 불꽃 사운드 구현
+// =========================
+
+void UGS_SeekerAudioComponent::PlayDyingFlameSpawnSound()
+{
+	if (AudioConfig.DyingFlameSpawnSound && IsValid(OwnerSeeker))
+	{
+		AkPlayingID PlayingID = UAkGameplayStatics::PostEvent(AudioConfig.DyingFlameSpawnSound, OwnerSeeker, 0, FOnAkPostEventCallback());
+		RegisterPlayingID(PlayingID);
+	}
+}
+
+void UGS_SeekerAudioComponent::PlayDyingFlameLoopSound()
+{
+	if (AudioConfig.DyingFlameLoopSound && IsValid(OwnerSeeker))
+	{
+		// 이미 재생 중이면 중복 재생 방지
+		if (DyingFlameLoopPlayingID != AK_INVALID_PLAYING_ID)
+		{
+			return;
+		}
+
+		DyingFlameLoopPlayingID = UAkGameplayStatics::PostEvent(AudioConfig.DyingFlameLoopSound, OwnerSeeker, 0, FOnAkPostEventCallback());
+		RegisterPlayingID(DyingFlameLoopPlayingID);
+	}
+}
+
+void UGS_SeekerAudioComponent::StopDyingFlameLoopSound()
+{
+	if (DyingFlameLoopPlayingID != AK_INVALID_PLAYING_ID)
+	{
+		if (FAkAudioDevice* AkDevice = FAkAudioDevice::Get())
+		{
+			AkDevice->StopPlayingID(DyingFlameLoopPlayingID, 200); // 0.2초 페이드아웃
+		}
+		DyingFlameLoopPlayingID = AK_INVALID_PLAYING_ID;
+	}
+}
+
+void UGS_SeekerAudioComponent::PlayDyingFlameEndSound()
+{
+	if (AudioConfig.DyingFlameEndSound && IsValid(OwnerSeeker))
+	{
+		AkPlayingID PlayingID = UAkGameplayStatics::PostEvent(AudioConfig.DyingFlameEndSound, OwnerSeeker, 0, FOnAkPostEventCallback());
+		RegisterPlayingID(PlayingID);
+	}
+}
+
+void UGS_SeekerAudioComponent::PlayDyingTimerWarningSound()
+{
+	if (!DyingTimerWarningSound)
+	{
+		return;
+	}
+
+	if (OwnerSeeker && OwnerSeeker->IsLocallyControlled())
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), DyingTimerWarningSound);
+	}
 }

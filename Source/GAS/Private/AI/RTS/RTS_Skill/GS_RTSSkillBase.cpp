@@ -164,8 +164,6 @@ void UGS_RTSSkillBase::PlaySkillVFX(UNiagaraSystem* NiagaraSystem, const FVector
 	);
 }
 
-// ... (Existing implementation of GetRTSController and GetSkillWorld) ...
-
 bool UGS_RTSSkillBase::IsRTSMode() const
 {
 	UWorld* World = GetSkillWorld();

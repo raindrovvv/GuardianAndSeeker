@@ -32,6 +32,21 @@ public:
 	// GameMode가 이 함수들을 호출하여 서버가 생성한 방 개수를 설정합니다.
 	void SetDungeonData(int32 InTotalRoomCount);
 
+	// ----- Monster Optimization -----
+	// Current active monsters in the world (maintained on both server and client)
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Optimization")
+	TArray<class AGS_Monster*> LiveMonsters;
+
+	void RegisterMonster(class AGS_Monster* Monster);
+	void UnregisterMonster(class AGS_Monster* Monster);
+
+	// ============================================
+	// Ember Chest Spawner
+	// ============================================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ember Chest")
+	class UGS_EmberChestSpawner* EmberChestSpawner;
+
+
 protected:
 	// 나중에 로딩 시스템의 기반이 될, 서버가 생성한 총 방의 개수입니다.
 	UPROPERTY(Replicated)

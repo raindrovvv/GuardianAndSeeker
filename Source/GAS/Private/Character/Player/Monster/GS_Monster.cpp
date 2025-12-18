@@ -18,11 +18,15 @@
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "Character/Component/GS_VFXComponent.h"
+#include "Character/Component/GS_StatComp.h"
 #include "Components/DecalComponent.h"
 #include "Components/WidgetComponent.h"
 // #include "BehaviorTree/BlackboardComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "AI/RTS/GS_RTSController.h"
+#include "AI/RTS/GS_RTSAttackNotificationManager.h"
+#include "System/GameState/GS_InGameGS.h"
 
 
 AGS_Monster::AGS_Monster()
@@ -79,11 +83,42 @@ void AGS_Monster::BeginPlay()
 	{
 		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(this, &AGS_Monster::HandleSkillCooldownChanged);
 	}
-	
+
+	// Bind to HP change for attack detection
+	if (StatComp)
+	{
+		LastKnownHP = StatComp->GetCurrentHealth();
+		StatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Monster::HandleHPChanged);
+	}
+
+	// Bind to owner's RTSController for attack notifications
+	// Bind to local RTSController for attack notifications (UI/Sound)
+	if (GetWorld())
+	{
+		// Find local player controller (RTS Player)
+		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(UGameplayStatics::GetPlayerController(this, 0)))
+		{
+			if (RTSController->AttackNotificationManager)
+			{
+				OnMonsterAttacked.AddUniqueDynamic(RTSController->AttackNotificationManager, &UGS_RTSAttackNotificationManager::OnUnitAttacked);
+				//UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Attack notification delegate bound to local RTSController"), *GetName());
+			}
+		}
+	}
+
 	// AkComponent Occlusion 비활성화
 	if (IsValid(AkComponent))
 	{
 		AkComponent->OcclusionRefreshInterval = 0.0f;
+	}
+
+	// Register to GameState for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
+		{
+			GS->RegisterMonster(this);
+		}
 	}
 }
 
@@ -145,6 +180,15 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		SkillCooldownWidgetComp->DestroyPhysicsState();
 	}
 
+	// Unregister from GameState
+	if (UWorld* World = GetWorld())
+	{
+		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
+		{
+			GS->UnregisterMonster(this);
+		}
+	}
+
 	Super::EndPlay(EndPlayReason);
 } 
 
@@ -152,6 +196,18 @@ void AGS_Monster::OnDeath()
 {
 	// Death 사운드는 부모 클래스(GS_Character::OnDeath)에서 통합 처리됨
 	Super::OnDeath();
+
+	// Unbind attack notification delegate
+	if (AController* OwnerController = GetController())
+	{
+		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(OwnerController))
+		{
+			if (RTSController->AttackNotificationManager)
+			{
+				OnMonsterAttacked.RemoveDynamic(RTSController->AttackNotificationManager, &UGS_RTSAttackNotificationManager::OnUnitAttacked);
+			}
+		}
+	}
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
@@ -351,7 +407,7 @@ void AGS_Monster::UpdateSkillCooldownWidget()
 	{
 		return;
 	}
-	
+
 	if (APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
 		FVector CameraForward = CameraManager->GetCameraRotation().Vector();
@@ -361,4 +417,23 @@ void AGS_Monster::UpdateSkillCooldownWidget()
 
 		SkillCooldownWidgetComp->SetWorldRotation(WidgetRotation);
 	}
+}
+
+void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
+{
+	if (!InStatComp)
+	{
+		return;
+	}
+
+	float CurrentHP = InStatComp->GetCurrentHealth();
+
+	// Only notify on damage (HP decrease), not healing
+	if (CurrentHP < LastKnownHP && !IsDead())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] HP decreased %.1f -> %.1f, Broadcasting attack notification!"), *GetName(), LastKnownHP, CurrentHP);
+		OnMonsterAttacked.Broadcast(this, GetActorLocation());
+	}
+
+	LastKnownHP = CurrentHP;
 }

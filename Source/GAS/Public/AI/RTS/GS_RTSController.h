@@ -91,6 +91,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
 	TArray<UInputAction*> RTSSkillKeyActions;
 
+	// 공격 알림 발생 시 카메라 이동 (스페이스바)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UInputAction* JumpToAttackAction;
+
 	// 선택 변경 델리게이트
 	UPROPERTY(BlueprintAssignable, Category="Selection")
 	FOnSelectionChanged OnSelectionChanged;
@@ -114,6 +118,10 @@ public:
 	// Guardian RTS 스킬 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Skill")
 	TObjectPtr<UGS_RTSSkillComponent> RTSSkillComp;
+
+	// Attack notification system
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Notification")
+	TObjectPtr<class UGS_RTSAttackNotificationManager> AttackNotificationManager;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -166,6 +174,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
 	void CancelGuardianSkillTargeting();
+
+	// 마지막 공격 위치로 카메라 이동 (스페이스바)
+	void OnJumpToLastAttack(const FInputActionValue& Value);
 
 	// 마우스 클릭 처리
 	void OnLeftMousePressed();
@@ -325,6 +336,10 @@ private:
 	UPROPERTY()
 	UGS_RTSSkillBarWidget* SkillBarWidget;
 
+	// Attack warning widget class
+	UPROPERTY(EditDefaultsOnly, Category="UI|RTS Notification")
+	TSubclassOf<class UGS_RTSAttackWarningWidget> AttackWarningWidgetClass;
+
 	bool bSeekerHovered;
 	bool bShowAttackCursor;
 	bool bCursorReady; // 커서 시스템 사용 가능 여부
@@ -396,6 +411,10 @@ private:
 	
 	// 명령 가능한 유닛들
 	void GatherCommandableUnits(TArray<AGS_Monster*>& Out) const;
+
+	// 최적화: 재사용을 위한 캐시된 유닛 배열 (mutable: const 함수에서도 수정 가능)
+	mutable TArray<AGS_Monster*> CachedCommandableUnits;
+
 	bool CheckMonsterSelectable(AGS_Monster* Monster) const;
 	
 	UFUNCTION()

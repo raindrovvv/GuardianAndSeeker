@@ -133,6 +133,9 @@ public:
 	UFUNCTION(Server, Reliable)
 	virtual void Server_OnComboAttack();
 
+	// Damage Handler
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 	// Control
 	UFUNCTION()
 	void SetMoveControlValue(bool bMoveForward, bool bMoveRight);
@@ -141,6 +144,7 @@ public:
 
 	// Replication Set
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnRep_IsDead() override;
 
 	// === Audio Functions ===
 	UFUNCTION(NetMulticast, Reliable)
@@ -268,6 +272,28 @@ public:
 	UNiagaraComponent* BodyLavaVFX;
 
 	// ================
+	// 빈사 상태 불꽃 VFX 컴포넌트
+	// ================
+	/** 푸른 불꽃 기둥 VFX ("불꽃의 안식처") */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UNiagaraComponent* DyingFlameEffectComp;
+
+	/** 바닥 마법진 VFX */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UNiagaraComponent* DyingMagicCircleComp;
+
+	// ================
+	// 빈사 상태 사운드
+	// ================
+	/** 빈사 상태 진입 시 불꽃 발동 사운드 ("화륵!") */
+	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
+	UAkAudioEvent* DyingFlameActivationSound;
+
+	/** 빈사 타이머 위험 구간 경고 사운드 (10초 이하) */
+	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
+	UAkAudioEvent* DyingFlameDangerSound;
+
+	// ================
 	// 전투 음악 관리
 	// ================
 	// 몬스터 감지용 컴포넌트 추가
@@ -293,6 +319,9 @@ public:
 	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 protected:
+	// 빈사 경고음 재생 제어용
+	int32 LastDyingWarningSecond = -1;
+
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -572,6 +601,23 @@ protected:
 	/** 빈사 상태 화면 효과 업데이트 */
 	void UpdateDyingPostProcessEffect();
 
+	/** 불꽃 효과 활성화 */
+	void ActivateDyingFlameEffects();
+
+	/** 불꽃 효과 비활성화 */
+	void DeactivateDyingFlameEffects();
+
+	/** 불꽃 크기 타이머 연동 업데이트 */
+	void UpdateDyingFlameVisuals(float TimeRemaining);
+
+	/** 불꽃 활성화 멀티캐스트 RPC */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ActivateDyingFlame();
+
+	/** 불꽃 비활성화 멀티캐스트 RPC */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_DeactivateDyingFlame();
+
 	/** 진행도 감소 시작 */
 	UFUNCTION()
 	void StartReviveDecay();
@@ -637,6 +683,8 @@ private:
 	UPROPERTY(Replicated)
 	float DyingTimeRemaining = 0.0f;
 
+	float DyingVisualUpdateTimer = 0.0f; // 시각 효과 업데이트 주기 조절용
+
 	/** 최대 빈사 시간 (90초) */
 	UPROPERTY(EditDefaultsOnly, Category = "Dying", meta = (ClampMin = "10.0", ClampMax = "300.0"))
 	float MaxDyingTime = 90.0f;
@@ -697,6 +745,9 @@ private:
 
 	/** 진행도가 감소 중인지 여부 (서버 전용) */
 	bool bIsReviveDecaying = false;
+
+	/** 위험 사운드 재생 여부 (한 번만 재생) */
+	bool bDangerSoundPlayed = false;
 
 	// OnRep 함수들
 	UFUNCTION()

@@ -8,6 +8,12 @@
 #include "Math/Box2D.h"
 #include "Math/Vector.h"
 #include "Math/Vector2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraSystem.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AGS_RTSCamera::AGS_RTSCamera()
@@ -21,23 +27,148 @@ void AGS_RTSCamera::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Post Process Setup
+	if (CloudMaterialBase)
+	{
+		CloudMaterialInstance = UMaterialInstanceDynamic::Create(CloudMaterialBase, this);
+		if (CloudMaterialInstance)
+		{
+			UpdateCloudMaterialParameters();
+
+			if (UCameraComponent* CameraComp = GetCameraComponent())
+			{
+				CameraComp->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, CloudMaterialInstance));
+			}
+		}
+	}
+
+	// Niagara Setup
+	if (CloudNiagaraSystem)
+	{
+		CloudNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			CloudNiagaraSystem,
+			GetCameraComponent(),
+			NAME_None,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			EAttachLocation::SnapToTarget,
+			true
+		);
+	}
+
+	// Sound Setup
+	if (CloudWindSound)
+	{
+		CloudWindAudioComponent = UGameplayStatics::SpawnSound2D(
+			this,
+			CloudWindSound,
+			0.0f, // Start with 0 volume
+			1.0f,
+			0.0f,
+			nullptr,
+			true,
+			true
+		);
+
+		if (CloudWindAudioComponent)
+		{
+			CloudWindAudioComponent->bAutoDestroy = false; 
+			CloudWindAudioComponent->Play();
+		}
+	}
+
+	// Cache components
+	CachedCameraComp = FindComponentByClass<UCameraComponent>();
+	CachedSpringArmComp = FindComponentByClass<USpringArmComponent>();
+}
+
+void AGS_RTSCamera::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	UpdateCloudMaterialParameters();
+}
+
+void AGS_RTSCamera::UpdateCloudMaterialParameters()
+{
+	if (CloudMaterialInstance)
+	{
+		CloudMaterialInstance->SetScalarParameterValue(FName("CloudHeightMin"), CloudHeightMin);
+		CloudMaterialInstance->SetScalarParameterValue(FName("CloudHeightMax"), CloudHeightMax);
+		CloudMaterialInstance->SetVectorParameterValue(FName("CloudFogColor"), CloudFogColor);
+	}
+}
+
+void AGS_RTSCamera::UpdateCloudNiagaraParameters()
+{
+	if (CloudNiagaraComponent && GetCameraComponent())
+	{
+		FVector CamLoc = GetCameraComponent()->GetComponentLocation();
+		float CurrentZ = CamLoc.Z;
+
+		// Calculate Alpha based on height (Same logic as Material)
+		float Alpha = FMath::GetMappedRangeValueClamped(
+			FVector2D(CloudHeightMin, CloudHeightMax),
+			FVector2D(0.0f, 1.0f),
+			CurrentZ
+		);
+
+		CloudNiagaraComponent->SetVariableFloat(FName("CloudAlpha"), Alpha);
+	}
+}
+
+void AGS_RTSCamera::UpdateCloudSoundParameters()
+{
+	if (CloudWindAudioComponent && GetCameraComponent())
+	{
+		FVector CamLoc = GetCameraComponent()->GetComponentLocation();
+		float CurrentZ = CamLoc.Z;
+
+		// Calculate Volume Alpha
+		float VolumeAlpha = FMath::GetMappedRangeValueClamped(
+			FVector2D(CloudHeightMin, CloudHeightMax),
+			FVector2D(0.0f, 1.0f),
+			CurrentZ
+		);
+
+		CloudWindAudioComponent->SetVolumeMultiplier(VolumeAlpha);
+	}
 }
 
 // Called every frame
 void AGS_RTSCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Only update effects if camera height changed significantly
+	if (GetCameraComponent())
+	{
+		float CurrentZ = GetCameraComponent()->GetComponentLocation().Z;
+		if (!FMath::IsNearlyEqual(CurrentZ, LastCameraZ, 1.0f)) // 1cm tolerance
+		{
+			LastCameraZ = CurrentZ;
+			UpdateCloudNiagaraParameters();
+			UpdateCloudSoundParameters();
+		}
+	}
 }
 
 UCameraComponent* AGS_RTSCamera::GetCameraComponent() const
 {
-	// 기존 블루프린트에서 추가된 카메라 컴포넌트 찾기
+	if (CachedCameraComp)
+	{
+		return CachedCameraComp;
+	}
+	// Fallback or lazy load (FindComponentByClass is non-const, so cast away constness if needed, but FindComponentByClass is const-safe usually)
+	// Just return result of FindComponent directly if cache missing, but better to update cache if possible (can't in const function without mutable)
 	return FindComponentByClass<UCameraComponent>();
 }
 
 USpringArmComponent* AGS_RTSCamera::GetSpringArmComponent() const
 {
-	// 기존 블루프린트에서 추가된 스프링 암 컴포넌트 찾기
+	if (CachedSpringArmComp)
+	{
+		return CachedSpringArmComp;
+	}
 	return FindComponentByClass<USpringArmComponent>();
 }
 
