@@ -198,7 +198,7 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 {
 	if (!Info.SkillClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT(">>> SetSkill: Invalid SkillClass"));
+		UE_LOG(LogTemp, Verbose, TEXT(">>> SetSkill: Invalid SkillClass"));
 		return;
 	}
 
