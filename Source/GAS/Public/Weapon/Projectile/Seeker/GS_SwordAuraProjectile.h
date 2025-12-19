@@ -42,12 +42,12 @@ public:
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite)
 	ESwordAuraEffectType EffectType = ESwordAuraEffectType::LeftNormal;
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StartSwordSlashVFX();
 	void Multicast_StartSwordSlashVFX_Implementation();
 
 	// VFX와 사운드를 하나의 RPC로 통합 (네트워크 최적화)
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitEffects(ESwordAuraHitTargetType TargetType, const FVector& HitLocation);
 	void Multicast_PlayHitEffects_Implementation(ESwordAuraHitTargetType TargetType, const FVector& HitLocation);
 

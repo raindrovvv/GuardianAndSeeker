@@ -129,10 +129,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_PlayTakeDamageShake(APlayerController* TargetPC);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShake(APlayerController* TargetPC);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShakeWithInfo(APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo);
 
 	//character death play ragdoll
@@ -164,7 +164,7 @@ public:
 	void MulicastRPCStopCurrentSkillMontage(UAnimMontage* CurrentSkillMontage);
 
 	// Impact VFX 재생
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale);
 
 	UFUNCTION(BlueprintCallable)

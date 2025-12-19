@@ -197,11 +197,11 @@ private:
     void OnRep_CurrentAudioState();
 
     // 클라이언트 사운드 재생 트리거용 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_TriggerSound(EMonsterAudioState SoundTypeToTrigger, bool bIsImmediate);
 
     // 스윙 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlaySwingSound();
 
     // 스윙 사운드 중단 멀티캐스트 RPC
