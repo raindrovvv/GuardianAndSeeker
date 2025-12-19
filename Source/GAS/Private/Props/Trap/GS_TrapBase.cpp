@@ -411,12 +411,6 @@ void AGS_TrapBase::OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActo
 
     if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Overlapped Actor: %s (%s)"), *OtherActor->GetName(), *OtherActor->GetClass()->GetName());
-        if (OtherComp)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Overlapped Component: %s (%s)"), *OtherComp->GetName(), *OtherComp->GetClass()->GetName());
-        }
-
         // 서버
         DamageBoxEffect(Seeker);
         CustomTrapEffect(Seeker);
@@ -539,10 +533,6 @@ EHitReactType AGS_TrapBase::GetHitReactType() const
 
 void AGS_TrapBase::HandleTrapDamage(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Trap: %s / Class: %s / HitReactType: %s"),
-		*GetName(),
-		*GetClass()->GetName(),
-		*UEnum::GetValueAsString(GetHitReactType()));
 	if (!OtherActor) return;
 	AGS_Seeker* DamagedSeeker = Cast<AGS_Seeker>(OtherActor);
 	if (!DamagedSeeker) return;
@@ -624,7 +614,6 @@ void AGS_TrapBase::Multicast_DamageBoxEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::DamageBoxEffect_Implementation(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("DamageBoxEffect Applied"));
 }
 
 
@@ -1068,6 +1057,10 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Activation SoundEvent is None for %s. Please check Trap DataTable or BP settings."), *GetName());
+	}
 }
 
 void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
@@ -1103,6 +1096,10 @@ void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Deactivation SoundEvent is None for %s."), *GetName());
+	}
 }
 
 void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
@@ -1137,5 +1134,9 @@ void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
 		{
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Hit SoundEvent is None for %s."), *GetName());
 	}
 }

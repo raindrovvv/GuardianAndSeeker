@@ -131,7 +131,7 @@ void AGS_TrigTrapBase::Server_DelayTrapEffect_Implementation(AActor* TargetActor
 
 void AGS_TrigTrapBase::ApplyTrapEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("ApplyTrapEffect_Implementation Applied"));
+	//함정 발동
 }
 
 void AGS_TrigTrapBase::DelayTrapEffect(AActor* TargetActor)
@@ -266,7 +266,7 @@ UAkComponent* AGS_TrigTrapBase::GetOrCreateTrapAkComponent()
 
 void AGS_TrigTrapBase::EndTrapEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("TrapEffect Ended"));
+	//함정 동작 끝
 }
 
 
