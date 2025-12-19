@@ -115,7 +115,16 @@ void UGS_ChanUltimateSkill::InterruptSkill()
 
 void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitiveComponent* HitComp)
 {
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority())
+	{
+		return;
+	}
+
 	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
+	if (!OwnerPlayer)
+	{
+		return;
+	}
 	
 	// 데이터 테이블에서 스킬 정보 가져오기
 	const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
@@ -124,10 +133,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 	{
 		ApplyEffectToGuardian(Guardian);
 		
-		// 가디언 충돌 사운드 재생
-		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+		// 가디언 충돌 사운드 재생 (멀티캐스트)
+		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 2); // 2 = 가디언 충돌
+			AudioComp->RequestSkillAudio(CurrentSkillType, 6); // 6 = 가디언 충돌 (2 + 4)
 		}
 		
 		EndCharge();
@@ -139,10 +148,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 			HitActors.Add(Monster);
 			ApplyEffectToDungeonMonster(Monster);
 			
-			// 몬스터 충돌 사운드 재생
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+			// 몬스터 충돌 사운드 재생 (멀티캐스트)
+			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
 			{
-				AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 1); // 1 = 몬스터 충돌
+				AudioComp->RequestSkillAudio(CurrentSkillType, 5); // 5 = 몬스터 충돌 (1 + 4)
 			}
 		}
 	}
@@ -152,10 +161,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 	{
 		bInStructureCrash = true;
 		
-		// 벽 충돌 사운드 재생
-		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+		// 벽 충돌 사운드 재생 (멀티캐스트)
+		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 0); // 0 = 벽 충돌
+			AudioComp->RequestSkillAudio(CurrentSkillType, 4); // 4 = 벽 충돌 (0 + 4)
 		}
 		
 		// 대시 종료

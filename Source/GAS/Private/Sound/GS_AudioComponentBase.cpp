@@ -53,8 +53,9 @@ void UGS_AudioComponentBase::BeginPlay()
                 {
                     AkComp->Stop();
                     AkComp->SetComponentTickEnabled(false);
+                    // 컴포넌트를 등록 해제하여 렌더링/물리/오디오 엔진과의 연결을 끊음
+                    // 하지만 객체 자체는 파괴하지 않아 블루프린트 참조 오류 방지
                     AkComp->UnregisterComponent();
-                    AkComp->DestroyComponent();
                 }
             }
         }

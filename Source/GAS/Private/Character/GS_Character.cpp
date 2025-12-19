@@ -126,13 +126,13 @@ void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 
 void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// 2. 가시성 끄기
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.Clear();
+	}
+
 	HPTextWidgetComp->SetVisibility(false);
-
-	// 3. 콜리전 비활성화
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 4. BodySetup 정리
 	if (HPTextWidgetComp->GetBodySetup())
 	{
 		HPTextWidgetComp->DestroyPhysicsState();
@@ -187,7 +187,6 @@ float AGS_Character::TakeDamage(float DamageAmount, FDamageEvent const& DamageEv
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
-	//when damage input start -> for drakhar 6/24
 	OnDamageStart();
 
 	if (HasAuthority())

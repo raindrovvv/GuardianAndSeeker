@@ -164,6 +164,7 @@ void UGS_DebuffComp::ClearAllDebuffs()
 
 void UGS_DebuffComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	OnDebuffListUpdated.Clear();
 	Super::EndPlay(EndPlayReason);
 	ClearAllDebuffs();
 }
