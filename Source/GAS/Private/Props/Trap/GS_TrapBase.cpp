@@ -148,6 +148,22 @@ void AGS_TrapBase::RefreshTrapAudioSetup(bool bForceFindComponent)
         return;
     }
 
+    // === 데디케이티드 서버 크래시 방지 ===
+    // BP에서 추가된 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        TrapAkComponent = FindComponentByClass<UAkComponent>();
+        if (IsValid(TrapAkComponent))
+        {
+            TrapAkComponent->Stop();
+            TrapAkComponent->SetComponentTickEnabled(false);
+            TrapAkComponent->UnregisterComponent();
+            TrapAkComponent->DestroyComponent();
+            TrapAkComponent = nullptr;
+        }
+        return; // 서버에서는 오디오 설정 중단
+    }
+
     if (IsValid(AudioAnchorComponent))
     {
         AudioAnchorComponent->SetRelativeLocation(AudioAnchorRelativeLocation);

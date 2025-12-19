@@ -79,6 +79,22 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// === 데디케이티드 서버 크래시 방지 ===
+	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	{
+		if (IsValid(AkComponent))
+		{
+			AkComponent->Stop();
+			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->UnregisterComponent();
+			AkComponent->DestroyComponent();
+			AkComponent = nullptr;
+		}
+		// 주의: MonsterAudioComponent는 GS_AudioComponentBase를 상속하므로 
+		// 해당 클래스의 BeginPlay에서 이미 처리됨
+	}
+
 	if (IsValid(MonsterSkillComp))
 	{
 		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(this, &AGS_Monster::HandleSkillCooldownChanged);
@@ -92,6 +108,7 @@ void AGS_Monster::BeginPlay()
 	}
 
 	// Bind to owner's RTSController for attack notifications
+
 	// Bind to local RTSController for attack notifications (UI/Sound)
 	if (GetWorld())
 	{

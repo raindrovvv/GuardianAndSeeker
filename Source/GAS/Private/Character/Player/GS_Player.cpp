@@ -78,6 +78,29 @@ void AGS_Player::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// === 데디케이티드 서버 크래시 방지 ===
+	// 생성자에서 만든 AkComponent들이 리스너 없는 서버에서 Tick하면 크래시 발생
+	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	{
+		if (IsValid(AkComponent))
+		{
+			AkComponent->Stop();
+			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->UnregisterComponent();
+			AkComponent->DestroyComponent();
+			AkComponent = nullptr;
+		}
+		if (IsValid(CameraAudioListenerComponent))
+		{
+			CameraAudioListenerComponent->Stop();
+			CameraAudioListenerComponent->SetComponentTickEnabled(false);
+			CameraAudioListenerComponent->UnregisterComponent();
+			CameraAudioListenerComponent->DestroyComponent();
+			CameraAudioListenerComponent = nullptr;
+		}
+		return; // 서버에서는 오디오 관련 초기화 중단
+	}
+
 	// 오디오 디바이스 캐싱
 	CachedAudioDevice = FAkAudioDevice::Get();
 	if (ObscureCurve)

@@ -37,6 +37,30 @@ void UGS_AudioComponentBase::BeginPlay()
 {
     Super::BeginPlay();
 
+    // === 데디케이티드 서버(Headless) 크래시 방지 및 최적화 ===
+    // IsRunningDedicatedServer()는 전역적으로 서버 환경을 체크하는 가장 안전한 방법
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        AActor* Owner = GetOwner();
+        if (Owner)
+        {
+            // 소유자에게 붙어있는 모든 AkComponent를 강제로 찾아내어 무력화
+            TArray<UAkComponent*> AkComponents;
+            Owner->GetComponents<UAkComponent>(AkComponents);
+            for (UAkComponent* AkComp : AkComponents)
+            {
+                if (IsValid(AkComp))
+                {
+                    AkComp->Stop();
+                    AkComp->SetComponentTickEnabled(false);
+                    AkComp->UnregisterComponent();
+                    AkComp->DestroyComponent();
+                }
+            }
+        }
+        return; // 서버에서는 오디오 매니저 로직 자체를 중단
+    }
+
     // 재시도 카운터 초기화
     AudioInitRetryCount = 0;
 
@@ -802,6 +826,12 @@ UAkComponent* UGS_AudioComponentBase::GetOrCreateAkComponent()
         return nullptr;
     }
 
+    // 데디케이티드 서버에서는 오디오 컴포넌트를 생성하지 않음
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        return nullptr;
+    }
+
     // World 검증 (Seamless Travel 대응: bIsTearingDown 체크 제거)
     UWorld* World = GetWorld();
     if (!World || !World->IsValidLowLevel())
@@ -902,6 +932,11 @@ void UGS_AudioComponentBase::SetUnifiedRTPCValue(UAkRtpc* RTPC, float Normalized
 
 bool UGS_AudioComponentBase::InitializeAudioSystem()
 {
+    // 데디케이티드 서버인 경우 즉시 중단 (오디오 불필요)
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        return false;
+    }
     // World 유효성 체크 (Seamless Travel 대응)
     UWorld* World = GetWorld();
     if (!World || !World->IsValidLowLevel())
