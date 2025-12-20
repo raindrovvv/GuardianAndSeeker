@@ -33,11 +33,14 @@ private:
 	float AutoAimingStateTime = 10.0f;
 
 	AActor* FindCloseTarget();
-	UPROPERTY()
-	TArray<AActor*> AllMonsterActors;
 
 	void TickAutoAimTarget();
 	void UpdateMonsterList();
 
-	AActor* CurrentTarget;
+	// 캐싱된 Merci 소유자 (ActiveSkill에서 설정)
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
+
+	UPROPERTY()
+	TObjectPtr<AActor> CurrentTarget;
 };

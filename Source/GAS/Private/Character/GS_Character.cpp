@@ -83,11 +83,14 @@ void AGS_Character::BeginPlay()
 	}
 
 	//Set HP 3D widget (monster)
-	if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
 		{
-			HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			}
 		}
 	}
 
@@ -140,11 +143,11 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if (IsValid(HPTextWidgetComp))
 	{
-		if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
-		{
-			Widget->RemoveFromParent();
-		}
-		HPTextWidgetComp->SetWidget(nullptr);
+		// if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
+		// {
+		// 	Widget->RemoveFromParent();
+		// }
+		// HPTextWidgetComp->SetWidget(nullptr);
 		HPTextWidgetComp->DestroyComponent();
 	}
 	

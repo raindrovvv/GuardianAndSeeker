@@ -167,12 +167,22 @@ void AGS_RTSController::BeginPlay()
 			}
 			else
 			{
-				SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
+				if (!SkillBarWidget)
+				{
+					SkillBarWidget = CreateWidget<UGS_RTSSkillBarWidget>(this, RTSSkillBarWidgetClass);
+				}
+				
 				if (SkillBarWidget)
 				{
-					// 화면에 추가
-					SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
-
+					if (!SkillBarWidget->IsInViewport())
+					{
+						SkillBarWidget->AddToViewport(10); // Z-Order 10 (HUD 위에 표시)
+					}
+					else
+					{
+						SkillBarWidget->SetVisibility(ESlateVisibility::Visible);
+					}
+					
 					// 초기화
 					SkillBarWidget->InitializeSkillBar(RTSSkillComp);
 
@@ -192,10 +202,23 @@ void AGS_RTSController::BeginPlay()
 		// Create attack warning widget
 		if (AttackWarningWidgetClass && AttackNotificationManager)
 		{
-			UGS_RTSAttackWarningWidget* WarningWidget = CreateWidget<UGS_RTSAttackWarningWidget>(this, AttackWarningWidgetClass);
+			UGS_RTSAttackWarningWidget* WarningWidget = AttackNotificationManager->GetWarningWidget();
+			if (!WarningWidget)
+			{
+				WarningWidget = CreateWidget<UGS_RTSAttackWarningWidget>(this, AttackWarningWidgetClass);
+			}
+
 			if (WarningWidget)
 			{
-				WarningWidget->AddToViewport(15); // Higher Z-order than skill bar (which is 10)
+				if (!WarningWidget->IsInViewport())
+				{
+					WarningWidget->AddToViewport(15); // Higher Z-order than skill bar (which is 10)
+				}
+				else
+				{
+					WarningWidget->SetVisibility(ESlateVisibility::Visible);
+				}
+				
 				AttackNotificationManager->SetWarningWidget(WarningWidget);
 
 				UE_LOG(LogTemp, Log, TEXT("RTSAttackWarningWidget created successfully"));

@@ -37,6 +37,7 @@
 #include "Character/Component/Seeker/GS_MarkerPlacementComponent.h"
 #include "Props/Item/SeekerItem/GS_HP_Potion.h"
 #include "Props/Item/GS_ItemData.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker()
@@ -188,6 +189,15 @@ void AGS_Seeker::BeginPlay()
 			PS->OnPlayerAliveStatusChangedDelegate.AddUObject(this, &AGS_Seeker::HandleAliveStatusChanged);
 		}
 	}
+
+	// Register to Subsystem for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterSeeker(this);
+		}
+	}
 }
 
 void AGS_Seeker::Tick(float DeltaTime)
@@ -300,9 +310,13 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SafeClearTimer(ReviveDecayTimerHandle);
 
 	// 포스트 프로세스 비활성화
-	if (DyingPostProcessComp)
+	// Unregister from Subsystem
+	if (UWorld* World = GetWorld())
 	{
-		DyingPostProcessComp->bEnabled = false;
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterSeeker(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);

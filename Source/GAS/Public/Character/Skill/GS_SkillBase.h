@@ -20,10 +20,10 @@ public:
 	float Damage;
 	
 	UPROPERTY(EditDefaultsOnly)
-	TArray<UAnimMontage*> SkillAnimMontages;
+	TArray<TObjectPtr<UAnimMontage>> SkillAnimMontages;
 
 	UPROPERTY(EditDefaultsOnly)
-	UTexture2D* SkillImage;
+	TObjectPtr<UTexture2D> SkillImage;
 
 	UPROPERTY(EditDefaultsOnly)
 	int16 AllowSkillsMask;
@@ -108,8 +108,11 @@ protected:
 	bool bIsCoolingDown;
 
 	// 스킬 소유자
-	AGS_Player* OwnerCharacter;
-	UGS_SkillComp* OwningComp;
+	UPROPERTY()
+	TObjectPtr<AGS_Player> OwnerCharacter;
+
+	UPROPERTY()
+	TObjectPtr<UGS_SkillComp> OwningComp;
 	
 	// Cast VFX 컴포넌트 추적 (스킬 종료 시 정리를 위해)
 	UPROPERTY()

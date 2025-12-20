@@ -30,4 +30,8 @@ private:
 
 	// Cooltime 복원용 변수
 	float OriginalMovingSkillCooltime = -1.f;
+
+	// 캐싱된 Ares 소유자 (ActiveSkill에서 설정)
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Ares> CachedAresOwner;
 };
