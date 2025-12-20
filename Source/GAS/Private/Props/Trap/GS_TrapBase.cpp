@@ -119,6 +119,29 @@ void AGS_TrapBase::BeginPlay()
 	ActivateSphereComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnActivSCompBeginOverlap);
 }
 
+void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 타이머 정리
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(CheckOverlapTimerHandle);
+	}
+
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (DamageBoxComp)
+	{
+		DamageBoxComp->OnComponentBeginOverlap.RemoveAll(this);
+		DamageBoxComp->OnComponentHit.RemoveAll(this);
+	}
+
+	if (ActivateSphereComp)
+	{
+		ActivateSphereComp->OnComponentBeginOverlap.RemoveAll(this);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AGS_TrapBase::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);

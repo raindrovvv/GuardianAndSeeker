@@ -76,6 +76,12 @@ void AGS_Door::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 타이머 정리 (레벨 전환 안정성)
 	SafeClearTimer(DoorCloseTimerHandle);
 
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (TriggerBoxComp)
+	{
+		TriggerBoxComp->OnComponentBeginOverlap.RemoveAll(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 

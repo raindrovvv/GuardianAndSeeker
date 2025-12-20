@@ -172,6 +172,16 @@ void AGS_AetherExtractor::SetHPTextWidget(UGS_HPText* InHPTextWidget)
 
 void AGS_AetherExtractor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.Clear();
+	}
+
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(AetherExtractTimerHandle);
+	}
+
 	Super::EndPlay(EndPlayReason);
 
 	if (!GetWorld())

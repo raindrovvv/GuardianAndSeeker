@@ -192,6 +192,20 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		AkComponent->Stop();
 	}
 
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (IsValid(MonsterSkillComp))
+	{
+		MonsterSkillComp->OnMonsterSkillCooldownChanged.RemoveAll(this);
+	}
+
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.RemoveAll(this);
+	}
+
+	// 공격 알림 델리게이트 해제
+	OnMonsterAttacked.RemoveAll(this);
+
 	// if (SkillCooldownWidgetComp && SkillCooldownWidgetComp->GetBodySetup())
 	// {
 	// 	SkillCooldownWidgetComp->DestroyPhysicsState();

@@ -348,6 +348,18 @@ void AGS_CustomLobbyPC::RequestOpenJobSelectionPopup()
 	}
 }
 
+void AGS_CustomLobbyPC::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (AGS_PlayerState* PS = GetPlayerState<AGS_PlayerState>())
+	{
+		PS->OnRoleChangedDelegate.RemoveAll(this);
+		PS->OnReadyStatusChangedDelegate.RemoveAll(this);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AGS_CustomLobbyPC::RequestOpenPerkOrDungeonPopup()
 {
 	AGS_PlayerState* PS = GetCachedPlayerState();
