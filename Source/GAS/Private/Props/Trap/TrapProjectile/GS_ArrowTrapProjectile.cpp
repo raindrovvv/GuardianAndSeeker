@@ -307,12 +307,12 @@ void AGS_ArrowTrapProjectile::StickWithVisualOnly(const FHitResult& Hit)
 bool AGS_ArrowTrapProjectile::IsReady() const
 {
 	//숨겨져 있으면 true를 반환 
-	return IsHidden() && !IsPendingKillPending();
+	return IsHidden() && IsValid(this);
 }
 
 void AGS_ArrowTrapProjectile::ActivateProjectile(const FVector& SpawnLocation, const FRotator& Rotation, float Speed)
 {
-	if (IsPendingKillPending() || !IsValid(this))
+	if (!IsValid(this))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ActivateProjectile not valid"));
 		return;

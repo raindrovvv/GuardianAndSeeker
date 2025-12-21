@@ -27,10 +27,10 @@ void UGS_ChanReadySkill::ActiveSkill()
 		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 		OwnerPlayer->CanChangeSeekerGait = false;
 
-		// 스킬 시작 사운드 재생
+		// 스킬 시작 사운드 재생 (멀티캐스트)
 		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillSoundFromDataTable(CurrentSkillType, true);
+			AudioComp->RequestSkillAudio(CurrentSkillType, 0); // 0 = 스킬 시작
 		}
 
 		if (OwningComp)

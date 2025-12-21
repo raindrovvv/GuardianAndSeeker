@@ -107,6 +107,12 @@ void AGS_Merci::BeginPlay()
 
 void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 {
+	// 빈사 상태에서는 공격 불가
+	if (IsInDyingState())
+	{
+		return;
+	}
+
 	if (!HasAuthority())
 	{
 		// 서버에 요청
@@ -605,6 +611,12 @@ void AGS_Merci::LeftClickRelease_Implementation()
 
 float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	// 이미 빈사 상태인 경우 데미지 및 로직 무시
+	if (IsInDyingState())
+	{
+		return 0.0f;
+	}
+
 	// 활을 들고 있는 경우
 	if (GetDrawState() || GetAimState())
 	{

@@ -19,7 +19,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Skill/Seeker/Chan/GS_ChanUltimateSkill.h"
-/*#include "Engine/DamageEvents.h"*/
+#include "Engine/DamageEvents.h"
 
 
 // Sets default values
@@ -255,6 +255,42 @@ float AGS_Chan::TakeDamage(float DamageAmount, struct FDamageEvent const& Damage
 			//UE_LOG(LogTemp, Warning, TEXT("Stamina Damage In"));
 			float StaminaDamage = DamageAmount * (MaxStamina / MaxHealth);
 			SetCurrentStamina(CurrentStamina - StaminaDamage, true);
+		}
+
+		// === 방어 성공 이펙트 및 사운드 재생 ===
+		if (HasAuthority() && DamageCauser && IsValid(DamageCauser) && DamageCauser != this)
+		{
+			// DamageCauser가 적인지 확인
+			AGS_Character* AttackerChar = Cast<AGS_Character>(DamageCauser);
+			if (AttackerChar && IsEnemy(AttackerChar))
+			{
+				// 방패를 찾아서 효과 재생 요청
+				for (int32 i = 0; i < 5; ++i)
+				{
+					if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
+					{
+						FHitResult HitResult;
+						if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+						{
+							HitResult = ((FPointDamageEvent&)DamageEvent).HitInfo;
+						}
+						else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+						{
+							HitResult.ImpactPoint = ((FRadialDamageEvent&)DamageEvent).Origin;
+							HitResult.ImpactNormal = (HitResult.ImpactPoint - GetActorLocation()).GetSafeNormal();
+						}
+						else
+						{
+							// 기본 설정 (방패 앞쪽 가상 위치)
+							HitResult.ImpactPoint = GetActorLocation() + GetActorForwardVector() * 50.f;
+							HitResult.ImpactNormal = (DamageCauser->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+						}
+
+						Shield->PlayDefenseEffects(DamageCauser, HitResult);
+						break;
+					}
+				}
+			}
 		}
 	}
 	else

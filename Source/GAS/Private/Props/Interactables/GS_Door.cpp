@@ -76,6 +76,12 @@ void AGS_Door::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 타이머 정리 (레벨 전환 안정성)
 	SafeClearTimer(DoorCloseTimerHandle);
 
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (TriggerBoxComp)
+	{
+		TriggerBoxComp->OnComponentBeginOverlap.RemoveAll(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -400,6 +406,22 @@ void AGS_Door::RefreshDoorAudioSetup(bool bForceFindComponent)
 	if (!GetWorld() || !IsValid(this))
 	{
 		return;
+	}
+
+	// === 데디케이티드 서버 크래시 방지 ===
+	// BP에서 추가된 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	{
+		DoorAkComponent = FindComponentByClass<UAkComponent>();
+		if (IsValid(DoorAkComponent))
+		{
+			DoorAkComponent->Stop();
+			DoorAkComponent->SetComponentTickEnabled(false);
+			DoorAkComponent->UnregisterComponent();
+			DoorAkComponent->DestroyComponent();
+			DoorAkComponent = nullptr;
+		}
+		return; // 서버에서는 오디오 설정 중단
 	}
 
 	if (IsValid(AudioAnchorComponent))

@@ -51,6 +51,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSeekerHover, bool, bIsHover);
 // 빈사 상태 변화 델리게이트
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDyingStateChanged, bool, bIsDying, float, TimeRemaining);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReviveProgressChanged, float, Progress);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, bIsDetected);
 
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
@@ -133,6 +134,9 @@ public:
 	UFUNCTION(Server, Reliable)
 	virtual void Server_OnComboAttack();
 
+	// Damage Handler
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 	// Control
 	UFUNCTION()
 	void SetMoveControlValue(bool bMoveForward, bool bMoveRight);
@@ -141,9 +145,10 @@ public:
 
 	// Replication Set
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnRep_IsDead() override;
 
 	// === Audio Functions ===
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySound(class UAkAudioEvent* SoundToPlay);
 
 	// ===============
@@ -268,6 +273,28 @@ public:
 	UNiagaraComponent* BodyLavaVFX;
 
 	// ================
+	// 빈사 상태 불꽃 VFX 컴포넌트
+	// ================
+	/** 푸른 불꽃 기둥 VFX ("불꽃의 안식처") */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UNiagaraComponent* DyingFlameEffectComp;
+
+	/** 바닥 마법진 VFX */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UNiagaraComponent* DyingMagicCircleComp;
+
+	// ================
+	// 빈사 상태 사운드
+	// ================
+	/** 빈사 상태 진입 시 불꽃 발동 사운드 ("화륵!") */
+	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
+	UAkAudioEvent* DyingFlameActivationSound;
+
+	/** 빈사 타이머 위험 구간 경고 사운드 (10초 이하) */
+	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
+	UAkAudioEvent* DyingFlameDangerSound;
+
+	// ================
 	// 전투 음악 관리
 	// ================
 	// 몬스터 감지용 컴포넌트 추가
@@ -293,6 +320,9 @@ public:
 	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 protected:
+	// 빈사 경고음 재생 제어용
+	int32 LastDyingWarningSecond = -1;
+
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -477,12 +507,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Detection")
 	float GetDetectionIntensity() const { return DetectionIntensity; }
 
-	/** 감지 HUD 위젯 인스턴스 (블루프린트 접근용) */
+	/** 감지 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "UI|Detection")
 	class UUserWidget* DetectionHUDWidget;
 
-	/** 감지 상태 변경 시 HUD 업데이트 */
-	void UpdateDetectionHUD();
+	/** 감지 상태 변화 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "Detection")
+	FOnDetectedByGuardianChanged OnDetectedByGuardianChanged;
+
+	/** 감지 상태 변경 시 HUD 업데이트 (C++ 기본 처리 + BP 추가 처리 가능) */
+	UFUNCTION(BlueprintNativeEvent, Category = "Detection")
+	void UpdateDetectionHUD(bool bIsDetected);
 
 private:
 	/** 감지 상태 변경 시 시각적/청각적 효과 업데이트 */
@@ -565,12 +600,45 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Dying")
 	TWeakObjectPtr<AGS_Seeker> CurrentReviver;
 
+	/** 주변 감지 업데이트용 블루프린트 이벤트 (Actor Tick 대용으로 사용 가능) */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Seeker|Sensor")
+	void OnPeripheralSensorUpdate();
+
 protected:
+	/** 캐릭터 빙의 완료 시 호출 (클라이언트) */
+	virtual void PawnClientRestart() override;
+
 	/** 빈사 상태 업데이트 (Tick에서 호출) */
 	void UpdateDyingState(float DeltaTime);
 
 	/** 빈사 상태 화면 효과 업데이트 */
 	void UpdateDyingPostProcessEffect();
+
+	/** 불꽃 효과 활성화 */
+	void ActivateDyingFlameEffects();
+
+	/** 불꽃 효과 비활성화 */
+	void DeactivateDyingFlameEffects();
+
+	/** 불꽃 크기 타이머 연동 업데이트 */
+	void UpdateDyingFlameVisuals(float TimeRemaining);
+
+	/** 주변 감지(보물상자 등) 주기적 업데이트 함수 */
+	void UpdatePeripheralSensor();
+
+	/** 주변 보물상자 감지 및 시각 효과 처리 */
+	void CheckNearbyEmberChests();
+
+	/** 빈사 상태 주기적 업데이트 함수 (타이머 호출용) */
+	void UpdateDyingStateTimer();
+
+	/** 불꽃 활성화 멀티캐스트 RPC */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_ActivateDyingFlame();
+
+	/** 불꽃 비활성화 멀티캐스트 RPC */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_DeactivateDyingFlame();
 
 	/** 진행도 감소 시작 */
 	UFUNCTION()
@@ -622,6 +690,17 @@ protected:
 	bool CanContinueRevive() const;
 
 private:
+	/** 빈사 상태 업데이트 타이머 핸들 */
+	FTimerHandle DyingUpdateTimerHandle;
+
+	/** 주변 감지(보물상자 등) 타이머 핸들 */
+	FTimerHandle PeripheralSensorTimerHandle;
+
+	/** 현재 감지된 보물상자 (아웃라인 표시용) */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_EmberChest> CurrentDetectedChest;
+
+
 	// ========================================
 	// 빈사 상태 변수들
 	// ========================================
@@ -636,6 +715,8 @@ private:
 	/** 남은 빈사 시간 (초) */
 	UPROPERTY(Replicated)
 	float DyingTimeRemaining = 0.0f;
+
+	float DyingVisualUpdateTimer = 0.0f; // 시각 효과 업데이트 주기 조절용
 
 	/** 최대 빈사 시간 (90초) */
 	UPROPERTY(EditDefaultsOnly, Category = "Dying", meta = (ClampMin = "10.0", ClampMax = "300.0"))
@@ -697,6 +778,9 @@ private:
 
 	/** 진행도가 감소 중인지 여부 (서버 전용) */
 	bool bIsReviveDecaying = false;
+
+	/** 위험 사운드 재생 여부 (한 번만 재생) */
+	bool bDangerSoundPlayed = false;
 
 	// OnRep 함수들
 	UFUNCTION()

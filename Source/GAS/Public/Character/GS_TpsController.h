@@ -15,6 +15,8 @@ class UInputAction;
 struct FInputActionValue;
 class AGS_Seeker;
 class UGS_ReviveIndicatorWidget;
+class IGS_InteractableInterface;
+class UGS_InteractionWidget;
 
 UCLASS()
 class GAS_API AGS_TpsController : public AGS_BasePlayerController
@@ -164,6 +166,29 @@ public:
 	UFUNCTION(Server, Unreliable, Category = "Revive")
 	void Server_SetHoldingReviveKey(bool bIsHolding);
 
+	// ==========================================
+	// 일반 상호작용 시스템 (IInteractable)
+	// ==========================================
+
+	/** 근처 상호작용 가능 액터 찾기 (캐싱됨) */
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	AActor* GetNearbyInteractable() const { return CachedInteractable.Get(); }
+
+	/** 현재 상호작용 중인지 확인 */
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsInteracting() const { return bIsInteracting; }
+
+	/** 상호작용 진행률 (0.0 ~ 1.0) */
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	float GetInteractionProgress() const;
+
+	/** 상호작용 완료 서버 RPC */
+	UFUNCTION(Server, Reliable, Category = "Interaction")
+	void Server_CompleteInteraction(AActor* Target);
+
+	/** 상호작용 가능 대상 감지 (오버랩 기반) */
+	void UpdateNearbyInteractable();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
@@ -188,6 +213,8 @@ protected:
 private:
 	// Auto Moving (KCY)
 	FTimerHandle AutoMoveTickHandle;
+	FTimerHandle ReviveIndicatorTimerHandle;
+	FTimerHandle InteractableUpdateTimerHandle;
 	
 	UPROPERTY(Replicated)
 	bool bIsAutoMoving = false;
@@ -227,6 +254,15 @@ private:
 	UPROPERTY()
 	UGS_ReviveIndicatorWidget* ReviveIndicatorWidget;
 
+	/** 상호작용 위젯 클래스 (BP에서 할당) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGS_InteractionWidget> InteractionWidgetClass;
+
+	/** 현재 생성된 상호작용 위젯 */
+	UPROPERTY()
+	UGS_InteractionWidget* InteractionWidget;
+
+
 	void AutoMoveTick();
 	void ApplyChargeCameraSettings(bool bCharging);
 	void SaveOriginalCameraSettings();
@@ -245,4 +281,36 @@ private:
 	bool bOriginalEnableCameraLag = true;
 	bool bOriginalEnableCameraRotationLag = true;
 	bool bOriginalInheritYaw = true;
+
+	// ==========================================
+	// 일반 상호작용 시스템 변수들
+	// ==========================================
+
+	/** 현재 상호작용 중인지 여부 */
+	bool bIsInteracting = false;
+
+	/** 상호작용 시작 시간 */
+	float InteractionStartTime = 0.0f;
+
+	/** 상호작용 소요 시간 */
+	float CurrentInteractionDuration = 0.0f;
+
+	/** 현재 상호작용 대상 (WeakPtr로 안전하게 참조) */
+	TWeakObjectPtr<AActor> CurrentInteractTarget;
+
+	/** 근처 상호작용 가능 액터 캐싱 (매 Tick 검색 방지) */
+	TWeakObjectPtr<AActor> CachedInteractable;
+
+
+	/** 상호작용 시작 */
+	void StartInteraction(AActor* Target);
+
+	/** 상호작용 취소 */
+	void CancelInteraction();
+
+	/** 상호작용 완료 */
+	void CompleteInteraction();
+
+	/** 상호작용 진행 업데이트 (Tick에서 호출) */
+	void UpdateInteractionProgress(float DeltaTime);
 };

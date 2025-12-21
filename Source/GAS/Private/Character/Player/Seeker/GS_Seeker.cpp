@@ -2,6 +2,7 @@
 
 
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Blueprint/UserWidget.h"
 #include "Character/Component/GS_SkillInputHandlerComp.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Components/PostProcessComponent.h"
@@ -37,6 +38,9 @@
 #include "Character/Component/Seeker/GS_MarkerPlacementComponent.h"
 #include "Props/Item/SeekerItem/GS_HP_Potion.h"
 #include "Props/Item/GS_ItemData.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "UI/Character/GS_SteamNameWidgetComp.h"
+#include "Props/Item/EmberChest/GS_EmberChest.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker()
@@ -102,6 +106,20 @@ AGS_Seeker::AGS_Seeker()
 	BodyLavaVFX->bAutoActivate = false;
 	BodyLavaVFX->SetRelativeLocation(FVector(-60.f, 0.f, 0.f));
 	BodyLavaVFX->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+
+	// =======================
+	// 빈사 상태 불꽃 VFX 컴포넌트 초기화
+	// =======================
+	DyingFlameEffectComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("DyingFlameEffectComp"));
+	DyingFlameEffectComp->SetupAttachment(RootComponent);
+	DyingFlameEffectComp->bAutoActivate = false;
+	DyingFlameEffectComp->SetRelativeLocation(FVector(0.f, 0.f, -88.f)); // 캡슐 바닥에서 시작
+
+	DyingMagicCircleComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("DyingMagicCircleComp"));
+	DyingMagicCircleComp->SetupAttachment(RootComponent);
+	DyingMagicCircleComp->bAutoActivate = false;
+	DyingMagicCircleComp->SetRelativeLocation(FVector(0.f, 0.f, -90.f)); // 바닥
+	DyingMagicCircleComp->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f)); // 바닥에 평행하게
 
 	// 전투 BGM 트리거 생성 (시커가 몬스터를 감지)
 	CombatTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CombatTrigger"));
@@ -174,23 +192,42 @@ void AGS_Seeker::BeginPlay()
 			PS->OnPlayerAliveStatusChangedDelegate.AddUObject(this, &AGS_Seeker::HandleAliveStatusChanged);
 		}
 	}
+
+	// Register to Subsystem for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterSeeker(this);
+		}
+	}
+
+	// === 최적화: Tick 비활성화 및 타이머 시스템 가동 ===
+	// 기본 Tick을 비활성화하여 CPU 사용량을 줄입니다.
+	SetActorTickEnabled(false);
+
+	// 주변 감지(상자 등) 및 저빈도 업데이트용 타이머 시작 (0.1초/10Hz)
+	// 이 타이머는 블루프린트의 OnPeripheralSensorUpdate 이벤트를 호출합니다.
+	GetWorldTimerManager().SetTimer(PeripheralSensorTimerHandle, this, &AGS_Seeker::UpdatePeripheralSensor, 0.1f, true);
+}
+
+void AGS_Seeker::PawnClientRestart()
+{
+	Super::PawnClientRestart();
+
+	// 로컬 플레이어 빙의 후, 이미 가디언에게 감지된 상태라면 UI 업데이트
+	if (IsLocallyControlled() && bIsDetectedByGuardian)
+	{
+		UpdateDetectionEffects();
+	}
 }
 
 void AGS_Seeker::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 빈사 상태 업데이트 (서버에서만)
-	if (HasAuthority() && bIsInDyingState)
-	{
-		UpdateDyingState(DeltaTime);
-	}
-
-	// 빈사 상태 화면 효과 업데이트 (로컬 플레이어만)
-	if (IsLocallyControlled() && bIsInDyingState)
-	{
-		UpdateDyingPostProcessEffect();
-	}
+	// 현재 시커의 Tick 로직은 모두 타이머(UpdatePeripheralSensor, UpdateDyingStateTimer)로 이동되었습니다.
+	// 하위 클래스(Merci의 Zoom 등)에서 필요할 경우 하위 클래스에서 Tick을 켜고 사용할 수 있습니다.
 }
 
 // Called to bind functionality to input
@@ -277,11 +314,17 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	// 빈사/구조 관련 타이머 정리
 	SafeClearTimer(ReviveDecayTimerHandle);
+	SafeClearTimer(DyingUpdateTimerHandle);
+	SafeClearTimer(PeripheralSensorTimerHandle);
 
 	// 포스트 프로세스 비활성화
-	if (DyingPostProcessComp)
+	// Unregister from Subsystem
+	if (UWorld* World = GetWorld())
 	{
-		DyingPostProcessComp->bEnabled = false;
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterSeeker(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -326,6 +369,12 @@ bool AGS_Seeker::GetDrawState()
 
 void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
 {
+	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
+	if (bIsInDyingState && Gait != EGait::Crawl)
+	{
+		return;
+	}
+
 	LastSeekerGait = SeekerGait;
 	SeekerGait = Gait;
 
@@ -353,6 +402,12 @@ void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
 
 void AGS_Seeker::SetSeekerGait(EGait Gait)
 {
+	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
+	if (bIsInDyingState && Gait != EGait::Crawl)
+	{
+		return;
+	}
+
 	LastSeekerGait = SeekerGait;
 	SeekerGait = Gait;
 	if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
@@ -475,8 +530,25 @@ void AGS_Seeker::ComboInputClose()
 	}
 }
 
+float AGS_Seeker::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	// 빈사 상태면 모든 데미지 및 피격 반응 무시 (무적)
+	if (bIsInDyingState)
+	{
+		return 0.0f;
+	}
+
+	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+}
+
 void AGS_Seeker::Server_OnComboAttack_Implementation()
 {
+	// 빈사 상태에서는 공격 불가
+	if (bIsInDyingState)
+	{
+		return;
+	}
+
 	if (!CanAcceptComboInput) // Handler 에서도 검사하고 있었는데 서버에서도 검사한다. 이중검사가 필요한가?
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, CanAcceptComboInput == false"));
@@ -827,6 +899,13 @@ void AGS_Seeker::UpdateCombatMusicState()
 
 void AGS_Seeker::OnDeath()
 {
+	// 사망 시 빈사 상태 효과 확실히 제거
+	if (HasAuthority())
+	{
+		Multicast_DeactivateDyingFlame();
+		bIsInDyingState = false;
+	}
+
 	// LowHP Pain 사운드 즉시 중지
 	if (SeekerAudioComponent)
 	{
@@ -929,6 +1008,12 @@ void AGS_Seeker::OnDetectedByGuardian(bool bIsDetected)
 		// 상태 변경 시 자동으로 OnRep_IsDetectedByGuardian이 모든 클라이언트에서 호출됨
 		bIsDetectedByGuardian = bIsDetected;
 
+		// 리슨 서버인 경우 본인(서버 플레이어)을 위해 직접 호출
+		if (IsLocallyControlled())
+		{
+			OnRep_IsDetectedByGuardian();
+		}
+
 		// 감지 해제 시 강도도 0으로 초기화
 		if (!bIsDetected)
 		{
@@ -955,6 +1040,9 @@ void AGS_Seeker::OnRep_IsDetectedByGuardian()
 
     // 시각적 효과 업데이트 (항상 실행)
     UpdateDetectionEffects();
+
+	// 델리게이트 알림 (블루프린트 UI용)
+	OnDetectedByGuardianChanged.Broadcast(bIsDetectedByGuardian);
 
 	// 청각적 피드백
 	if (!SeekerAudioComponent)
@@ -1009,8 +1097,7 @@ void AGS_Seeker::UpdateDetectionEffects()
 	if (bIsDetectedByGuardian)
 	{
 		// 감지되었을 때 - 블루프린트에서 HUD 위젯 표시
-		// BP_Seeker에서 이벤트 바인딩하여 처리
-        UpdateDetectionHUD();
+        UpdateDetectionHUD(true);
 
 		// 감지 전용 포스트 프로세스 활성화
         if (DetectionEffectComp)
@@ -1021,7 +1108,7 @@ void AGS_Seeker::UpdateDetectionEffects()
 	else
 	{
 		// 감지 해제 시 - 블루프린트에서 HUD 위젯 숨김
-        UpdateDetectionHUD();
+        UpdateDetectionHUD(false);
 
 		// 감지 전용 포스트 프로세스 비활성화
         if (DetectionEffectComp)
@@ -1044,9 +1131,38 @@ void AGS_Seeker::UpdateDetectionPostProcessEffect(float Intensity)
     }
 }
 
-void AGS_Seeker::UpdateDetectionHUD()
+void AGS_Seeker::UpdateDetectionHUD_Implementation(bool bIsDetected)
 {
-	// 실제 HUD 표시/숨김은 블루프린트에서 이벤트로 처리됨
+	// 로컬 플레이어가 아닌 경우 UI 처리를 하지 않음
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (bIsDetected)
+	{
+		// 감지되었을 때 UI 표시
+		if (!DetectionHUDWidget && DetectionHUDWidgetClass)
+		{
+			DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), DetectionHUDWidgetClass);
+			if (DetectionHUDWidget)
+			{
+				DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
+			}
+		}
+		else if (DetectionHUDWidget)
+		{
+			DetectionHUDWidget->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+	else
+	{
+		// 감지되지 않았을 때 UI 숨김
+		if (DetectionHUDWidget)
+		{
+			DetectionHUDWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 // ==========================================
@@ -1077,11 +1193,15 @@ void AGS_Seeker::EnterDyingState()
 		return;
 	}
 
-	// 빈사 상태 진입
+	// 빈사 상태 활성화
 	bIsInDyingState = true;
 	DyingTimeRemaining = MaxDyingTime;
 	bIsBeingRevived = false;
 	ReviveProgress = 0.0f;
+	bDangerSoundPlayed = false;
+
+	// 빈사 상태 업데이트 타이머 시작 (Tick 대신 사용, 20Hz)
+	GetWorldTimerManager().SetTimer(DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, 0.05f, true);
 
 	// 현재 Gait 저장
 	GaitBeforeDying = SeekerGait;
@@ -1091,6 +1211,30 @@ void AGS_Seeker::EnterDyingState()
 
 	// 스킬 사용 불가
 	SetCanUseSkill(false);
+
+	// 메르시 등 무기/조준 상태 강제 해제 (애니메이션 정상화를 위해)
+	SetDrawState(false);
+	SetAimState(false);
+	SetIsLockedRotationToController(false); // 회전 고정 해제 추가
+
+	// 몬스터 회피: 물리적 충돌(Pawn)은 유지하여 통과하지 않게 함.
+	// 대신 AI 감지(Visibility, Camera) 및 타겟팅(RTSTarget)을 무시하여 공격 대상에서 제외되도록 유도.
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore); // RTSTarget
+
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
+
+	// 방법 A: 불꽃 효과 활성화 (OnRep에서 처리하도록 변수 복제만 담당, 서버/리슨서버는 직접 호출)
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_IsInDyingState();
+	}
+
+	// 위험 사운드 플래그 초기화
+	bDangerSoundPlayed = false;
 
 	// LowHP Pain 사운드는 빈사 상태에서도 계속 재생 (더 긴박한 분위기)
 
@@ -1116,6 +1260,24 @@ void AGS_Seeker::ExitDyingState(bool bWasRevived)
 	bIsBeingRevived = false;
 	ReviveProgress = 0.0f;
 	CurrentReviver = nullptr;
+
+
+	// 몬스터 콜리전 복구 (감지 채널들)
+	// 원래 설정값으로 복구해야 하지만, 기본적으로 Block 또는 Overlap일 것이므로 Block으로 설정
+	// (프로젝트 설정에 따라 다를 수 있으나, 일반적으로 캐릭터는 Visibility/Camera에 반응함)
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block); // or Overlap? 보통 캡슐은 Trace Block 함
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Block); // or Ignore? (카메라 줌인 방지 등) -> 일단 Block으로 복구
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block); // RTSTarget
+
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
+	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
+
+	// 불꽃 효과 비활성화 (OnRep에서 처리하도록 변수 복제만 담당, 서버/리슨서버는 직접 호출)
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_IsInDyingState();
+	}
 
 	// 델리게이트 브로드캐스트
 	OnDyingStateChanged.Broadcast(false, 0.0f);
@@ -1169,6 +1331,113 @@ void AGS_Seeker::OnDyingTimeExpired()
 	OnDeath();
 }
 
+void AGS_Seeker::UpdatePeripheralSensor()
+{
+	// 1. 블루프린트에서 추가 기능을 수행할 수 있도록 이벤트 호출
+	OnPeripheralSensorUpdate();
+
+	// 2. 주변 보물상자 감지 및 시각 효과 (C++)
+	CheckNearbyEmberChests();
+
+	// 3. 부모 클래스(AGS_Player)의 이름표 회전 기능을 여기서 저빈도로 수행 (Tick 대신)
+	if (IsValid(SteamNameWidgetComp))
+	{
+		UpdateSteamNameWidgetRotation();
+	}
+
+	// 4. 로컬 컨트롤러의 상호작용 로직 업데이트 (Tick이 꺼져 있으므로 여기서 명시적 호출)
+	if (IsLocallyControlled())
+	{
+		if (AGS_TpsController* TPSController = Cast<AGS_TpsController>(GetController()))
+		{
+			TPSController->UpdateNearbyInteractable();
+		}
+	}
+}
+
+void AGS_Seeker::UpdateDyingStateTimer()
+{
+	// 고정 시간 간격 (0.05s)
+	const float DeltaTime = 0.05f;
+
+	if (bIsInDyingState)
+	{
+		// 서버: 타이머 로직 처리
+		if (HasAuthority())
+		{
+			UpdateDyingState(DeltaTime);
+		}
+
+		// 로컬 전용 포스트 프로세스 효과
+		if (IsLocallyControlled())
+		{
+			UpdateDyingPostProcessEffect();
+		}
+
+		// 비주얼 및 경고 사운드 업데이트 (모든 클라이언트)
+		UpdateDyingFlameVisuals(DyingTimeRemaining);
+
+		// 로컬 클라이언트 UI 업데이트를 위한 방송 (남은 시간 실시간 갱신)
+		if (IsLocallyControlled())
+		{
+			OnDyingStateChanged.Broadcast(true, DyingTimeRemaining);
+		}
+	}
+	else
+	{
+		// 상태가 해제되었으면 타이머 종료
+		GetWorldTimerManager().ClearTimer(DyingUpdateTimerHandle);
+	}
+}
+
+void AGS_Seeker::CheckNearbyEmberChests()
+{
+	// 로컬 플레이어만 시각 효과(아웃라인 등)를 처리하면 됨
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	// 1. 주변 액터 검색 (오버랩 기반)
+	TArray<AActor*> OverlappingActors;
+	GetOverlappingActors(OverlappingActors, AGS_EmberChest::StaticClass());
+
+	AGS_EmberChest* ClosestChest = nullptr;
+	float MinDistanceSq = TNumericLimits<float>::Max();
+
+	for (AActor* Actor : OverlappingActors)
+	{
+		AGS_EmberChest* Chest = Cast<AGS_EmberChest>(Actor);
+		if (Chest && Chest->CurrentState == EEmberChestState::Idle)
+		{
+			float DistanceSq = FVector::DistSquared(GetActorLocation(), Chest->GetActorLocation());
+			if (DistanceSq < MinDistanceSq)
+			{
+				MinDistanceSq = DistanceSq;
+				ClosestChest = Chest;
+			}
+		}
+	}
+
+	// 2. 감지된 상자가 변경되었을 때만 처리
+	if (ClosestChest != CurrentDetectedChest.Get())
+	{
+		// 이전 상자의 하이라이트 끄기
+		if (CurrentDetectedChest.IsValid())
+		{
+			CurrentDetectedChest->SetHighlight(false);
+		}
+
+		// 새 상자의 하이라이트 켜기
+		if (ClosestChest)
+		{
+			ClosestChest->SetHighlight(true);
+		}
+
+		CurrentDetectedChest = ClosestChest;
+	}
+}
+
 void AGS_Seeker::UpdateDyingState(float DeltaTime)
 {
 	// 서버에서만 호출
@@ -1192,6 +1461,9 @@ void AGS_Seeker::UpdateDyingState(float DeltaTime)
 	{
 		UpdateReviveProgress(DeltaTime);
 	}
+
+	// 빈사 상태 로직 (서버 사이드: 진행도 및 타이머만 관리)
+	// 비주얼 및 경고음은 Tick -> UpdateDyingFlameVisuals (로컬) 에서 처리됨
 }
 
 void AGS_Seeker::UpdateDyingPostProcessEffect()
@@ -1445,9 +1717,24 @@ bool AGS_Seeker::IsReviverValid(const AGS_Seeker* Reviver) const
 
 void AGS_Seeker::OnRep_IsInDyingState()
 {
-	// 클라이언트에서 빈사 상태 변화 처리
+	// 클라이언트에서 빈사 상태 로직을 위한 타이머 관리 (Tick 대신 사용)
+	if (bIsInDyingState)
+	{
+		if (!GetWorldTimerManager().IsTimerActive(DyingUpdateTimerHandle))
+		{
+			GetWorldTimerManager().SetTimer(DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, 0.05f, true);
+		}
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(DyingUpdateTimerHandle);
+	}
+
+	// 클라이언트에서 빈사 상태 변화 처리 (UI 및 효과)
 	if (IsLocallyControlled())
 	{
+		UpdateDetectionEffects();
+		
 		if (bIsInDyingState)
 		{
 			// 빈사 상태 화면 효과 활성화
@@ -1474,8 +1761,29 @@ void AGS_Seeker::OnRep_IsInDyingState()
 		}
 	}
 
-	// 델리게이트 브로드캐스트 (UI 업데이트용)
-	OnDyingStateChanged.Broadcast(bIsInDyingState, DyingTimeRemaining);
+	// 불꽃 효과 동기화 (모든 플레이어에게 보임)
+	if (bIsInDyingState)
+	{
+		ActivateDyingFlameEffects();
+	}
+	else
+	{
+		DeactivateDyingFlameEffects();
+	}
+
+	// 델리게이트 브로드캐스트 (UI 업데이트용 - 모든 클라이언트/로컬 공통)
+	OnDyingStateChanged.Broadcast(bIsInDyingState, bIsInDyingState ? DyingTimeRemaining : 0.0f);
+}
+
+void AGS_Seeker::OnRep_IsDead()
+{
+	Super::OnRep_IsDead();
+
+	// 사망 시 고통 소리(LowHP Pain) 즉시 중지 (클라이언트 동기화)
+	if (SeekerAudioComponent && IsDead())
+	{
+		SeekerAudioComponent->StopLowHPPainSound();
+	}
 }
 
 void AGS_Seeker::OnRep_IsBeingRevived()
@@ -1492,4 +1800,104 @@ void AGS_Seeker::OnRep_ReviveProgress()
 {
 	// 구조 진행도 UI 업데이트
 	OnReviveProgressChanged.Broadcast(ReviveProgress);
+}// ========================================
+// 빈사 상태 불꽃 효과 구현
+// ========================================
+
+void AGS_Seeker::ActivateDyingFlameEffects()
+{
+	// Niagara 컴포넌트 활성화
+	if (DyingFlameEffectComp && DyingFlameEffectComp->GetAsset())
+	{
+		DyingFlameEffectComp->Activate();
+	}
+
+	if (DyingMagicCircleComp && DyingMagicCircleComp->GetAsset())
+	{
+		DyingMagicCircleComp->Activate();
+	}
+
+	// 불꽃 발동 사운드 재생 (Spawn + Loop)
+	if (SeekerAudioComponent)
+	{
+		SeekerAudioComponent->PlayDyingFlameSpawnSound();
+		SeekerAudioComponent->PlayDyingFlameLoopSound();
+	}
+}
+
+void AGS_Seeker::DeactivateDyingFlameEffects()
+{
+	// Niagara 컴포넌트 비활성화
+	if (DyingFlameEffectComp && DyingFlameEffectComp->IsActive())
+	{
+		DyingFlameEffectComp->Deactivate();
+	}
+
+	if (DyingMagicCircleComp && DyingMagicCircleComp->IsActive())
+	{
+		DyingMagicCircleComp->Deactivate();
+	}
+
+	// 불꽃 사운드 정리 (Loop Stop + End Sound)
+	if (SeekerAudioComponent)
+	{
+		SeekerAudioComponent->StopDyingFlameLoopSound();
+		SeekerAudioComponent->PlayDyingFlameEndSound();
+	}
+}
+
+void AGS_Seeker::UpdateDyingFlameVisuals(float TimeRemaining)
+{
+	if (!DyingFlameEffectComp && !DyingMagicCircleComp)
+	{
+		return;
+	}
+
+	// 남은 시간 비율 계산 (1.0 ~ 0.0)
+	float TimeRatio = FMath::Clamp(TimeRemaining / MaxDyingTime, 0.0f, 1.0f);
+
+	// 불꽃 크기 스케일 (시간이 지날수록 작아짐)
+	float FlameScale = FMath::Lerp(0.3f, 1.0f, TimeRatio); // 30% ~ 100%
+
+	if (DyingFlameEffectComp)
+	{
+		// Niagara 파라미터로 크기 조절 (에셋에 "FlameScale" 파라미터 필요)
+		DyingFlameEffectComp->SetFloatParameter(FName("FlameScale"), FlameScale);
+	}
+
+	if (DyingMagicCircleComp)
+	{
+		// 마법진 크기도 동일하게 조절 (에셋에 "CircleScale" 파라미터 필요)
+		DyingMagicCircleComp->SetFloatParameter(FName("CircleScale"), FlameScale);
+	}
+
+	// 10초 이하일 때 UI 경고음 재생 (한 번만)
+	if (IsLocallyControlled() && TimeRemaining <= 10.0f && TimeRemaining > 0.0f)
+	{
+		// 아직 재생하지 않았을 때만 재생 (-1: 미재생 상태)
+		if (LastDyingWarningSecond == -1)
+		{
+			if (SeekerAudioComponent)
+			{
+				SeekerAudioComponent->PlayDyingTimerWarningSound();
+			}
+			// 재생 완료 표시
+			LastDyingWarningSecond = 1; 
+		}
+	}
+	else if (TimeRemaining > 10.0f)
+	{
+		// 10초 넘어가면 리셋 (구조 등으로 인해 시간이 늘어난 경우)
+		LastDyingWarningSecond = -1;
+	}
+}
+
+void AGS_Seeker::Multicast_ActivateDyingFlame_Implementation()
+{
+	ActivateDyingFlameEffects();
+}
+
+void AGS_Seeker::Multicast_DeactivateDyingFlame_Implementation()
+{
+	DeactivateDyingFlameEffects();
 }

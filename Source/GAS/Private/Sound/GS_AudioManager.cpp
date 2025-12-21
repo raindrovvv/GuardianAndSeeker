@@ -3,6 +3,7 @@
 
 #include "Sound/GS_AudioManager.h"
 #include "Sound/GS_UIAudioSystem.h"
+#include "System/GameState/GS_InGameGS.h"
 #include "AkAudioDevice.h"
 #include "AkComponent.h"
 #include "AkAudioEvent.h"
@@ -234,6 +235,12 @@ void UGS_AudioManager::Deinitialize()
 
 UAkComponent* UGS_AudioManager::GetOrCreateBGMAkComponent()
 {
+	// 데디케이티드 서버에서는 오디오 처리를 하지 않으므로 컴포넌트 생성 안 함
+	if (!IsAudioProcessingAllowed())
+	{
+		return nullptr;
+	}
+
 	// 이미 생성되어 있고 유효하면 반환
 	if (BGMAkComponent && BGMAkComponent->IsValidLowLevel())
 	{
@@ -280,7 +287,7 @@ UAkComponent* UGS_AudioManager::GetOrCreateBGMAkComponent()
 // Wwise 이벤트 호출 함수
 void UGS_AudioManager::PlayEvent(UAkAudioEvent* Event, AActor* Context)
 {
-	if (!Event || !Context)
+	if (!IsAudioProcessingAllowed() || !Event || !Context)
 	{
 		return;
 	}
@@ -801,7 +808,18 @@ void UGS_AudioManager::StopCurrentBossMusic(AActor* Context)
 
 void UGS_AudioManager::StartBossSequence(AActor* Context, UAkAudioEvent* InBossMusicStartEvent, UAkAudioEvent* InBossMusicStopEvent)
 {
-	// 서버에서 멀티캐스트로 모든 클라이언트에 전파
+	// 1. 서버(데디케이티드/리슨)에서 GameState 상태 업데이트 (Late Join 대응의 핵심)
+	if (GetWorld() && (GetWorld()->GetNetMode() == NM_DedicatedServer || GetWorld()->GetNetMode() == NM_ListenServer))
+	{
+		if (AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>())
+		{
+			UAkAudioEvent* BossStartEvent = InBossMusicStartEvent ? InBossMusicStartEvent : DefaultBossMusicStartEvent;
+			UAkAudioEvent* BossStopEvent = InBossMusicStopEvent ? InBossMusicStopEvent : DefaultBossMusicStopEvent;
+			GS->SetBossMusicState(true, BossStartEvent, BossStopEvent);
+		}
+	}
+
+	// 2. 서버에서 멀티캐스트로 모든 클라이언트에 즉시 전파
 	if (GetWorld() && GetWorld()->GetNetMode() != NM_Standalone)
 	{
 		Multicast_StartBossSequence(Context, InBossMusicStartEvent, InBossMusicStopEvent);
@@ -883,7 +901,16 @@ void UGS_AudioManager::Multicast_StartBossSequence_Implementation(AActor* Contex
 
 void UGS_AudioManager::EndBossSequence(AActor* Context, float FadeTime)
 {
-	// 서버에서 멀티캐스트로 모든 클라이언트에 전파
+	// 1. 서버에서 GameState 상태 업데이트
+	if (GetWorld() && (GetWorld()->GetNetMode() == NM_DedicatedServer || GetWorld()->GetNetMode() == NM_ListenServer))
+	{
+		if (AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>())
+		{
+			GS->SetBossMusicState(false);
+		}
+	}
+
+	// 2. 서버에서 멀티캐스트로 모든 클라이언트에 전파
 	if (GetWorld() && GetWorld()->GetNetMode() != NM_Standalone)
 	{
 		Multicast_EndBossSequence(Context, FadeTime);
@@ -935,7 +962,7 @@ void UGS_AudioManager::StartBossSequenceLocal(AActor* Context, UAkAudioEvent* In
 	UAkAudioEvent* BossStartEvent = InBossMusicStartEvent ? InBossMusicStartEvent : DefaultBossMusicStartEvent;
 	UAkAudioEvent* BossStopEvent = InBossMusicStopEvent ? InBossMusicStopEvent : DefaultBossMusicStopEvent;
 
-	if (!Context || !BossStartEvent)
+	if (!BossStartEvent)
 	{
 		return;
 	}
@@ -1002,9 +1029,6 @@ void UGS_AudioManager::EndBossSequenceLocal(AActor* Context, float FadeTime)
 {
 	if (!IsAudioProcessingAllowed())
 	{
-		CurrentBossMusicStartEvent = nullptr;
-		CurrentBossMusicStopEvent = nullptr;
-		bIsBossMusicPlaying = false;
 		return;
 	}
 

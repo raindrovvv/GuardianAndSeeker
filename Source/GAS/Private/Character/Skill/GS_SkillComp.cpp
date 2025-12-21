@@ -198,7 +198,7 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 {
 	if (!Info.SkillClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT(">>> SetSkill: Invalid SkillClass"));
+		UE_LOG(LogTemp, Verbose, TEXT(">>> SetSkill: Invalid SkillClass"));
 		return;
 	}
 
@@ -703,6 +703,11 @@ void UGS_SkillComp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	OnSkillCooldownChanged.Clear();
+	OnHealCountChanged.Clear();
+	OnSkillActivated.Clear();
+	OnSkillCooldownBlocked.Clear();
+
 	Super::EndPlay(EndPlayReason);
 
 	if (GetWorld())

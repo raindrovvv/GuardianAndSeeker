@@ -206,7 +206,7 @@ public:
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeStart();
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeEnd();
 	
-	UFUNCTION(NetMulticast, Reliable) void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
+	UFUNCTION(NetMulticast, Unreliable) void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
 	
 	// === Blueprint Events ===
 	UFUNCTION(BlueprintImplementableEvent, Category = "Skill|Fly", meta = (DisplayName = "On Fly Start"))

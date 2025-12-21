@@ -56,7 +56,13 @@ void UGS_StatComp::BeginPlay()
 		}
 	}
 }
-
+ 
+void UGS_StatComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	OnCurrentHPChanged.Clear();
+	Super::EndPlay(EndPlayReason);
+}
+ 
 void UGS_StatComp::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);	

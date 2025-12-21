@@ -29,6 +29,9 @@
 #include "System/GameMode/GS_InGameGM.h"
 #include "EngineUtils.h"  // TActorIterator
 #include "UI/Character/GS_ReviveIndicatorWidget.h"
+#include "Interface/GS_InteractableInterface.h"
+#include "UI/Interaction/GS_InteractionWidget.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 AGS_TpsController::AGS_TpsController()
@@ -302,14 +305,20 @@ void AGS_TpsController::TestFunction()
 		TSubclassOf<UUserWidget> Widget = PlayerWidgetClasses[GS_Character->GetCharacterType()];
 		if (IsValid(Widget))
 		{
+			// 기존 위젯이 있고 클래스가 같다면 재사용, 아니면 새로 생성
 			if (PlayerWidgetInstance)
 			{
-				PlayerWidgetInstance->RemoveFromParent();
-				PlayerWidgetInstance = nullptr;
-				CrosshairWidget = nullptr;
+				if (PlayerWidgetInstance->GetClass() != Widget)
+				{
+					PlayerWidgetInstance->RemoveFromParent();
+					PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+				}
 			}
-			
-			PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+			else
+			{
+				PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+			}
+
 			if (IsValid(PlayerWidgetInstance))
 			{
 				UGS_HPBoardWidget* HPBoardWidget = Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
@@ -318,7 +327,6 @@ void AGS_TpsController::TestFunction()
 				
 				if (BossWidget)
 				{
-					//HP
 					BossWidget->SetOwningActor(GS_Character);
 					BossWidget->InitGuardianHPWidget();
 				}
@@ -333,12 +341,18 @@ void AGS_TpsController::TestFunction()
 					HPBoardWidget->InitBoardWidget();
 				}
 
-				PlayerWidgetInstance->AddToViewport(0);
+				if (!PlayerWidgetInstance->IsInViewport())
+				{
+					PlayerWidgetInstance->AddToViewport(0);
+				}
+				else
+				{
+					PlayerWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+				}
 
 				CrosshairWidget = Cast<UGS_CrossHairImage>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_CrossHairImage")));
 				if (CrosshairWidget)
 				{
-					// 메르시 캐릭터에게 크로스헤어 위젯 참조 전달
 					if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(GS_Character))
 					{
 						MerciCharacter->SetCrosshairWidget(CrosshairWidget);
@@ -548,14 +562,34 @@ void AGS_TpsController::BeginPlay()
 
 	InitControllerPerWorld();
 
-	// 구조 표시 위젯 생성 (로컬 컨트롤러만)
-	if (IsLocalController() && ReviveIndicatorWidgetClass)
+	// 위젯 생성 (로컬 컨트롤러만)
+	if (IsLocalController())
 	{
-		ReviveIndicatorWidget = CreateWidget<UGS_ReviveIndicatorWidget>(this, ReviveIndicatorWidgetClass);
-		if (ReviveIndicatorWidget)
+		// 구조 표시 위젯 생성
+		if (ReviveIndicatorWidgetClass)
 		{
-			ReviveIndicatorWidget->AddToViewport();
+			ReviveIndicatorWidget = CreateWidget<UGS_ReviveIndicatorWidget>(this, ReviveIndicatorWidgetClass);
+			if (ReviveIndicatorWidget)
+			{
+				ReviveIndicatorWidget->AddToViewport();
+			}
 		}
+
+		// 상호작용 위젯 생성
+		if (InteractionWidgetClass)
+		{
+			InteractionWidget = CreateWidget<UGS_InteractionWidget>(this, InteractionWidgetClass);
+			if (InteractionWidget)
+			{
+				InteractionWidget->AddToViewport();
+			}
+		}
+
+		// 빈사 상태 체크 타이머 시작 (0.2초 간격)
+		GetWorldTimerManager().SetTimer(ReviveIndicatorTimerHandle, this, &AGS_TpsController::UpdateReviveIndicatorVisibility, 0.2f, true);
+		
+		// 상호작용 가능 대상 감지 타이머 시작 (0.1초 간격)
+		GetWorldTimerManager().SetTimer(InteractableUpdateTimerHandle, this, &AGS_TpsController::UpdateNearbyInteractable, 0.1f, true);
 	}
 }
 
@@ -648,6 +682,8 @@ void AGS_TpsController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(AutoMoveTickHandle);
+		GetWorld()->GetTimerManager().ClearTimer(ReviveIndicatorTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(InteractableUpdateTimerHandle);
 	}
 }
 
@@ -660,8 +696,8 @@ void AGS_TpsController::Tick(float DeltaTime)
 		return;
 	}
 
-	// 빈사 시커 감지 및 위젯 업데이트
-	UpdateReviveIndicatorVisibility();
+	// 상호작용 진행 업데이트 (진행바의 부드러움을 위해 Tick 유지)
+	UpdateInteractionProgress(DeltaTime);
 
 	// 기존 구조 중 로직 (변경 없음)
 	if (bIsReviving && ReviveTarget.IsValid())
@@ -775,65 +811,73 @@ void AGS_TpsController::TryStartRevive(const FInputActionValue& InputValue)
 		return;
 	}
 
-	// 자신이 빈사 상태면 구조할 수 없음
+	// 자신이 빈사 상태면 구조/상호작용 불가
 	if (MySeeker->IsInDyingState())
 	{
 		return;
 	}
 
-	// 근처에 빈사 상태인 시커 찾기
+	// 우선순위 1: 빈사 아군 구조
 	AGS_Seeker* DyingSeeker = FindNearbyDyingSeeker();
-	if (!IsValid(DyingSeeker))
+	if (IsValid(DyingSeeker))
 	{
+		// 구조 시작
+		bIsReviving = true;
+		bIsHoldingReviveKey = true;
+		ReviveTarget = DyingSeeker;
+
+		if (ReviveIndicatorWidget)
+		{
+			ReviveIndicatorWidget->StartRevive(DyingSeeker);
+		}
+
+		Server_SetHoldingReviveKey(true);
+		Server_RequestRevive(DyingSeeker);
 		return;
 	}
 
-	// 구조 시작
-	bIsReviving = true;
-	bIsHoldingReviveKey = true;  // E키 누르기 시작 (로컬)
-	ReviveTarget = DyingSeeker;
-
-	// 위젯에 구조 시작 알림
-	if (ReviveIndicatorWidget)
+	// 우선순위 2: IInteractable 상호작용
+	if (CachedInteractable.IsValid())
 	{
-		ReviveIndicatorWidget->StartRevive(DyingSeeker);
+		AActor* Interactable = CachedInteractable.Get();
+		if (Interactable->Implements<UGS_InteractableInterface>())
+		{
+			if (IGS_InteractableInterface::Execute_CanInteract(Interactable, MySeeker))
+			{
+				StartInteraction(Interactable);
+			}
+		}
 	}
-
-	// 서버에 홀드 상태 전달
-	Server_SetHoldingReviveKey(true);
-
-	// 서버에 구조 요청
-	Server_RequestRevive(DyingSeeker);
 }
 
 void AGS_TpsController::StopRevive(const FInputActionValue& InputValue)
 {
-	if (!bIsReviving)
+	// 구조 중이면 구조 취소
+	if (bIsReviving)
 	{
+		bIsReviving = false;
+		bIsHoldingReviveKey = false;
+
+		if (ReviveIndicatorWidget)
+		{
+			ReviveIndicatorWidget->StopReviveProgress();
+		}
+
+		if (ReviveTarget.IsValid())
+		{
+			Server_CancelRevive();
+		}
+
+		Server_SetHoldingReviveKey(false);
+		ReviveTarget = nullptr;
 		return;
 	}
 
-	bIsReviving = false;
-	bIsHoldingReviveKey = false;  // E키 떼기 (로컬)
-
-	// 위젯은 즉시 숨기지 않음 - 진행도만 숨김 (진행도 감소를 보여주기 위해)
-	if (ReviveIndicatorWidget)
+	// 상호작용 중이면 상호작용 취소
+	if (bIsInteracting)
 	{
-		ReviveIndicatorWidget->StopReviveProgress();
-		// CurrentTarget은 유지 (NativeTick에서 진행도 감소를 계속 표시하기 위함)
+		CancelInteraction();
 	}
-
-	// 서버에 구조 취소 요청 (ReviveTarget을 nullptr로 설정하기 전에 호출!)
-	if (ReviveTarget.IsValid())
-	{
-		Server_CancelRevive();
-	}
-
-	// 서버에 홀드 상태 전달
-	Server_SetHoldingReviveKey(false);
-
-	// ReviveTarget은 nullptr로 설정 (구조 중이 아니므로)
-	ReviveTarget = nullptr;
 }
 
 AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
@@ -855,29 +899,45 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 	float ClosestDistance = ReviveDistance;
 
 	// 모든 시커를 순회하여 빈사 상태인 시커 찾기
-	for (TActorIterator<AGS_Seeker> It(World); It; ++It)
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AGS_Seeker* OtherSeeker = *It;
+		const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs = Registry->GetSeekers();
 
-		// 자기 자신 제외
-		if (OtherSeeker == MySeeker)
+		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 		{
-			continue;
-		}
+			AGS_Seeker* OtherSeeker = SeekerPtr.Get();
+			if (!IsValid(OtherSeeker)) continue;
 
-		// 빈사 상태가 아니면 스킵
-		if (!OtherSeeker->IsInDyingState())
-		{
-			continue;
-		}
+			// 자기 자신 제외
+			if (OtherSeeker == MySeeker)
+			{
+				continue;
+			}
 
-		// 거리 확인
-		float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
+			// 빈사 상태가 아니면 스킵
+			if (!OtherSeeker->IsInDyingState())
+			{
+				continue;
+			}
 
-		if (Distance < ClosestDistance)
-		{
-			ClosestDistance = Distance;
-			ClosestDyingSeeker = OtherSeeker;
+			// 거리 확인
+			float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
+
+			if (Distance < ClosestDistance)
+			{
+				// 시야(LOS) 확인 - 벽 너머 구조 방지 및 UI 가독성 향상
+				FHitResult LOSHit;
+				FCollisionQueryParams Params;
+				Params.AddIgnoredActor(MySeeker);
+				Params.AddIgnoredActor(OtherSeeker);
+				
+				if (!World->LineTraceSingleByChannel(LOSHit, MyLocation, OtherSeeker->GetActorLocation(), ECC_Visibility, Params))
+				{
+					// 가려진 것 없음
+					ClosestDistance = Distance;
+					ClosestDyingSeeker = OtherSeeker;
+				}
+			}
 		}
 	}
 
@@ -901,6 +961,18 @@ void AGS_TpsController::Server_RequestRevive_Implementation(AGS_Seeker* Target)
 	float Distance = FVector::Dist(MySeeker->GetActorLocation(), Target->GetActorLocation());
 	if (Distance > ReviveDistance)
 	{
+		return;
+	}
+
+	// [보안/로직] 시야(LOS) 재확인 (서버 검증)
+	FHitResult LOSHit;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(MySeeker);
+	Params.AddIgnoredActor(Target);
+	
+	if (GetWorld()->LineTraceSingleByChannel(LOSHit, MySeeker->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params))
+	{
+		// 무언가에 가려짐
 		return;
 	}
 
@@ -932,3 +1004,207 @@ void AGS_TpsController::Server_SetHoldingReviveKey_Implementation(bool bIsHoldin
 {
 	bIsHoldingReviveKey = bIsHolding;
 }
+
+// ============================================
+// 일반 상호작용 시스템 구현
+// ============================================
+
+float AGS_TpsController::GetInteractionProgress() const
+{
+	if (!bIsInteracting || CurrentInteractionDuration <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	float Elapsed = GetWorld()->GetTimeSeconds() - InteractionStartTime;
+	return FMath::Clamp(Elapsed / CurrentInteractionDuration, 0.0f, 1.0f);
+}
+
+void AGS_TpsController::UpdateNearbyInteractable()
+{
+	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
+	if (!IsValid(MySeeker))
+	{
+		CachedInteractable.Reset();
+		return;
+	}
+
+	// 오버랩 기반 감지 - 시커의 Capsule과 겹치는 IInteractable 찾기
+	TArray<AActor*> OverlappingActors;
+	MySeeker->GetOverlappingActors(OverlappingActors);
+
+	AActor* BestInteractable = nullptr;
+	int32 HighestPriority = INT_MIN;
+
+	for (AActor* Actor : OverlappingActors)
+	{
+		if (!Actor || !Actor->Implements<UGS_InteractableInterface>())
+		{
+			continue;
+		}
+
+		if (!IGS_InteractableInterface::Execute_CanInteract(Actor, MySeeker))
+		{
+			continue;
+		}
+
+		int32 Priority = IGS_InteractableInterface::Execute_GetInteractionPriority(Actor);
+		if (Priority > HighestPriority)
+		{
+			HighestPriority = Priority;
+			BestInteractable = Actor;
+		}
+	}
+
+	// 위젯 업데이트: 상호작용 가능 대상이 변경되었을 때만 호출
+	if (InteractionWidget)
+	{
+		if (BestInteractable != CachedInteractable.Get() || bIsInteracting)
+		{
+			if (BestInteractable && !bIsInteracting)
+			{
+				FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
+				InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
+			}
+			else
+			{
+				InteractionWidget->HideNearbyIndicator();
+			}
+		}
+	}
+
+	CachedInteractable = BestInteractable;
+}
+
+void AGS_TpsController::StartInteraction(AActor* Target)
+{
+	if (!Target || !Target->Implements<UGS_InteractableInterface>())
+	{
+		return;
+	}
+
+	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
+	if (!IsValid(MySeeker))
+	{
+		return;
+	}
+
+	bIsInteracting = true;
+	CurrentInteractTarget = Target;
+	InteractionStartTime = GetWorld()->GetTimeSeconds();
+	CurrentInteractionDuration = IGS_InteractableInterface::Execute_GetInteractionDuration(Target);
+
+	// 대상에게 상호작용 시작 알림
+	IGS_InteractableInterface::Execute_BeginInteract(Target, MySeeker);
+
+	// 위젯 업데이트
+	if (InteractionWidget)
+	{
+		FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(Target);
+		InteractionWidget->ShowInteraction(Target, CurrentInteractionDuration, ActionText);
+	}
+}
+
+void AGS_TpsController::CancelInteraction()
+{
+	if (!bIsInteracting)
+	{
+		return;
+	}
+
+	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
+
+	// 대상에게 상호작용 취소 알림
+	if (CurrentInteractTarget.IsValid() && CurrentInteractTarget->Implements<UGS_InteractableInterface>())
+	{
+		IGS_InteractableInterface::Execute_EndInteract(CurrentInteractTarget.Get(), MySeeker, false);
+	}
+
+	bIsInteracting = false;
+	CurrentInteractTarget.Reset();
+	CurrentInteractionDuration = 0.0f;
+
+	// 위젯 업데이트
+	if (InteractionWidget)
+	{
+		InteractionWidget->OnInteractionCancelled();
+		InteractionWidget->HideInteraction();
+	}
+}
+
+void AGS_TpsController::CompleteInteraction()
+{
+	if (!bIsInteracting)
+	{
+		return;
+	}
+
+	AActor* Target = CurrentInteractTarget.Get();
+
+	// 서버에 상호작용 완료 알림 (서버에서 보상 지급)
+	if (Target)
+	{
+		Server_CompleteInteraction(Target);
+	}
+
+	bIsInteracting = false;
+	CurrentInteractTarget.Reset();
+	CurrentInteractionDuration = 0.0f;
+
+	// 위젯 업데이트
+	if (InteractionWidget)
+	{
+		InteractionWidget->OnInteractionComplete();
+		InteractionWidget->HideInteraction();
+	}
+}
+
+void AGS_TpsController::Server_CompleteInteraction_Implementation(AActor* Target)
+{
+	if (!IsValid(Target))
+	{
+		return;
+	}
+
+	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
+	if (!IsValid(MySeeker))
+	{
+		return;
+	}
+
+	// 서버에서 상호작용 완료 처리
+	if (Target->Implements<UGS_InteractableInterface>())
+	{
+		IGS_InteractableInterface::Execute_EndInteract(Target, MySeeker, true);
+	}
+}
+
+void AGS_TpsController::UpdateInteractionProgress(float DeltaTime)
+{
+	if (!bIsInteracting)
+	{
+		return;
+	}
+
+	// 대상이 유효한지 확인
+	if (!CurrentInteractTarget.IsValid())
+	{
+		CancelInteraction();
+		return;
+	}
+
+	// 진행률 확인
+	float Progress = GetInteractionProgress();
+
+	// 위젯 진행률 업데이트
+	if (InteractionWidget)
+	{
+		InteractionWidget->UpdateProgress(Progress);
+	}
+
+	if (Progress >= 1.0f)
+	{
+		CompleteInteraction();
+	}
+}
+

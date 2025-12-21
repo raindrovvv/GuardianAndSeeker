@@ -85,4 +85,8 @@ private:
 
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	// 캐싱된 Chan 소유자 (ActiveSkill에서 설정)
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Chan> CachedChanOwner;
 };

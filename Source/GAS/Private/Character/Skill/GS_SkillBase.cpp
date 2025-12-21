@@ -291,7 +291,7 @@ void UGS_SkillBase::PlaySkillStartSound() const
 	{
 		if (UGS_SeekerAudioComponent* AudioComp = OwnerSeeker->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillSoundFromDataTable(CurrentSkillType, true);
+			AudioComp->RequestSkillAudio(CurrentSkillType, 0); // 0 = 스킬 시작
 		}
 	}
 	else
@@ -312,7 +312,7 @@ void UGS_SkillBase::PlaySkillEndSound() const
 	{
 		if (UGS_SeekerAudioComponent* AudioComp = OwnerSeeker->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillSoundFromDataTable(CurrentSkillType, false);
+			AudioComp->RequestSkillAudio(CurrentSkillType, 1); // 1 = 스킬 종료
 		}
 	}
 	// 다른 캐릭터 타입은 각자의 오디오 컴포넌트 사용

@@ -29,7 +29,7 @@
 
 AGS_Character::AGS_Character()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	StatComp = CreateDefaultSubobject<UGS_StatComp>(TEXT("StatComp"));
 	DebuffComp = CreateDefaultSubobject<UGS_DebuffComp>(TEXT("DebuffComp"));
@@ -42,6 +42,8 @@ AGS_Character::AGS_Character()
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HPTextWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 	HPTextWidgetComp->SetVisibility(false);
+	//HPTextWidgetComp->SetDrawAtDesiredSize(true);
+	HPTextWidgetComp->SetCullDistance(2000.0f);
 
 	SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
 	SelectionDecal->SetupAttachment(RootComponent);
@@ -81,11 +83,14 @@ void AGS_Character::BeginPlay()
 	}
 
 	//Set HP 3D widget (monster)
-	if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
 		{
-			HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			}
 		}
 	}
 
@@ -119,18 +124,19 @@ void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 	DOREPLIFETIME(AGS_Character, bIsInvincible);
 	DOREPLIFETIME(AGS_Character, bLockRotationToController);
 	DOREPLIFETIME(AGS_Character, WeaponHandlingState);
+	DOREPLIFETIME(AGS_Character, RepImpactVFX);
 }
 
 
 void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// 2. 가시성 끄기
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.Clear();
+	}
+
 	HPTextWidgetComp->SetVisibility(false);
-
-	// 3. 콜리전 비활성화
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 4. BodySetup 정리
 	if (HPTextWidgetComp->GetBodySetup())
 	{
 		HPTextWidgetComp->DestroyPhysicsState();
@@ -138,11 +144,11 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if (IsValid(HPTextWidgetComp))
 	{
-		if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
-		{
-			Widget->RemoveFromParent();
-		}
-		HPTextWidgetComp->SetWidget(nullptr);
+		// if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
+		// {
+		// 	Widget->RemoveFromParent();
+		// }
+		// HPTextWidgetComp->SetWidget(nullptr);
 		HPTextWidgetComp->DestroyComponent();
 	}
 	
@@ -185,7 +191,6 @@ float AGS_Character::TakeDamage(float DamageAmount, FDamageEvent const& DamageEv
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
-	//when damage input start -> for drakhar 6/24
 	OnDamageStart();
 
 	if (HasAuthority())
@@ -479,12 +484,27 @@ void AGS_Character::MulicastRPCStopCurrentSkillMontage_Implementation(UAnimMonta
 	StopAnimMontage(CurrentSkillMontage);
 }
 
-void AGS_Character::Multicast_PlayImpactVFX_Implementation(UNiagaraSystem* VFXAsset, FVector Scale)
+void AGS_Character::PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale)
 {
-	if (VFXAsset)
+	if (!HasAuthority()) return;
+
+	RepImpactVFX.VFXAsset = VFXAsset;
+	RepImpactVFX.Scale = Scale;
+	RepImpactVFX.Counter++;
+
+	// 서버가 리슨 서버이거나 스탠드얼론이면 즉시 실행
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_ImpactVFX();
+	}
+}
+
+void AGS_Character::OnRep_ImpactVFX()
+{
+	if (RepImpactVFX.VFXAsset)
 	{
 		UNiagaraComponent* SpawnedVFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			VFXAsset,
+			RepImpactVFX.VFXAsset,
 			GetRootComponent(),
 			NAME_None,
 			FVector::ZeroVector,
@@ -493,9 +513,9 @@ void AGS_Character::Multicast_PlayImpactVFX_Implementation(UNiagaraSystem* VFXAs
 			true
 		);
 
-		if(SpawnedVFX)
+		if (SpawnedVFX)
 		{
-			SpawnedVFX->SetWorldScale3D(Scale);
+			SpawnedVFX->SetWorldScale3D(RepImpactVFX.Scale);
 		}
 	}
 }
