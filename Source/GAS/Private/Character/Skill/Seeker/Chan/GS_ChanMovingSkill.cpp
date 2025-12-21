@@ -193,13 +193,13 @@ void UGS_ChanMovingSkill::AggroToOwner()
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
 				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				TargetMonster->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetMonster->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
 				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				TargetGuardian->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetGuardian->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 		}
 	}

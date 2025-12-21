@@ -124,6 +124,7 @@ void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 	DOREPLIFETIME(AGS_Character, bIsInvincible);
 	DOREPLIFETIME(AGS_Character, bLockRotationToController);
 	DOREPLIFETIME(AGS_Character, WeaponHandlingState);
+	DOREPLIFETIME(AGS_Character, RepImpactVFX);
 }
 
 
@@ -483,12 +484,27 @@ void AGS_Character::MulicastRPCStopCurrentSkillMontage_Implementation(UAnimMonta
 	StopAnimMontage(CurrentSkillMontage);
 }
 
-void AGS_Character::Multicast_PlayImpactVFX_Implementation(UNiagaraSystem* VFXAsset, FVector Scale)
+void AGS_Character::PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale)
 {
-	if (VFXAsset)
+	if (!HasAuthority()) return;
+
+	RepImpactVFX.VFXAsset = VFXAsset;
+	RepImpactVFX.Scale = Scale;
+	RepImpactVFX.Counter++;
+
+	// 서버가 리슨 서버이거나 스탠드얼론이면 즉시 실행
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_ImpactVFX();
+	}
+}
+
+void AGS_Character::OnRep_ImpactVFX()
+{
+	if (RepImpactVFX.VFXAsset)
 	{
 		UNiagaraComponent* SpawnedVFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			VFXAsset,
+			RepImpactVFX.VFXAsset,
 			GetRootComponent(),
 			NAME_None,
 			FVector::ZeroVector,
@@ -497,9 +513,9 @@ void AGS_Character::Multicast_PlayImpactVFX_Implementation(UNiagaraSystem* VFXAs
 			true
 		);
 
-		if(SpawnedVFX)
+		if (SpawnedVFX)
 		{
-			SpawnedVFX->SetWorldScale3D(Scale);
+			SpawnedVFX->SetWorldScale3D(RepImpactVFX.Scale);
 		}
 	}
 }

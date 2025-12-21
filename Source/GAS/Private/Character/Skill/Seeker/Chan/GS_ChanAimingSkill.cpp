@@ -218,13 +218,13 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
 				// Impact VFX 재생
-				TargetMonster->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetMonster->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
 				// Impact VFX 재생
-				TargetGuardian->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetGuardian->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 			else if (AGS_Character* Target = Cast<AGS_Character>(HitActor)) // 시커일 경우
 			{
