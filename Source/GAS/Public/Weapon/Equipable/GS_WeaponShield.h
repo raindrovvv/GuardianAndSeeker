@@ -83,8 +83,13 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void ServerEnableDefenseHit();
+
 	UFUNCTION(Server, Reliable)
 	void ServerDisableDefenseHit();
+
+	// 방어 성공 효과 재생 (외부 호출용)
+	UFUNCTION(BlueprintCallable, Category = "Defense")
+	void PlayDefenseEffects(AActor* Attacker, const FHitResult& HitResult);
 
 	// 기존 호환성을 위한 함수들 (공격용으로 리다이렉트)
 	UFUNCTION()
