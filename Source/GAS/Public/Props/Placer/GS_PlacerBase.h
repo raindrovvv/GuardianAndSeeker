@@ -88,6 +88,10 @@ private:
 
 	int RotateYaw;
 	bool bObjectSelected;
+	bool bLastCanBuild;
+
+	UPROPERTY()
+	TArray<UMeshComponent*> CachedMeshComponents;
 	
 	// 드래그 사운드 관련
 	FIntPoint LastCellPosition;

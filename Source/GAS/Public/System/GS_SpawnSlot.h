@@ -10,18 +10,15 @@ class GAS_API AGS_SpawnSlot : public AActor
 {
 	GENERATED_BODY()
 	
-public:
+public:	
 	AGS_SpawnSlot();
 
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spawn Slot")
-	EPlayerRole ForRole;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawn Slot")
+	EPlayerRole ForRole = EPlayerRole::PR_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spawn Slot")
-	int32 SlotIndex;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawn Slot")
+	int32 SlotIndex = 0;
 
-public:	
-	EPlayerRole GetRole() const { return ForRole; }
-	int32 GetSlotIndex() const { return SlotIndex; }
-	
+	FORCEINLINE EPlayerRole GetRole() const { return ForRole; }
+	FORCEINLINE int32 GetSlotIndex() const { return SlotIndex; }
 };

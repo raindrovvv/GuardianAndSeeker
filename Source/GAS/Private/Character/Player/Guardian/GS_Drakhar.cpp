@@ -465,8 +465,6 @@ void AGS_Drakhar::MulticastRPCComboAttack_Implementation()
 
 void AGS_Drakhar::ServerRPCDoDash_Implementation(float DeltaTime)
 {
-	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-
 	DashInterpAlpha += DeltaTime / DashDuration;
 
 	DashAttackCheck();
@@ -559,6 +557,11 @@ void AGS_Drakhar::ServerRPCCalculateDashLocation_Implementation()
 	if (AudioComponent) AudioComponent->PlayDashSkillSound();
 	MulticastStartWingRushVFX();
 	MulticastStartDustVFX();
+
+	if (UPrimitiveComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	}
 }
 
 void AGS_Drakhar::DashAttackCheck()
