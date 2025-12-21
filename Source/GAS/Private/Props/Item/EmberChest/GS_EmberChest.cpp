@@ -460,3 +460,25 @@ int32 AGS_EmberChest::GetInteractionPriority_Implementation() const
 	return 50;
 }
 
+void AGS_EmberChest::SetHighlight(bool bEnable)
+{
+	// 액터의 모든 메쉬 컴포넌트를 찾아 Overlay Material 적용
+	TArray<UMeshComponent*> MeshComponents;
+	GetComponents<UMeshComponent>(MeshComponents);
+
+	for (UMeshComponent* Mesh : MeshComponents)
+	{
+		if (Mesh)
+		{
+			if (bEnable && HighlightMaterial)
+			{
+				Mesh->SetOverlayMaterial(HighlightMaterial);
+			}
+			else
+			{
+				Mesh->SetOverlayMaterial(nullptr);
+			}
+		}
+	}
+}
+
