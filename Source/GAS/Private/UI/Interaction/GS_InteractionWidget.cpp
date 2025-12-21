@@ -25,7 +25,10 @@ void UGS_InteractionWidget::ShowInteraction(AActor* Target, float Duration, cons
 {
 	if (InteractionPromptBox)
 	{
-		InteractionPromptBox->SetVisibility(ESlateVisibility::Visible);
+		if (InteractionPromptBox->GetVisibility() != ESlateVisibility::Visible)
+		{
+			InteractionPromptBox->SetVisibility(ESlateVisibility::Visible);
+		}
 	}
 	
 	// 근처 알림은 숨기기 (상호작용 중이므로)
@@ -46,7 +49,10 @@ void UGS_InteractionWidget::HideInteraction()
 {
 	if (InteractionPromptBox)
 	{
-		InteractionPromptBox->SetVisibility(ESlateVisibility::Hidden);
+		if (InteractionPromptBox->GetVisibility() != ESlateVisibility::Hidden)
+		{
+			InteractionPromptBox->SetVisibility(ESlateVisibility::Hidden);
+		}
 	}
 }
 
@@ -79,7 +85,10 @@ void UGS_InteractionWidget::ShowNearbyIndicator(AActor* Target, const FText& Act
 
 	if (NearbyIndicatorBox)
 	{
-		NearbyIndicatorBox->SetVisibility(ESlateVisibility::Visible);
+		if (NearbyIndicatorBox->GetVisibility() != ESlateVisibility::Visible)
+		{
+			NearbyIndicatorBox->SetVisibility(ESlateVisibility::Visible);
+		}
 	}
 
 	if (Text_NearbyInfo)
@@ -94,6 +103,9 @@ void UGS_InteractionWidget::HideNearbyIndicator()
 {
 	if (NearbyIndicatorBox)
 	{
-		NearbyIndicatorBox->SetVisibility(ESlateVisibility::Hidden);
+		if (NearbyIndicatorBox->GetVisibility() != ESlateVisibility::Hidden)
+		{
+			NearbyIndicatorBox->SetVisibility(ESlateVisibility::Hidden);
+		}
 	}
 }

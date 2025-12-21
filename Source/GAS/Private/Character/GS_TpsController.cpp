@@ -1032,17 +1032,20 @@ void AGS_TpsController::UpdateNearbyInteractable()
 		}
 	}
 
-	// 위젯 업데이트: 상호작용 가능 대상 표시
+	// 위젯 업데이트: 상호작용 가능 대상이 변경되었을 때만 호출
 	if (InteractionWidget)
 	{
-		if (BestInteractable && !bIsInteracting)
+		if (BestInteractable != CachedInteractable.Get() || bIsInteracting)
 		{
-			FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
-			InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
-		}
-		else if (!BestInteractable && !bIsInteracting)
-		{
-			InteractionWidget->HideNearbyIndicator();
+			if (BestInteractable && !bIsInteracting)
+			{
+				FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
+				InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
+			}
+			else
+			{
+				InteractionWidget->HideNearbyIndicator();
+			}
 		}
 	}
 
