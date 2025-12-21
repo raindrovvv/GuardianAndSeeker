@@ -54,20 +54,24 @@ UTexture2D* USteamAvatarHelper::GetSteamAvatar(const FUniqueNetIdRepl& UniqueNet
             return nullptr;
         }
 
-        uint8* oAvatarRGBA = new uint8[Width * Height * 4];
-        SteamUtils()->GetImageRGBA(Picture, oAvatarRGBA, Width * Height * 4);
+        TArray<uint8> AvatarRGBA;
+        AvatarRGBA.SetNumUninitialized(Width * Height * 4);
+        SteamUtils()->GetImageRGBA(Picture, AvatarRGBA.GetData(), AvatarRGBA.Num());
 
         UTexture2D* Avatar = UTexture2D::CreateTransient(Width, Height, PF_R8G8B8A8);
+        if (!Avatar)
+        {
+            return nullptr;
+        }
 
         if (FTexturePlatformData* PlatformData = Avatar->GetPlatformData())
         {
             uint8* MipData = (uint8*)PlatformData->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
-            FMemory::Memcpy(MipData, oAvatarRGBA, Height * Width * 4);
+            FMemory::Memcpy(MipData, AvatarRGBA.GetData(), AvatarRGBA.Num());
             PlatformData->Mips[0].BulkData.Unlock();
             Avatar->UpdateResource();
         }
 
-        delete[] oAvatarRGBA;
         return Avatar;
     }
 #endif
