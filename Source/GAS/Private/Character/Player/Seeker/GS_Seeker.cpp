@@ -2,6 +2,7 @@
 
 
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Blueprint/UserWidget.h"
 #include "Character/Component/GS_SkillInputHandlerComp.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Components/PostProcessComponent.h"
@@ -197,6 +198,20 @@ void AGS_Seeker::BeginPlay()
 		{
 			Registry->RegisterSeeker(this);
 		}
+	}
+
+	// 초기화 시 Tick 비활성화 (보통 상태에서는 Tick 불필요, 빈사 상태에서만 활성화됨)
+	SetActorTickEnabled(false);
+}
+
+void AGS_Seeker::PawnClientRestart()
+{
+	Super::PawnClientRestart();
+
+	// 로컬 플레이어 빙의 후, 이미 가디언에게 감지된 상태라면 UI 업데이트
+	if (IsLocallyControlled() && bIsDetectedByGuardian)
+	{
+		UpdateDetectionEffects();
 	}
 }
 
@@ -1000,6 +1015,12 @@ void AGS_Seeker::OnDetectedByGuardian(bool bIsDetected)
 		// 상태 변경 시 자동으로 OnRep_IsDetectedByGuardian이 모든 클라이언트에서 호출됨
 		bIsDetectedByGuardian = bIsDetected;
 
+		// 리슨 서버인 경우 본인(서버 플레이어)을 위해 직접 호출
+		if (IsLocallyControlled())
+		{
+			OnRep_IsDetectedByGuardian();
+		}
+
 		// 감지 해제 시 강도도 0으로 초기화
 		if (!bIsDetected)
 		{
@@ -1026,6 +1047,9 @@ void AGS_Seeker::OnRep_IsDetectedByGuardian()
 
     // 시각적 효과 업데이트 (항상 실행)
     UpdateDetectionEffects();
+
+	// 델리게이트 알림 (블루프린트 UI용)
+	OnDetectedByGuardianChanged.Broadcast(bIsDetectedByGuardian);
 
 	// 청각적 피드백
 	if (!SeekerAudioComponent)
@@ -1080,8 +1104,7 @@ void AGS_Seeker::UpdateDetectionEffects()
 	if (bIsDetectedByGuardian)
 	{
 		// 감지되었을 때 - 블루프린트에서 HUD 위젯 표시
-		// BP_Seeker에서 이벤트 바인딩하여 처리
-        UpdateDetectionHUD();
+        UpdateDetectionHUD(true);
 
 		// 감지 전용 포스트 프로세스 활성화
         if (DetectionEffectComp)
@@ -1092,7 +1115,7 @@ void AGS_Seeker::UpdateDetectionEffects()
 	else
 	{
 		// 감지 해제 시 - 블루프린트에서 HUD 위젯 숨김
-        UpdateDetectionHUD();
+        UpdateDetectionHUD(false);
 
 		// 감지 전용 포스트 프로세스 비활성화
         if (DetectionEffectComp)
@@ -1115,9 +1138,38 @@ void AGS_Seeker::UpdateDetectionPostProcessEffect(float Intensity)
     }
 }
 
-void AGS_Seeker::UpdateDetectionHUD()
+void AGS_Seeker::UpdateDetectionHUD_Implementation(bool bIsDetected)
 {
-	// 실제 HUD 표시/숨김은 블루프린트에서 이벤트로 처리됨
+	// 로컬 플레이어가 아닌 경우 UI 처리를 하지 않음
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (bIsDetected)
+	{
+		// 감지되었을 때 UI 표시
+		if (!DetectionHUDWidget && DetectionHUDWidgetClass)
+		{
+			DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), DetectionHUDWidgetClass);
+			if (DetectionHUDWidget)
+			{
+				DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
+			}
+		}
+		else if (DetectionHUDWidget)
+		{
+			DetectionHUDWidget->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+	else
+	{
+		// 감지되지 않았을 때 UI 숨김
+		if (DetectionHUDWidget)
+		{
+			DetectionHUDWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 // ==========================================
@@ -1148,11 +1200,15 @@ void AGS_Seeker::EnterDyingState()
 		return;
 	}
 
-	// 빈사 상태 진입
+	// 빈사 상태 활성화
 	bIsInDyingState = true;
 	DyingTimeRemaining = MaxDyingTime;
 	bIsBeingRevived = false;
 	ReviveProgress = 0.0f;
+	bDangerSoundPlayed = false;
+
+	// Tick 활성화 (빈사 상태 로직 처리용)
+	SetActorTickEnabled(true);
 
 	// 현재 Gait 저장
 	GaitBeforeDying = SeekerGait;
@@ -1208,6 +1264,9 @@ void AGS_Seeker::ExitDyingState(bool bWasRevived)
 	bIsBeingRevived = false;
 	ReviveProgress = 0.0f;
 	CurrentReviver = nullptr;
+
+	// Tick 비활성화
+	SetActorTickEnabled(false);
 
 	// 몬스터 콜리전 복구 (감지 채널들)
 	// 원래 설정값으로 복구해야 하지만, 기본적으로 Block 또는 Overlap일 것이므로 Block으로 설정
@@ -1554,6 +1613,9 @@ bool AGS_Seeker::IsReviverValid(const AGS_Seeker* Reviver) const
 
 void AGS_Seeker::OnRep_IsInDyingState()
 {
+	// 클라이언트 Tick 동기화
+	SetActorTickEnabled(bIsInDyingState);
+
 	// 클라이언트에서 빈사 상태 변화 처리
 	if (IsLocallyControlled())
 	{

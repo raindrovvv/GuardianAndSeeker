@@ -87,4 +87,6 @@ protected:
 	void OnNavMeshBuildComplete();
 
 	FTimerHandle NavMeshBuildTimerHandle;
+	int32 NavMeshCheckCount = 0;
+	const int32 MaxNavMeshChecks = 30; // 0.5초 간격으로 최대 15초 대기
 };

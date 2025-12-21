@@ -210,6 +210,8 @@ protected:
 private:
 	// Auto Moving (KCY)
 	FTimerHandle AutoMoveTickHandle;
+	FTimerHandle ReviveIndicatorTimerHandle;
+	FTimerHandle InteractableUpdateTimerHandle;
 	
 	UPROPERTY(Replicated)
 	bool bIsAutoMoving = false;

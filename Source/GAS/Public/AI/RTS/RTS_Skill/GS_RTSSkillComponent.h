@@ -103,7 +103,6 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 에테르 설정
@@ -142,6 +141,10 @@ private:
 
 	// 에테르 회복 타이머
 	FTimerHandle AetherRegenTimer;
+	
+	// 쿨다운 UI 업데이트 타이머
+	FTimerHandle CooldownUpdateTimer;
+	void UpdateCooldowns();
 
 	UFUNCTION()
 	void OnRep_CurrentAether();

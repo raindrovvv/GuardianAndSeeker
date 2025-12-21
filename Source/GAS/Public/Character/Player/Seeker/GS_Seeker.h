@@ -51,6 +51,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSeekerHover, bool, bIsHover);
 // 빈사 상태 변화 델리게이트
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDyingStateChanged, bool, bIsDying, float, TimeRemaining);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReviveProgressChanged, float, Progress);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, bIsDetected);
 
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
@@ -506,12 +507,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Detection")
 	float GetDetectionIntensity() const { return DetectionIntensity; }
 
-	/** 감지 HUD 위젯 인스턴스 (블루프린트 접근용) */
+	/** 감지 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "UI|Detection")
 	class UUserWidget* DetectionHUDWidget;
 
-	/** 감지 상태 변경 시 HUD 업데이트 */
-	void UpdateDetectionHUD();
+	/** 감지 상태 변화 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "Detection")
+	FOnDetectedByGuardianChanged OnDetectedByGuardianChanged;
+
+	/** 감지 상태 변경 시 HUD 업데이트 (C++ 기본 처리 + BP 추가 처리 가능) */
+	UFUNCTION(BlueprintNativeEvent, Category = "Detection")
+	void UpdateDetectionHUD(bool bIsDetected);
 
 private:
 	/** 감지 상태 변경 시 시각적/청각적 효과 업데이트 */
@@ -595,6 +601,9 @@ public:
 	TWeakObjectPtr<AGS_Seeker> CurrentReviver;
 
 protected:
+	/** 캐릭터 빙의 완료 시 호출 (클라이언트) */
+	virtual void PawnClientRestart() override;
+
 	/** 빈사 상태 업데이트 (Tick에서 호출) */
 	void UpdateDyingState(float DeltaTime);
 

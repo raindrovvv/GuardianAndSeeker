@@ -431,6 +431,8 @@ void AGS_RTSController::MoveSelectedUnits()
 	{
 		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
 	}
+
+	UpdateCursorForEdgeScroll();
 }
 
 
@@ -449,6 +451,8 @@ void AGS_RTSController::AttackSelectedUnits()
 	{
 		UGameplayStatics::PlaySound2D(this, CommandButtonSound);
 	}
+
+	UpdateCursorForEdgeScroll();
 }
 
 
@@ -472,6 +476,8 @@ void AGS_RTSController::StopSelectedUnits()
 	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	UpdateCursorForEdgeScroll();
 }
 
 
@@ -495,6 +501,8 @@ void AGS_RTSController::HoldSelectedUnits()
 	// 즉시 실행 명령이므로 바로 None으로 변경 (우클릭 취소 사운드 방지)
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	UpdateCursorForEdgeScroll();
 }
 
 
@@ -519,6 +527,8 @@ void AGS_RTSController::SkillSelectedUnits()
 	// TODO: 타게팅 스킬 추가 시 스킬 타입별 분기 처리 필요
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	UpdateCursorForEdgeScroll();
 }
 
 
@@ -620,6 +630,8 @@ void AGS_RTSController::OnLeftMousePressed()
 	
 	CurrentCommand = ERTSCommand::None;
 	OnRTSCommandChanged.Broadcast(CurrentCommand);
+
+	UpdateCursorForEdgeScroll();
 }
 
 void AGS_RTSController::OnLeftMouseReleased()
@@ -720,6 +732,8 @@ void AGS_RTSController::OnEscapeButtonClicked()
 		{
 			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
 		}
+
+		UpdateCursorForEdgeScroll();
 	}
 }
 
@@ -915,7 +929,11 @@ void AGS_RTSController::ShowAttackCursor()
 
 	GetWorldTimerManager().SetTimer(
 		AttackCursorTimerHandle,
-		[this]() { bShowAttackCursor = false; },
+		[this]() 
+		{ 
+			bShowAttackCursor = false; 
+			UpdateCursorForEdgeScroll();
+		},
 		0.3f,
 		false
 	);
@@ -1921,9 +1939,7 @@ bool AGS_RTSController::IsSeekerInCameraView(AGS_Seeker* Seeker)
 	}
 
 	FVector2D ScreenLocation;
-	bool bProjected = ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation);
-
-	if (!bProjected)
+	if (!ProjectWorldLocationToScreen(Seeker->GetActorLocation(), ScreenLocation))
 	{
 		return false;
 	}
@@ -1936,7 +1952,6 @@ bool AGS_RTSController::IsSeekerInCameraView(AGS_Seeker* Seeker)
 		return false;
 	}
 
-	// 화면 영역 내에 있는지 확인
 	return ScreenLocation.X >= 0 && ScreenLocation.X <= SizeX &&
 		   ScreenLocation.Y >= 0 && ScreenLocation.Y <= SizeY;
 }
@@ -2071,6 +2086,9 @@ void AGS_RTSController::ActivateGuardianSkill(int32 SkillIndex)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[RTSController] Failed to activate skill %d"), SkillIndex);
 	}
+	
+	// 타겟팅 모드 진입 가능성이 있으므로 커서 갱신
+	UpdateCursorForEdgeScroll();
 }
 
 void AGS_RTSController::HandleSkillTargetingClick(const FVector& TargetLocation)
@@ -2082,6 +2100,9 @@ void AGS_RTSController::HandleSkillTargetingClick(const FVector& TargetLocation)
 
 	// 스킬 실행
 	RTSSkillComp->ExecuteSkillAtLocation(TargetLocation);
+	
+	// 타겟팅 모드 종료 후 커서 갱신
+	UpdateCursorForEdgeScroll();
 
 	UE_LOG(LogTemp, Log, TEXT("[RTSController] Guardian skill executed at %s"), *TargetLocation.ToString());
 }
@@ -2096,6 +2117,7 @@ void AGS_RTSController::CancelGuardianSkillTargeting()
 	if (RTSSkillComp)
 	{
 		RTSSkillComp->ExitSkillTargetingMode();
+		UpdateCursorForEdgeScroll();
 	}
 }
 
