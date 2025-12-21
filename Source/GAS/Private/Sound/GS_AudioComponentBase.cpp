@@ -53,13 +53,23 @@ void UGS_AudioComponentBase::BeginPlay()
                 {
                     AkComp->Stop();
                     AkComp->SetComponentTickEnabled(false);
-                    // 컴포넌트를 등록 해제하여 렌더링/물리/오디오 엔진과의 연결을 끊음
-                    // 하지만 객체 자체는 파괴하지 않아 블루프린트 참조 오류 방지
                     AkComp->UnregisterComponent();
                 }
             }
         }
-        return; // 서버에서는 오디오 매니저 로직 자체를 중단
+
+        // 서버에서도 몬스터/시커의 상태 체크(CheckForStateChanges)를 통한 리플리케이션은 동작해야 함
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                DistanceCheckTimerHandle,
+                this,
+                &UGS_AudioComponentBase::UpdateDistanceRTPC,
+                DistanceCheckInterval,
+                true
+            );
+        }
+        return; // 서버에서는 오디오 엔진 초기화 및 RTPC 업데이트는 중단
     }
 
     // 재시도 카운터 초기화
@@ -911,6 +921,12 @@ void UGS_AudioComponentBase::SetUnifiedRTPCValue(UAkRtpc* RTPC, float Normalized
             UE_LOG(LogTemp, Warning, TEXT("[AudioComponentBase] RTPC is null for actor: %s"), *ActorName);
             WarnedActors.Add(ActorName);
         }
+        return;
+    }
+
+    // 데디케이티드 서버에서는 RTPC 설정을 하지 않음
+    if (!IsAudioSystemValid())
+    {
         return;
     }
 
