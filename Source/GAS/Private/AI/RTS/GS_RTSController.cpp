@@ -29,6 +29,7 @@
 #include "UI/RTS/GS_RTSAttackWarningWidget.h"
 #include "UI/RTS/GS_MinimapWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 
@@ -365,10 +366,10 @@ void AGS_RTSController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 마우스 엣지 감지
+	// 마우스 엣지 감지 (필요할 때만 계산하도록 최적화 여지가 있으나 현재는 매 프레임 업데이트 유지하되 커서 처리는 최적화)
 	MouseEdgeDir = GetMouseEdgeDirection();
 
-	// 커서 준비된 경우에만 커서 업데이트
+	// 커서 업데이트 (상태 변화가 있을 때만 처리하도록 추후 개선 가능)
 	if (bCursorReady && !bSeekerHovered)
 	{
 		UpdateCursorForEdgeScroll();
@@ -978,107 +979,49 @@ void AGS_RTSController::HandleSeekerHover(bool bIsHover)
 
 void AGS_RTSController::SelectOnCtrlClick()
 {
-	// 뷰포트 유효성 검사
-	if (!GetWorld() || !GetWorld()->GetGameViewport())
-	{
-		return;
-	}
+	if (!GetWorld()) return;
 
 	int32 ViewportX, ViewportY;
 	GetViewportSize(ViewportX, ViewportY);
-
-	if (ViewportX <= 0 || ViewportY <= 0)
-	{
-		return;
-	}
+	if (ViewportX <= 0 || ViewportY <= 0) return;
 
 	FHitResult Hit;
-	bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), true, Hit);
-	if (!bHit || !Hit.GetActor())
-	{
-		return;
-	}
+	if (!GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), true, Hit)) return;
 
 	AGS_Monster* Monster = Cast<AGS_Monster>(Hit.GetActor());
-	if (!Monster || !CheckMonsterSelectable(Monster))
-	{
-		return;
-	}
+	if (!Monster || !CheckMonsterSelectable(Monster)) return;
 	
 	ECharacterType MonsterType = Monster->GetCharacterType();
 	TArray<AGS_Monster*> SameTypeUnits;
 	
-	// 최적화: GameState의 LiveMonsters 배열 사용하여 순회 (TActorIterator 대체)
-	const TArray<AGS_Monster*>* LiveMonsters = nullptr;
-	if (AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>())
-	{
-		LiveMonsters = &GS->LiveMonsters;
-	}
+	// [최적화] GameState에 캐싱된 LiveMonsters 리스트를 사용하여 전체 액터 순회 대체
+	AGS_InGameGS* GS = GetWorld()->GetGameState<AGS_InGameGS>();
+	if (!GS) return;
 
-	if (LiveMonsters)
+	for (AGS_Monster* CurrentMonster : GS->LiveMonsters)
 	{
-		for (AGS_Monster* CurrentMonster : *LiveMonsters)
+		if (!IsValid(CurrentMonster) || CurrentMonster->GetCharacterType() != MonsterType) continue;
+
+		FVector2D ScreenPos;
+		if (ProjectWorldLocationToScreen(CurrentMonster->GetActorLocation(), ScreenPos, true))
 		{
-			if (!IsValid(CurrentMonster) || CurrentMonster->GetCharacterType() != MonsterType)
-			{
-				continue;
-			}
-
-			// 월드 좌표를 스크린 좌표로 투영
-			FVector WorldLoc = CurrentMonster->GetActorLocation();
-			FVector2D ScreenPos;
-			
-			// 1차 거리 필터링 (화면 밖의 너무 먼 유닛은 투영 연산조차 하지 않도록 최적화 가능하지만, 
-			// 현재는 ProjectWorldLocationToScreen으로 정확도 유지)
-			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
-
-			// HUD 제외 카메라 뷰에서만 보이는 몬스터만 선택되도록 
-			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
-			{
-				SameTypeUnits.Add(CurrentMonster);
-			}
-		}
-	}
-	else
-	{
-		// Fallback: GameState가 없을 경우 기존 방식 (안전장치)
-		for (TActorIterator<AGS_Monster> It(GetWorld()); It; ++It)
-		{
-			AGS_Monster* CurrentMonster = *It;
-			if (CurrentMonster->GetCharacterType() != MonsterType)
-			{
-				continue;
-			}
-
-			FVector WorldLoc = CurrentMonster->GetActorLocation();
-			FVector2D ScreenPos;
-			bool bProjected = ProjectWorldLocationToScreen(WorldLoc, ScreenPos, true);
-
-			if (bProjected && ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77)
+			if (ScreenPos.X >= 0.0f && ScreenPos.X <= ViewportX && ScreenPos.Y >= 0.0f && ScreenPos.Y <= ViewportY * 0.77f)
 			{
 				SameTypeUnits.Add(CurrentMonster);
 			}
 		}
 	}
 
-	// 유닛으로부터의 거리를 기준으로 정렬
-	SameTypeUnits.Sort([Monster](const AGS_Monster& A, const AGS_Monster& B)
-	{
+	SameTypeUnits.Sort([Monster](const AGS_Monster& A, const AGS_Monster& B) {
 		return Monster->GetDistanceTo(&A) < Monster->GetDistanceTo(&B);
 	});
 
-	// 클릭된 유닛 포함하여 가까이에 있는 12개만 선택되도록 
 	TArray<AGS_Monster*> Selection;
 	for (int32 i = 0; i < SameTypeUnits.Num() && Selection.Num() < MaxSelectableUnits; ++i)
 	{
-		AGS_Monster* UnitToAdd = SameTypeUnits[i];
-		if (!Selection.Contains(UnitToAdd)) 
-		{
-			Selection.Add(UnitToAdd);
-		}
+		Selection.Add(SameTypeUnits[i]);
 	}
 
-	// 한 번에 선택하여 첫 번째 유닛만 소리 재생
 	AddMultipleUnitsToSelection(Selection);
 }
 
@@ -1564,23 +1507,28 @@ void AGS_RTSController::Server_SetMultipleUnitsSelection_Implementation(const TA
 // 명령 RPC 구현
 // ==========================================
 
+bool AGS_RTSController::Server_RTSMove_Validate(const FVector& Dest)
+{
+	// 유닛 선택 배열 검증
+	if (UnitSelection.IsEmpty()) return false;
+	return true;
+}
+
 void AGS_RTSController::Server_RTSMove_Implementation(const FVector& Dest)
 {
-	// 서버에서 직접 명령 가능한 유닛 수집
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
 
 	for (int32 i = 0; i < Commandables.Num(); ++i)
 	{
 		AGS_Monster* Unit = Commandables[i];
-		if (!IsValid(Unit))
-		{
-			continue;
-		}
+		if (!IsValid(Unit)) continue;
+
+		// 유닛 소유권/권한 검증 추가
+		if (Unit->GetOwner() != this && !HasAuthority()) continue;
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
-			// 기존 타겟을 명시적으로 클리어
 			AIController->ClearCurrentTarget();
 
 			if (UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent())
@@ -1591,7 +1539,6 @@ void AGS_RTSController::Server_RTSMove_Implementation(const FVector& Dest)
 				BlackboardComp->ClearValue(AGS_AIController::TargetActorKey);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
-				// 첫 번째 유닛만 이동 사운드 재생
 				if (i == 0 && Unit->MonsterAudioComponent)
 				{
 					Unit->MonsterAudioComponent->PlayRTSCommandSound(ERTSCommandSoundType::Move);
@@ -1601,19 +1548,21 @@ void AGS_RTSController::Server_RTSMove_Implementation(const FVector& Dest)
 	}
 }
 
+bool AGS_RTSController::Server_RTSAttackMove_Validate(const FVector& Dest)
+{
+	if (UnitSelection.IsEmpty()) return false;
+	return true;
+}
+
 void AGS_RTSController::Server_RTSAttackMove_Implementation(const FVector& Dest)
 {
-	// 서버에서 직접 명령 가능한 유닛 수집
 	TArray<AGS_Monster*> Commandables;
 	GatherCommandableUnits(Commandables);
 
 	for (int32 i = 0; i < Commandables.Num(); ++i)
 	{
 		AGS_Monster* Unit = Commandables[i];
-		if (!IsValid(Unit))
-		{
-			continue;
-		}
+		if (!IsValid(Unit)) continue;
 
 		if (AGS_AIController* AIController = Cast<AGS_AIController>(Unit->GetController()))
 		{
@@ -1624,7 +1573,6 @@ void AGS_RTSController::Server_RTSAttackMove_Implementation(const FVector& Dest)
 				BlackboardComp->SetValueAsVector(AGS_AIController::MoveLocationKey, Dest);
 				BlackboardComp->SetValueAsBool(AGS_AIController::TargetLockedKey, false);
 
-				// 첫 번째 유닛만 공격 사운드 재생
 				if (i == 0 && Unit->MonsterAudioComponent)
 				{
 					Unit->MonsterAudioComponent->PlayRTSCommandSound(ERTSCommandSoundType::Attack);
@@ -1632,6 +1580,12 @@ void AGS_RTSController::Server_RTSAttackMove_Implementation(const FVector& Dest)
 			}
 		}
 	}
+}
+
+bool AGS_RTSController::Server_RTSAttack_Validate(AGS_Character* TargetActor)
+{
+	if (UnitSelection.IsEmpty() || !IsValid(TargetActor)) return false;
+	return true;
 }
 
 void AGS_RTSController::Server_RTSAttack_Implementation(AGS_Character* TargetActor)
@@ -1899,12 +1853,16 @@ void AGS_RTSController::UpdateSeekerDetection()
 		return;
 	}
 
-	// 현재 카메라 시야 안에 있는 시커들 찾기
+	// [최적화] 서브시스템을 활용하여 시커 목록 캐싱 순회
+	UGS_ActorRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UGS_ActorRegistrySubsystem>();
+	if (!Registry) return;
+
 	TArray<AGS_Seeker*> CurrentVisibleSeekers;
 
-	for (TActorIterator<AGS_Seeker> It(GetWorld()); It; ++It)
+	const TArray<TWeakObjectPtr<AGS_Seeker>>& RegisteredSeekers = Registry->GetSeekers();
+	for (int32 i = 0; i < RegisteredSeekers.Num(); ++i)
 	{
-		AGS_Seeker* Seeker = *It;
+		AGS_Seeker* Seeker = RegisteredSeekers[i].Get();
 		
 		if (IsValid(Seeker) && !Seeker->IsDead())
 		{

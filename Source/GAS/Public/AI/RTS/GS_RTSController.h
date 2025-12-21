@@ -234,13 +234,14 @@ public:
 	void Server_SetMultipleUnitsSelection(const TArray<AGS_Monster*>& Units);
 
 	// Server - 유닛 배열을 RPC로 전달하지 않고 서버에서 UnitSelection 직접 참조
-	UFUNCTION(Server, Reliable)
+	// 이동 명령(Server_RTSMove)은 Unreliable로 변경하여 대역폭 절약
+	UFUNCTION(Server, Unreliable, WithValidation)
 	void Server_RTSMove(const FVector& Dest);
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable, WithValidation)
 	void Server_RTSAttackMove(const FVector& Dest);
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable, WithValidation)
 	void Server_RTSAttack(AGS_Character* TargetActor);
 
 	UFUNCTION(Server, Reliable)
@@ -389,8 +390,13 @@ private:
 	TArray<AGS_Seeker*> DetectedSeekers;
 
 	// 감지 업데이트 주기 (초)
+	// RPC Throttling (0.05초 간격 제한)
+	float LastMoveRPCRequestTime = 0.0f;
+	const float MoveRPCThrottleInterval = 0.05f;
+
+	// 감지 업데이트 주기 (초)
 	UPROPERTY(EditAnywhere, Category = "Detection")
-	float DetectionUpdateInterval = 0.1f;
+	float DetectionUpdateInterval = 0.2f;
 
 	// RPC 쿨다운 시간 (초)
 	UPROPERTY(EditAnywhere, Category = "Detection")
