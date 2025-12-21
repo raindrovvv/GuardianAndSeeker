@@ -394,6 +394,10 @@ private:
 	float LastMoveRPCRequestTime = 0.0f;
 	const float MoveRPCThrottleInterval = 0.05f;
 
+	// 마우스 엣지 스크롤 최적화용 캐시
+	FVector2D LastMousePosition;
+	FIntPoint LastViewportSize;
+
 	// 감지 업데이트 주기 (초)
 	UPROPERTY(EditAnywhere, Category = "Detection")
 	float DetectionUpdateInterval = 0.2f;
@@ -407,7 +411,7 @@ private:
 	TMap<AGS_Seeker*, float> LastSeekerNotifyTimes;
 
 	FVector2D GetKeyboardDirection() const;
-	FVector2D GetMouseEdgeDirection() const;
+	FVector2D CalculateMouseEdgeDirection(FVector2D MousePos, FIntPoint ViewportSize) const;
 	FVector2D GetFinalDirection() const;
 	void MoveCamera(const FVector2D& Direction, float DeltaTime);
 	void InitCameraActor();

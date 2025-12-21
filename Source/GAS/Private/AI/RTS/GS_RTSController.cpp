@@ -43,6 +43,8 @@ AGS_RTSController::AGS_RTSController()
 	CameraActor = nullptr;
 	CameraSpeed = 2000.f;
 	EdgeScreenRatio = 0.01f;
+	LastMousePosition = FVector2D(-1.f, -1.f);
+	LastViewportSize = FIntPoint(0, 0);
 	UnitGroups.SetNum(9);
 	bCtrlDown = false;
 	bShiftDown = false;
@@ -366,13 +368,33 @@ void AGS_RTSController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 마우스 엣지 감지 (필요할 때만 계산하도록 최적화 여지가 있으나 현재는 매 프레임 업데이트 유지하되 커서 처리는 최적화)
-	MouseEdgeDir = GetMouseEdgeDirection();
-
-	// 커서 업데이트 (상태 변화가 있을 때만 처리하도록 추후 개선 가능)
-	if (bCursorReady && !bSeekerHovered)
+	// 마우스 엣지 감지 최적화: 마우스 위치나 뷰포트 크기가 변했을 때만 방향 재계산
+	float MouseX, MouseY;
+	int32 ViewportX, ViewportY;
+	GetViewportSize(ViewportX, ViewportY);
+	
+	if (GetMousePosition(MouseX, MouseY))
 	{
-		UpdateCursorForEdgeScroll();
+		FVector2D CurrentMousePos(MouseX, MouseY);
+		FIntPoint CurrentViewportSize(ViewportX, ViewportY);
+
+		if (!CurrentMousePos.Equals(LastMousePosition) || CurrentViewportSize != LastViewportSize)
+		{
+			FVector2D NewEdgeDir = CalculateMouseEdgeDirection(CurrentMousePos, CurrentViewportSize);
+			
+			// 방향이 바뀌었을 때만 커서 업데이트 호출
+			if (!NewEdgeDir.Equals(MouseEdgeDir))
+			{
+				MouseEdgeDir = NewEdgeDir;
+				if (bCursorReady && !bSeekerHovered)
+				{
+					UpdateCursorForEdgeScroll();
+				}
+			}
+
+			LastMousePosition = CurrentMousePos;
+			LastViewportSize = CurrentViewportSize;
+		}
 	}
 
 	FVector2D FinalDir = GetFinalDirection();
@@ -710,46 +732,26 @@ FVector2D AGS_RTSController::GetKeyboardDirection() const
 	return FVector2D::ZeroVector;
 }
 
-FVector2D AGS_RTSController::GetMouseEdgeDirection() const
+FVector2D AGS_RTSController::CalculateMouseEdgeDirection(FVector2D MousePos, FIntPoint ViewportSize) const
 {
-	// 뷰포트 유효성 검사
-	if (!GetWorld() || !GetWorld()->GetGameViewport())
-	{
-		return FVector2D::ZeroVector;
-	}
-
-	float MouseX, MouseY;
-	if (!GetMousePosition(MouseX, MouseY))
-	{
-		return FVector2D::ZeroVector;
-	}
-
-	int32 ViewportX, ViewportY;
-	GetViewportSize(ViewportX, ViewportY);
-
-	// 뷰포트 크기가 유효한지 확인
-	if (ViewportX <= 0 || ViewportY <= 0)
-	{
-		return FVector2D::ZeroVector;
-	}
-
-	float EdgeW = ViewportX * EdgeScreenRatio;
-	float EdgeH = ViewportY * EdgeScreenRatio;
+	float EdgeW = ViewportSize.X * EdgeScreenRatio;
+	float EdgeH = ViewportSize.Y * EdgeScreenRatio;
 
 	FVector2D Dir = FVector2D::ZeroVector;
-	if (MouseX <= EdgeW) // 좌·우 엣지 판정
+	if (MousePos.X <= EdgeW) // 좌·우 엣지 판정
 	{
 		Dir.X = -1.f;
 	}
-	else if (MouseX >= ViewportX - EdgeW)
+	else if (MousePos.X >= ViewportSize.X - EdgeW)
 	{
 		Dir.X = 1.f;
 	}
-	if (MouseY <= EdgeH) // 위·아래 엣지 판정 
+	
+	if (MousePos.Y <= EdgeH) // 위·아래 엣지 판정 
 	{
 		Dir.Y = 1.f;
 	}
-	else if (MouseY >= ViewportY - EdgeH)
+	else if (MousePos.Y >= ViewportSize.Y - EdgeH)
 	{
 		Dir.Y = -1.f;
 	}
