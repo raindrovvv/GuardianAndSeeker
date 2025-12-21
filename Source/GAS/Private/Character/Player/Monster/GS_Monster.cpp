@@ -27,6 +27,7 @@
 #include "AI/RTS/GS_RTSController.h"
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "System/GameState/GS_InGameGS.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 AGS_Monster::AGS_Monster()
@@ -79,6 +80,31 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 서브시스템에 등록
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterMonster(this);
+		}
+	}
+
+	// === 데디케이티드 서버 크래시 방지 ===
+	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	{
+		if (IsValid(AkComponent))
+		{
+			AkComponent->Stop();
+			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->UnregisterComponent();
+			AkComponent->DestroyComponent();
+			AkComponent = nullptr;
+		}
+		// 주의: MonsterAudioComponent는 GS_AudioComponentBase를 상속하므로 
+		// 해당 클래스의 BeginPlay에서 이미 처리됨
+	}
+
 	if (IsValid(MonsterSkillComp))
 	{
 		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(this, &AGS_Monster::HandleSkillCooldownChanged);
@@ -92,6 +118,7 @@ void AGS_Monster::BeginPlay()
 	}
 
 	// Bind to owner's RTSController for attack notifications
+
 	// Bind to local RTSController for attack notifications (UI/Sound)
 	if (GetWorld())
 	{
@@ -112,12 +139,17 @@ void AGS_Monster::BeginPlay()
 		AkComponent->OcclusionRefreshInterval = 0.0f;
 	}
 
-	// Register to GameState for optimization
+	// Register to GameState and Subsystem for optimization
 	if (UWorld* World = GetWorld())
 	{
 		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
 		{
 			GS->RegisterMonster(this);
+		}
+
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterMonster(this);
 		}
 	}
 }
@@ -160,6 +192,20 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		AkComponent->Stop();
 	}
 
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (IsValid(MonsterSkillComp))
+	{
+		MonsterSkillComp->OnMonsterSkillCooldownChanged.RemoveAll(this);
+	}
+
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.RemoveAll(this);
+	}
+
+	// 공격 알림 델리게이트 해제
+	OnMonsterAttacked.RemoveAll(this);
+
 	// if (SkillCooldownWidgetComp && SkillCooldownWidgetComp->GetBodySetup())
 	// {
 	// 	SkillCooldownWidgetComp->DestroyPhysicsState();
@@ -180,12 +226,17 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		SkillCooldownWidgetComp->DestroyPhysicsState();
 	}
 
-	// Unregister from GameState
+	// Unregister from GameState and Subsystem
 	if (UWorld* World = GetWorld())
 	{
 		if (AGS_InGameGS* GS = World->GetGameState<AGS_InGameGS>())
 		{
 			GS->UnregisterMonster(this);
+		}
+
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterMonster(this);
 		}
 	}
 
@@ -222,14 +273,15 @@ void AGS_Monster::OnDeath()
 	}
 	
 	// 주변의 모든 Seeker에게 이 몬스터 제거 알림
-	if (GetWorld())
+	if (UWorld* World = GetWorld())
 	{
-		for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
-			APawn* Pawn = *It;
-			if (Pawn && Pawn->IsA(AGS_Seeker::StaticClass()))
+			const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs = Registry->GetSeekers();
+
+			for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 			{
-				if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Pawn))
+				if (AGS_Seeker* Seeker = SeekerPtr.Get())
 				{
 					Seeker->RemoveCombatMonster(this);
 				}

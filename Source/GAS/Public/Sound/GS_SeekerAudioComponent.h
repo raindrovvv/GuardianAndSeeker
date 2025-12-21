@@ -428,7 +428,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sound|EventDriven")
     void RequestSkillAudio(ESkillSlot SkillSlot, int32 AudioEventType, FVector Location = FVector::ZeroVector);
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_RequestSkillAudio(ESkillSlot SkillSlot, int32 AudioEventType, FVector Location = FVector::ZeroVector);
 
     // 스킬셋 데이터 기반 사운드 재생 헬퍼 함수
@@ -456,18 +456,18 @@ public:
     // ===================
     
     // 찬 전용 TPS 콤보 공격 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayChanComboAttackSound(int32 ComboIndex);
 
     // 아레스 전용 TPS 콤보 공격 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayAresComboAttackSound(int32 ComboIndex);
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayAresComboAttackSoundWithExtra(int32 ComboIndex);
 
     // 찬 전용 방어 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayDefenseSound();
 
     // ===================
@@ -612,25 +612,25 @@ private:
     void OnRep_CurrentAudioState();
 
     // 클라이언트 사운드 재생 트리거용 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_TriggerSound(ESeekerAudioState SoundTypeToTrigger, bool bIsImmediate);
 
     // 조준 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayBowDrawSound();
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayBowReleaseSound();
 
     // 방패 슬램 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayShieldSlamStartSound();
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayShieldSlamImpactSound();
 
     // 화살 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayArrowShotSound();
 
     // ===================

@@ -46,6 +46,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ember Chest")
 	class UGS_EmberChestSpawner* EmberChestSpawner;
 
+	/** 보스 음악 상태 설정 (서버 전용) */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	void SetBossMusicState(bool bActive, class UAkAudioEvent* StartEvent = nullptr, class UAkAudioEvent* StopEvent = nullptr);
+
 
 protected:
 	// 나중에 로딩 시스템의 기반이 될, 서버가 생성한 총 방의 개수입니다.
@@ -56,6 +60,19 @@ protected:
 	bool bDungeonDataReady;
 	
 	virtual void BeginPlay() override;
+
+	// 보스 음악 복제 변수
+	UPROPERTY(ReplicatedUsing = OnRep_BossMusicActive)
+	bool bIsBossMusicActive;
+
+	UPROPERTY(Replicated)
+	class UAkAudioEvent* CurrentBossMusicStartEvent;
+
+	UPROPERTY(Replicated)
+	class UAkAudioEvent* CurrentBossMusicStopEvent;
+
+	UFUNCTION()
+	void OnRep_BossMusicActive();
 
 	void UpdateGameTime();
 

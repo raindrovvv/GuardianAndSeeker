@@ -31,6 +31,7 @@
 #include "UI/Character/GS_ReviveIndicatorWidget.h"
 #include "Interface/GS_InteractableInterface.h"
 #include "UI/Interaction/GS_InteractionWidget.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 AGS_TpsController::AGS_TpsController()
@@ -304,14 +305,20 @@ void AGS_TpsController::TestFunction()
 		TSubclassOf<UUserWidget> Widget = PlayerWidgetClasses[GS_Character->GetCharacterType()];
 		if (IsValid(Widget))
 		{
+			// 기존 위젯이 있고 클래스가 같다면 재사용, 아니면 새로 생성
 			if (PlayerWidgetInstance)
 			{
-				PlayerWidgetInstance->RemoveFromParent();
-				PlayerWidgetInstance = nullptr;
-				CrosshairWidget = nullptr;
+				if (PlayerWidgetInstance->GetClass() != Widget)
+				{
+					PlayerWidgetInstance->RemoveFromParent();
+					PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+				}
 			}
-			
-			PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+			else
+			{
+				PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+			}
+
 			if (IsValid(PlayerWidgetInstance))
 			{
 				UGS_HPBoardWidget* HPBoardWidget = Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
@@ -320,7 +327,6 @@ void AGS_TpsController::TestFunction()
 				
 				if (BossWidget)
 				{
-					//HP
 					BossWidget->SetOwningActor(GS_Character);
 					BossWidget->InitGuardianHPWidget();
 				}
@@ -335,12 +341,18 @@ void AGS_TpsController::TestFunction()
 					HPBoardWidget->InitBoardWidget();
 				}
 
-				PlayerWidgetInstance->AddToViewport(0);
+				if (!PlayerWidgetInstance->IsInViewport())
+				{
+					PlayerWidgetInstance->AddToViewport(0);
+				}
+				else
+				{
+					PlayerWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+				}
 
 				CrosshairWidget = Cast<UGS_CrossHairImage>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_CrossHairImage")));
 				if (CrosshairWidget)
 				{
-					// 메르시 캐릭터에게 크로스헤어 위젯 참조 전달
 					if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(GS_Character))
 					{
 						MerciCharacter->SetCrosshairWidget(CrosshairWidget);
@@ -885,29 +897,35 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 	float ClosestDistance = ReviveDistance;
 
 	// 모든 시커를 순회하여 빈사 상태인 시커 찾기
-	for (TActorIterator<AGS_Seeker> It(World); It; ++It)
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AGS_Seeker* OtherSeeker = *It;
+		const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs = Registry->GetSeekers();
 
-		// 자기 자신 제외
-		if (OtherSeeker == MySeeker)
+		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 		{
-			continue;
-		}
+			AGS_Seeker* OtherSeeker = SeekerPtr.Get();
+			if (!IsValid(OtherSeeker)) continue;
 
-		// 빈사 상태가 아니면 스킵
-		if (!OtherSeeker->IsInDyingState())
-		{
-			continue;
-		}
+			// 자기 자신 제외
+			if (OtherSeeker == MySeeker)
+			{
+				continue;
+			}
 
-		// 거리 확인
-		float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
+			// 빈사 상태가 아니면 스킵
+			if (!OtherSeeker->IsInDyingState())
+			{
+				continue;
+			}
 
-		if (Distance < ClosestDistance)
-		{
-			ClosestDistance = Distance;
-			ClosestDyingSeeker = OtherSeeker;
+			// 거리 확인
+			float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
+
+			if (Distance < ClosestDistance)
+			{
+				ClosestDistance = Distance;
+				ClosestDyingSeeker = OtherSeeker;
+			}
 		}
 	}
 
@@ -1014,17 +1032,20 @@ void AGS_TpsController::UpdateNearbyInteractable()
 		}
 	}
 
-	// 위젯 업데이트: 상호작용 가능 대상 표시
+	// 위젯 업데이트: 상호작용 가능 대상이 변경되었을 때만 호출
 	if (InteractionWidget)
 	{
-		if (BestInteractable && !bIsInteracting)
+		if (BestInteractable != CachedInteractable.Get() || bIsInteracting)
 		{
-			FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
-			InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
-		}
-		else if (!BestInteractable && !bIsInteracting)
-		{
-			InteractionWidget->HideNearbyIndicator();
+			if (BestInteractable && !bIsInteracting)
+			{
+				FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
+				InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
+			}
+			else
+			{
+				InteractionWidget->HideNearbyIndicator();
+			}
 		}
 	}
 

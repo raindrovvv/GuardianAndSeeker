@@ -51,6 +51,11 @@ public:
 	void SetWarningWidget(UGS_RTSAttackWarningWidget* InWarningWidget);
 
 	/**
+	 * Get the HUD warning widget reference
+	 */
+	UGS_RTSAttackWarningWidget* GetWarningWidget() const { return WarningWidget.Get(); }
+
+	/**
 	 * Set the minimap widget reference
 	 * @param InMinimapWidget - The minimap widget to use for warning icons
 	 */

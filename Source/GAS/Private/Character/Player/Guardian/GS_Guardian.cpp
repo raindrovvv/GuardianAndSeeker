@@ -11,6 +11,7 @@
 #include "Character/Component/GS_VFXComponent.h"
 #include "Props/Interactables/GS_BridgePiece.h"
 #include "Components/WidgetComponent.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 AGS_Guardian::AGS_Guardian()
 {
@@ -39,6 +40,29 @@ AGS_Guardian::AGS_Guardian()
 void AGS_Guardian::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Register to Subsystem for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterGuardian(this);
+		}
+	}
+}
+
+void AGS_Guardian::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Unregister from Subsystem
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterGuardian(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_Guardian::PostInitializeComponents()

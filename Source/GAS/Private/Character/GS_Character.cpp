@@ -83,11 +83,14 @@ void AGS_Character::BeginPlay()
 	}
 
 	//Set HP 3D widget (monster)
-	if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
 		{
-			HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+			}
 		}
 	}
 
@@ -126,13 +129,13 @@ void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 
 void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// 2. 가시성 끄기
+	if (StatComp)
+	{
+		StatComp->OnCurrentHPChanged.Clear();
+	}
+
 	HPTextWidgetComp->SetVisibility(false);
-
-	// 3. 콜리전 비활성화
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 4. BodySetup 정리
 	if (HPTextWidgetComp->GetBodySetup())
 	{
 		HPTextWidgetComp->DestroyPhysicsState();
@@ -140,11 +143,11 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if (IsValid(HPTextWidgetComp))
 	{
-		if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
-		{
-			Widget->RemoveFromParent();
-		}
-		HPTextWidgetComp->SetWidget(nullptr);
+		// if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
+		// {
+		// 	Widget->RemoveFromParent();
+		// }
+		// HPTextWidgetComp->SetWidget(nullptr);
 		HPTextWidgetComp->DestroyComponent();
 	}
 	
@@ -187,7 +190,6 @@ float AGS_Character::TakeDamage(float DamageAmount, FDamageEvent const& DamageEv
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
-	//when damage input start -> for drakhar 6/24
 	OnDamageStart();
 
 	if (HasAuthority())

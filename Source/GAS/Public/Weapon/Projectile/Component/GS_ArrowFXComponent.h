@@ -41,18 +41,18 @@ public:
 	void SetArrowType(EArrowType ArrowType);
 
 	// 멀티캐스트 함수들 - Trail VFX
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StartArrowTrailVFX(EArrowType ArrowType);
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_StopArrowTrailVFX();
 
 	// 멀티캐스트 함수들 - Hit VFX
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitVFX(ETargetType TargetType, const FHitResult& SweepResult);
 
 	// 멀티캐스트 함수들 - Hit Sound
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult);
 
 protected:

@@ -119,6 +119,29 @@ void AGS_TrapBase::BeginPlay()
 	ActivateSphereComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnActivSCompBeginOverlap);
 }
 
+void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 타이머 정리
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(CheckOverlapTimerHandle);
+	}
+
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (DamageBoxComp)
+	{
+		DamageBoxComp->OnComponentBeginOverlap.RemoveAll(this);
+		DamageBoxComp->OnComponentHit.RemoveAll(this);
+	}
+
+	if (ActivateSphereComp)
+	{
+		ActivateSphereComp->OnComponentBeginOverlap.RemoveAll(this);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AGS_TrapBase::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
@@ -146,6 +169,22 @@ void AGS_TrapBase::RefreshTrapAudioSetup(bool bForceFindComponent)
     if (!GetWorld() || !IsValid(this))
     {
         return;
+    }
+
+    // === 데디케이티드 서버 크래시 방지 ===
+    // BP에서 추가된 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        TrapAkComponent = FindComponentByClass<UAkComponent>();
+        if (IsValid(TrapAkComponent))
+        {
+            TrapAkComponent->Stop();
+            TrapAkComponent->SetComponentTickEnabled(false);
+            TrapAkComponent->UnregisterComponent();
+            TrapAkComponent->DestroyComponent();
+            TrapAkComponent = nullptr;
+        }
+        return; // 서버에서는 오디오 설정 중단
     }
 
     if (IsValid(AudioAnchorComponent))
@@ -395,12 +434,6 @@ void AGS_TrapBase::OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActo
 
     if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Overlapped Actor: %s (%s)"), *OtherActor->GetName(), *OtherActor->GetClass()->GetName());
-        if (OtherComp)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Overlapped Component: %s (%s)"), *OtherComp->GetName(), *OtherComp->GetClass()->GetName());
-        }
-
         // 서버
         DamageBoxEffect(Seeker);
         CustomTrapEffect(Seeker);
@@ -523,10 +556,6 @@ EHitReactType AGS_TrapBase::GetHitReactType() const
 
 void AGS_TrapBase::HandleTrapDamage(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Trap: %s / Class: %s / HitReactType: %s"),
-		*GetName(),
-		*GetClass()->GetName(),
-		*UEnum::GetValueAsString(GetHitReactType()));
 	if (!OtherActor) return;
 	AGS_Seeker* DamagedSeeker = Cast<AGS_Seeker>(OtherActor);
 	if (!DamagedSeeker) return;
@@ -608,7 +637,6 @@ void AGS_TrapBase::Multicast_DamageBoxEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::DamageBoxEffect_Implementation(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("DamageBoxEffect Applied"));
 }
 
 
@@ -1052,6 +1080,10 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Activation SoundEvent is None for %s. Please check Trap DataTable or BP settings."), *GetName());
+	}
 }
 
 void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
@@ -1087,6 +1119,10 @@ void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Deactivation SoundEvent is None for %s."), *GetName());
+	}
 }
 
 void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
@@ -1121,5 +1157,9 @@ void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
 		{
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Hit SoundEvent is None for %s."), *GetName());
 	}
 }

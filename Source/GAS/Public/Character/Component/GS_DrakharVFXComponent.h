@@ -222,13 +222,13 @@ protected:
 	UNiagaraSystem* GetDebuffExpireVFX(EDebuffType DebuffType) const;
 
 	// 디버프 VFX 재생 (멀티캐스트)
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDebuffVFX(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_RemoveDebuffVFX(EDebuffType DebuffType);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDebuffExpireVFX(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale);
 
 private:

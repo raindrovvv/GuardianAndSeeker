@@ -46,9 +46,9 @@ private:
 	UFUNCTION() 
 	void HandleProjectileDestroy();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(FVector HitLocation);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal);
 };

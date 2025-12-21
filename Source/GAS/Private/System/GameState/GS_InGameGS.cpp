@@ -9,6 +9,8 @@
 #include "Props/GS_RoomBase.h"
 #include "System/GS_PlayerState.h"
 #include "System/GS_EmberChestSpawner.h"
+#include "Sound/GS_AudioManager.h"
+#include "AkAudioEvent.h"
 
 AGS_InGameGS::AGS_InGameGS()
 {
@@ -19,6 +21,44 @@ AGS_InGameGS::AGS_InGameGS()
 
 	// 불씨 보물상자 스폰 관리자 생성
 	EmberChestSpawner = CreateDefaultSubobject<UGS_EmberChestSpawner>(TEXT("EmberChestSpawner"));
+
+	bIsBossMusicActive = false;
+	CurrentBossMusicStartEvent = nullptr;
+	CurrentBossMusicStopEvent = nullptr;
+}
+
+void AGS_InGameGS::SetBossMusicState(bool bActive, UAkAudioEvent* StartEvent, UAkAudioEvent* StopEvent)
+{
+	if (HasAuthority())
+	{
+		bIsBossMusicActive = bActive;
+		CurrentBossMusicStartEvent = StartEvent;
+		CurrentBossMusicStopEvent = StopEvent;
+
+		// Listen Server에서는 즉시 적용되도록 OnRep 직접 호출
+		if (GetNetMode() != NM_DedicatedServer)
+		{
+			OnRep_BossMusicActive();
+		}
+	}
+}
+
+void AGS_InGameGS::OnRep_BossMusicActive()
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UGS_AudioManager* AM = GI->GetSubsystem<UGS_AudioManager>())
+		{
+			if (bIsBossMusicActive)
+			{
+				AM->StartBossSequenceLocal(this, CurrentBossMusicStartEvent, CurrentBossMusicStopEvent);
+			}
+			else
+			{
+				AM->EndBossSequenceLocal(this);
+			}
+		}
+	}
 }
 
 
@@ -71,6 +111,9 @@ void AGS_InGameGS::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AGS_InGameGS, CurrentTime);
 	DOREPLIFETIME(AGS_InGameGS, TotalRoomCount);
 	DOREPLIFETIME(AGS_InGameGS, bDungeonDataReady);
+	DOREPLIFETIME(AGS_InGameGS, bIsBossMusicActive);
+	DOREPLIFETIME(AGS_InGameGS, CurrentBossMusicStartEvent);
+	DOREPLIFETIME(AGS_InGameGS, CurrentBossMusicStopEvent);
 }
 
 void AGS_InGameGS::UpdateGameTime()

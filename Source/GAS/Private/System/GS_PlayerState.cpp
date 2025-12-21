@@ -47,6 +47,17 @@ void AGS_PlayerState::BeginPlay()
     }    
 }
 //
+void AGS_PlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (BoundStatComp)
+    {
+        BoundStatComp->OnCurrentHPChanged.RemoveAll(this);
+        BoundStatComp = nullptr;
+    }
+
+    Super::EndPlay(EndPlayReason);
+}
+//
 // void AGS_PlayerState::CopyProperties(APlayerState* NewPlayerState)
 // {
 //     Super::CopyProperties(NewPlayerState);

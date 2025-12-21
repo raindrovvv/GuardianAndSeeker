@@ -82,6 +82,7 @@ AGS_PlacerBase::AGS_PlacerBase()
 
 	bUpdatePlaceIndicators = false;
 	Direction = EPlacerDirectionType::Forward;
+	bLastCanBuild = false;
 }
 
 void AGS_PlacerBase::BeginPlay()
@@ -131,6 +132,10 @@ void AGS_PlacerBase::SetupObjectPlacer()
 	{
 		CreateIndicatorMesh();
 	}
+	
+	// 캐시된 메시 컴포넌트들 초기화
+	CachedMeshComponents.Empty();
+	GetComponents<UMeshComponent>(CachedMeshComponents);
 
 	bUpdatePlaceIndicators = true;
 }
@@ -350,7 +355,6 @@ void AGS_PlacerBase::DrawPlacementIndicators()
 				PlaceIndicators[i]->SetWorldLocation(CellLocation);
 				
 				if (!BuildManagerRef->CheckOccupancyData(IntPointArray[i], TargetType))
-					//&& FMath::Abs(CellLocation.Z - BaseBuildLevel) < MaxHeightDifferenceforConstruction))
 				{
 					PlaceIndicators[i]->SetMaterial(0, PlaceAcceptedMaterial);
 				}
@@ -361,41 +365,42 @@ void AGS_PlacerBase::DrawPlacementIndicators()
 				}
 			}
 
-			TArray<UMeshComponent*> AllMeshComponents;
-			GetComponents<UMeshComponent>(AllMeshComponents);
-			
-			for (UMeshComponent* MeshComponent : AllMeshComponents)
+			// 설치 가능 여부가 변경되었거나 강제 업데이트가 필요할 때만 메시 머티리얼 변경
+			if (bCanBuild != bLastCanBuild || bUpdatePlaceIndicators)
 			{
-				if (MeshComponent)
+				for (UMeshComponent* MeshComponent : CachedMeshComponents)
 				{
-					if (MeshComponent->ComponentHasTag(FName("PlacementIndicator")))
+					if (MeshComponent)
 					{
-						if (bCanBuild)
+						if (MeshComponent->ComponentHasTag(FName("PlacementIndicator")))
 						{
-							MeshComponent->SetMaterial(0, PlaceAcceptedMaterial);
-						}
-						else
-						{
-							MeshComponent->SetMaterial(0, PlaceRejectedMaterial);
+							if (bCanBuild)
+							{
+								MeshComponent->SetMaterial(0, PlaceAcceptedMaterial);
+							}
+							else
+							{
+								MeshComponent->SetMaterial(0, PlaceRejectedMaterial);
+							}
+							
+							continue; 
 						}
 						
-						continue; 
-					}
-					
-					int32 NumMaterials = MeshComponent->GetNumMaterials();
-
-					for (int32 i = 0; i < NumMaterials; ++i)
-					{					
-						if (bCanBuild)
-						{
-							MeshComponent->SetMaterial(i, BuildAcceptedMaterial);
-						}
-						else
-						{
-							MeshComponent->SetMaterial(i, BuildRejectedMaterial);
+						int32 NumMaterials = MeshComponent->GetNumMaterials();
+						for (int32 MatIdx = 0; MatIdx < NumMaterials; ++MatIdx)
+						{					
+							if (bCanBuild)
+							{
+								MeshComponent->SetMaterial(MatIdx, BuildAcceptedMaterial);
+							}
+							else
+							{
+								MeshComponent->SetMaterial(MatIdx, BuildRejectedMaterial);
+							}
 						}
 					}
 				}
+				bLastCanBuild = bCanBuild;
 			}
 		}
 	}

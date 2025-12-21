@@ -38,26 +38,29 @@ void UGS_ChanUltimateSkill::ActiveSkill()
 	// 무적 설정
 	OwnerCharacter->SetInvincible(true);
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	// 소유자 캐싱
+	CachedChanOwner = Cast<AGS_Chan>(OwnerCharacter);
+
+	if (CachedChanOwner.IsValid())
 	{
-		if (UAnimInstance* AnimInstance = OwnerPlayer->GetMesh()->GetAnimInstance())
+		if (UAnimInstance* AnimInstance = CachedChanOwner->GetMesh()->GetAnimInstance())
 		{
 			AnimInstance->OnMontageEnded.AddUniqueDynamic(this, &UGS_ChanUltimateSkill::OnMontageEnded);
 		}
 
 		// 궁극기 사운드 재생 (멀티캐스트)
-		if (OwnerPlayer->HasAuthority())
+		if (CachedChanOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
 		}
 
 		// 입력 제한 설정
-		//OwnerPlayer->SetSkillInputControl(false, false, false);
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-		OwnerPlayer->SetMoveControlValue(false, false);
+		//CachedChanOwner->SetSkillInputControl(false, false, false);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedChanOwner->SetMoveControlValue(false, false);
 	}
 
 	// 돌진 시작 (약간 딜레이)
@@ -79,11 +82,11 @@ void UGS_ChanUltimateSkill::OnSkillAnimationEnd()
 	// 무적 해제
 	OwnerCharacter->SetInvincible(false);
 
-	if(AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if(CachedChanOwner.IsValid())
 	{
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		OwnerPlayer->SetMoveControlValue(true, true);
-		OwnerPlayer->CanChangeSeekerGait = true;
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedChanOwner->SetMoveControlValue(true, true);
+		CachedChanOwner->CanChangeSeekerGait = true;
 	}
 	
 	if(AGS_TpsController* Controller = Cast<AGS_TpsController>(OwnerCharacter->GetController()))
@@ -115,7 +118,16 @@ void UGS_ChanUltimateSkill::InterruptSkill()
 
 void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitiveComponent* HitComp)
 {
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority())
+	{
+		return;
+	}
+
 	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
+	if (!OwnerPlayer)
+	{
+		return;
+	}
 	
 	// 데이터 테이블에서 스킬 정보 가져오기
 	const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
@@ -124,10 +136,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 	{
 		ApplyEffectToGuardian(Guardian);
 		
-		// 가디언 충돌 사운드 재생
-		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+		// 가디언 충돌 사운드 재생 (멀티캐스트)
+		if (CachedChanOwner.IsValid() && CachedChanOwner->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 2); // 2 = 가디언 충돌
+			CachedChanOwner->SeekerAudioComponent->RequestSkillAudio(CurrentSkillType, 6); // 6 = 가디언 충돌 (2 + 4)
 		}
 		
 		EndCharge();
@@ -139,10 +151,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 			HitActors.Add(Monster);
 			ApplyEffectToDungeonMonster(Monster);
 			
-			// 몬스터 충돌 사운드 재생
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+			// 몬스터 충돌 사운드 재생 (멀티캐스트)
+			if (CachedChanOwner.IsValid() && CachedChanOwner->SeekerAudioComponent)
 			{
-				AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 1); // 1 = 몬스터 충돌
+				CachedChanOwner->SeekerAudioComponent->RequestSkillAudio(CurrentSkillType, 5); // 5 = 몬스터 충돌 (1 + 4)
 			}
 		}
 	}
@@ -152,10 +164,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 	{
 		bInStructureCrash = true;
 		
-		// 벽 충돌 사운드 재생
-		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+		// 벽 충돌 사운드 재생 (멀티캐스트)
+		if (CachedChanOwner.IsValid() && CachedChanOwner->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillCollisionSoundFromDataTable(ESkillSlot::Ultimate, 0); // 0 = 벽 충돌
+			CachedChanOwner->SeekerAudioComponent->RequestSkillAudio(CurrentSkillType, 4); // 4 = 벽 충돌 (0 + 4)
 		}
 		
 		// 대시 종료
@@ -183,8 +195,8 @@ void UGS_ChanUltimateSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 	}
 
 	// 현재 프레임의 실시간 방향 계산
-	FVector CurrentForward = OwnerPlayer->GetActorForwardVector().GetSafeNormal();
-	FVector PlayerToMonster = Target->GetActorLocation() - OwnerPlayer->GetActorLocation();
+	FVector CurrentForward = CachedChanOwner.IsValid() ? CachedChanOwner->GetActorForwardVector().GetSafeNormal() : FVector::ForwardVector;
+	FVector PlayerToMonster = Target->GetActorLocation() - (CachedChanOwner.IsValid() ? CachedChanOwner->GetActorLocation() : FVector::ZeroVector);
 	FVector RightVector = FVector::CrossProduct(CurrentForward, FVector::UpVector).GetSafeNormal();
 
 	// Dot 비교로 방향 판별
@@ -211,7 +223,7 @@ void UGS_ChanUltimateSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
     if (!OwnerPlayer) return;
     
     // 가디언용 넉백 (더 약한 힘)
-    FVector KnockbackDirection = (Target->GetActorLocation() - OwnerPlayer->GetActorLocation()).GetSafeNormal();
+    FVector KnockbackDirection = (Target->GetActorLocation() - (CachedChanOwner.IsValid() ? CachedChanOwner->GetActorLocation() : FVector::ZeroVector)).GetSafeNormal();
     FVector KnockbackVelocity = KnockbackDirection * GuardianKnockbackForce;
     
     if (Target->GetCharacterMovement())
@@ -222,11 +234,10 @@ void UGS_ChanUltimateSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
 
 void UGS_ChanUltimateSkill::DeactiveSkill()
 {
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	if (OwnerPlayer)
+	if (CachedChanOwner.IsValid())
 	{
 		// 넉백 Collision 설정
-		OwnerPlayer->UltimateCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		CachedChanOwner->UltimateCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	
 	// 속도 조절
@@ -261,8 +272,10 @@ void UGS_ChanUltimateSkill::DeactiveSkill()
 void UGS_ChanUltimateSkill::StartCharge()
 {	
 	// 넉백 Collision 켜기
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	OwnerPlayer->UltimateCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	if (CachedChanOwner.IsValid())
+	{
+		CachedChanOwner->UltimateCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	}
 
 	GetWorld()->GetTimerManager().SetTimer(
 		ChargeTimerHandle,
@@ -280,15 +293,15 @@ void UGS_ChanUltimateSkill::StartCharge()
 	Controller->SetMoveControlValue(true, true);
 	Controller->StartAutoMoveForward();
 
-	if (OwnerPlayer)
+	if (CachedChanOwner.IsValid())
 	{
 		// 애니메이션 설정
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 
 		// 스킬 애니메이션 재생
 		if (SkillAnimMontages[0])
 		{
-			OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 		}
 
 		// =======================
@@ -309,21 +322,20 @@ void UGS_ChanUltimateSkill::StartCharge()
 
 void UGS_ChanUltimateSkill::EndCharge()
 {
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
 	if(bInStructureCrash) // 구조물에 부딪혔을 때
 	{
-		if (OwnerPlayer && SkillAnimMontages[2])
+		if (CachedChanOwner.IsValid() && SkillAnimMontages[2])
 		{
 			// 애니메이션 재생만 (방패 공격 콜리전 비활성화)
-			OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[2]);
+			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[2]);
 		}
 	}
 	else // 구조물이 아닌 곳에 부딪혔을 때
 	{
-		if (OwnerPlayer && SkillAnimMontages[1])
+		if (CachedChanOwner.IsValid() && SkillAnimMontages[1])
 		{
 			// 애니메이션 재생 (방패 공격은 애님님노티파이로 처리)
-			OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
 		}
 	}
 

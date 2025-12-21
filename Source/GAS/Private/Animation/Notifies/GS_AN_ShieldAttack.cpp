@@ -35,6 +35,12 @@ void UGS_AN_ShieldAttack::Notify(USkeletalMeshComponent* MeshComp, UAnimSequence
 	}
 
 	// 방패를 찾아서 공격 콜리전 활성화
+	// Server RPC는 로컬에서 조종하는 캐릭터에서만 호출
+	if (!Chan->IsLocallyControlled())
+	{
+		return;
+	}
+
 	for (int32 i = 0; i < 5; ++i)
 	{
 		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(Chan->GetWeaponByIndex(i)))

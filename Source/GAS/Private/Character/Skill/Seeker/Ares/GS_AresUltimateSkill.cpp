@@ -26,12 +26,14 @@ void UGS_AresUltimateSkill::ActiveSkill()
 	StartCoolDown();
 	
 	const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
-	if (AGS_Ares* OwnerPlayer = Cast<AGS_Ares>(OwnerCharacter))
+	CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
+
+	if (CachedAresOwner.IsValid())
 	{
 		// 스킬 시작 사운드 및 루프 사운드 재생 (멀티캐스트)
-		if (OwnerPlayer->HasAuthority())
+		if (CachedAresOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedAresOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0); // 0 = 스킬 시작
 				AudioComp->RequestSkillAudio(CurrentSkillType, 2); // 2 = 루프 시작
@@ -39,11 +41,11 @@ void UGS_AresUltimateSkill::ActiveSkill()
 		}
 
 		// 입력 제한 설정
-		//OwnerPlayer->Multicast_SetIsFullBodySlot(true);
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
-		//OwnerPlayer->SetSkillInputControl(false, false, false, false);
-		OwnerPlayer->SetMoveControlValue(false, false);
+		//CachedAresOwner->Multicast_SetIsFullBodySlot(true);
+		CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		//CachedAresOwner->SetSkillInputControl(false, false, false, false);
+		CachedAresOwner->SetMoveControlValue(false, false);
 	}
 	
 	// =======================
@@ -80,10 +82,10 @@ void UGS_AresUltimateSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Seeker* OwnerPlayer = Cast<AGS_Seeker>(OwnerCharacter))
+	if (CachedAresOwner.IsValid())
 	{
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		OwnerPlayer->SetMoveControlValue(true, true);
+		CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedAresOwner->SetMoveControlValue(true, true);
 	}
 }
 
@@ -127,11 +129,11 @@ void UGS_AresUltimateSkill::DeactiveSkill()
 	}
 
 	// 궁극기 루프 사운드 정지 및 종료 사운드 재생 (멀티캐스트)
-	if (OwnerCharacter->HasAuthority())
+	if (OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
-		if (AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter))
+		if (CachedAresOwner.IsValid())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerSeeker->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedAresOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 3); // 3 = 루프 정지
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1); // 1 = 스킬 종료
