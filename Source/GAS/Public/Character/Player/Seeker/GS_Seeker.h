@@ -148,7 +148,7 @@ public:
 	virtual void OnRep_IsDead() override;
 
 	// === Audio Functions ===
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySound(class UAkAudioEvent* SoundToPlay);
 
 	// ===============
@@ -620,11 +620,11 @@ protected:
 	void UpdateDyingFlameVisuals(float TimeRemaining);
 
 	/** 불꽃 활성화 멀티캐스트 RPC */
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_ActivateDyingFlame();
 
 	/** 불꽃 비활성화 멀티캐스트 RPC */
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_DeactivateDyingFlame();
 
 	/** 진행도 감소 시작 */

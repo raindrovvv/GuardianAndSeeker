@@ -859,11 +859,19 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 				FGS_StatRow Stat;
 				Stat.ATK = 50.f;
 				GetStatComp()->ResetStat(Stat);
-				MulticastRPC_OnFeverModeEnd();
-				MulticastPlayFeverModeEndEffects();  // 피버 모드 종료 사운드 & 카메라 효과
-			}
 
-			IsFeverMode = false;
+				IsFeverMode = false;
+				
+				// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
+				if (GetNetMode() != NM_DedicatedServer)
+				{
+					OnRep_IsFeverMode();
+				}
+			}
+			else
+			{
+				IsFeverMode = false;
+			}
 		}
 
 		//Start Fever Mode
@@ -990,26 +998,11 @@ void AGS_Drakhar::StartFeverMode()
 
 	GetStatComp()->ChangeStat(Stat);
 	MulticastRPCFeverMontagePlay();
-	MulticastRPC_OnFeverModeStart();
 	
-	if (AudioComponent)
+	// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		// 피버모드 시작 사운드 즉시 재생 (bForcePlay = true로 RPC 제한 무시)
-		AudioComponent->PlayFeverModeStartSound(true);
-
-		// FeverModeStateSound는 0.2초 후에 재생 (RPC 간격 제한 확실히 회피)
-		UWorld* World = GetWorld();
-		if (World && World->IsValidLowLevel() && !World->bIsTearingDown)
-		{
-			SafeClearTimer(FeverStateSoundDelayTimer);
-			World->GetTimerManager().SetTimer(
-				FeverStateSoundDelayTimer,
-				this,
-				&AGS_Drakhar::PlayFeverModeStateSoundDelayed,
-				0.2f,
-				false
-			);
-		}
+		OnRep_IsFeverMode();
 	}
 }
 
@@ -1353,7 +1346,47 @@ void AGS_Drakhar::OnRep_IsFeverMode()
 {
 	if (DrakharVFXComponent) DrakharVFXComponent->OnFeverModeChanged(IsFeverMode);
 
-	// 클라이언트에서도 블루프린트 이벤트 호출
+	if (AudioComponent)
+	{
+		if (IsFeverMode)
+		{
+			AudioComponent->PlayFeverModeStartSoundLocal();
+			
+			// State Sound는 약간의 딜레이 후 재생 (시각 효과와 맞추기 위함)
+			UWorld* World = GetWorld();
+			if (World)
+			{
+				SafeClearTimer(FeverStateSoundDelayTimer);
+				World->GetTimerManager().SetTimer(
+					FeverStateSoundDelayTimer,
+					this,
+					&AGS_Drakhar::PlayFeverModeStateSoundDelayed,
+					0.2f,
+					false
+				);
+			}
+		}
+		else
+		{
+			AudioComponent->PlayFeverModeEndSoundLocal();
+			AudioComponent->StopFeverModeStateSoundLocal();
+
+			// 피버 종료 시 카메라 쉐이크 및 줌 효과 (로컬 플레이어 전용)
+			if (IsLocallyControlled())
+			{
+				if (APlayerController* PC = Cast<APlayerController>(GetController()))
+				{
+					FGS_CameraShakeInfo EndFeverShake = AttackSuccessShake;
+					EndFeverShake.Intensity *= 0.5f;
+					Client_PlayAttackSuccessShakeWithInfo(PC, EndFeverShake);
+				}
+				
+				ApplyFeverModeEndCameraEffect();
+			}
+		}
+	}
+
+	// 블루프린트 이벤트 호출
 	if (IsFeverMode)
 	{
 		BP_OnFeverModeStart();
@@ -1431,8 +1464,8 @@ void AGS_Drakhar::PlayFeverModeStateSoundDelayed()
 
 	if (AudioComponent && IsFeverMode)
 	{
-		// bForcePlay = true로 RPC 제한 무시하여 확실하게 재생
-		AudioComponent->PlayFeverModeStateSound(true);
+		// OnRep에서 타이머로 호출되거나 서버에서 직접 호출됨
+		AudioComponent->PlayFeverModeStateSoundLocal();
 	}
 }
 

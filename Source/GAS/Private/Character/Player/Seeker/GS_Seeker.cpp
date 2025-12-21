@@ -1234,8 +1234,11 @@ void AGS_Seeker::EnterDyingState()
 	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
 
-	// 방법 A: 불꽃 효과 활성화 (RPC로 모든 클라이언트에 전파)
-	Multicast_ActivateDyingFlame();
+	// 방법 A: 불꽃 효과 활성화 (OnRep에서 처리하도록 변수 복제만 담당, 서버/리슨서버는 직접 호출)
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_IsInDyingState();
+	}
 
 	// 위험 사운드 플래그 초기화
 	bDangerSoundPlayed = false;
@@ -1279,8 +1282,11 @@ void AGS_Seeker::ExitDyingState(bool bWasRevived)
 	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
 	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
 
-	// 불꽃 효과 비활성화 (RPC로 모든 클라이언트에 전파)
-	Multicast_DeactivateDyingFlame();
+	// 불꽃 효과 비활성화 (OnRep에서 처리하도록 변수 복제만 담당, 서버/리슨서버는 직접 호출)
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_IsInDyingState();
+	}
 
 	// 델리게이트 브로드캐스트
 	OnDyingStateChanged.Broadcast(false, 0.0f);
@@ -1643,6 +1649,16 @@ void AGS_Seeker::OnRep_IsInDyingState()
 				DyingPostProcessComp->bEnabled = false;
 			}
 		}
+	}
+
+	// 불꽃 효과 동기화 (모든 플레이어에게 보임)
+	if (bIsInDyingState)
+	{
+		ActivateDyingFlameEffects();
+	}
+	else
+	{
+		DeactivateDyingFlameEffects();
 	}
 
 	// 델리게이트 브로드캐스트 (UI 업데이트용)
