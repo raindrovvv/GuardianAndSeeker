@@ -39,6 +39,8 @@
 #include "Props/Item/SeekerItem/GS_HP_Potion.h"
 #include "Props/Item/GS_ItemData.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "UI/Character/GS_SteamNameWidgetComp.h"
+#include "Props/Item/EmberChest/GS_EmberChest.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker()
@@ -200,8 +202,13 @@ void AGS_Seeker::BeginPlay()
 		}
 	}
 
-	// 초기화 시 Tick 비활성화 (보통 상태에서는 Tick 불필요, 빈사 상태에서만 활성화됨)
+	// === 최적화: Tick 비활성화 및 타이머 시스템 가동 ===
+	// 기본 Tick을 비활성화하여 CPU 사용량을 줄입니다.
 	SetActorTickEnabled(false);
+
+	// 주변 감지(상자 등) 및 저빈도 업데이트용 타이머 시작 (0.1초/10Hz)
+	// 이 타이머는 블루프린트의 OnPeripheralSensorUpdate 이벤트를 호출합니다.
+	GetWorldTimerManager().SetTimer(PeripheralSensorTimerHandle, this, &AGS_Seeker::UpdatePeripheralSensor, 0.1f, true);
 }
 
 void AGS_Seeker::PawnClientRestart()
@@ -219,24 +226,8 @@ void AGS_Seeker::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 빈사 상태 업데이트
-	if (bIsInDyingState)
-	{
-		// 서버: 타이머 로직 처리
-		if (HasAuthority())
-		{
-			UpdateDyingState(DeltaTime);
-		}
-
-		// 로컬 전용 포스트 프로세스 효과
-		if (IsLocallyControlled())
-		{
-			UpdateDyingPostProcessEffect();
-		}
-
-		// 비주얼 및 경고 사운드 업데이트 (모든 클라이언트)
-		UpdateDyingFlameVisuals(DyingTimeRemaining);
-	}
+	// 현재 시커의 Tick 로직은 모두 타이머(UpdatePeripheralSensor, UpdateDyingStateTimer)로 이동되었습니다.
+	// 하위 클래스(Merci의 Zoom 등)에서 필요할 경우 하위 클래스에서 Tick을 켜고 사용할 수 있습니다.
 }
 
 // Called to bind functionality to input
@@ -323,6 +314,8 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	// 빈사/구조 관련 타이머 정리
 	SafeClearTimer(ReviveDecayTimerHandle);
+	SafeClearTimer(DyingUpdateTimerHandle);
+	SafeClearTimer(PeripheralSensorTimerHandle);
 
 	// 포스트 프로세스 비활성화
 	// Unregister from Subsystem
@@ -1207,8 +1200,8 @@ void AGS_Seeker::EnterDyingState()
 	ReviveProgress = 0.0f;
 	bDangerSoundPlayed = false;
 
-	// Tick 활성화 (빈사 상태 로직 처리용)
-	SetActorTickEnabled(true);
+	// 빈사 상태 업데이트 타이머 시작 (Tick 대신 사용, 20Hz)
+	GetWorldTimerManager().SetTimer(DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, 0.05f, true);
 
 	// 현재 Gait 저장
 	GaitBeforeDying = SeekerGait;
@@ -1268,8 +1261,6 @@ void AGS_Seeker::ExitDyingState(bool bWasRevived)
 	ReviveProgress = 0.0f;
 	CurrentReviver = nullptr;
 
-	// Tick 비활성화
-	SetActorTickEnabled(false);
 
 	// 몬스터 콜리전 복구 (감지 채널들)
 	// 원래 설정값으로 복구해야 하지만, 기본적으로 Block 또는 Overlap일 것이므로 Block으로 설정
@@ -1338,6 +1329,113 @@ void AGS_Seeker::OnDyingTimeExpired()
 
 	// 실제 사망 처리
 	OnDeath();
+}
+
+void AGS_Seeker::UpdatePeripheralSensor()
+{
+	// 1. 블루프린트에서 추가 기능을 수행할 수 있도록 이벤트 호출
+	OnPeripheralSensorUpdate();
+
+	// 2. 주변 보물상자 감지 및 시각 효과 (C++)
+	CheckNearbyEmberChests();
+
+	// 3. 부모 클래스(AGS_Player)의 이름표 회전 기능을 여기서 저빈도로 수행 (Tick 대신)
+	if (IsValid(SteamNameWidgetComp))
+	{
+		UpdateSteamNameWidgetRotation();
+	}
+
+	// 4. 로컬 컨트롤러의 상호작용 로직 업데이트 (Tick이 꺼져 있으므로 여기서 명시적 호출)
+	if (IsLocallyControlled())
+	{
+		if (AGS_TpsController* TPSController = Cast<AGS_TpsController>(GetController()))
+		{
+			TPSController->UpdateNearbyInteractable();
+		}
+	}
+}
+
+void AGS_Seeker::UpdateDyingStateTimer()
+{
+	// 고정 시간 간격 (0.05s)
+	const float DeltaTime = 0.05f;
+
+	if (bIsInDyingState)
+	{
+		// 서버: 타이머 로직 처리
+		if (HasAuthority())
+		{
+			UpdateDyingState(DeltaTime);
+		}
+
+		// 로컬 전용 포스트 프로세스 효과
+		if (IsLocallyControlled())
+		{
+			UpdateDyingPostProcessEffect();
+		}
+
+		// 비주얼 및 경고 사운드 업데이트 (모든 클라이언트)
+		UpdateDyingFlameVisuals(DyingTimeRemaining);
+
+		// 로컬 클라이언트 UI 업데이트를 위한 방송 (남은 시간 실시간 갱신)
+		if (IsLocallyControlled())
+		{
+			OnDyingStateChanged.Broadcast(true, DyingTimeRemaining);
+		}
+	}
+	else
+	{
+		// 상태가 해제되었으면 타이머 종료
+		GetWorldTimerManager().ClearTimer(DyingUpdateTimerHandle);
+	}
+}
+
+void AGS_Seeker::CheckNearbyEmberChests()
+{
+	// 로컬 플레이어만 시각 효과(아웃라인 등)를 처리하면 됨
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	// 1. 주변 액터 검색 (오버랩 기반)
+	TArray<AActor*> OverlappingActors;
+	GetOverlappingActors(OverlappingActors, AGS_EmberChest::StaticClass());
+
+	AGS_EmberChest* ClosestChest = nullptr;
+	float MinDistanceSq = TNumericLimits<float>::Max();
+
+	for (AActor* Actor : OverlappingActors)
+	{
+		AGS_EmberChest* Chest = Cast<AGS_EmberChest>(Actor);
+		if (Chest && Chest->CurrentState == EEmberChestState::Idle)
+		{
+			float DistanceSq = FVector::DistSquared(GetActorLocation(), Chest->GetActorLocation());
+			if (DistanceSq < MinDistanceSq)
+			{
+				MinDistanceSq = DistanceSq;
+				ClosestChest = Chest;
+			}
+		}
+	}
+
+	// 2. 감지된 상자가 변경되었을 때만 처리
+	if (ClosestChest != CurrentDetectedChest.Get())
+	{
+		// 이전 상자의 하이라이트 끄기
+		if (CurrentDetectedChest.IsValid())
+		{
+			CurrentDetectedChest->SetHighlight(false);
+		}
+
+		// 새 상자의 하이라이트 켜기
+		if (ClosestChest)
+		{
+			ClosestChest->SetHighlight(true);
+		}
+
+		CurrentDetectedChest = ClosestChest;
+	}
 }
 
 void AGS_Seeker::UpdateDyingState(float DeltaTime)
@@ -1619,12 +1717,24 @@ bool AGS_Seeker::IsReviverValid(const AGS_Seeker* Reviver) const
 
 void AGS_Seeker::OnRep_IsInDyingState()
 {
-	// 클라이언트 Tick 동기화
-	SetActorTickEnabled(bIsInDyingState);
+	// 클라이언트에서 빈사 상태 로직을 위한 타이머 관리 (Tick 대신 사용)
+	if (bIsInDyingState)
+	{
+		if (!GetWorldTimerManager().IsTimerActive(DyingUpdateTimerHandle))
+		{
+			GetWorldTimerManager().SetTimer(DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, 0.05f, true);
+		}
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(DyingUpdateTimerHandle);
+	}
 
-	// 클라이언트에서 빈사 상태 변화 처리
+	// 클라이언트에서 빈사 상태 변화 처리 (UI 및 효과)
 	if (IsLocallyControlled())
 	{
+		UpdateDetectionEffects();
+		
 		if (bIsInDyingState)
 		{
 			// 빈사 상태 화면 효과 활성화
@@ -1661,8 +1771,8 @@ void AGS_Seeker::OnRep_IsInDyingState()
 		DeactivateDyingFlameEffects();
 	}
 
-	// 델리게이트 브로드캐스트 (UI 업데이트용)
-	OnDyingStateChanged.Broadcast(bIsInDyingState, DyingTimeRemaining);
+	// 델리게이트 브로드캐스트 (UI 업데이트용 - 모든 클라이언트/로컬 공통)
+	OnDyingStateChanged.Broadcast(bIsInDyingState, bIsInDyingState ? DyingTimeRemaining : 0.0f);
 }
 
 void AGS_Seeker::OnRep_IsDead()

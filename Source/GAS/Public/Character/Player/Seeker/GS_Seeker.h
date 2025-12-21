@@ -600,6 +600,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Dying")
 	TWeakObjectPtr<AGS_Seeker> CurrentReviver;
 
+	/** 주변 감지 업데이트용 블루프린트 이벤트 (Actor Tick 대용으로 사용 가능) */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Seeker|Sensor")
+	void OnPeripheralSensorUpdate();
+
 protected:
 	/** 캐릭터 빙의 완료 시 호출 (클라이언트) */
 	virtual void PawnClientRestart() override;
@@ -618,6 +622,15 @@ protected:
 
 	/** 불꽃 크기 타이머 연동 업데이트 */
 	void UpdateDyingFlameVisuals(float TimeRemaining);
+
+	/** 주변 감지(보물상자 등) 주기적 업데이트 함수 */
+	void UpdatePeripheralSensor();
+
+	/** 주변 보물상자 감지 및 시각 효과 처리 */
+	void CheckNearbyEmberChests();
+
+	/** 빈사 상태 주기적 업데이트 함수 (타이머 호출용) */
+	void UpdateDyingStateTimer();
 
 	/** 불꽃 활성화 멀티캐스트 RPC */
 	UFUNCTION(NetMulticast, Unreliable)
@@ -677,6 +690,17 @@ protected:
 	bool CanContinueRevive() const;
 
 private:
+	/** 빈사 상태 업데이트 타이머 핸들 */
+	FTimerHandle DyingUpdateTimerHandle;
+
+	/** 주변 감지(보물상자 등) 타이머 핸들 */
+	FTimerHandle PeripheralSensorTimerHandle;
+
+	/** 현재 감지된 보물상자 (아웃라인 표시용) */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_EmberChest> CurrentDetectedChest;
+
+
 	// ========================================
 	// 빈사 상태 변수들
 	// ========================================

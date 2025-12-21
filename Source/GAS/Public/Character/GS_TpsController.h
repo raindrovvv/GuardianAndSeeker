@@ -186,6 +186,9 @@ public:
 	UFUNCTION(Server, Reliable, Category = "Interaction")
 	void Server_CompleteInteraction(AActor* Target);
 
+	/** 상호작용 가능 대상 감지 (오버랩 기반) */
+	void UpdateNearbyInteractable();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
@@ -298,8 +301,6 @@ private:
 	/** 근처 상호작용 가능 액터 캐싱 (매 Tick 검색 방지) */
 	TWeakObjectPtr<AActor> CachedInteractable;
 
-	/** 상호작용 가능 대상 감지 (오버랩 기반) */
-	void UpdateNearbyInteractable();
 
 	/** 상호작용 시작 */
 	void StartInteraction(AActor* Target);
