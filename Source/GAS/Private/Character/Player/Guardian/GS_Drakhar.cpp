@@ -142,6 +142,9 @@ AGS_Drakhar::AGS_Drakhar()
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Drakhar");
 	FlyingStaminaCoolTime = MaxFlyingStaminaCoolTime;
+
+	ComboAttackCount = 0;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 }
 
 void AGS_Drakhar::BeginPlay()
@@ -171,6 +174,11 @@ void AGS_Drakhar::Tick(float DeltaTime)
 			SpringArmComp->TargetArmLength = FMath::FInterpTo(SpringArmComp->TargetArmLength, TargetSpringArmLength, DeltaTime, 5.0f);
 		}
 	}
+	else
+	{
+		// 보간이 필요 없을 때는 Tick 비활성화 (성능 최적화)
+		SetActorTickEnabled(false);
+	}
 }
 
 void AGS_Drakhar::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -178,6 +186,7 @@ void AGS_Drakhar::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ThisClass, bCanCombo);
+	DOREPLIFETIME(ThisClass, ComboAttackCount);
 	DOREPLIFETIME(ThisClass, CurrentFeverGauge);
 	DOREPLIFETIME(ThisClass, IsFeverMode);
 	DOREPLIFETIME(ThisClass, FlyingStaminaCoolTime);
@@ -322,6 +331,16 @@ void AGS_Drakhar::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNo
 	}
 }
 
+void AGS_Drakhar::OnRep_ComboAttackCount()
+{
+	// 서버가 아닌 클라이언트(다른 플레이어)에서만 실행
+	if (!IsLocallyControlled())
+	{
+		PlayComboAttackMontage();
+		if (AudioComponent) AudioComponent->PlayComboAttackSound();
+	}
+}
+
 void AGS_Drakhar::MeleeAttackCheck()
 {
 	if (HasAuthority())
@@ -332,10 +351,10 @@ void AGS_Drakhar::MeleeAttackCheck()
 		const float MeleeAttackRange = 200.f;
 		const float MeleeAttackRadius = 200.f;
 		
-		TSet<AGS_Character*> DamagedCharacters = DetectPlayerInRange(Start, MeleeAttackRange, MeleeAttackRadius);
+		DetectPlayerInRange(CachedDamagedCharacters, Start, MeleeAttackRange, MeleeAttackRadius);
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (AGS_Character* DamagedCharacter : DamagedCharacters)
+		for (AGS_Character* DamagedCharacter : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedCharacter))
 			{
@@ -392,10 +411,10 @@ void AGS_Drakhar::ComboLastAttack()
 		const float Radius = 300.f;
 		const float PlusDamage = 20.f;
 
-		TSet<AGS_Character*> DamagedPlayers = DetectPlayerInRange(Start, 200.f, Radius);
+		DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, Radius);
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (AGS_Character* DamagedPlayer : DamagedPlayers)
+		for (AGS_Character* DamagedPlayer : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedPlayer))
 			{
@@ -445,16 +464,19 @@ void AGS_Drakhar::ServerRPCResetValue_Implementation()
 void AGS_Drakhar::ServerRPCNewComboAttack_Implementation()
 {
 	bCanCombo = false;
-	MulticastRPCComboAttack();
+	
+	// Increment counter to trigger OnRep on other clients
+	ComboAttackCount++;
+	
+	// Server also needs to play montage to trigger damage check notifies
+	PlayComboAttackMontage();
+	
 	if (AudioComponent) AudioComponent->PlayComboAttackSound();
 }
 
 void AGS_Drakhar::MulticastRPCComboAttack_Implementation()
 {
-	if (!IsLocallyControlled())
-	{
-		PlayComboAttackMontage();
-	}
+	// Deprecated: Using OnRep_ComboAttackCount instead
 }
 
 void AGS_Drakhar::ServerRPCDoDash_Implementation(float DeltaTime)
@@ -564,7 +586,9 @@ void AGS_Drakhar::DashAttackCheck()
 	if (HasAuthority())
 	{
 		const FVector Start = GetActorLocation();
-		DamagedCharactersFromDash.Append(DetectPlayerInRange(Start, 10.f, 100.f));
+		TSet<AGS_Character*> DetectedThisFrame;
+		DetectPlayerInRange(DetectedThisFrame, Start, 10.f, 100.f);
+		DamagedCharactersFromDash.Append(DetectedThisFrame);
 	}
 }
 
@@ -574,7 +598,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 	if (AudioComponent) AudioComponent->PlayEarthquakeSkillSound();
 
 	const FVector Start = GetActorLocation() + 100.f;
-	TSet<AGS_Character*> EarthquakeDamagedCharacters = DetectPlayerInRange(Start, 200.f, EarthquakeRadius);
+	DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, EarthquakeRadius);
 
 	//Spawn Skill Effect
 	FVector SpawnLocation = Start + GetActorForwardVector() * 300.f;
@@ -582,7 +606,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 	GC_Earthquake->SetOwner(this);
 	GC_Earthquake->MulticastTriggerDestruction(SpawnLocation, EarthquakeRadius, 3000.f);
 	
-	for (const auto& DamagedCharacter : EarthquakeDamagedCharacters)
+	for (const auto& DamagedCharacter : CachedDamagedCharacters)
 	{
 		float SkillCoefficient = GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::Aiming)->Damage;
 		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, SkillCoefficient);
@@ -675,6 +699,7 @@ void AGS_Drakhar::StartCtrl()
 		
 		TargetSpringArmLength = 800.f;
 		bIsFlying = true;
+		SetActorTickEnabled(true);
 	}
 }
 
@@ -689,6 +714,7 @@ void AGS_Drakhar::StopCtrl()
 		TargetSpringArmLength = 500.f;
 		bIsFlying = true;
 		bCanCombo = true;
+		SetActorTickEnabled(true);
 	}
 }
 
@@ -918,23 +944,25 @@ void AGS_Drakhar::FeverComoLastAttack()
 		const FVector LeftPillarLocation = CenterPillarLocation - (RightVector * PillarSideSpacing);
 		const FVector RightPillarLocation = CenterPillarLocation + (RightVector * PillarSideSpacing);
 
-		TArray<FVector> PillarLocations;
-		PillarLocations.Add(LeftPillarLocation);
-		PillarLocations.Add(CenterPillarLocation);
-		PillarLocations.Add(RightPillarLocation);
+		CachedPillarLocations.Reset();
+		CachedPillarLocations.Add(LeftPillarLocation);
+		CachedPillarLocations.Add(CenterPillarLocation);
+		CachedPillarLocations.Add(RightPillarLocation);
 
-		TSet<AGS_Character*> DamagedSeekers;
+		CachedDamagedCharacters.Reset();
 		FCollisionQueryParams Params(NAME_None, false, this);
 
 		TArray<FHitResult> OutHitResults;
 
-		for (const FVector& PillarLocation : PillarLocations)
+		for (const FVector& PillarLocation : CachedPillarLocations)
 		{
-			DamagedSeekers.Append(DetectPlayerInRange(PillarLocation, 0.f, PillarRadius));
+			TSet<AGS_Character*> DamagedThisPillar;
+			DetectPlayerInRange(DamagedThisPillar, PillarLocation, 0.f, PillarRadius);
+			CachedDamagedCharacters.Append(DamagedThisPillar);
 		}
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (const auto& DamagedSeeker : DamagedSeekers)
+		for (const auto& DamagedSeeker : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedSeeker))
 			{
@@ -1423,7 +1451,24 @@ void AGS_Drakhar::MulticastStopDustCloudVFX_Implementation()
 
 void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal, float Scale)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+	if (ShouldPlayVFXAtLocation(HitLocation))
+	{
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+	}
+}
+
+bool AGS_Drakhar::ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance) const
+{
+	if (IsNetMode(NM_DedicatedServer)) return false;
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC && PC->PlayerCameraManager)
+	{
+		FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+		return FVector::DistSquared(Location, CameraLocation) <= FMath::Square(MaxDistance);
+	}
+
+	return true;
 }
 
 // === 월드 컨텍스트 검증 함수 ===

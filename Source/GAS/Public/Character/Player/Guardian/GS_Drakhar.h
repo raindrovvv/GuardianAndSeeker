@@ -41,6 +41,13 @@ public:
 	//[combo attack variables]
 	UPROPERTY(Replicated)
 	bool bCanCombo;
+
+	// Optimization: Replicated counter for combo attack (OnRep pattern)
+	UPROPERTY(ReplicatedUsing = OnRep_ComboAttackCount)
+	uint8 ComboAttackCount;
+
+	UFUNCTION()
+	void OnRep_ComboAttackCount();
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool IsAttacking;
 	
@@ -144,6 +151,10 @@ public:
 	void SetFeverGauge(float InValue);
 	void ResetIsAttackingDuringFeverMode();
 	void StartIsAttackingTimer();
+	
+	// Optimization: Pre-allocated collections to reduce GC pressure
+	TSet<AGS_Character*> CachedDamagedCharacters;
+	TArray<FVector> CachedPillarLocations;
 	
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCFeverMontagePlay();
@@ -496,4 +507,7 @@ private:
 
 	// 다음 카메라 효과 단계로 전환
 	void TransitionToNextCameraPhase();
+
+	// Optimization: Check for VFX culling
+	bool ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance = 5000.0f) const;
 };
