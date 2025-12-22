@@ -166,7 +166,16 @@ void UGS_AresMovingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
 
-	// 카메라 원복 (Idle 상태가 아닐 때만)
+	// 서버에서 인터럽트 발생 시 클라이언트들에게 카메라 복원 알림
+	if (OwnerCharacter && OwnerCharacter->HasAuthority())
+	{
+		if (AGS_Ares* Ares = Cast<AGS_Ares>(OwnerCharacter))
+		{
+			Ares->Multicast_RestoreDashCameraZoom();
+		}
+	}
+
+	// 로컬 플레이어 직접 복원 (서버-클라이언트 지연 감소 및 단일 플레이어 대응)
 	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && CurrentZoomState != EZoomState::Idle)
 	{
 		RestoreCameraZoom(true); // 강제 복원
@@ -391,12 +400,12 @@ void UGS_AresMovingSkill::DeactiveSkill()
 		ResetCameraMotionBlur();
 	}
 
-	// 카메라 연출 상태 초기화 (끝나지 않았을 경우를 대비)
-	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
+	// 카메라 연출 상태 초기화 및 모든 클라이언트 복원
+	if (OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
-		if (CurrentZoomState != EZoomState::Idle)
+		if (AGS_Ares* Ares = Cast<AGS_Ares>(OwnerCharacter))
 		{
-			RestoreCameraZoom(true); // 강제로 제자리로
+			Ares->Multicast_RestoreDashCameraZoom();
 		}
 	}
 

@@ -34,4 +34,7 @@ private:
 	/** 캐싱된 Merci 소유자 */
 	UPROPERTY()
 	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
+
+	/** 5초 후 자동 해제를 위한 타이머 */
+	FTimerHandle AimTimeoutTimerHandle;
 };

@@ -27,22 +27,35 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 	AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter);
 	if (OwnerCharacter)
 	{
+		// 메르시 궁극기 상태인지 확인
+		bool bIsMerciUltimate = false;
+		if (OwnerSeeker && OwnerSeeker->IsMerci())
+		{
+			if (OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+			{
+				bIsMerciUltimate = true;
+			}
+		}
+
 		if (ReactType == EHitReactType::Interrupt)
 		{			
 			if (OwnerSeeker)
 			{
-				OwnerSeeker->GetSkillComp()->SkillsInterrupt();
-
-				UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance());
-
-				OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-				
-				UAnimMontage* AM_HitReact = AM_HitReacts[static_cast<int>(ReactType)];
-				if (AM_HitReact)
+				// 메르시 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
+				if (!bIsMerciUltimate)
 				{
-					OwnerCharacter->Multicast_PlaySkillMontage(AM_HitReact, Section);
-					HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::OnEndDelegate);
-					SeekerAnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, AM_HitReact);
+					OwnerSeeker->GetSkillComp()->SkillsInterrupt();
+
+					UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance());
+					OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+					
+					UAnimMontage* AM_HitReact = AM_HitReacts[static_cast<int>(ReactType)];
+					if (AM_HitReact)
+					{
+						OwnerCharacter->Multicast_PlaySkillMontage(AM_HitReact, Section);
+						HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::OnEndDelegate);
+						SeekerAnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, AM_HitReact);
+					}
 				}
 			}
 			
@@ -50,7 +63,7 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		}
 		else if (ReactType == EHitReactType::Additive)
 		{
-			if (OwnerSeeker) // 추후 수정. // SJE
+			if (OwnerSeeker && !bIsMerciUltimate)
 			{
 				OwnerSeeker->StateReset();
 			}
@@ -64,7 +77,8 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		}
 
 
-		if (OwnerSeeker)
+		// 메르시 궁극기 중에는 활 조준 상태를 유지함
+		if (OwnerSeeker && !bIsMerciUltimate)
 		{
 			OwnerSeeker->SetAimState(false);
 			OwnerSeeker->SetDrawState(false);

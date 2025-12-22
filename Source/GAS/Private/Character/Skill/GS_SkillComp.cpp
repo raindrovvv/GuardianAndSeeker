@@ -166,6 +166,9 @@ void UGS_SkillComp::InitSkills()
 		SetSkill(ESkillSlot::Rolling, SkillSet->RollingSkill);
 		SetSkill(ESkillSlot::Combo, SkillSet->ComboSkill);
 		SetSkill(ESkillSlot::HealPotion, SkillSet->HealPotionSkill);
+		
+		// 스킬 초기화 후 마스크 리셋 (초기 상태에서 스킬 사용 가능하도록)
+		ResetAllowedSkillsMask();
 	}
 }
 

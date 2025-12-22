@@ -75,15 +75,15 @@ void AGS_Ares::ServerAttackMontage()
 	Super::ServerAttackMontage();
 }
 
-void AGS_Ares::MulticastPlayComboSection()
+void AGS_Ares::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 {	
-	Super::MulticastPlayComboSection();
+	Super::MulticastPlayComboSection_Implementation(ComboIndex);
 
-	// SeekerAudioComponent를 통해 아레스 전용 콤보 공격 사운드 재생
+	// SeekerAudioComponent를 통해 아레스 전용 콤보 공격 사운드 재생 (1-based 인덱스 전달)
 	if (SeekerAudioComponent)
 	{
 		// GS_SeekerAudioComponent의 AresComboXXX 프로퍼티들을 사용하여 사운드 재생
-		SeekerAudioComponent->PlayAresComboAttackSoundWithExtra(CurrentComboIndex);
+		SeekerAudioComponent->PlayAresComboAttackSoundWithExtra(ComboIndex + 1);
 	}
 }
 

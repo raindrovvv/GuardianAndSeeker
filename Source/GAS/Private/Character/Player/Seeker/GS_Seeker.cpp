@@ -245,17 +245,19 @@ void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	DOREPLIFETIME(AGS_Seeker, bIsLowHealthEffectActive);
-	DOREPLIFETIME(AGS_Seeker, CurrentEffectStrength);
+	// 소유 클라이언트는 어차피 로컬에서 효과를 계산하므로 복제 제외 가능
+	DOREPLIFETIME_CONDITION(AGS_Seeker, bIsLowHealthEffectActive, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AGS_Seeker, CurrentEffectStrength, COND_SkipOwner);
+	
 	DOREPLIFETIME(AGS_Seeker, LastSeekerGait);
 	DOREPLIFETIME(AGS_Seeker, SeekerGait);
 	DOREPLIFETIME(AGS_Seeker, CanChangeSeekerGait);
 	DOREPLIFETIME(AGS_Seeker, CanAcceptComboInput);
 	DOREPLIFETIME(AGS_Seeker, CurrentComboIndex);
-	//DOREPLIFETIME(AGS_Seeker, bComboEnded);
 	DOREPLIFETIME(AGS_Seeker, SeekerState);
+
 	DOREPLIFETIME(AGS_Seeker, bIsDetectedByGuardian);
-	DOREPLIFETIME(AGS_Seeker, DetectionIntensity);
+	DOREPLIFETIME_CONDITION(AGS_Seeker, DetectionIntensity, COND_SkipOwner);
 	
 	// 빈사 상태 변수들
 	DOREPLIFETIME(AGS_Seeker, bIsInDyingState);
@@ -444,11 +446,14 @@ EGait AGS_Seeker::GetLastSeekerGait()
 
 void AGS_Seeker::StateReset()
 {
+	this->SetAimState(false);
+	this->SetDrawState(false);
+	
 	if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
 		if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 		{
-			Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			this->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 		}
 	}
 
@@ -460,14 +465,17 @@ void AGS_Seeker::StateReset()
 		}
 	}
 	
-	CanChangeSeekerGait = true;
-	CanAcceptComboInput = true;
-	SetMoveControlValue(true, true);
-	SetLookControlValue(true, true);
+	this->CanChangeSeekerGait = true;
+	this->CanAcceptComboInput = true;
+	this->SetMoveControlValue(true, true);
+	this->SetLookControlValue(true, true);
 
-	Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+	this->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 
-	GetSkillComp()->ResetAllowedSkillsMask();
+	if (this->GetSkillComp())
+	{
+		this->GetSkillComp()->ResetAllowedSkillsMask();
+	}
 }
 
 const FName AGS_Seeker::HPRatioParamName = TEXT("HPRatio");
@@ -606,23 +614,24 @@ void AGS_Seeker::UpdatePostProcessEffect(float EffectStrength)
 void AGS_Seeker::ServerAttackMontage_Implementation()
 {
 	Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-	MulticastPlayComboSection();
+	MulticastPlayComboSection(CurrentComboIndex);
 }
 
-void AGS_Seeker::MulticastPlayComboSection_Implementation()
+void AGS_Seeker::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 {
-	FName SectionName = FName(*FString::Printf(TEXT("Attack%d"), CurrentComboIndex + 1));
+	FName SectionName = FName(*FString::Printf(TEXT("Attack%d"), ComboIndex + 1));
 
 	if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
+		AnimInstance->Montage_Play(ComboAnimMontage);
+		AnimInstance->Montage_JumpToSection(SectionName, ComboAnimMontage);
+
 		if (HasAuthority())
 		{
 			CurrentComboIndex++;
 			CanAcceptComboInput = false;
 			bNextCombo = false;
 		}
-		AnimInstance->Montage_Play(ComboAnimMontage);
-		AnimInstance->Montage_JumpToSection(SectionName, ComboAnimMontage);
 	}
 }
 
@@ -749,7 +758,6 @@ void AGS_Seeker::PossessedBy(AController* NewController)
 
 	// 상태 초기화
 	StateReset();
-	UE_LOG(LogTemp,Warning,TEXT("[상태 초기화] Seeker PossessedBy 호출 후 상태 초기화 완료."));
 }
 
 void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
@@ -759,14 +767,25 @@ void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
 		return;
 	}
 
-	// 무효한 몬스터 제거
-	NearbyMonsters.RemoveAll([](AGS_Monster* M) { return !IsValid(M); });
-
-	if (!NearbyMonsters.Contains(Monster))
+	// TWeakObjectPtr 배열이므로 수동으로 중복 확인
+	bool bAlreadyContains = false;
+	for (const TWeakObjectPtr<AGS_Monster>& Ptr : NearbyMonsters)
 	{
-		NearbyMonsters.Add(Monster);
+		if (Ptr.Get() == Monster)
+		{
+			bAlreadyContains = true;
+			break;
+		}
+	}
 
-		// 첫 번째 몬스터가 추가되면 음악 시작
+	if (!bAlreadyContains)
+	{
+		NearbyMonsters.Add(TWeakObjectPtr<AGS_Monster>(Monster));
+		
+		// 몬스터 사망 시 호출될 델리게이트 바인딩
+		Monster->OnMonsterDead.AddUniqueDynamic(this, &AGS_Seeker::HandleMonsterDeath);
+
+		// 첫 번째 몬스터가 추가되면 음악 시작 (서버에서 클라이언트로 명령)
 		if (NearbyMonsters.Num() == 1)
 		{
 			StartCombatMusic();
@@ -776,19 +795,23 @@ void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
 
 void AGS_Seeker::RemoveCombatMonster(AGS_Monster* Monster)
 {
-	if (Monster)
-	{
-		NearbyMonsters.Remove(Monster);
-	}
+	if (!Monster) return;
 
-	// 무효한 몬스터 제거
-	NearbyMonsters.RemoveAll([](AGS_Monster* M) { return !IsValid(M); });
+	NearbyMonsters.RemoveAll([Monster](const TWeakObjectPtr<AGS_Monster>& Ptr) {
+		return Ptr.Get() == Monster;
+	});
+	Monster->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
 
 	// 모든 몬스터가 제거되면 음악 중지
 	if (NearbyMonsters.Num() == 0)
 	{
 		ClientRPCStopCombatMusic();
 	}
+}
+
+void AGS_Seeker::HandleMonsterDeath(AGS_Monster* DeadMonster)
+{
+	RemoveCombatMonster(DeadMonster);
 }
 
 void AGS_Seeker::StartCombatMusic()
@@ -799,8 +822,8 @@ void AGS_Seeker::StartCombatMusic()
 		return;
 	}
 
-	// 무효한 몬스터 제거 후 배열 체크
-	NearbyMonsters.RemoveAll([](AGS_Monster* M) { return !IsValid(M); });
+	// 무효한 몬스터 제거 (TWeakObjectPtr이므로 유효성 체크만 수행)
+	NearbyMonsters.RemoveAll([](const TWeakObjectPtr<AGS_Monster>& M) { return !M.IsValid(); });
 
 	if (NearbyMonsters.Num() == 0)
 	{
@@ -816,8 +839,9 @@ void AGS_Seeker::StartCombatMusic()
             UAkAudioEvent* CombatStopEvent = nullptr;
 
             // 유효한 이벤트를 가진 몬스터를 우선 탐색
-            for (AGS_Monster* Monster : NearbyMonsters)
+            for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
             {
+                AGS_Monster* Monster = MonsterPtr.Get();
                 if (!IsValid(Monster))
                 {
                     continue;
@@ -863,9 +887,9 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 			{
 				CombatStopEventToUse = AudioManager->GetCurrentCombatMusicStopEvent();
 			}
-			else if (!NearbyMonsters.IsEmpty() && NearbyMonsters.Last()->CombatMusicStopEvent) // 몬스터 배열에서 가져오기
+			else if (!NearbyMonsters.IsEmpty() && NearbyMonsters.Last().IsValid() && NearbyMonsters.Last().Get()->CombatMusicStopEvent) // 몬스터 배열에서 가져오기
 			{
-				CombatStopEventToUse = NearbyMonsters.Last()->CombatMusicStopEvent;
+				CombatStopEventToUse = NearbyMonsters.Last().Get()->CombatMusicStopEvent;
 			}
 
 			// EndCombatSequence 호출 시 CombatStopEvent도 전달
@@ -882,20 +906,6 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 	}
 }
 
-void AGS_Seeker::UpdateCombatMusicState()
-{
-	// 유효하지 않은 몬스터들 제거
-	NearbyMonsters.RemoveAll([](AGS_Monster* Monster)
-	{
-		return !IsValid(Monster);
-	});
-	
-	// 몬스터가 없으면 음악 중지
-	if (NearbyMonsters.Num() == 0)
-	{
-		ClientRPCStopCombatMusic();
-	}
-}
 
 void AGS_Seeker::OnDeath()
 {
@@ -916,6 +926,14 @@ void AGS_Seeker::OnDeath()
 	Super::OnDeath();
 
 	ClientRPCStopCombatMusic();
+	
+	for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
+	{
+		if (NearbyMonsters[i].IsValid())
+		{
+			NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
+		}
+	}
 	NearbyMonsters.Empty();
 }
 
@@ -936,6 +954,14 @@ void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, b
 	if (!bIsNowAlive) // 자신이 죽었을 때
 	{
 		ClientRPCStopCombatMusic();
+		
+		for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
+		{
+			if (NearbyMonsters[i].IsValid())
+			{
+				NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
+			}
+		}
 		NearbyMonsters.Empty();
 	}
 }
@@ -954,13 +980,7 @@ void AGS_Seeker::TransWeaponHandingState(EWeaponHandlingState RequiredCurState, 
 
 void AGS_Seeker::Server_RestKey_Implementation()
 {
-	SetAimState(false);
-	SetDrawState(false);
-	CanAcceptComboInput = true;
-	CanChangeSeekerGait = true;
-	Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-	SetMoveControlValue(true, true);
-	SetLookControlValue(true, true);
+	this->StateReset();
 }
 
 void AGS_Seeker::Multicast_PlaySound_Implementation(UAkAudioEvent* SoundToPlay)

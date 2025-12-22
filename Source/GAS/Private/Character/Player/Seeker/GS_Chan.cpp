@@ -131,16 +131,14 @@ void AGS_Chan::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	Super::OnComboAttack();	
 }*/
 
-void AGS_Chan::MulticastPlayComboSection()
+void AGS_Chan::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 {
-	Super::MulticastPlayComboSection();
+	Super::MulticastPlayComboSection_Implementation(ComboIndex);
 
-	// 방패 콜리전은 GS_AN_ShieldAttack AnimNotify에서 처리
-
-	// 오디오 컴포넌트를 통해 찬 전용 콤보 공격 사운드 재생
+	// 오디오 컴포넌트를 통해 찬 전용 콤보 공격 사운드 재생 (1-based 인덱스 전달)
 	if (SeekerAudioComponent)
 	{
-		SeekerAudioComponent->PlayChanComboAttackSound(CurrentComboIndex);
+		SeekerAudioComponent->PlayChanComboAttackSound(ComboIndex + 1);
 	}
 }
 

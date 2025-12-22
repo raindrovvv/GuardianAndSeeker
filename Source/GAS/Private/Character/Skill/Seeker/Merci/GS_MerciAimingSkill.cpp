@@ -60,6 +60,18 @@ void UGS_MerciAimingSkill::ActiveSkill()
 
 		// 활 당기기
 		CachedMerciOwner->DrawBow(SkillAnimMontages[0]);
+
+		// 5초 후 자동 조준 해제 타이머 시작 (서버에서 실행)
+		if (OwnerCharacter->HasAuthority())
+		{
+			OwnerCharacter->GetWorldTimerManager().SetTimer(
+				AimTimeoutTimerHandle,
+				this,
+				&UGS_MerciAimingSkill::DeactiveSkill,
+				5.0f,
+				false
+			);
+		}
 	}
 }
 
@@ -85,6 +97,12 @@ void UGS_MerciAimingSkill::OnSkillCommand()
 		}
 	}
 
+	// 타이머 정리
+	if (OwnerCharacter)
+	{
+		OwnerCharacter->GetWorldTimerManager().ClearTimer(AimTimeoutTimerHandle);
+	}
+
 	// 스킬 종료
 	DeactiveSkill();
 }
@@ -97,12 +115,12 @@ void UGS_MerciAimingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
 
-	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
+	if (CachedMerciOwner.IsValid())
 	{
-		if (CachedMerciOwner.IsValid())
-		{
-			CachedMerciOwner->Client_StopZoom(0.0f);
-		}
+		CachedMerciOwner->Client_StopZoom(0.0f);
+		
+		// 타이머 해제 추가 (인터럽트 시에도 정리)
+		CachedMerciOwner->GetWorldTimerManager().ClearTimer(AimTimeoutTimerHandle);
 	}
 
 	SetIsActive(false);
@@ -110,12 +128,9 @@ void UGS_MerciAimingSkill::InterruptSkill()
 
 void UGS_MerciAimingSkill::DeactiveSkill()
 {
-	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
+	if (CachedMerciOwner.IsValid())
 	{
-		if (CachedMerciOwner.IsValid())
-		{
-			CachedMerciOwner->Client_StopZoom(0.0f);
-		}
+		CachedMerciOwner->Client_StopZoom(0.0f);
 	}
 
 	// 스킬 종료 사운드 재생 (멀티캐스트)
@@ -128,6 +143,12 @@ void UGS_MerciAimingSkill::DeactiveSkill()
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
 		}
+	}
+
+	// 타이머 정리
+	if (OwnerCharacter)
+	{
+		OwnerCharacter->GetWorldTimerManager().ClearTimer(AimTimeoutTimerHandle);
 	}
 
 	Super::DeactiveSkill();

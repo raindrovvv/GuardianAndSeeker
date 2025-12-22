@@ -69,6 +69,7 @@ class GAS_API AGS_Seeker : public AGS_Player, public IGS_ManualDataInterface
 
 public:
 	AGS_Seeker();
+
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -123,7 +124,7 @@ public:
 	virtual void ServerAttackMontage();
 
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MulticastPlayComboSection();
+	virtual void MulticastPlayComboSection(int32 ComboIndex);
 
 	UFUNCTION()
 	void ComboInputOpen();
@@ -401,7 +402,10 @@ private:
 	FSeekerState SeekerState;
 
 	UPROPERTY()
-	TArray<AGS_Monster*> NearbyMonsters;
+	TArray<TWeakObjectPtr<AGS_Monster>> NearbyMonsters;
+
+	UFUNCTION()
+	void HandleMonsterDeath(AGS_Monster* DeadMonster);
 
 	UPROPERTY()
 	FTimerHandle LowHealthEffectTimer;

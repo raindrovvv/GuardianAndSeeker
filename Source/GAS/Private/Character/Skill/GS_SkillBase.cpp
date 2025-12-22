@@ -63,6 +63,13 @@ void UGS_SkillBase::DeactiveSkill()
 	UE_LOG(LogTemp, Warning, TEXT("DeactiveSkill!!!!!!!!!!!!!!"));
 	StopCastVFX();
 	SetIsActive(false);
+
+	// 스킬 비활성화 시에도 스킬 마스크 리셋 (OnSkillAnimationEnd가 호출되지 않는 경우 대비)
+	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
+	if(OwnerPlayer && OwnerPlayer->GetSkillComp())
+	{
+		OwnerPlayer->GetSkillComp()->ResetAllowedSkillsMask();
+	}
 }
 
 void UGS_SkillBase::OnSkillCommand()
