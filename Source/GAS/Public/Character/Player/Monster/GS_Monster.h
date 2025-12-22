@@ -130,6 +130,9 @@ protected:
 private:
 	bool bIsSelected;
 
+	/** Cache for TargetedUI visibility to avoid redundant updates */
+	bool bIsTargetUIActive;
+
 	/** Tracks previous HP for damage detection (not healing) */
 	float LastKnownHP;
 
