@@ -36,4 +36,8 @@ private:
 	// 피버 모드 인디케이터 반경 배율
 	UPROPERTY(EditDefaultsOnly, Category = "Skill|Indicator|Fever", meta = (ClampMin = "1.0", ClampMax = "3.0"))
 	float FeverIndicatorRadiusMultiplier = 1.5f;
+
+	/** 캐싱된 Drakhar 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Drakhar> CachedDrakharOwner;
 };

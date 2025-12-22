@@ -19,6 +19,8 @@ void UGS_DrakharEarthquake::ActiveSkill()
 	{
 		return;
 	}
+
+	CachedDrakharOwner = Cast<AGS_Drakhar>(OwnerCharacter);
 	
 	ExecuteSkillEffect();
 }
@@ -33,10 +35,9 @@ void UGS_DrakharEarthquake::ExecuteSkillEffect()
 	}
 
 	//server logic
-	AGS_Guardian* Guardian =Cast<AGS_Guardian>(OwnerCharacter);
-	if (Guardian)
+	if (CachedDrakharOwner.IsValid())
 	{
-		Guardian->GuardianDoSkillState = EGuardianDoSkill::Aiming;
+		CachedDrakharOwner->GuardianDoSkillState = EGuardianDoSkill::Aiming;
 	}
 	
 	StartCoolDown();

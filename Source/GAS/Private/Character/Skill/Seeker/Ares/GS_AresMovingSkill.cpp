@@ -34,15 +34,17 @@ void UGS_AresMovingSkill::ActiveSkill()
 {
 	Super::ActiveSkill();
 
-	if (AGS_Ares* OwnerPlayer = Cast<AGS_Ares>(OwnerCharacter))
+	CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
+
+	if (CachedAresOwner.IsValid())
 	{
 		// 스킬 애니메이션 재생
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 
 		// 스킬 시작 사운드 재생 (멀티캐스트)
-		if (OwnerPlayer->HasAuthority())
+		if (CachedAresOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedAresOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
@@ -50,7 +52,7 @@ void UGS_AresMovingSkill::ActiveSkill()
 
 		// 차징 루프 사운드는 SeekerAudioComponent를 통해 처리됨
 
-		OwnerPlayer->SetMoveControlValue(false, false);
+		CachedAresOwner->SetMoveControlValue(false, false);
 	}
 
 	// 기본 충돌 설정 저장
@@ -83,6 +85,12 @@ void UGS_AresMovingSkill::HandleSkillActivated(ESkillSlot ActivatedSkillSlot)
 		// 카메라 줌아웃 시작 (클라이언트에서만)
 		if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
 		{
+			// 클라이언트에서도 소유자 캐싱 보장
+			if (!CachedAresOwner.IsValid())
+			{
+				CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
+			}
+			
 			StartCameraZoomOut();
 		}
 	}
@@ -104,17 +112,17 @@ void UGS_AresMovingSkill::OnSkillCommand()
 		return;
 	}
 
-	if (AGS_Ares* OwnerPlayer = Cast<AGS_Ares>(OwnerCharacter))
+	if (CachedAresOwner.IsValid())
 	{
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
 	}
 
 	Super::OnSkillCommand();
 
 	// Actor의 Multicast RPC를 통해 카메라 원복 (모든 클라이언트에게 전달됨)
-	if (AGS_Ares* AresOwner = Cast<AGS_Ares>(OwnerCharacter))
+	if (CachedAresOwner.IsValid())
 	{
-		AresOwner->Multicast_RestoreDashCameraZoom();
+		CachedAresOwner->Multicast_RestoreDashCameraZoom();
 	}
 
 	// 사운드 처리 (멀티캐스트)
@@ -371,7 +379,7 @@ void UGS_AresMovingSkill::DeactiveSkill()
 	}
 
 	// 대시 모션블러 타이머 정리 및 모션블러 비활성화
-	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled() && bDashMotionBlurActive)
+	if (CachedAresOwner.IsValid() && CachedAresOwner->IsLocallyControlled() && bDashMotionBlurActive)
 	{
 		if (OwnerCharacter->GetWorld())
 		{
@@ -383,11 +391,22 @@ void UGS_AresMovingSkill::DeactiveSkill()
 		ResetCameraMotionBlur();
 	}
 
+	// 카메라 연출 상태 초기화 (끝나지 않았을 경우를 대비)
+	if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
+	{
+		if (CurrentZoomState != EZoomState::Idle)
+		{
+			RestoreCameraZoom(true); // 강제로 제자리로
+		}
+	}
+
 	// 입력 제한 설정
 	/*AGS_TpsController* Controller = Cast<AGS_TpsController>(OwnerCharacter->GetController());
 	Controller->SetMoveControlValue(true, true);*/
-	AGS_Ares* AresCharacter = Cast<AGS_Ares>(OwnerCharacter);
-	AresCharacter->SetMoveControlValue(true, true);
+	if (CachedAresOwner.IsValid())
+	{
+		CachedAresOwner->SetMoveControlValue(true, true);
+	}
 	//OwnerCharacter->SetSkillInputControl(true, true, true);
 
 	// 원래대로 Block으로 되돌리기
@@ -416,23 +435,28 @@ void UGS_AresMovingSkill::StartCameraZoomOut()
 		return;
 	}
 
-	// 이미 줌 진행 중이면 중복 호출 방지
-	if (CurrentZoomState != EZoomState::Idle)
+	// 이미 줌아웃 진행 중이면 중복 호출 방지 (줌인 중이면 줌아웃으로 전환 가능)
+	if (CurrentZoomState == EZoomState::ZoomingOut || CurrentZoomState == EZoomState::ZoomedOut)
 	{
 		return;
 	}
 
-	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if (!OwnerPlayer || !OwnerPlayer->SpringArmComp)
+	if (!CachedAresOwner.IsValid())
 	{
-		return;
+		CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 	}
 
-	CacheCameraMotionBlurDefaults(OwnerPlayer);
-	ResetCameraMotionBlur();
+	if (CachedAresOwner.IsValid())
+	{
+		CacheCameraMotionBlurDefaults(CachedAresOwner.Get());
+		ResetCameraMotionBlur();
 
-	// 원래 거리 저장
-	OriginalArmLength = OwnerPlayer->SpringArmComp->TargetArmLength;
+		// 원래 거리 저장 (Idle 상태일 때만 저장하여 정확한 원본 값 유지)
+		if (CurrentZoomState == EZoomState::Idle)
+		{
+			OriginalArmLength = CachedAresOwner->SpringArmComp->TargetArmLength;
+		}
+	}
 
 	// 커브 시간 계산
 	CameraZoomDuration = GetCameraZoomDuration();
@@ -473,13 +497,15 @@ void UGS_AresMovingSkill::RestoreCameraZoom(bool bForceRestore)
 		return;
 	}
 
-	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if (!OwnerPlayer || !OwnerPlayer->SpringArmComp)
+	if (!CachedAresOwner.IsValid())
 	{
-		return;
+		CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 	}
 
-	CacheCameraMotionBlurDefaults(OwnerPlayer);
+	if (CachedAresOwner.IsValid())
+	{
+		CacheCameraMotionBlurDefaults(CachedAresOwner.Get());
+	}
 
 	// 커브 시간 계산
 	CameraZoomDuration = GetCameraZoomDuration();
@@ -530,36 +556,39 @@ void UGS_AresMovingSkill::UpdateCameraZoom()
 		return;
 	}
 
-	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if (!OwnerPlayer || !OwnerPlayer->SpringArmComp)
+	// 클라이언트에서 소유자 캐싱 보장
+	if (!CachedAresOwner.IsValid())
 	{
-		return;
+		CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 	}
 
-	// 시간 경과 (타이머 간격 0.016초 사용)
-	float DeltaTime = 0.016f;
-	CameraZoomElapsed += DeltaTime;
-
-	float Alpha = FMath::Clamp(CameraZoomElapsed / CameraZoomDuration, 0.0f, 1.0f);
-
-	// 커브가 있으면 커브 값 사용, 없으면 선형 보간
-	if (CameraZoomCurve)
+	if (CachedAresOwner.IsValid() && CachedAresOwner->SpringArmComp)
 	{
-		Alpha = CameraZoomCurve->GetFloatValue(CameraZoomElapsed);
-	}
+		// 시간 경과 (타이머 간격 0.016초 사용)
+		float DeltaTime = 0.016f;
+		CameraZoomElapsed += DeltaTime;
 
-	float TargetArmLength = OriginalArmLength;
-	if (CurrentZoomState == EZoomState::ZoomingOut)
-	{
-		TargetArmLength = FMath::Lerp(OriginalArmLength, OriginalArmLength + ZoomOutDistance, Alpha);
-	}
-	else if (CurrentZoomState == EZoomState::ZoomingIn)
-	{
-		TargetArmLength = FMath::Lerp(OriginalArmLength + ZoomOutDistance, OriginalArmLength, Alpha);
-		UpdateCameraMotionBlur(Alpha, CameraZoomElapsed);
-	}
+		float Alpha = FMath::Clamp(CameraZoomElapsed / CameraZoomDuration, 0.0f, 1.0f);
 
-	OwnerPlayer->SpringArmComp->TargetArmLength = TargetArmLength;
+		// 커브가 있으면 커브 값 사용, 없으면 선형 보간
+		if (CameraZoomCurve)
+		{
+			Alpha = CameraZoomCurve->GetFloatValue(CameraZoomElapsed);
+		}
+
+		float TargetArmLength = OriginalArmLength;
+		if (CurrentZoomState == EZoomState::ZoomingOut)
+		{
+			TargetArmLength = FMath::Lerp(OriginalArmLength, OriginalArmLength + ZoomOutDistance, Alpha);
+		}
+		else if (CurrentZoomState == EZoomState::ZoomingIn)
+		{
+			TargetArmLength = FMath::Lerp(OriginalArmLength + ZoomOutDistance, OriginalArmLength, Alpha);
+			UpdateCameraMotionBlur(Alpha, CameraZoomElapsed);
+		}
+
+		CachedAresOwner->SpringArmComp->TargetArmLength = TargetArmLength;
+	}
 
 	// 애니메이션 완료 체크
 	if (CameraZoomElapsed >= CameraZoomDuration)
