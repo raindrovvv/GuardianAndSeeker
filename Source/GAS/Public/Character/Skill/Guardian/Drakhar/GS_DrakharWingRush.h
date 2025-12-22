@@ -14,4 +14,8 @@ public:
 	virtual void ActiveSkill() override;
 	virtual void ExecuteSkillEffect() override;
 	virtual void OnSkillAnimationEnd() override;
+
+	/** 캐싱된 Drakhar 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Drakhar> CachedDrakharOwner;
 };

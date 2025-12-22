@@ -27,16 +27,18 @@ void UGS_ChanMovingSkill::ActiveSkill()
 	// 스킬 쿨타임 측정 시작
 	StartCoolDown();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	CachedChanOwner = Cast<AGS_Chan>(OwnerCharacter);
+
+	if (CachedChanOwner.IsValid())
 	{
 		// 애니메이션 설정
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 
 		// 입력 제한 설정
-		OwnerPlayer->SetMoveControlValue(false, false);
+		CachedChanOwner->SetMoveControlValue(false, false);
 
 		// 스킬 애니메이션 재생
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 
 		// =======================
 		// VFX 재생 - 컴포넌트 RPC 사용
@@ -56,7 +58,7 @@ void UGS_ChanMovingSkill::ActiveSkill()
 		// 스킬 시작 사운드 재생 (멀티캐스트)
 		if (OwnerCharacter->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
@@ -79,13 +81,11 @@ void UGS_ChanMovingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-
-	if(OwnerPlayer)
+	if(CachedChanOwner.IsValid())
 	{
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		OwnerPlayer->SetMoveControlValue(true, true);
-		OwnerPlayer->CanChangeSeekerGait = true;
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedChanOwner->SetMoveControlValue(true, true);
+		CachedChanOwner->CanChangeSeekerGait = true;
 	}
 
 	SetIsActive(false);
@@ -106,11 +106,13 @@ void UGS_ChanMovingSkill::OnSkillAnimationEnd()
 void UGS_ChanMovingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
 
+	if (CachedChanOwner.IsValid())
+	{
+		CachedChanOwner->GetWorldTimerManager().ClearTimer(DEFBuffHandle);
+	}
+	
 	SetIsActive(false);
-
-	OwnerPlayer->GetWorldTimerManager().ClearTimer(DEFBuffHandle);
 }
 
 void UGS_ChanMovingSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
@@ -164,8 +166,11 @@ void UGS_ChanMovingSkill::AggroToOwner()
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(OwnerCharacter);
 
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	OwnerPlayer->Multicast_DrawSkillRange(Center, Radius, FColor::Red, 2.0f);
+	AGS_Chan* OwnerPlayer = CachedChanOwner.Get();
+	if (OwnerPlayer)
+	{
+		OwnerPlayer->Multicast_DrawSkillRange(Center, Radius, FColor::Red, 2.0f);
+	}
 	// 캐릭터를 중심으로 한 지점에 고정된 SphereOverlap
 	if (GetWorld()->SweepMultiByChannel(HitResults, Center, Center, FQuat::Identity, ECC_Pawn, Shape, Params))
 	{

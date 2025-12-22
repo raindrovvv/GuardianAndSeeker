@@ -720,6 +720,14 @@ void AGS_WeaponShield::OnDefenseHit(UPrimitiveComponent* OverlappedComponent, AA
 	{
 		return;
 	}
+
+	// 공격 콜리전이 실제로 활성화되어 있는지 확인 (공격 중일 때만 방어 판정)
+	ECollisionEnabled::Type CollisionType = OtherComp->GetCollisionEnabled();
+	if (CollisionType == ECollisionEnabled::NoCollision)
+	{
+		// 콜리전이 비활성화 상태면 공격 중이 아니므로 방어 판정 안함
+		return;
+	}
 	
 	// OwnerChar 유효성 확인 (레벨 전환 시 null일 수 있음.)
 	if (!IsOwnerCharValid())
@@ -729,30 +737,16 @@ void AGS_WeaponShield::OnDefenseHit(UPrimitiveComponent* OverlappedComponent, AA
 	
 	// 실제 공격자(캐릭터)를 찾기. OtherActor는 무기일 수 있음.
 	AActor* AttackerActor = FindUltimateAttacker(OtherActor);
-	
+
+	// === 중복 방지: 이미 처리된 공격자면 즉시 종료 ===
+	if (DefenseHitActors.Contains(AttackerActor))
+	{
+		return;
+	}
+
 	// 방어 효과 재생
 	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
 	PlayDefenseEffects(AttackerActor, CorrectHitResult);
-
-	// 방어 성공 시 몬스터 공격 콜리전을 비활성화하여 데미지 전달 방지
-	if (OtherComp)
-	{
-		// 일시적으로 공격 콜리전 비활성화
-		OtherComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		
-		// 0.1초 후 콜리전 재활성화 (null 참조 방지)
-		if (UWorld* World = GetWorld())
-		{
-			FTimerHandle ReEnableCollisionHandle;
-			World->GetTimerManager().SetTimer(ReEnableCollisionHandle, [OtherComp]() 
-			{
-				if (OtherComp && IsValid(OtherComp))
-				{
-					OtherComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-				}
-			}, 0.1f, false);
-		}
-	}
 }
 
 void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResult& HitResult)
@@ -800,18 +794,18 @@ void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResul
 		SeekerAudio->PlayDefenseSound();
 	}
 
-	// 0.5초 후 목록에서 제거 (너무 빈번한 재생 방지)
 	// OnDefenseEndOverlap에서도 제거하므로, 둘 중 먼저 발생하는 쪽이 처리함
 	if (UWorld* World = GetWorld())
 	{
 		FTimerHandle ClearHandle;
-		World->GetTimerManager().SetTimer(ClearHandle, [this, AttackerActor]() 
+		TWeakObjectPtr<AActor> WeakAttacker = AttackerActor;
+		World->GetTimerManager().SetTimer(ClearHandle, [this, WeakAttacker]()
 		{
-			if (IsValid(this))
+			if (IsValid(this) && WeakAttacker.IsValid())
 			{
-				DefenseHitActors.Remove(AttackerActor);
+				DefenseHitActors.Remove(WeakAttacker.Get());
 			}
-		}, 0.5f, false);
+		}, 0.55f, false);
 	}
 }
 

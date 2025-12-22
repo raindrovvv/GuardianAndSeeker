@@ -17,6 +17,7 @@ class GAS_API UGS_MerciAimingSkill : public UGS_SeekerSkillBase
 	
 public:
 	UGS_MerciAimingSkill();
+	virtual void InitializeDelegate() override;
 	virtual void ActiveSkill() override;
 	virtual void OnSkillCommand() override;
 	virtual void OnSkillAnimationEnd() override;
@@ -25,4 +26,12 @@ public:
 	TSubclassOf<AGS_SeekerMerciArrow> ArrowClass;
 private:
 	virtual void DeactiveSkill() override;
+
+	/** OnSkillActivated 델리게이트에 바인딩할 함수 */
+	UFUNCTION()
+	void HandleSkillActivated(ESkillSlot ActivatedSkillSlot);
+
+	/** 캐싱된 Merci 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
 };

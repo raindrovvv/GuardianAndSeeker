@@ -15,23 +15,23 @@ void UGS_MerciMovingSkill::ActiveSkill()
 {
 	Super::ActiveSkill();
 
-	AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-	if (MerciCharacter)
+	CachedMerciOwner = Cast<AGS_Merci>(OwnerCharacter);
+	if (CachedMerciOwner.IsValid())
 	{
 		// 스킬 시작 사운드 재생 (멀티캐스트)
-		if (MerciCharacter->HasAuthority())
+		if (CachedMerciOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = MerciCharacter->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedMerciOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
 		}
 
-		MerciCharacter->SetDrawState(false);
+		CachedMerciOwner->SetDrawState(false);
 
 		// 활 당기기
-		MerciCharacter->DrawBow(SkillAnimMontages[0]);
-		MerciCharacter->Client_StartZoom();
+		CachedMerciOwner->DrawBow(SkillAnimMontages[0]);
+		CachedMerciOwner->Client_StartZoom();
 	}
 }
 
@@ -48,18 +48,20 @@ void UGS_MerciMovingSkill::OnSkillCommand()
 	}
 
 	// 활 놓기
-	AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-	bool IsFullyDrawn = MerciCharacter->GetIsFullyDrawn();
-	
-	if (MerciCharacter->SmokeArrowClass)
+	if (CachedMerciOwner.IsValid())
 	{
-		MerciCharacter->ReleaseArrow(MerciCharacter->SmokeArrowClass);
-	}
-	
-	if (IsFullyDrawn)
-	{
-		// 쿨타임 측정 시작
-		StartCoolDown();
+		bool IsFullyDrawn = CachedMerciOwner->GetIsFullyDrawn();
+		
+		if (CachedMerciOwner->SmokeArrowClass)
+		{
+			CachedMerciOwner->ReleaseArrow(CachedMerciOwner->SmokeArrowClass);
+		}
+		
+		if (IsFullyDrawn)
+		{
+			// 쿨타임 측정 시작
+			StartCoolDown();
+		}
 	}
 
 	// 스킬 종료
@@ -70,7 +72,6 @@ void UGS_MerciMovingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
 
-	AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
 	SetIsActive(false);
 }
 

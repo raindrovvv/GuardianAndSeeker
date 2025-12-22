@@ -23,14 +23,12 @@ void UGS_DrakharDraconicFury::ActiveSkill()
 		return;
 	}
 
+	CachedDrakharOwner = Cast<AGS_Drakhar>(OwnerCharacter);
+
 	// 서버에서만 타겟 위치 생성 (투사체가 사용)
-	if (OwnerCharacter && OwnerCharacter->HasAuthority())
+	if (CachedDrakharOwner.IsValid() && CachedDrakharOwner->HasAuthority())
 	{
-		AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter);
-		if (Drakhar)
-		{
-			Drakhar->GenerateDraconicFuryTargets();
-		}
+		CachedDrakharOwner->GenerateDraconicFuryTargets();
 	}
 
 	ExecuteSkillEffect();
@@ -45,10 +43,9 @@ void UGS_DrakharDraconicFury::ExecuteSkillEffect()
 	}
 
 	// 가디언 상태를 궁극기 사용 중으로 변경
-	AGS_Guardian* Guardian = Cast<AGS_Guardian>(OwnerCharacter);
-	if (Guardian)
+	if (CachedDrakharOwner.IsValid())
 	{
-		Guardian->GuardianDoSkillState = EGuardianDoSkill::Ultimate;
+		CachedDrakharOwner->GuardianDoSkillState = EGuardianDoSkill::Ultimate;
 	}
 
 	// 쿨다운 시작

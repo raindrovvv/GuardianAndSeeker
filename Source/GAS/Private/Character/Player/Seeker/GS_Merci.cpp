@@ -81,6 +81,8 @@ void AGS_Merci::Client_UpdateTargetUI_Implementation(AActor* NewTarget, AActor* 
 void AGS_Merci::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	SetActorTickEnabled(true);
 
 	CurrentArrowType = EArrowType::Normal;
 
@@ -183,7 +185,7 @@ void AGS_Merci::ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float
 	// 줌 중지
 	if (!(this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate)))
 	{
-		Client_StopZoom(5.f);
+		Client_StopZoom(5.0f);
 	}
 	
 	// 몽타주 정지

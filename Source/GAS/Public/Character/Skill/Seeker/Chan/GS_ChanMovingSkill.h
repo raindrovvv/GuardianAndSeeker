@@ -38,4 +38,7 @@ private:
 	void DeactiveDEFBuff();
 	FGS_StatRow BuffAmount;
 
+	/** 캐싱된 Chan 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Chan> CachedChanOwner;
 };

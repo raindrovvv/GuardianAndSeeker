@@ -23,4 +23,8 @@ public:
 
 protected:
 	//bool bIsEarthquaking;
+
+	/** 캐싱된 Drakhar 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Drakhar> CachedDrakharOwner;
 };
