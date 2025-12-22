@@ -38,7 +38,7 @@ public:
 	);
 
 private:
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal);
 	
 protected:

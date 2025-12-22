@@ -36,6 +36,12 @@ void AGS_WeaponSword::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerChar = Cast<AGS_Character>(GetOwner());
+
+	// === HitBox에 방어 가능 태그 추가 ===
+	if (HitBox)
+	{
+		HitBox->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
+	}
 }
 
 void AGS_WeaponSword::EnableHit()

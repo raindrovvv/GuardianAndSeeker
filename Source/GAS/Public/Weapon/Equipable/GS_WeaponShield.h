@@ -174,25 +174,25 @@ protected:
 	void DisableAllCollisions();
 
 	// 멀티캐스트 함수들
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitSound_Validate(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitSound_Implementation(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitVFX(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitVFX_Validate(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayGuardSuccessVFX(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayGuardSuccessVFX_Validate(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayGuardSuccessVFX_Implementation(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayGuardSuccessSound(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayGuardSuccessSound_Validate(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayGuardSuccessSound_Implementation(EShieldHitTargetType TargetType, const FHitResult& SweepResult);

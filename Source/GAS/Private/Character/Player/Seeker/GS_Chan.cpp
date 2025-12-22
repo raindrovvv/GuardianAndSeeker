@@ -257,46 +257,24 @@ float AGS_Chan::TakeDamage(float DamageAmount, struct FDamageEvent const& Damage
 			SetCurrentStamina(CurrentStamina - StaminaDamage, true);
 		}
 
-		// === 방어 성공 이펙트 및 사운드 재생 ===
-		if (HasAuthority() && DamageCauser && IsValid(DamageCauser) && DamageCauser != this)
+		// === 물리 충돌이 없는 공격(거리 기반 판정 등)에 대한 방어 효과 수동 호출 ===
+		for (int32 i = 0; i < 5; ++i)
 		{
-			// DamageCauser가 적인지 확인
-			AGS_Character* AttackerChar = Cast<AGS_Character>(DamageCauser);
-			if (AttackerChar && IsEnemy(AttackerChar))
+			if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
 			{
-				// 방패를 찾아서 효과 재생 요청
-				for (int32 i = 0; i < 5; ++i)
-				{
-					if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
-					{
-						FHitResult HitResult;
-						if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
-						{
-							HitResult = ((FPointDamageEvent&)DamageEvent).HitInfo;
-						}
-						else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
-						{
-							HitResult.ImpactPoint = ((FRadialDamageEvent&)DamageEvent).Origin;
-							HitResult.ImpactNormal = (HitResult.ImpactPoint - GetActorLocation()).GetSafeNormal();
-						}
-						else
-						{
-							// 기본 설정 (방패 앞쪽 가상 위치)
-							HitResult.ImpactPoint = GetActorLocation() + GetActorForwardVector() * 50.f;
-							HitResult.ImpactNormal = (DamageCauser->GetActorLocation() - GetActorLocation()).GetSafeNormal();
-						}
+				FHitResult HitResult;
+				// 히트 정보가 있으면 사용하고, 없으면 방패 앞 임의의 지점 생성
+				HitResult.ImpactPoint = Shield->GetActorLocation() + Shield->GetActorForwardVector() * 50.0f;
+				HitResult.ImpactNormal = -Shield->GetActorForwardVector();
 
-						Shield->PlayDefenseEffects(DamageCauser, HitResult);
-						break;
-					}
-				}
+				Shield->PlayDefenseEffects(DamageCauser, HitResult);
+				break;
 			}
 		}
 	}
 	else
 	{
 		// 방어 상태가 아닐 때만 부모 클래스의 TakeDamage 호출
-		//UE_LOG(LogTemp, Warning, TEXT("Normal Damage In"));
 		ActualDamage = Super::TakeDamage(ActualDamage, DamageEvent, EventInstigator, DamageCauser);
 	}
 

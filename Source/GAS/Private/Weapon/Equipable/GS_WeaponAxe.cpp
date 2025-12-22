@@ -431,7 +431,11 @@ void AGS_WeaponAxe::BeginPlay()
 	// OwnerChar 설정
 	OwnerChar = Cast<AGS_Character>(GetOwner());
 
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// === HitBox에 방어 가능 태그 추가 ===
+	if (HitBox)
+	{
+		HitBox->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
+	}
 }
 
 // Called every frame
