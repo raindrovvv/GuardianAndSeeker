@@ -204,14 +204,41 @@ float AGS_Character::TakeDamage(float DamageAmount, FDamageEvent const& DamageEv
 	if (CanHitReact)
 	{
 		EHitReactType HitReactType = EHitReactType::DamageOnly;
+		FVector HitDirection = -GetActorForwardVector(); // 기본값
+
+		// FGS_DamageEvent 타입인 경우 (커스텀 데미지 이벤트)
 		if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
 		{
 			const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
 			HitReactType = MyDamageEvent.HitReactType;
+
+			// FGS_DamageEvent도 PointDamage나 RadialDamage를 상속받았을 수 있으므로 체크
+			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+			{
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+				HitDirection = -PointEvent->ShotDirection;
+			}
+			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+			{
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+			}
 		}
-		
-		const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
-		FVector HitDirection = -PointEvent->ShotDirection;
+		// FGS_DamageEvent가 아닌 일반 UE 데미지 이벤트인 경우 (폴백)
+		else
+		{
+			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+			{
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+				HitDirection = -PointEvent->ShotDirection;
+			}
+			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+			{
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+			}
+		}
+
 		if(UGS_HitReactComp* HitReactComponent = GetComponentByClass<UGS_HitReactComp>())
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
