@@ -9,7 +9,8 @@
 
 UGS_RTSSkillComponent::UGS_RTSSkillComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 
 	// 기본 에테르 설정
 	MaxAether = 100.f;
@@ -45,9 +46,14 @@ void UGS_RTSSkillComponent::BeginPlay()
 	OnAetherChanged.Broadcast(CurrentAether, MaxAether);
 }
 
-void UGS_RTSSkillComponent::UpdateCooldowns()
+void UGS_RTSSkillComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-	const float DeltaTime = 0.1f; // 타이머 간격과 동일
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	UpdateCooldowns(DeltaTime);
+}
+
+void UGS_RTSSkillComponent::UpdateCooldowns(float DeltaTime)
+{
 	bool bAnySkillOnCooldown = false;
 
 	// 쿨다운 업데이트
@@ -58,16 +64,22 @@ void UGS_RTSSkillComponent::UpdateCooldowns()
 			bAnySkillOnCooldown = true;
 			CooldownRemaining[i] = FMath::Max(0.f, CooldownRemaining[i] - DeltaTime);
 			
-			UGS_RTSSkillBase* Skill = Skills.IsValidIndex(i) ? Skills[i] : nullptr;
-			const float MaxCooldown = Skill ? Skill->GetCooldownTime() : 0.f;
-			OnSkillCooldownChanged.Broadcast(i, CooldownRemaining[i], MaxCooldown);
+			// Delta 체크: 0.1초 이상 변화가 있거나, 쿨다운이 끝난 경우에만 브로드캐스트 (UI 부하 감소)
+			if (FMath::Abs(CooldownRemaining[i] - LastBroadcastCooldown[i]) >= 0.1f || CooldownRemaining[i] == 0.f)
+			{
+				UGS_RTSSkillBase* Skill = Skills.IsValidIndex(i) ? Skills[i] : nullptr;
+				const float MaxCooldown = Skill ? Skill->GetCooldownTime() : 0.f;
+				
+				OnSkillCooldownChanged.Broadcast(i, CooldownRemaining[i], MaxCooldown);
+				LastBroadcastCooldown[i] = CooldownRemaining[i];
+			}
 		}
 	}
 
-	// 모든 쿨다운이 끝났다면 타이머를 중지하여 부하 감소
+	// 모든 쿨다운이 끝났다면 Tick을 꺼서 부하 감소
 	if (!bAnySkillOnCooldown)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(CooldownUpdateTimer);
+		SetComponentTickEnabled(false);
 	}
 }
 
@@ -84,11 +96,13 @@ void UGS_RTSSkillComponent::InitializeSkills()
 	Skills.SetNum(SkillCount);
 	CooldownTimers.SetNum(SkillCount);
 	CooldownRemaining.SetNum(SkillCount);
+	LastBroadcastCooldown.SetNum(SkillCount);
 
 	for (int32 i = 0; i < SkillCount; ++i)
 	{
 		CooldownTimers[i] = FTimerHandle();
 		CooldownRemaining[i] = 0.f;
+		LastBroadcastCooldown[i] = 0.f;
 
 		UGS_RTSSkillData* SkillData = SkillDataAssets[i];
 		if (!SkillData)
@@ -334,10 +348,10 @@ void UGS_RTSSkillComponent::Server_ActivateSkill_Implementation(int32 SkillIndex
 	// 쿨다운 시작
 	StartSkillCooldown(SkillIndex);
 
-	// 타이머가 돌고 있지 않다면 시작
-	if (!GetWorld()->GetTimerManager().IsTimerActive(CooldownUpdateTimer))
+	// 쿨다운 업데이트 시작 (Tick 활성화)
+	if (!IsComponentTickEnabled())
 	{
-		GetWorld()->GetTimerManager().SetTimer(CooldownUpdateTimer, this, &UGS_RTSSkillComponent::UpdateCooldowns, 0.1f, true);
+		SetComponentTickEnabled(true);
 	}
 
 	// 멀티캐스트로 모든 클라이언트에 알림
@@ -364,10 +378,10 @@ void UGS_RTSSkillComponent::StartSkillCooldown(int32 SkillIndex)
 	CooldownRemaining[SkillIndex] = Skill->GetCooldownTime();
 	OnSkillCooldownChanged.Broadcast(SkillIndex, CooldownRemaining[SkillIndex], Skill->GetCooldownTime());
 
-	// 클라이언트에서도 타이머가 필요할 수 있으므로 체크 (UI 갱신용)
-	if (!GetWorld()->GetTimerManager().IsTimerActive(CooldownUpdateTimer))
+	// 쿨다운 업데이트 시작 (Tick 활성화)
+	if (!IsComponentTickEnabled())
 	{
-		GetWorld()->GetTimerManager().SetTimer(CooldownUpdateTimer, this, &UGS_RTSSkillComponent::UpdateCooldowns, 0.1f, true);
+		SetComponentTickEnabled(true);
 	}
 }
 
@@ -376,6 +390,7 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 	if (CooldownRemaining.IsValidIndex(SkillIndex))
 	{
 		CooldownRemaining[SkillIndex] = 0.f;
+		LastBroadcastCooldown[SkillIndex] = 0.f;
 		
 		UGS_RTSSkillBase* Skill = GetSkill(SkillIndex);
 		if (Skill)

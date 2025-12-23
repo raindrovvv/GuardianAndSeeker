@@ -103,6 +103,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 에테르 설정
@@ -139,12 +140,15 @@ private:
 	bool bIsInTargetingMode;
 	int32 TargetingSkillIndex;
 
+	// UI에 브로드캐스트한 쿨다운 값 (부하 감소용)
+	UPROPERTY()
+	TArray<float> LastBroadcastCooldown;
+
 	// 에테르 회복 타이머
 	FTimerHandle AetherRegenTimer;
 	
-	// 쿨다운 UI 업데이트 타이머
-	FTimerHandle CooldownUpdateTimer;
-	void UpdateCooldowns();
+	// 쿨다운 업데이트
+	void UpdateCooldowns(float DeltaTime);
 
 	UFUNCTION()
 	void OnRep_CurrentAether();
