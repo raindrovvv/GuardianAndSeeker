@@ -12,11 +12,20 @@
 #include "Sound/GS_AudioComponentBase.h"
 #include "GS_TrapBase.generated.h"
 
-class UNiagaraSystem;
-
 // Forward declarations
+class UNiagaraSystem;
 class UAkAudioEvent;
 class UBoxComponent;
+
+/** 함정 사운드 타입을 구분하기 위한 열거형 */
+UENUM(BlueprintType)
+enum class ETrapSoundType : uint8
+{
+	Activation,
+	Deactivation,
+	Hit
+};
+
 UCLASS()
 class GAS_API AGS_TrapBase : public AActor
 {
@@ -137,15 +146,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Trap|Audio")
 	void AdjustAudioAnchorByPlacement();
 
-	/** 서버에서 멀티캐스트로 사운드 재생 */
 	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayActivationSound();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayDeactivationSound();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayHitSound();
+	void Multicast_PlayTrapSound(ETrapSoundType SoundType);
+	void Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundType);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_EnableOptimizedCollision();
@@ -216,16 +219,20 @@ public:
 	virtual bool CanStartMotion() const;
 
 protected:
+	/** 캐싱된 트랩 매니저 */
+	mutable TWeakObjectPtr<AGS_TrapManager> CachedTrapManager;
+
+	/** 최적화된 콜리전 컴포넌트들 캐싱 */
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> OptimizedCollisionComponents;
+
+	/** 혈흔 VFX 발동 쿨다운 관리 */
+	double LastBloodVFXTime = 0.0;
+	const float BloodVFXCooldown = 0.3f;
+
 	AGS_TrapManager* GetTrapManager() const;
-
 	void LoadTrapData();
-
 	bool IsBlockedInDirection(const FVector& Start, const FVector& Direction, float Distance, AGS_Character* CharacterToIgnore);
-
-	//void ClearDotTimerForActor(AActor* Actor);
-
-protected:
-	//TMap<AActor*, FTimerHandle> ActiveDoTTimers;
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
