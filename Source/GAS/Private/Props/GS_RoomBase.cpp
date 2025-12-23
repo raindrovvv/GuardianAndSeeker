@@ -25,11 +25,6 @@ void AGS_RoomBase::BeginPlay()
 	
 }
 
-void AGS_RoomBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
 
 void AGS_RoomBase::HideCeiling()
 {

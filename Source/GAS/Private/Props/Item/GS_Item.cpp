@@ -24,11 +24,6 @@ void AGS_Item::BeginPlay()
 	Super::BeginPlay();
 }
 
-// Called every frame
-void AGS_Item::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
 
 void AGS_Item::SetItemData(UGS_ItemData* InputItemData)
 {

@@ -450,11 +450,6 @@ void AGS_WeaponAxe::BeginPlay()
 	}
 }
 
-// Called every frame
-void AGS_WeaponAxe::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
 
 bool AGS_WeaponAxe::GetListenerLocation(FVector& OutLocation) const
 {
@@ -492,4 +487,3 @@ void AGS_WeaponAxe::ClearSafetyTimer()
 {
 	Super::ClearSafetyTimer();
 }
-

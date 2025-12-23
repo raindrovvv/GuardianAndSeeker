@@ -27,7 +27,6 @@ public:
 	// Sets default values for this actor's properties
 	AGS_WeaponAxe();
 
-	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, Category = "Mesh")
 	USkeletalMeshComponent* AxeMeshComponent;
