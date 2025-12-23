@@ -710,3 +710,31 @@ void AGS_Character::SetWeaponHandlingState(EWeaponHandlingState InputWeaponHandl
 {
 	WeaponHandlingState = InputWeaponHandlingState;
 }
+
+bool AGS_Character::ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance) const
+{
+	// Dedicated Server는 VFX 불필요
+	if (IsNetMode(NM_DedicatedServer))
+	{
+		return false;
+	}
+
+	// 카메라 위치 획득
+	if (UWorld* World = GetWorld())
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				const FVector CameraLocation = CameraManager->GetCameraLocation();
+				const float DistanceSquared = FVector::DistSquared(Location, CameraLocation);
+				const float MaxDistanceSquared = MaxDistance * MaxDistance;
+
+				return DistanceSquared <= MaxDistanceSquared;
+			}
+		}
+	}
+
+	// 카메라를 찾지 못한 경우 (Listen Server, Editor) VFX 재생
+	return true;
+}

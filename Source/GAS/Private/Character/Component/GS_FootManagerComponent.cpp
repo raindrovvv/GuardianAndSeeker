@@ -2,6 +2,7 @@
 
 #include "Character/Component/GS_FootManagerComponent.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
+#include "Character/GS_Character.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/DecalComponent.h"
 #include "Engine/World.h"
@@ -484,6 +485,15 @@ void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const
 
 void UGS_FootManagerComponent::SpawnFootDustEffect(EPhysicalSurface Surface, const FVector& Location, const FVector& Normal)
 {
+	// VFX 거리 기반 컬링
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!Character->ShouldPlayVFXAtLocation(Location, 3000.0f))
+		{
+			return;
+		}
+	}
+
 	if (Surface == SurfaceType6) // Water surface
 	{
 		if (!bEnableWaterEffects)
@@ -632,6 +642,15 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (!bEnableWaterEffects)
 	{
 		return;
+	}
+
+	// VFX 거리 기반 컬링 (물 이펙트도 작은 이펙트)
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!Character->ShouldPlayVFXAtLocation(Location, 3000.0f))
+		{
+			return;
+		}
 	}
 
 	const FVector Normal = FVector::UpVector;

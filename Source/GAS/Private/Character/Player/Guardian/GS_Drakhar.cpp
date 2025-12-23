@@ -1322,6 +1322,12 @@ void AGS_Drakhar::MulticastStartDustCloudVFX_Implementation()
 
 void AGS_Drakhar::HandleDraconicProjectileImpact(const FVector& ImpactLocation, const FVector& ImpactNormal, bool bHitCharacter)
 {
+	// VFX 거리 기반 컬링 (궁극기 투사체)
+	if (!ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
+	{
+		return;
+	}
+
 	// 로컬 재생 (모든 클라이언트에서 OnHit이 호출되므로 RPC 불필요)
 	if (DrakharVFXComponent) DrakharVFXComponent->HandleDraconicProjectileImpact(ImpactLocation, ImpactNormal, bHitCharacter);
 	if (AudioComponent) AudioComponent->PlayDraconicProjectileImpactSoundLocal(ImpactLocation, bHitCharacter);
@@ -1455,20 +1461,6 @@ void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, 
 	{
 		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
 	}
-}
-
-bool AGS_Drakhar::ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance) const
-{
-	if (IsNetMode(NM_DedicatedServer)) return false;
-
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (PC && PC->PlayerCameraManager)
-	{
-		FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
-		return FVector::DistSquared(Location, CameraLocation) <= FMath::Square(MaxDistance);
-	}
-
-	return true;
 }
 
 // === 월드 컨텍스트 검증 함수 ===

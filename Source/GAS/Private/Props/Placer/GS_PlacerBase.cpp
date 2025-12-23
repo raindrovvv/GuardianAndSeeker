@@ -230,22 +230,42 @@ void AGS_PlacerBase::BuildObject()
 
 			// if (ObjectData.ObjectType == EObjectType::DoorAndWall)
 			EffectSpawnLocation.Z = 1100.0f;
-			
-			UNiagaraComponent* SpawnedEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				GetWorld(),
-				DustEffectTemplate,
-				EffectSpawnLocation,
-				FRotator::ZeroRotator,
-				FVector(1.0f),
-				true,
-				true
-			);
 
-			if (SpawnedEffect)
+			// VFX 거리 기반 컬링 (카메라 거리 체크)
+			bool bShouldPlayVFX = true;
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			{
-				float EffectScale = 0.25f * FMath::Max(ObjectData.ObjectSize.X , ObjectData.ObjectSize.Y);
-				SpawnedEffect->SetFloatParameter(FName("Scale_All"), EffectScale);
-				SpawnedEffect->SetRelativeRotation(EffectSpawnRotation);
+				if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+				{
+					const FVector CameraLocation = CameraManager->GetCameraLocation();
+					const float DistanceSquared = FVector::DistSquared(EffectSpawnLocation, CameraLocation);
+					const float MaxDistanceSquared = 3500.0f * 3500.0f;
+
+					if (DistanceSquared > MaxDistanceSquared)
+					{
+						bShouldPlayVFX = false;
+					}
+				}
+			}
+
+			if (bShouldPlayVFX)
+			{
+				UNiagaraComponent* SpawnedEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					GetWorld(),
+					DustEffectTemplate,
+					EffectSpawnLocation,
+					FRotator::ZeroRotator,
+					FVector(1.0f),
+					true,
+					true
+				);
+
+				if (SpawnedEffect)
+				{
+					float EffectScale = 0.25f * FMath::Max(ObjectData.ObjectSize.X , ObjectData.ObjectSize.Y);
+					SpawnedEffect->SetFloatParameter(FName("Scale_All"), EffectScale);
+					SpawnedEffect->SetRelativeRotation(EffectSpawnRotation);
+				}
 			}
 		}
 	}

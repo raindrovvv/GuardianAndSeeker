@@ -212,6 +212,12 @@ public:
 
 	void SetInvincible(bool bEnable);
 
+	// VFX 거리 기반 컬링 (성능 최적화)
+	// @param Location VFX를 재생할 월드 위치
+	// @param MaxDistance 최대 재생 거리 (cm, 기본값 4000cm)
+	// @return VFX를 재생해야 하면 true, 아니면 false
+	bool ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance = 4000.0f) const;
+
 protected:
 	virtual void NotifyActorBeginCursorOver() override;
 	virtual void NotifyActorEndCursorOver() override;

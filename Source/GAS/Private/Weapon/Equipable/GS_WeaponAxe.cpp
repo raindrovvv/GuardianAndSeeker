@@ -288,7 +288,13 @@ void AGS_WeaponAxe::Multicast_PlayHitVFX_Implementation(EAxeHitTargetType Target
 		return;
 	}
 
-	PlayHitVFX(TargetType, SweepResult);
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
+		{
+			PlayHitVFX(TargetType, SweepResult);
+		}
+	}
 }
 
 void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
@@ -299,17 +305,23 @@ void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* V
 		return;
 	}
 
-	if (VFXToPlay && GetWorld())
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			HitResult.ImpactPoint,
-			HitResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
+		{
+			if (VFXToPlay && GetWorld())
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					GetWorld(),
+					VFXToPlay,
+					HitResult.ImpactPoint,
+					HitResult.ImpactNormal.Rotation(),
+					FVector(1.0f),
+					true,
+					true
+				);
+			}
+		}
 	}
 }
 

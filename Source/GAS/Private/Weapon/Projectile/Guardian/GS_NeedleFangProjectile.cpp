@@ -113,5 +113,11 @@ void AGS_NeedleFangProjectile::Multicast_PlayHitSound_Implementation(FVector Hit
 
 void AGS_NeedleFangProjectile::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator());
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (OwnerChar->ShouldPlayVFXAtLocation(HitLocation, 3000.0f))
+		{
+			UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator());
+		}
+	}
 }

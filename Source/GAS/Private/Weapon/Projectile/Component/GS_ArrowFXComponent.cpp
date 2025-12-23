@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Weapon/Projectile/Component/GS_ArrowFXComponent.h"
+#include "Character/GS_Character.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -95,6 +96,15 @@ void UGS_ArrowFXComponent::Multicast_StartArrowTrailVFX_Implementation(EArrowTyp
 		return;
 	}
 
+	// VFX 거리 기반 컬링 (트레일 VFX)
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(OwnerActor))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(OwnerActor->GetActorLocation(), 4000.0f))
+		{
+			return;
+		}
+	}
+
 	// 화살 타입에 따른 VFX 선택
 	UNiagaraSystem* SelectedVFXSystem = nullptr;
 	switch (ArrowType)
@@ -158,6 +168,15 @@ void UGS_ArrowFXComponent::Multicast_StopArrowTrailVFX_Implementation()
 
 void UGS_ArrowFXComponent::Multicast_PlayHitVFX_Implementation(ETargetType TargetType, const FHitResult& SweepResult)
 {
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(OwnerActor))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3000.0f))
+		{
+			return;
+		}
+	}
+
 	UNiagaraSystem* VFXToPlay = nullptr;
 
 	switch (TargetType)

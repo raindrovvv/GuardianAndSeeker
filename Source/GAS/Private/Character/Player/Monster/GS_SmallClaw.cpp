@@ -95,5 +95,8 @@ void AGS_SmallClaw::OnAttackBiteboxOverlap(UPrimitiveComponent* OverlappedCompon
 
 void AGS_SmallClaw::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
+	if (ShouldPlayVFXAtLocation(HitLocation, 3000.0f))
+	{
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
+	}
 }

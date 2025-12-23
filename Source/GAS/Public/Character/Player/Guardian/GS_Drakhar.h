@@ -507,7 +507,4 @@ private:
 
 	// 다음 카메라 효과 단계로 전환
 	void TransitionToNextCameraPhase();
-
-	// Optimization: Check for VFX culling
-	bool ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance = 5000.0f) const;
 };

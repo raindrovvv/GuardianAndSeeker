@@ -1,5 +1,6 @@
 #include "Props/Trap/GS_TrapBase.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/GS_Character.h"
 #include "Engine/DamageEvents.h"
 #include "Props/Trap/TrapMotion/GS_TrapMotionCompBase.h"
 #include "EngineUtils.h"
@@ -652,6 +653,28 @@ void AGS_TrapBase::CustomTrapEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLocation)
 {
+	// VFX 거리 기반 컬링 (Dedicated Server 체크)
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// 카메라 거리 체크
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+		{
+			const FVector CameraLocation = CameraManager->GetCameraLocation();
+			const float DistanceSquared = FVector::DistSquared(HitLocation, CameraLocation);
+			const float MaxDistanceSquared = 3000.0f * 3000.0f;
+
+			if (DistanceSquared > MaxDistanceSquared)
+			{
+				return;
+			}
+		}
+	}
+
 	// 함정 데이터에서 혈흔 이펙트 가져오기 (개별 함정에서 오버라이드 가능)
 	UNiagaraSystem* BloodEffectToUse = TrapData.TrapHitBloodEffect;
 

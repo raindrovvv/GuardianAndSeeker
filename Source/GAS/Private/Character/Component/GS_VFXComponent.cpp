@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Character/Component/GS_VFXComponent.h"
+#include "Character/GS_Character.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
@@ -147,6 +148,15 @@ void UGS_VFXComponent::Multicast_PlayDebuffVFX_Implementation(EDebuffType Debuff
 		return;
 	}
 
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
+		{
+			return;
+		}
+	}
+
 	UNiagaraSystem* VFXSystem = GetDebuffVFX(DebuffType);
 	if (!VFXSystem)
 	{
@@ -203,6 +213,15 @@ void UGS_VFXComponent::Multicast_PlayDebuffExpireVFX_Implementation(EDebuffType 
 	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
 	{
 		return;
+	}
+
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
+		{
+			return;
+		}
 	}
 
 	UNiagaraSystem* ExpireVFXSystem = GetDebuffExpireVFX(DebuffType);
@@ -329,6 +348,16 @@ void UGS_VFXComponent::Multicast_PlayOneShotVFX_Implementation(UNiagaraSystem* V
 	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
 	{
 		return;
+	}
+
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		FVector WorldLocation = OwnerChar->GetActorLocation() + LocationOffset;
+		if (!OwnerChar->ShouldPlayVFXAtLocation(WorldLocation, 4000.0f))
+		{
+			return;
+		}
 	}
 
 	if (!VFXSystem || !GetOwner())
