@@ -104,6 +104,13 @@ void UGS_DrakharVFXComponent::OnFlyStart()
 	if (OwnerDrakhar->FlyingDustVFX && !IsValid(ActiveFlyingDustVFXComponent))
 	{
 		FVector Location = OwnerDrakhar->GetActorLocation() - FVector(0,0,OwnerDrakhar->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+
+		// VFX 거리 기반 컬링 (비행 먼지 VFX)
+		if (!OwnerDrakhar->ShouldPlayVFXAtLocation(Location, 4000.0f))
+		{
+			return;
+		}
+
 		ActiveFlyingDustVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->FlyingDustVFX, Location);
 		if(ActiveFlyingDustVFXComponent)
 		{
@@ -400,6 +407,12 @@ void UGS_DrakharVFXComponent::PlayAttackHitVFX(FVector ImpactPoint)
 	if (!OwnerDrakhar) return;
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
 
+	// VFX 거리 기반 컬링
+	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactPoint, 4000.0f))
+	{
+		return;
+	}
+
 	UNiagaraSystem* VFXToPlay = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverAttackHitVFX : OwnerDrakhar->NormalAttackHitVFX;
 	if (VFXToPlay)
 	{
@@ -411,6 +424,12 @@ void UGS_DrakharVFXComponent::PlayEarthquakeImpactVFX(const FVector& ImpactLocat
 {
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
 
+	// VFX 거리 기반 컬링 (스킬 이펙트)
+	if (OwnerDrakhar && !OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
+	{
+		return;
+	}
+
 	if (OwnerDrakhar && OwnerDrakhar->EarthquakeImpactVFX && GetWorld())
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->EarthquakeImpactVFX, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true, true, ENCPoolMethod::AutoRelease, true);
@@ -420,6 +439,12 @@ void UGS_DrakharVFXComponent::PlayEarthquakeImpactVFX(const FVector& ImpactLocat
 void UGS_DrakharVFXComponent::PlayFeverEarthquakeImpactVFX(const FVector& ImpactLocation)
 {
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+
+	// VFX 거리 기반 컬링 (궁극기 이펙트)
+	if (OwnerDrakhar && !OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
+	{
+		return;
+	}
 
 	if (OwnerDrakhar && OwnerDrakhar->FeverEarthquakeImpactVFX && GetWorld())
 	{
@@ -800,6 +825,12 @@ void UGS_DrakharVFXComponent::Multicast_PlayDebuffVFX_Implementation(EDebuffType
 {
 	if (!OwnerDrakhar || GetWorld()->GetNetMode() == NM_DedicatedServer) return;
 
+	// VFX 거리 기반 컬링 (디버프 VFX)
+	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
+	{
+		return;
+	}
+
 	UNiagaraSystem* VFXToPlay = GetDebuffVFX(DebuffType);
 	if (!VFXToPlay) return;
 
@@ -839,6 +870,12 @@ void UGS_DrakharVFXComponent::Multicast_RemoveDebuffVFX_Implementation(EDebuffTy
 void UGS_DrakharVFXComponent::Multicast_PlayDebuffExpireVFX_Implementation(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale)
 {
 	if (!OwnerDrakhar) return;
+
+	// VFX 거리 기반 컬링 (디버프 만료 VFX)
+	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
+	{
+		return;
+	}
 
 	UNiagaraSystem* VFXToPlay = GetDebuffExpireVFX(DebuffType);
 	if (!VFXToPlay)

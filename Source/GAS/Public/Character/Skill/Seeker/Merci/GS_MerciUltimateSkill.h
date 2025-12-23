@@ -22,6 +22,7 @@ public:
 	virtual void InterruptSkill() override;
 
 private:
+	UFUNCTION()
 	virtual void DeactiveSkill() override;
 
 	// 스탠스 관리
@@ -34,7 +35,9 @@ private:
 
 	AActor* FindCloseTarget();
 
+	UFUNCTION()
 	void TickAutoAimTarget();
+
 	void UpdateMonsterList();
 
 	// 캐싱된 Merci 소유자 (ActiveSkill에서 설정)

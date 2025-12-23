@@ -104,6 +104,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ember Chest")
 	void SetReward(const FEmberRewardConfig& InRewardConfig);
 
+	/** 하이라이트 효과 설정 (Overlay Material 방식) */
+	UFUNCTION(BlueprintCallable, Category = "Ember Chest")
+	void SetHighlight(bool bEnable);
+
+	/** 하이라이트용 오버레이 머티리얼 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ember Chest|Visual")
+	UMaterialInterface* HighlightMaterial;
+
 	/** 수명 타이머 시작 (스포너에서 호출) */
 	UFUNCTION(BlueprintCallable, Category = "Ember Chest")
 	void StartLifetimeTimer(float Lifetime);

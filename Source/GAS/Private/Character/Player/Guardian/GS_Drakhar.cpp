@@ -142,6 +142,9 @@ AGS_Drakhar::AGS_Drakhar()
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Drakhar");
 	FlyingStaminaCoolTime = MaxFlyingStaminaCoolTime;
+
+	ComboAttackCount = 0;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 }
 
 void AGS_Drakhar::BeginPlay()
@@ -152,12 +155,6 @@ void AGS_Drakhar::BeginPlay()
 	if (IsValid(Anim))
 	{
 		Anim->OnPlayMontageNotifyBegin.AddDynamic(this, &ThisClass::OnMontageNotifyBegin);
-	}
-
-	// 드라카의 공격이 찬의 방어 콜리전에 감지될 수 있도록 태그 추가
-	if (UPrimitiveComponent* CapsuleComp = GetCapsuleComponent())
-	{
-		CapsuleComp->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
 	}
 }
 
@@ -177,6 +174,11 @@ void AGS_Drakhar::Tick(float DeltaTime)
 			SpringArmComp->TargetArmLength = FMath::FInterpTo(SpringArmComp->TargetArmLength, TargetSpringArmLength, DeltaTime, 5.0f);
 		}
 	}
+	else
+	{
+		// 보간이 필요 없을 때는 Tick 비활성화 (성능 최적화)
+		SetActorTickEnabled(false);
+	}
 }
 
 void AGS_Drakhar::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -184,6 +186,7 @@ void AGS_Drakhar::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ThisClass, bCanCombo);
+	DOREPLIFETIME(ThisClass, ComboAttackCount);
 	DOREPLIFETIME(ThisClass, CurrentFeverGauge);
 	DOREPLIFETIME(ThisClass, IsFeverMode);
 	DOREPLIFETIME(ThisClass, FlyingStaminaCoolTime);
@@ -328,6 +331,16 @@ void AGS_Drakhar::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNo
 	}
 }
 
+void AGS_Drakhar::OnRep_ComboAttackCount()
+{
+	// 서버가 아닌 클라이언트(다른 플레이어)에서만 실행
+	if (!IsLocallyControlled())
+	{
+		PlayComboAttackMontage();
+		if (AudioComponent) AudioComponent->PlayComboAttackSound();
+	}
+}
+
 void AGS_Drakhar::MeleeAttackCheck()
 {
 	if (HasAuthority())
@@ -338,10 +351,10 @@ void AGS_Drakhar::MeleeAttackCheck()
 		const float MeleeAttackRange = 200.f;
 		const float MeleeAttackRadius = 200.f;
 		
-		TSet<AGS_Character*> DamagedCharacters = DetectPlayerInRange(Start, MeleeAttackRange, MeleeAttackRadius);
+		DetectPlayerInRange(CachedDamagedCharacters, Start, MeleeAttackRange, MeleeAttackRadius);
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (AGS_Character* DamagedCharacter : DamagedCharacters)
+		for (AGS_Character* DamagedCharacter : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedCharacter))
 			{
@@ -398,10 +411,10 @@ void AGS_Drakhar::ComboLastAttack()
 		const float Radius = 300.f;
 		const float PlusDamage = 20.f;
 
-		TSet<AGS_Character*> DamagedPlayers = DetectPlayerInRange(Start, 200.f, Radius);
+		DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, Radius);
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (AGS_Character* DamagedPlayer : DamagedPlayers)
+		for (AGS_Character* DamagedPlayer : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedPlayer))
 			{
@@ -451,16 +464,19 @@ void AGS_Drakhar::ServerRPCResetValue_Implementation()
 void AGS_Drakhar::ServerRPCNewComboAttack_Implementation()
 {
 	bCanCombo = false;
-	MulticastRPCComboAttack();
+	
+	// Increment counter to trigger OnRep on other clients
+	ComboAttackCount++;
+	
+	// Server also needs to play montage to trigger damage check notifies
+	PlayComboAttackMontage();
+	
 	if (AudioComponent) AudioComponent->PlayComboAttackSound();
 }
 
 void AGS_Drakhar::MulticastRPCComboAttack_Implementation()
 {
-	if (!IsLocallyControlled())
-	{
-		PlayComboAttackMontage();
-	}
+	// Deprecated: Using OnRep_ComboAttackCount instead
 }
 
 void AGS_Drakhar::ServerRPCDoDash_Implementation(float DeltaTime)
@@ -570,7 +586,9 @@ void AGS_Drakhar::DashAttackCheck()
 	if (HasAuthority())
 	{
 		const FVector Start = GetActorLocation();
-		DamagedCharactersFromDash.Append(DetectPlayerInRange(Start, 10.f, 100.f));
+		TSet<AGS_Character*> DetectedThisFrame;
+		DetectPlayerInRange(DetectedThisFrame, Start, 10.f, 100.f);
+		DamagedCharactersFromDash.Append(DetectedThisFrame);
 	}
 }
 
@@ -580,7 +598,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 	if (AudioComponent) AudioComponent->PlayEarthquakeSkillSound();
 
 	const FVector Start = GetActorLocation() + 100.f;
-	TSet<AGS_Character*> EarthquakeDamagedCharacters = DetectPlayerInRange(Start, 200.f, EarthquakeRadius);
+	DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, EarthquakeRadius);
 
 	//Spawn Skill Effect
 	FVector SpawnLocation = Start + GetActorForwardVector() * 300.f;
@@ -588,7 +606,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 	GC_Earthquake->SetOwner(this);
 	GC_Earthquake->MulticastTriggerDestruction(SpawnLocation, EarthquakeRadius, 3000.f);
 	
-	for (const auto& DamagedCharacter : EarthquakeDamagedCharacters)
+	for (const auto& DamagedCharacter : CachedDamagedCharacters)
 	{
 		float SkillCoefficient = GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::Aiming)->Damage;
 		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, SkillCoefficient);
@@ -681,6 +699,7 @@ void AGS_Drakhar::StartCtrl()
 		
 		TargetSpringArmLength = 800.f;
 		bIsFlying = true;
+		SetActorTickEnabled(true);
 	}
 }
 
@@ -695,6 +714,7 @@ void AGS_Drakhar::StopCtrl()
 		TargetSpringArmLength = 500.f;
 		bIsFlying = true;
 		bCanCombo = true;
+		SetActorTickEnabled(true);
 	}
 }
 
@@ -859,11 +879,19 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 				FGS_StatRow Stat;
 				Stat.ATK = 50.f;
 				GetStatComp()->ResetStat(Stat);
-				MulticastRPC_OnFeverModeEnd();
-				MulticastPlayFeverModeEndEffects();  // 피버 모드 종료 사운드 & 카메라 효과
-			}
 
-			IsFeverMode = false;
+				IsFeverMode = false;
+				
+				// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
+				if (GetNetMode() != NM_DedicatedServer)
+				{
+					OnRep_IsFeverMode();
+				}
+			}
+			else
+			{
+				IsFeverMode = false;
+			}
 		}
 
 		//Start Fever Mode
@@ -916,23 +944,25 @@ void AGS_Drakhar::FeverComoLastAttack()
 		const FVector LeftPillarLocation = CenterPillarLocation - (RightVector * PillarSideSpacing);
 		const FVector RightPillarLocation = CenterPillarLocation + (RightVector * PillarSideSpacing);
 
-		TArray<FVector> PillarLocations;
-		PillarLocations.Add(LeftPillarLocation);
-		PillarLocations.Add(CenterPillarLocation);
-		PillarLocations.Add(RightPillarLocation);
+		CachedPillarLocations.Reset();
+		CachedPillarLocations.Add(LeftPillarLocation);
+		CachedPillarLocations.Add(CenterPillarLocation);
+		CachedPillarLocations.Add(RightPillarLocation);
 
-		TSet<AGS_Character*> DamagedSeekers;
+		CachedDamagedCharacters.Reset();
 		FCollisionQueryParams Params(NAME_None, false, this);
 
 		TArray<FHitResult> OutHitResults;
 
-		for (const FVector& PillarLocation : PillarLocations)
+		for (const FVector& PillarLocation : CachedPillarLocations)
 		{
-			DamagedSeekers.Append(DetectPlayerInRange(PillarLocation, 0.f, PillarRadius));
+			TSet<AGS_Character*> DamagedThisPillar;
+			DetectPlayerInRange(DamagedThisPillar, PillarLocation, 0.f, PillarRadius);
+			CachedDamagedCharacters.Append(DamagedThisPillar);
 		}
 		
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
-		for (const auto& DamagedSeeker : DamagedSeekers)
+		for (const auto& DamagedSeeker : CachedDamagedCharacters)
 		{
 			if (IsValid(DamagedSeeker))
 			{
@@ -990,26 +1020,11 @@ void AGS_Drakhar::StartFeverMode()
 
 	GetStatComp()->ChangeStat(Stat);
 	MulticastRPCFeverMontagePlay();
-	MulticastRPC_OnFeverModeStart();
 	
-	if (AudioComponent)
+	// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		// 피버모드 시작 사운드 즉시 재생 (bForcePlay = true로 RPC 제한 무시)
-		AudioComponent->PlayFeverModeStartSound(true);
-
-		// FeverModeStateSound는 0.2초 후에 재생 (RPC 간격 제한 확실히 회피)
-		UWorld* World = GetWorld();
-		if (World && World->IsValidLowLevel() && !World->bIsTearingDown)
-		{
-			SafeClearTimer(FeverStateSoundDelayTimer);
-			World->GetTimerManager().SetTimer(
-				FeverStateSoundDelayTimer,
-				this,
-				&AGS_Drakhar::PlayFeverModeStateSoundDelayed,
-				0.2f,
-				false
-			);
-		}
+		OnRep_IsFeverMode();
 	}
 }
 
@@ -1307,6 +1322,12 @@ void AGS_Drakhar::MulticastStartDustCloudVFX_Implementation()
 
 void AGS_Drakhar::HandleDraconicProjectileImpact(const FVector& ImpactLocation, const FVector& ImpactNormal, bool bHitCharacter)
 {
+	// VFX 거리 기반 컬링 (궁극기 투사체)
+	if (!ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
+	{
+		return;
+	}
+
 	// 로컬 재생 (모든 클라이언트에서 OnHit이 호출되므로 RPC 불필요)
 	if (DrakharVFXComponent) DrakharVFXComponent->HandleDraconicProjectileImpact(ImpactLocation, ImpactNormal, bHitCharacter);
 	if (AudioComponent) AudioComponent->PlayDraconicProjectileImpactSoundLocal(ImpactLocation, bHitCharacter);
@@ -1353,7 +1374,47 @@ void AGS_Drakhar::OnRep_IsFeverMode()
 {
 	if (DrakharVFXComponent) DrakharVFXComponent->OnFeverModeChanged(IsFeverMode);
 
-	// 클라이언트에서도 블루프린트 이벤트 호출
+	if (AudioComponent)
+	{
+		if (IsFeverMode)
+		{
+			AudioComponent->PlayFeverModeStartSoundLocal();
+			
+			// State Sound는 약간의 딜레이 후 재생 (시각 효과와 맞추기 위함)
+			UWorld* World = GetWorld();
+			if (World)
+			{
+				SafeClearTimer(FeverStateSoundDelayTimer);
+				World->GetTimerManager().SetTimer(
+					FeverStateSoundDelayTimer,
+					this,
+					&AGS_Drakhar::PlayFeverModeStateSoundDelayed,
+					0.2f,
+					false
+				);
+			}
+		}
+		else
+		{
+			AudioComponent->PlayFeverModeEndSoundLocal();
+			AudioComponent->StopFeverModeStateSoundLocal();
+
+			// 피버 종료 시 카메라 쉐이크 및 줌 효과 (로컬 플레이어 전용)
+			if (IsLocallyControlled())
+			{
+				if (APlayerController* PC = Cast<APlayerController>(GetController()))
+				{
+					FGS_CameraShakeInfo EndFeverShake = AttackSuccessShake;
+					EndFeverShake.Intensity *= 0.5f;
+					Client_PlayAttackSuccessShakeWithInfo(PC, EndFeverShake);
+				}
+				
+				ApplyFeverModeEndCameraEffect();
+			}
+		}
+	}
+
+	// 블루프린트 이벤트 호출
 	if (IsFeverMode)
 	{
 		BP_OnFeverModeStart();
@@ -1396,7 +1457,10 @@ void AGS_Drakhar::MulticastStopDustCloudVFX_Implementation()
 
 void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal, float Scale)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+	if (ShouldPlayVFXAtLocation(HitLocation))
+	{
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+	}
 }
 
 // === 월드 컨텍스트 검증 함수 ===
@@ -1431,8 +1495,8 @@ void AGS_Drakhar::PlayFeverModeStateSoundDelayed()
 
 	if (AudioComponent && IsFeverMode)
 	{
-		// bForcePlay = true로 RPC 제한 무시하여 확실하게 재생
-		AudioComponent->PlayFeverModeStateSound(true);
+		// OnRep에서 타이머로 호출되거나 서버에서 직접 호출됨
+		AudioComponent->PlayFeverModeStateSoundLocal();
 	}
 }
 

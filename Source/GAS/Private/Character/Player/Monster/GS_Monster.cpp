@@ -9,7 +9,6 @@
 #include "Animation/Character/GS_MonsterAnimInstance.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/GS_AudioManager.h"
-#include "EngineUtils.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 // #include "Character/GS_Character.h"
 #include "Engine/World.h"
@@ -63,6 +62,9 @@ AGS_Monster::AGS_Monster()
 
 	TeamId = FGenericTeamId(2);
 	Tags.Add("Monster");
+	
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	// RTS 선택을 위한 콜리전 설정 (모든 몬스터에 적용)
 	if (GetCapsuleComponent())
@@ -73,6 +75,7 @@ AGS_Monster::AGS_Monster()
 	bCommandLocked = false;
 	bSelectionLocked = false;
 	bIsSelected = false;
+	bIsTargetUIActive = false;
 	bReplicates = true;
 }
 
@@ -80,7 +83,12 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 서브시스템에 등록
+	// === 서버 성능 최적화: 데디케이티드 서버에서는 틱을 비활성화 ===
+	if (IsRunningDedicatedServer())
+	{
+		PrimaryActorTick.bCanEverTick = false;
+		SetActorTickEnabled(false);
+	}
 	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
@@ -158,7 +166,8 @@ void AGS_Monster::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (IsValid(SkillCooldownWidgetComp) && !HasAuthority())
+	// 클라이언트 또는 리슨 서버 호스트에서만 위젯 회전 업데이트 (데디케이티드 서버는 위에서 틱 비활성화됨)
+	if (IsValid(SkillCooldownWidgetComp) && !IsRunningDedicatedServer())
 	{
 		UpdateSkillCooldownWidget();
 	}
@@ -328,8 +337,11 @@ void AGS_Monster::EndStiffness()
 
 void AGS_Monster::ShowTargetUI(bool bIsActive)
 {
+	if (bIsTargetUIActive == bIsActive) return;
+
 	if (TargetedUIComponent)
 	{
+		bIsTargetUIActive = bIsActive;
 		TargetedUIComponent->SetVisibility(bIsActive);
 	}
 }

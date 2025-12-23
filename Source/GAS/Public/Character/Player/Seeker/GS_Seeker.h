@@ -51,6 +51,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSeekerHover, bool, bIsHover);
 // 빈사 상태 변화 델리게이트
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDyingStateChanged, bool, bIsDying, float, TimeRemaining);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReviveProgressChanged, float, Progress);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, bIsDetected);
 
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
@@ -68,6 +69,7 @@ class GAS_API AGS_Seeker : public AGS_Player, public IGS_ManualDataInterface
 
 public:
 	AGS_Seeker();
+
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -122,7 +124,7 @@ public:
 	virtual void ServerAttackMontage();
 
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MulticastPlayComboSection();
+	virtual void MulticastPlayComboSection(int32 ComboIndex);
 
 	UFUNCTION()
 	void ComboInputOpen();
@@ -147,7 +149,7 @@ public:
 	virtual void OnRep_IsDead() override;
 
 	// === Audio Functions ===
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySound(class UAkAudioEvent* SoundToPlay);
 
 	// ===============
@@ -400,7 +402,10 @@ private:
 	FSeekerState SeekerState;
 
 	UPROPERTY()
-	TArray<AGS_Monster*> NearbyMonsters;
+	TArray<TWeakObjectPtr<AGS_Monster>> NearbyMonsters;
+
+	UFUNCTION()
+	void HandleMonsterDeath(AGS_Monster* DeadMonster);
 
 	UPROPERTY()
 	FTimerHandle LowHealthEffectTimer;
@@ -506,12 +511,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Detection")
 	float GetDetectionIntensity() const { return DetectionIntensity; }
 
-	/** 감지 HUD 위젯 인스턴스 (블루프린트 접근용) */
+	/** 감지 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "UI|Detection")
 	class UUserWidget* DetectionHUDWidget;
 
-	/** 감지 상태 변경 시 HUD 업데이트 */
-	void UpdateDetectionHUD();
+	/** 감지 상태 변화 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "Detection")
+	FOnDetectedByGuardianChanged OnDetectedByGuardianChanged;
+
+	/** 감지 상태 변경 시 HUD 업데이트 (C++ 기본 처리 + BP 추가 처리 가능) */
+	UFUNCTION(BlueprintNativeEvent, Category = "Detection")
+	void UpdateDetectionHUD(bool bIsDetected);
 
 private:
 	/** 감지 상태 변경 시 시각적/청각적 효과 업데이트 */
@@ -594,7 +604,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Dying")
 	TWeakObjectPtr<AGS_Seeker> CurrentReviver;
 
+	/** 주변 감지 업데이트용 블루프린트 이벤트 (Actor Tick 대용으로 사용 가능) */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Seeker|Sensor")
+	void OnPeripheralSensorUpdate();
+
 protected:
+	/** 캐릭터 빙의 완료 시 호출 (클라이언트) */
+	virtual void PawnClientRestart() override;
+
 	/** 빈사 상태 업데이트 (Tick에서 호출) */
 	void UpdateDyingState(float DeltaTime);
 
@@ -610,12 +627,21 @@ protected:
 	/** 불꽃 크기 타이머 연동 업데이트 */
 	void UpdateDyingFlameVisuals(float TimeRemaining);
 
+	/** 주변 감지(보물상자 등) 주기적 업데이트 함수 */
+	void UpdatePeripheralSensor();
+
+	/** 주변 보물상자 감지 및 시각 효과 처리 */
+	void CheckNearbyEmberChests();
+
+	/** 빈사 상태 주기적 업데이트 함수 (타이머 호출용) */
+	void UpdateDyingStateTimer();
+
 	/** 불꽃 활성화 멀티캐스트 RPC */
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_ActivateDyingFlame();
 
 	/** 불꽃 비활성화 멀티캐스트 RPC */
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_DeactivateDyingFlame();
 
 	/** 진행도 감소 시작 */
@@ -668,6 +694,17 @@ protected:
 	bool CanContinueRevive() const;
 
 private:
+	/** 빈사 상태 업데이트 타이머 핸들 */
+	FTimerHandle DyingUpdateTimerHandle;
+
+	/** 주변 감지(보물상자 등) 타이머 핸들 */
+	FTimerHandle PeripheralSensorTimerHandle;
+
+	/** 현재 감지된 보물상자 (아웃라인 표시용) */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_EmberChest> CurrentDetectedChest;
+
+
 	// ========================================
 	// 빈사 상태 변수들
 	// ========================================

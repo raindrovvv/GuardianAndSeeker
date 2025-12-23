@@ -138,6 +138,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_SkillComp> SkillComp;
+
+	void UpdateSteamNameWidgetRotation();
+
 private:
 	// Input Control Flag
 	UPROPERTY(Replicated)
@@ -147,7 +150,6 @@ private:
 
 	bool bIsObscuring;
 
-	void UpdateSteamNameWidgetRotation();
 
 	// 오디오 디바이스 캐싱
 	FAkAudioDevice* CachedAudioDevice = nullptr;

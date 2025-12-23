@@ -258,7 +258,22 @@ void AGS_PlayerState::SetIsAlive(bool bNewIsAlive)
     }
 }
 
-bool AGS_PlayerState::Server_SetPlayerRole_Validate(EPlayerRole NewRole) { return true; }
+bool AGS_PlayerState::Server_SetPlayerRole_Validate(EPlayerRole NewRole) 
+{ 
+    // Enum 범위 검증 (PR_None은 선택 불가)
+    if (NewRole <= EPlayerRole::PR_None || NewRole > EPlayerRole::PR_Guardian)
+    {
+        return false;
+    }
+
+    // 로비에서만 변경 가능하도록 검증
+    if (GetWorld() && GetWorld()->GetAuthGameMode<AGS_CustomLobbyGM>() == nullptr)
+    {
+        return false;
+    }
+
+    return true; 
+}
 void AGS_PlayerState::Server_SetPlayerRole_Implementation(EPlayerRole NewRole)
 {
     if (CurrentPlayerRole != NewRole)
@@ -287,7 +302,22 @@ void AGS_PlayerState::OnRep_SeekerJob()
     }
 }
 
-bool AGS_PlayerState::Server_SetSeekerJob_Validate(ESeekerJob NewJob) { return true; }
+bool AGS_PlayerState::Server_SetSeekerJob_Validate(ESeekerJob NewJob) 
+{ 
+    // Enum 범위 검증
+    if (NewJob >= ESeekerJob::End)
+    {
+        return false;
+    }
+
+    // 로비에서만 변경 가능하도록 검증
+    if (GetWorld() && GetWorld()->GetAuthGameMode<AGS_CustomLobbyGM>() == nullptr)
+    {
+        return false;
+    }
+
+    return true; 
+}
 void AGS_PlayerState::Server_SetSeekerJob_Implementation(ESeekerJob NewJob)
 {
     if (CurrentPlayerRole == EPlayerRole::PR_Seeker && CurrentSeekerJob != NewJob)
@@ -316,7 +346,22 @@ void AGS_PlayerState::OnRep_GuardianJob()
     }
 }
 
-bool AGS_PlayerState::Server_SetGuardianJob_Validate(EGuardianJob NewJob) { return true; }
+bool AGS_PlayerState::Server_SetGuardianJob_Validate(EGuardianJob NewJob) 
+{ 
+    // Enum 범위 검증
+    if (NewJob >= EGuardianJob::End)
+    {
+        return false;
+    }
+
+    // 로비에서만 변경 가능하도록 검증
+    if (GetWorld() && GetWorld()->GetAuthGameMode<AGS_CustomLobbyGM>() == nullptr)
+    {
+        return false;
+    }
+
+    return true; 
+}
 void AGS_PlayerState::Server_SetGuardianJob_Implementation(EGuardianJob NewJob)
 {
 	if (CurrentPlayerRole == EPlayerRole::PR_Guardian && CurrentGuardianJob != NewJob)
@@ -337,6 +382,17 @@ void AGS_PlayerState::Server_SetGuardianJob_Implementation(EGuardianJob NewJob)
 	}
 }
 
+bool AGS_PlayerState::Server_SetObjectData_Validate(const TArray<FDESaveData>& InObjectData)
+{
+    // 로비에서만 데이터 설정 가능하도록 검증
+    if (GetWorld() && GetWorld()->GetAuthGameMode<AGS_CustomLobbyGM>() == nullptr)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 void AGS_PlayerState::Server_SetObjectData_Implementation(const TArray<FDESaveData>& InObjectData)
 {
     this->ObjectData = InObjectData; 
@@ -348,7 +404,16 @@ void AGS_PlayerState::OnRep_IsReady()
     OnReadyStatusChangedDelegate.Broadcast(bIsReady);
 }
 
-bool AGS_PlayerState::Server_SetReadyStatus_Validate(bool bNewReadyStatus) { return true; }
+bool AGS_PlayerState::Server_SetReadyStatus_Validate(bool bNewReadyStatus) 
+{ 
+    // 로비에서만 준비 상태 변경 가능하도록 검증
+    if (GetWorld() && GetWorld()->GetAuthGameMode<AGS_CustomLobbyGM>() == nullptr)
+    {
+        return false;
+    }
+
+    return true; 
+}
 void AGS_PlayerState::Server_SetReadyStatus_Implementation(bool bNewReadyStatus)
 {
     if (bIsReady != bNewReadyStatus)

@@ -118,20 +118,10 @@ void UGS_ChanUltimateSkill::InterruptSkill()
 
 void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitiveComponent* HitComp)
 {
-	if (!OwnerCharacter || !OwnerCharacter->HasAuthority())
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !CachedChanOwner.IsValid())
 	{
 		return;
 	}
-
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	if (!OwnerPlayer)
-	{
-		return;
-	}
-	
-	// 데이터 테이블에서 스킬 정보 가져오기
-	const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
-	
 	if (AGS_Guardian* Guardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 	{
 		ApplyEffectToGuardian(Guardian);
@@ -177,13 +167,7 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 
 void UGS_ChanUltimateSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 {
-	if (!Target)
-	{
-		return;
-	}
-
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	if (!OwnerPlayer) 
+	if (!Target || !CachedChanOwner.IsValid())
 	{
 		return;
 	}
@@ -217,10 +201,7 @@ void UGS_ChanUltimateSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 
 void UGS_ChanUltimateSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
 {
-	if (!Target) return;
-    
-    AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-    if (!OwnerPlayer) return;
+	if (!Target || !CachedChanOwner.IsValid()) return;
     
     // 가디언용 넉백 (더 약한 힘)
     FVector KnockbackDirection = (Target->GetActorLocation() - (CachedChanOwner.IsValid() ? CachedChanOwner->GetActorLocation() : FVector::ZeroVector)).GetSafeNormal();
@@ -257,9 +238,9 @@ void UGS_ChanUltimateSkill::DeactiveSkill()
 	// 스킬 종료 사운드 재생 (멀티캐스트)
 	if (OwnerCharacter->HasAuthority())
 	{
-		if (AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter))
+		if (CachedChanOwner.IsValid())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerSeeker->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}

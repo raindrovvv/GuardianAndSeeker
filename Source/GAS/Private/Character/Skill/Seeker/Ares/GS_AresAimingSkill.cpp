@@ -21,22 +21,24 @@ void UGS_AresAimingSkill::ActiveSkill()
 	// 쿨타임 측정 시작
 	StartCoolDown();
 
-	if (AGS_Seeker* OwnerPlayer = Cast<AGS_Ares>(OwnerCharacter))
+	CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
+
+	if (CachedAresOwner.IsValid())
 	{
 		// 스킬 시작 사운드 재생 (멀티캐스트)
-		if (OwnerPlayer->HasAuthority())
+		if (CachedAresOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedAresOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
 		}
 
 		// 스킬 애니메이션 재생
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 
 		// 입력 제한
-		OwnerPlayer->SetMoveControlValue(false, false);
+		CachedAresOwner->SetMoveControlValue(false, false);
 	}
 	
 	// 투사체 1차 발사
@@ -56,7 +58,6 @@ void UGS_AresAimingSkill::OnSkillAnimationEnd()
 void UGS_AresAimingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-	AGS_Ares* AresCharacter = Cast<AGS_Ares>(OwnerCharacter);
 	SetIsActive(false);
 }
 
@@ -83,8 +84,7 @@ void UGS_AresAimingSkill::DeactiveSkill()
 
 void UGS_AresAimingSkill::SpawnFirstProjectile()
 {
-	AGS_Ares* AresCharacter = Cast<AGS_Ares>(OwnerCharacter);
-	if (!OwnerCharacter || !AresCharacter || !AresCharacter->AresProjectileClass)
+	if (!CachedAresOwner.IsValid() || !CachedAresOwner->AresProjectileClass)
 	{
 		return;
 	}
@@ -111,7 +111,7 @@ void UGS_AresAimingSkill::SpawnFirstProjectile()
 	FTransform SpawnTransform(SpawnRotationA, SpawnLocation);
 
 	AGS_SwordAuraProjectile* ProjectileA = World->SpawnActorDeferred<AGS_SwordAuraProjectile>(
-		AresCharacter->AresProjectileClass,
+		CachedAresOwner->AresProjectileClass,
 		SpawnTransform,
 		OwnerCharacter,
 		nullptr,
@@ -152,19 +152,13 @@ void UGS_AresAimingSkill::SpawnFirstProjectile()
 
 void UGS_AresAimingSkill::SpawnSecondProjectile()
 {
-	AGS_Ares* AresCharacter = Cast<AGS_Ares>(OwnerCharacter);
-	if (!OwnerCharacter || !AresCharacter || !AresCharacter->AresProjectileClass) 
+	if (!CachedAresOwner.IsValid() || !CachedAresOwner->AresProjectileClass) 
 	{
 		return;
 	}
 
 	UWorld* World = OwnerCharacter->GetWorld();
 	if (!World)
-	{
-		return;
-	}
-
-	if (!AresCharacter || !World || !AresCharacter->AresProjectileClass) 
 	{
 		return;
 	}
@@ -185,7 +179,7 @@ void UGS_AresAimingSkill::SpawnSecondProjectile()
 	FTransform SpawnTransform(SpawnRotationB, SpawnLocation);
 
 	AGS_SwordAuraProjectile* ProjectileB = World->SpawnActorDeferred<AGS_SwordAuraProjectile>(
-		AresCharacter->AresProjectileClass,
+		CachedAresOwner->AresProjectileClass,
 		SpawnTransform,
 		OwnerCharacter,
 		nullptr,

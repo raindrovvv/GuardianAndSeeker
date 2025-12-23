@@ -119,15 +119,17 @@ void AGS_Guardian::MeleeAttackCheck()
 		const float MeleeAttackRange = 200.f;
 		const float MeleeAttackRadius = 200.f;
 		
-		TSet<AGS_Character*> DamagedCharacters = DetectPlayerInRange(Start, MeleeAttackRange, MeleeAttackRadius);
+		TSet<AGS_Character*> DamagedCharacters;
+		DetectPlayerInRange(DamagedCharacters, Start, MeleeAttackRange, MeleeAttackRadius);
 		ApplyDamageToDetectedPlayer(DamagedCharacters, 0.f);
 	}
 }
 
-TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, float SkillRange, float Radius)
+void AGS_Guardian::DetectPlayerInRange(TSet<AGS_Character*>& OutDamagedCharacters, const FVector& Start, float SkillRange, float Radius)
 {
+	OutDamagedCharacters.Reset();
+
 	TArray<FHitResult> OutHitResults;
-	TSet<AGS_Character*> DamagedPlayers;
 	FCollisionQueryParams Params(NAME_None, false, this);
 	Params.AddIgnoredActor(this);
 
@@ -149,7 +151,7 @@ TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, flo
 			AGS_Character* DamagedCharacter = Cast<AGS_Character>(OutHitResult.GetActor());
 			if (IsValid(DamagedCharacter))
 			{
-				DamagedPlayers.Add(DamagedCharacter);
+				OutDamagedCharacters.Add(DamagedCharacter);
 			}
 			//break bridge
 			if (OutHitResult.GetActor()->IsA<AGS_BridgePiece>())
@@ -162,8 +164,6 @@ TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, flo
 			}
 		}
 	}
-
-	return DamagedPlayers;
 }
 
 void AGS_Guardian::ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& DamagedCharacters, float PlusDamge)

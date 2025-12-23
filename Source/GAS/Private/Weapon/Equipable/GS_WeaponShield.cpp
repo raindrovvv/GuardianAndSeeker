@@ -405,7 +405,6 @@ void AGS_WeaponShield::PlayGuardSuccessVFX(EShieldHitTargetType TargetType, cons
 
 	if (VFXToPlay && GetWorld())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AGS_WeaponShield::PlayGuardSuccessVFX - Playing common guard VFX: %s"), *VFXToPlay->GetName());
 		// 방패 중앙에서 이펙트 재생
 		FVector ShieldCenter = ShieldMeshComponent->GetComponentLocation();
 		FRotator ShieldRotation = ShieldMeshComponent->GetComponentRotation();
@@ -420,15 +419,10 @@ void AGS_WeaponShield::PlayGuardSuccessVFX(EShieldHitTargetType TargetType, cons
 			true
 		);
 	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AGS_WeaponShield::PlayGuardSuccessVFX - Common guard VFX is not set or World is invalid."));
-	}
 
 	// WeaponVFXComponent를 통한 시커별 개별 가드 이펙트도 재생
 	if (WeaponVFXComponent && OwnerChar)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AGS_WeaponShield::PlayGuardSuccessVFX - Calling WeaponVFXComponent->PlayGuardSuccessVFX"));
 		ESeekerAuraType DefenderAuraType = GetSeekerAuraType(OwnerChar);
 		WeaponVFXComponent->PlayGuardSuccessVFX(SweepResult, DefenderAuraType);
 	}
@@ -464,7 +458,13 @@ void AGS_WeaponShield::Multicast_PlayHitVFX_Implementation(EShieldHitTargetType 
 		return;
 	}
 
-	PlayHitVFX(TargetType, SweepResult);
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
+		{
+			PlayHitVFX(TargetType, SweepResult);
+		}
+	}
 }
 
 void AGS_WeaponShield::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
@@ -475,17 +475,23 @@ void AGS_WeaponShield::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem
 		return;
 	}
 
-	if (VFXToPlay && GetWorld())
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			HitResult.ImpactPoint,
-			HitResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
+		{
+			if (VFXToPlay && GetWorld())
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					GetWorld(),
+					VFXToPlay,
+					HitResult.ImpactPoint,
+					HitResult.ImpactNormal.Rotation(),
+					FVector(1.0f),
+					true,
+					true
+				);
+			}
+		}
 	}
 }
 
@@ -502,7 +508,13 @@ void AGS_WeaponShield::Multicast_PlayGuardSuccessVFX_Implementation(EShieldHitTa
 		return;
 	}
 
-	PlayGuardSuccessVFX(TargetType, SweepResult);
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
+		{
+			PlayGuardSuccessVFX(TargetType, SweepResult);
+		}
+	}
 }
 
 void AGS_WeaponShield::PlayGuardSuccessSound(EShieldHitTargetType TargetType, const FHitResult& SweepResult)
@@ -724,75 +736,94 @@ void AGS_WeaponShield::OnDefenseHit(UPrimitiveComponent* OverlappedComponent, AA
 	// 충돌한 컴포넌트가 방어가 가능한 공격인지 확인
 	if (!OtherComp->ComponentHasTag("DEFENSIBLE_ATTACK"))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[찬 방어] DEFENSIBLE_ATTACK 태그 없음: %s"), *OtherComp->GetName());
+		return;
+	}
+
+	// 공격 콜리전이 실제로 활성화되어 있는지 확인 (공격 중일 때만 방어 판정)
+	ECollisionEnabled::Type CollisionType = OtherComp->GetCollisionEnabled();
+	if (CollisionType == ECollisionEnabled::NoCollision)
+	{
+		// 콜리전이 비활성화 상태면 공격 중이 아니므로 방어 판정 안함
 		return;
 	}
 	
 	// OwnerChar 유효성 확인 (레벨 전환 시 null일 수 있음.)
 	if (!IsOwnerCharValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[찬 방어] OwnerChar 유효하지 않음"));
 		return;
 	}
 	
 	// 실제 공격자(캐릭터)를 찾기. OtherActor는 무기일 수 있음.
 	AActor* AttackerActor = FindUltimateAttacker(OtherActor);
-	
-	// 중복 방어 히트 방지
+
+	// === 중복 방지: 이미 처리된 공격자면 즉시 종료 ===
 	if (DefenseHitActors.Contains(AttackerActor))
 	{
 		return;
 	}
-	DefenseHitActors.Add(AttackerActor);
+
+	// 방어 효과 재생
+	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
+	PlayDefenseEffects(AttackerActor, CorrectHitResult);
+}
+
+void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResult& HitResult)
+{
+	if (!HasAuthority() || !AttackerActor || !OwnerChar || AttackerActor == OwnerChar)
+	{
+		return;
+	}
+
+	// 중복 방어 히트 방지 (짧은 시간 내 동일 공격자 공격 무시)
+	if (DefenseHitActors.Contains(AttackerActor))
+	{
+		return;
+	}
+
+	// 상대방이 적인지 확인
+	if (OwnerChar->IsEnemy(Cast<AGS_Character>(AttackerActor)))
+	{
+		DefenseHitActors.Add(AttackerActor);
+	}
+	else
+	{
+		// 적이 아니면 방어 효과를 재생하지 않음
+		return;
+	}
+
+	// 찬이 방어 상태일 때만 가드 성공으로 인정
+	AGS_Chan* Chan = Cast<AGS_Chan>(OwnerChar);
+	if (!Chan || !Chan->bIsDefending)
+	{
+		DefenseHitActors.Remove(AttackerActor);
+		return;
+	}
 
 	// 맞은 대상 구분
 	EShieldHitTargetType TargetType = DetermineTargetType(AttackerActor);
 
-	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
-
-	AGS_Character* Attacker = Cast<AGS_Character>(AttackerActor); // 공격자
-	AGS_Character* Defender = OwnerChar; // 방어자
-	if (!Attacker || !Defender || !Attacker->IsEnemy(Defender))
-	{
-		return;
-	}
-	// 찬이 방어 상태일 때만 가드 성공으로 인정
-	AGS_Chan* Chan = Cast<AGS_Chan>(Defender);
-	if (!Chan || !Chan->bIsDefending)
-	{
-		return;
-	}
 	// === 가드 성공 이펙트 재생 ===
-	// 방어 성공 시 방패에서 이펙트와 사운드 재생
-	Multicast_PlayGuardSuccessVFX(TargetType, CorrectHitResult);
-	Multicast_PlayGuardSuccessSound(TargetType, CorrectHitResult);
+	Multicast_PlayGuardSuccessVFX(TargetType, HitResult);
+	Multicast_PlayGuardSuccessSound(TargetType, HitResult);
 
 	// 찬 전용 추가 방어 사운드 (시커 오디오 컴포넌트)
 	if (UGS_SeekerAudioComponent* SeekerAudio = Chan->GetComponentByClass<UGS_SeekerAudioComponent>())
 	{
 		SeekerAudio->PlayDefenseSound();
 	}
-	
-	// 방어 성공 시 몬스터 공격 콜리전을 비활성화하여 데미지 전달 방지
-	if (OtherComp)
+
+	// OnDefenseEndOverlap에서도 제거하므로, 둘 중 먼저 발생하는 쪽이 처리함
+	if (UWorld* World = GetWorld())
 	{
-		// 일시적으로 공격 콜리전 비활성화
-		OtherComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		
-		// 0.1초 후 콜리전 재활성화 (null 참조 방지)
-		if (UWorld* World = GetWorld())
+		FTimerHandle ClearHandle;
+		TWeakObjectPtr<AActor> WeakAttacker = AttackerActor;
+		World->GetTimerManager().SetTimer(ClearHandle, [this, WeakAttacker]()
 		{
-			FTimerHandle ReEnableCollisionHandle;
-			World->GetTimerManager().SetTimer(ReEnableCollisionHandle, [this, OtherComp, AttackerActor]()
+			if (IsValid(this) && WeakAttacker.IsValid())
 			{
-				if (OtherComp && IsValid(OtherComp))
-				{
-					OtherComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-				}
-				//DefenseHitActors.Remove(FindUltimateAttacker(OtherActor));
-				DefenseHitActors.Remove(AttackerActor);
-			}, 0.1f, false);
-		}
+				DefenseHitActors.Remove(WeakAttacker.Get());
+			}
+		}, 0.55f, false);
 	}
 }
 
@@ -814,7 +845,6 @@ void AGS_WeaponShield::OnDefenseEndOverlap(UPrimitiveComponent* OverlappedCompon
 	
 	// 방어용 히트 액터 목록에서 제거하여 다음 공격 시 가드 이펙트가 다시 나올 수 있도록 함
 	DefenseHitActors.Remove(AttackerActor);
-	UE_LOG(LogTemp, Warning, TEXT("[찬 방어] 중복 해제 성공"));
 }
 
 void AGS_WeaponShield::EnableDefenseHit()

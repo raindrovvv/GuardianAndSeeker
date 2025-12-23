@@ -225,7 +225,7 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDebuffVFX(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_RemoveDebuffVFX(EDebuffType DebuffType);
 
 	UFUNCTION(NetMulticast, Unreliable)

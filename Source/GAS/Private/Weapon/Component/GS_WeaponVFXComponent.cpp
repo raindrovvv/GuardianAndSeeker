@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Weapon/Component/GS_WeaponVFXComponent.h"
+#include "Character/GS_Character.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -559,6 +560,15 @@ void UGS_WeaponVFXComponent::Multicast_PlayGuardSuccessVFX_Implementation(FVecto
 		return;
 	}
 
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(ImpactPoint, 3500.0f))
+		{
+			return;
+		}
+	}
+
 	UNiagaraSystem* VFXSystem = GetWeaponVFX(EWeaponVFXType::GuardSuccess, DefenderSeekerType);
 	if (VFXSystem && GetWorld())
 	{
@@ -638,6 +648,15 @@ void UGS_WeaponVFXComponent::Multicast_PlaySlashVFX_Implementation(FVector Impac
 	if (!IsValidForVFXOperation())
 	{
 		return;
+	}
+
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(ImpactPoint, 3500.0f))
+		{
+			return;
+		}
 	}
 
 	// Slash Effect

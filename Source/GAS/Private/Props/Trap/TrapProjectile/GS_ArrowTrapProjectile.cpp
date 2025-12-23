@@ -245,19 +245,37 @@ void AGS_ArrowTrapProjectile::PlayHitVFX(EArrowHitType HitType, const FVector& I
 
 void AGS_ArrowTrapProjectile::Multicast_PlayHitEffects_Implementation(EArrowHitType HitType, const FVector& ImpactPoint, const FVector& ImpactNormal)
 {
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(ImpactPoint, 3000.0f))
+		{
+			return;
+		}
+	}
+
 	HandleHitEffects(HitType, ImpactPoint, ImpactNormal);
 }
 
 void AGS_ArrowTrapProjectile::Multicast_PlayHitVFXOnly_Implementation(const FVector& ImpactPoint, const FVector& ImpactNormal)
 {
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(ImpactPoint, 3000.0f))
+		{
+			return;
+		}
+	}
+
 	// 임팩트 VFX만 재생 (사운드 없음)
 	if (ImpactVFX)
 	{
 		FRotator VFXRotation = FRotationMatrix::MakeFromZ(ImpactNormal).Rotator();
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(), 
-			ImpactVFX, 
-			ImpactPoint, 
+			GetWorld(),
+			ImpactVFX,
+			ImpactPoint,
 			VFXRotation
 		);
 	}

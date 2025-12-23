@@ -15,6 +15,8 @@ UGS_ChanRollingSkill::UGS_ChanRollingSkill()
 void UGS_ChanRollingSkill::ActiveSkill()
 {
 	Super::ActiveSkill();
+
+	CachedChanOwner = Cast<AGS_Chan>(OwnerCharacter);
 }
 
 void UGS_ChanRollingSkill::OnSkillCanceledByDebuff()
@@ -26,23 +28,23 @@ void UGS_ChanRollingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
-		if (OwnerPlayer->HasAuthority())
+		if (CachedChanOwner->HasAuthority())
 		{
-			OwnerPlayer->Multicast_StopSkillMontage(SkillAnimMontages[0]);
-			OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			OwnerPlayer->CanChangeSeekerGait = true;
+			CachedChanOwner->Multicast_StopSkillMontage(SkillAnimMontages[0]);
+			CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedChanOwner->CanChangeSeekerGait = true;
 
 			// 스킬 종료 사운드 재생 (멀티캐스트)
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
 
 			SetIsActive(false);
 
-			OwnerPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			CachedChanOwner->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 		}
 	}
 }
@@ -50,13 +52,13 @@ void UGS_ChanRollingSkill::OnSkillAnimationEnd()
 void UGS_ChanRollingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-	if (AGS_Chan* AresCharacter = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
-		if (AresCharacter->GetSkillComp())
+		if (CachedChanOwner->GetSkillComp())
 		{
-			AresCharacter->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			AresCharacter->SetMoveControlValue(true, true);
-			SetIsActive(false);
+			CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedChanOwner->SetMoveControlValue(true, true);
 		}
 	}
+	SetIsActive(false);
 }

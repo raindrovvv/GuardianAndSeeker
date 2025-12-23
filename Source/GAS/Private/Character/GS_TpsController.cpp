@@ -584,6 +584,12 @@ void AGS_TpsController::BeginPlay()
 				InteractionWidget->AddToViewport();
 			}
 		}
+
+		// 빈사 상태 체크 타이머 시작 (0.2초 간격)
+		GetWorldTimerManager().SetTimer(ReviveIndicatorTimerHandle, this, &AGS_TpsController::UpdateReviveIndicatorVisibility, 0.2f, true);
+		
+		// 상호작용 가능 대상 감지 타이머 시작 (0.1초 간격)
+		GetWorldTimerManager().SetTimer(InteractableUpdateTimerHandle, this, &AGS_TpsController::UpdateNearbyInteractable, 0.1f, true);
 	}
 }
 
@@ -676,6 +682,8 @@ void AGS_TpsController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(AutoMoveTickHandle);
+		GetWorld()->GetTimerManager().ClearTimer(ReviveIndicatorTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(InteractableUpdateTimerHandle);
 	}
 }
 
@@ -688,13 +696,7 @@ void AGS_TpsController::Tick(float DeltaTime)
 		return;
 	}
 
-	// 빈사 시커 감지 및 위젯 업데이트
-	UpdateReviveIndicatorVisibility();
-
-	// 근처 상호작용 가능 대상 캐싱 (오버랩 기반)
-	UpdateNearbyInteractable();
-
-	// 상호작용 진행 업데이트
+	// 상호작용 진행 업데이트 (진행바의 부드러움을 위해 Tick 유지)
 	UpdateInteractionProgress(DeltaTime);
 
 	// 기존 구조 중 로직 (변경 없음)
@@ -923,8 +925,18 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 
 			if (Distance < ClosestDistance)
 			{
-				ClosestDistance = Distance;
-				ClosestDyingSeeker = OtherSeeker;
+				// 시야(LOS) 확인 - 벽 너머 구조 방지 및 UI 가독성 향상
+				FHitResult LOSHit;
+				FCollisionQueryParams Params;
+				Params.AddIgnoredActor(MySeeker);
+				Params.AddIgnoredActor(OtherSeeker);
+				
+				if (!World->LineTraceSingleByChannel(LOSHit, MyLocation, OtherSeeker->GetActorLocation(), ECC_Visibility, Params))
+				{
+					// 가려진 것 없음
+					ClosestDistance = Distance;
+					ClosestDyingSeeker = OtherSeeker;
+				}
 			}
 		}
 	}
@@ -949,6 +961,18 @@ void AGS_TpsController::Server_RequestRevive_Implementation(AGS_Seeker* Target)
 	float Distance = FVector::Dist(MySeeker->GetActorLocation(), Target->GetActorLocation());
 	if (Distance > ReviveDistance)
 	{
+		return;
+	}
+
+	// [보안/로직] 시야(LOS) 재확인 (서버 검증)
+	FHitResult LOSHit;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(MySeeker);
+	Params.AddIgnoredActor(Target);
+	
+	if (GetWorld()->LineTraceSingleByChannel(LOSHit, MySeeker->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params))
+	{
+		// 무언가에 가려짐
 		return;
 	}
 

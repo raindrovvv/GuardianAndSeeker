@@ -26,13 +26,12 @@ void UGS_DrakharFly::ActiveSkill()
 
 	bIsFlying = true;
 	
+	CachedDrakharOwner = Cast<AGS_Drakhar>(OwnerCharacter);
+
 	// 멀티플레이어 환경에서 안전성 체크 추가
-	if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
+	if (CachedDrakharOwner.IsValid())
 	{
-		if (IsValid(Drakhar))
-		{
-			Drakhar->MulticastRPC_OnFlyStart();
-		}
+		CachedDrakharOwner->MulticastRPC_OnFlyStart();
 	}
 	
 	ExecuteSkillEffect();
@@ -42,14 +41,11 @@ void UGS_DrakharFly::OnSkillCanceledByDebuff()
 {
 	bIsFlying = false;
 	
-	if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
+	if (CachedDrakharOwner.IsValid())
 	{
-		if (IsValid(Drakhar))
-		{
-			Drakhar->MulticastRPC_OnFlyEnd();
-			Drakhar->GuardianDoSkillState = EGuardianDoSkill::None;
-			Drakhar->GuardianState = EGuardianCtrlState::CtrlEnd;
-		}
+		CachedDrakharOwner->MulticastRPC_OnFlyEnd();
+		CachedDrakharOwner->GuardianDoSkillState = EGuardianDoSkill::None;
+		CachedDrakharOwner->GuardianState = EGuardianCtrlState::CtrlEnd;
 	}
 	ExecuteSkillEffect();
 }

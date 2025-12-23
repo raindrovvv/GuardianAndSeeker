@@ -64,6 +64,8 @@ void UGS_MerciUltimateSkill::OnSkillAnimationEnd()
 void UGS_MerciUltimateSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
+	// 궁극기는 InterruptSkill로 중단되지 않음 (AutoAimingHandle 타이머가 끝날 때까지 유지)
+	// DeactiveSkill은 타이머 종료 시에만 호출됨
 }
 
 void UGS_MerciUltimateSkill::AutoAimingStart()

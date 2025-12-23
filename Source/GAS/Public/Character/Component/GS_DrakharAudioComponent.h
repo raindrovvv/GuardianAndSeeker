@@ -39,6 +39,10 @@ public:
 	void PlayLandingSound();
 
 	// === 로컬 전용 사운드 재생 (RPC 없음 - RepNotify에서 호출) ===
+	void PlayFeverModeStartSoundLocal();
+	void PlayFeverModeEndSoundLocal();
+	void PlayFeverModeStateSoundLocal();
+	void StopFeverModeStateSoundLocal();
 	void PlayHurtSoundLocal();
 	void PlayDeathSoundLocal();
 	void PlayDraconicProjectileImpactSoundLocal(const FVector& ImpactLocation, bool bHitCharacter);
@@ -67,16 +71,16 @@ private:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayAttackHitSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStartSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeEndSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStateSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StopFeverModeStateSound();
 
 	UFUNCTION(NetMulticast, Unreliable)

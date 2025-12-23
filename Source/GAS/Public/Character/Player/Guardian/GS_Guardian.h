@@ -83,7 +83,7 @@ public:
 	virtual void MeleeAttackCheck();
 	
 	//check player in attack range
-	TSet<AGS_Character*> DetectPlayerInRange(const FVector& Start, float SkillRange, float Radius);
+	void DetectPlayerInRange(TSet<AGS_Character*>& OutDamagedCharacters, const FVector& Start, float SkillRange, float Radius);
 	
 	//damage player in TSet
 	void ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& DamagedCharacters, float PlusDamge);

@@ -24,4 +24,8 @@ public:
 
 	UFUNCTION()
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	/** 캐싱된 Seeker 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Seeker> CachedSeekerOwner;
 };

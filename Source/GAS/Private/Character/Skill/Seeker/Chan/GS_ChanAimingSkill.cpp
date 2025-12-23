@@ -29,40 +29,42 @@ void UGS_ChanAimingSkill::ActiveSkill()
 	// 쿨타임 측정 시작
 	StartCoolDown();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	CachedChanOwner = Cast<AGS_Chan>(OwnerCharacter);
+
+	if (CachedChanOwner.IsValid())
 	{
-		if (!OwnerPlayer->GetSkillComp()->IsSkillAllowed(ESkillSlot::Aiming))
+		if (!CachedChanOwner->GetSkillComp()->IsSkillAllowed(ESkillSlot::Aiming))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Aiming Skill, OnSkillCommand, IsSkillAllowd is false"));
 			return;
 		}
 
 		// 애니메이션 설정
-		OwnerPlayer->Multicast_SetMustTurnInPlace(false);
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedChanOwner->Multicast_SetMustTurnInPlace(false);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 
 		// 입력 제한 설정
-		OwnerPlayer->SetLookControlValue(false, false);
-		OwnerPlayer->SetMoveControlValue(false, false);
+		CachedChanOwner->SetLookControlValue(false, false);
+		CachedChanOwner->SetMoveControlValue(false, false);
 
 		// bitmask flag
-		OwnerPlayer->GetSkillComp()->SetCurAllowedSkillsMask(0);
+		CachedChanOwner->GetSkillComp()->SetCurAllowedSkillsMask(0);
 
 		// Play Montage
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
 
 		// Set HitReact
-		OwnerPlayer->SetCanHitReact(false);
+		CachedChanOwner->SetCanHitReact(false);
 
 		// Forward Jump
-		const FVector Forward = OwnerPlayer->GetActorForwardVector();
+		const FVector Forward = CachedChanOwner->GetActorForwardVector();
 		const FVector JumpVelocity = Forward * 600.0f + FVector(0.f, 0.f, 420.0f);
-		OwnerPlayer->LaunchCharacter(JumpVelocity, true, true);
+		CachedChanOwner->LaunchCharacter(JumpVelocity, true, true);
 
 		// 스킬 시작 사운드 재생 (멀티캐스트)
-		if (OwnerPlayer->HasAuthority())
+		if (CachedChanOwner->HasAuthority())
 		{
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
@@ -88,9 +90,9 @@ void UGS_ChanAimingSkill::OnSkillCanceledByDebuff()
 	Super::OnSkillCanceledByDebuff();
 
 	// 방어 상태 비활성화
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
-		OwnerPlayer->SetDefending(false);
+		CachedChanOwner->SetDefending(false);
 	}
 }
 
@@ -98,21 +100,21 @@ void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
 		// Change Slot
-		OwnerPlayer->Multicast_SetMustTurnInPlace(false);
-		OwnerPlayer->SetSeekerGait(OwnerPlayer->GetLastSeekerGait());
+		CachedChanOwner->Multicast_SetMustTurnInPlace(false);
+		CachedChanOwner->SetSeekerGait(CachedChanOwner->GetLastSeekerGait());
 		// Change Slot
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 
-		OwnerPlayer->CanChangeSeekerGait = true;
+		CachedChanOwner->CanChangeSeekerGait = true;
 		
-		OwnerPlayer->SetMoveControlValue(true, true);
-		OwnerPlayer->SetLookControlValue(true, true);
+		CachedChanOwner->SetMoveControlValue(true, true);
+		CachedChanOwner->SetLookControlValue(true, true);
 
 		// 피격 애니메이션 재생 가능 설정
-		//OwnerPlayer->SetCanHitReact(true);
+		//CachedChanOwner->SetCanHitReact(true);
 
 		// SetIsActive(false); // 방어 상태를 유지하기 위해 제거
 
@@ -129,7 +131,7 @@ void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 			OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
 		}
 
-		OwnerPlayer->SetCanHitReact(true);
+		CachedChanOwner->SetCanHitReact(true);
 	}
 }
 
@@ -151,13 +153,14 @@ void UGS_ChanAimingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
 
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-
-	OwnerPlayer->SetLookControlValue(true, true);
+	if (CachedChanOwner.IsValid())
+	{
+		CachedChanOwner->SetLookControlValue(true, true);
+		// 방어 상태 비활성화 (스킬이 중단될 때)
+		CachedChanOwner->SetDefending(false);
+	}
+	
 	SetIsActive(false);
-
-	// 방어 상태 비활성화 (스킬이 중단될 때)
-	OwnerPlayer->SetDefending(false);
 
 	//OwnerPlayer->SetCurrentStamina(0.f);
 	//OwnerPlayer->Client_ChanAimingSkillBar(false);
@@ -179,13 +182,15 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 	Params.AddIgnoredActor(OwnerCharacter);
 
 	// 스킬 범위 표시(테스트)
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-	OwnerPlayer->Multicast_DrawSkillRange(SkillLocation, Radius, FColor::Red, 1.0f);
-
-	// 방패 슬램 충돌 사운드 재생
-	if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->FindComponentByClass<UGS_SeekerAudioComponent>())
+	if (CachedChanOwner.IsValid())
 	{
-		AudioComp->PlayShieldSlamImpactSound();
+		CachedChanOwner->Multicast_DrawSkillRange(SkillLocation, Radius, FColor::Red, 1.0f);
+
+		// 방패 슬램 충돌 사운드 재생
+		if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
+		{
+			AudioComp->PlayShieldSlamImpactSound();
+		}
 	}
 
 	if (OwnerCharacter->GetWorld()->SweepMultiByChannel(HitResults, SkillLocation, SkillLocation, FQuat::Identity, ECC_Pawn, Shape, Params))
@@ -218,13 +223,13 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
 				// Impact VFX 재생
-				TargetMonster->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetMonster->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
 				// Impact VFX 재생
-				TargetGuardian->Multicast_PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				TargetGuardian->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
 			}
 			else if (AGS_Character* Target = Cast<AGS_Character>(HitActor)) // 시커일 경우
 			{
@@ -239,7 +244,10 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 	//OwnerPlayer->SetCanHitReact(true);
 
 	// 방어 상태 해제 (방패 슬램 실행 시)
-	OwnerPlayer->SetDefending(false);
+	if (CachedChanOwner.IsValid())
+	{
+		CachedChanOwner->SetDefending(false);
+	}
 
 	// 스킬 종료
 	DeactiveSkill();
@@ -247,14 +255,14 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 
 void UGS_ChanAimingSkill::StartHoldUp()
 {
-	if (AGS_Chan* OwnerChan = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
 		// 스테미나 초기화
-		//OwnerChan->ResetCurrentStamina();
-		OwnerChan->SetDefending(true);
+		//CachedChanOwner->ResetCurrentStamina();
+		CachedChanOwner->SetDefending(true);
 
 		// UI 표시
-		//OwnerChan->Client_ChanAimingSkillBar(true);
+		//CachedChanOwner->Client_ChanAimingSkillBar(true);
 	}
 }
 
@@ -293,15 +301,15 @@ void UGS_ChanAimingSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
 
 void UGS_ChanAimingSkill::DeactiveSkill()
 {
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
 		// Set HitReact
-		OwnerPlayer->CanChangeSeekerGait = true;
-		OwnerPlayer->SetSeekerGait(EGait::Run);
-		//OwnerPlayer->SetCanHitReact(true);
+		CachedChanOwner->CanChangeSeekerGait = true;
+		CachedChanOwner->SetSeekerGait(EGait::Run);
+		//CachedChanOwner->SetCanHitReact(true);
 
 		// 방어 상태 비활성화 (스킬 완전 종료 시)
-		OwnerPlayer->SetDefending(false);
+		CachedChanOwner->SetDefending(false);
 	}
 
 	// 스킬 상태 업데이트

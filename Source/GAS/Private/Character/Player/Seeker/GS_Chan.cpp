@@ -19,7 +19,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Skill/Seeker/Chan/GS_ChanUltimateSkill.h"
-/*#include "Engine/DamageEvents.h"*/
+#include "Engine/DamageEvents.h"
 
 
 // Sets default values
@@ -131,16 +131,14 @@ void AGS_Chan::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	Super::OnComboAttack();	
 }*/
 
-void AGS_Chan::MulticastPlayComboSection()
+void AGS_Chan::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 {
-	Super::MulticastPlayComboSection();
+	Super::MulticastPlayComboSection_Implementation(ComboIndex);
 
-	// 방패 콜리전은 GS_AN_ShieldAttack AnimNotify에서 처리
-
-	// 오디오 컴포넌트를 통해 찬 전용 콤보 공격 사운드 재생
+	// 오디오 컴포넌트를 통해 찬 전용 콤보 공격 사운드 재생 (1-based 인덱스 전달)
 	if (SeekerAudioComponent)
 	{
-		SeekerAudioComponent->PlayChanComboAttackSound(CurrentComboIndex);
+		SeekerAudioComponent->PlayChanComboAttackSound(ComboIndex + 1);
 	}
 }
 
@@ -256,11 +254,25 @@ float AGS_Chan::TakeDamage(float DamageAmount, struct FDamageEvent const& Damage
 			float StaminaDamage = DamageAmount * (MaxStamina / MaxHealth);
 			SetCurrentStamina(CurrentStamina - StaminaDamage, true);
 		}
+
+		// === 물리 충돌이 없는 공격(거리 기반 판정 등)에 대한 방어 효과 수동 호출 ===
+		for (int32 i = 0; i < 5; ++i)
+		{
+			if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
+			{
+				FHitResult HitResult;
+				// 히트 정보가 있으면 사용하고, 없으면 방패 앞 임의의 지점 생성
+				HitResult.ImpactPoint = Shield->GetActorLocation() + Shield->GetActorForwardVector() * 50.0f;
+				HitResult.ImpactNormal = -Shield->GetActorForwardVector();
+
+				Shield->PlayDefenseEffects(DamageCauser, HitResult);
+				break;
+			}
+		}
 	}
 	else
 	{
 		// 방어 상태가 아닐 때만 부모 클래스의 TakeDamage 호출
-		//UE_LOG(LogTemp, Warning, TEXT("Normal Damage In"));
 		ActualDamage = Super::TakeDamage(ActualDamage, DamageEvent, EventInstigator, DamageCauser);
 	}
 

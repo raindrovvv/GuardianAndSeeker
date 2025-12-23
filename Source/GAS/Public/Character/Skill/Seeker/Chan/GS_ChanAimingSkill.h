@@ -44,4 +44,8 @@ private:
 	//Range VFX
 	FTimerHandle RangeVFXSpawnHandle;
 	void SpawnAimingSkillVFX();
+
+	/** 캐싱된 Chan 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Chan> CachedChanOwner;
 };

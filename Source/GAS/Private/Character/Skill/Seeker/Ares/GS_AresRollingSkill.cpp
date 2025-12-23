@@ -15,6 +15,8 @@ UGS_AresRollingSkill::UGS_AresRollingSkill()
 void UGS_AresRollingSkill::ActiveSkill()
 {	
 	Super::ActiveSkill();
+
+	CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 }
 
 void UGS_AresRollingSkill::OnSkillCanceledByDebuff()
@@ -26,16 +28,16 @@ void UGS_AresRollingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Ares* OwnerPlayer = Cast<AGS_Ares>(OwnerCharacter))
+	if (CachedAresOwner.IsValid())
 	{
-		if (OwnerPlayer->HasAuthority())
+		if (CachedAresOwner->HasAuthority())
 		{
-			OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			OwnerPlayer->SetMoveControlValue(true, true);
-			OwnerPlayer->CanChangeSeekerGait = true;
+			CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedAresOwner->SetMoveControlValue(true, true);
+			CachedAresOwner->CanChangeSeekerGait = true;
 
 			// 스킬 종료 사운드 재생 (멀티캐스트)
-			if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedAresOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
@@ -48,11 +50,10 @@ void UGS_AresRollingSkill::OnSkillAnimationEnd()
 void UGS_AresRollingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-	AGS_Ares* AresCharacter = Cast<AGS_Ares>(OwnerCharacter);
-	if (AresCharacter->GetSkillComp())
+	if (CachedAresOwner.IsValid() && CachedAresOwner->GetSkillComp())
 	{
-		AresCharacter->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		AresCharacter->CanChangeSeekerGait = true;
-		SetIsActive(false);
+		CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedAresOwner->CanChangeSeekerGait = true;
 	}
+	SetIsActive(false);
 }

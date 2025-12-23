@@ -35,13 +35,14 @@ UClass* AGS_BossLevelGM::GetDefaultPawnClassForController_Implementation(AContro
         return Super::GetDefaultPawnClassForController_Implementation(InController);
     }
 
-    if (!(PS->bIsAlive))
-    {
-        return nullptr;
-    }
     if (!PS)
     {
 		return Super::GetDefaultPawnClassForController_Implementation(InController);
+    }
+
+    if (!(PS->bIsAlive))
+    {
+        return nullptr;
     }
 
     if (PS->CurrentPlayerRole == EPlayerRole::PR_Guardian)

@@ -41,6 +41,13 @@ public:
 	//[combo attack variables]
 	UPROPERTY(Replicated)
 	bool bCanCombo;
+
+	// Optimization: Replicated counter for combo attack (OnRep pattern)
+	UPROPERTY(ReplicatedUsing = OnRep_ComboAttackCount)
+	uint8 ComboAttackCount;
+
+	UFUNCTION()
+	void OnRep_ComboAttackCount();
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool IsAttacking;
 	
@@ -145,6 +152,10 @@ public:
 	void ResetIsAttackingDuringFeverMode();
 	void StartIsAttackingTimer();
 	
+	// Optimization: Pre-allocated collections to reduce GC pressure
+	TSet<AGS_Character*> CachedDamagedCharacters;
+	TArray<FVector> CachedPillarLocations;
+	
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCFeverMontagePlay();
 	
@@ -206,7 +217,7 @@ public:
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeStart();
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeEnd();
 	
-	UFUNCTION(NetMulticast, Reliable) void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
+	UFUNCTION(NetMulticast, Unreliable) void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
 	
 	// === Blueprint Events ===
 	UFUNCTION(BlueprintImplementableEvent, Category = "Skill|Fly", meta = (DisplayName = "On Fly Start"))

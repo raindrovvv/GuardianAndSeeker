@@ -24,15 +24,19 @@ AGS_NeedleFangProjectile::AGS_NeedleFangProjectile()
 void AGS_NeedleFangProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	GetWorld()->GetTimerManager().SetTimer(DestroyTimerHandle, this, &AGS_NeedleFangProjectile::HandleProjectileDestroy, ProjectileLifeTime, false);
+
+	// === 투사체 콜리전에 방어 가능 태그 추가 ===
 	if (CollisionComponent)
 	{
-		CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AGS_NeedleFangProjectile::OnBeginOverlap);
+		CollisionComponent->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
 
-		// Overlap 설정 강화
+		// 기존 Overlap 설정 (유지)
+		CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AGS_NeedleFangProjectile::OnBeginOverlap);
 		CollisionComponent->SetGenerateOverlapEvents(true);
 	}
+
+	// 기존 타이머 설정 (유지)
+	GetWorld()->GetTimerManager().SetTimer(DestroyTimerHandle, this, &AGS_NeedleFangProjectile::HandleProjectileDestroy, ProjectileLifeTime, false);
 }
 
 void AGS_NeedleFangProjectile::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -109,5 +113,11 @@ void AGS_NeedleFangProjectile::Multicast_PlayHitSound_Implementation(FVector Hit
 
 void AGS_NeedleFangProjectile::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator());
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (OwnerChar->ShouldPlayVFXAtLocation(HitLocation, 3000.0f))
+		{
+			UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator());
+		}
+	}
 }

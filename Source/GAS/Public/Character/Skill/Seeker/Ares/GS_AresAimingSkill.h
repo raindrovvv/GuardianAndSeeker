@@ -34,4 +34,7 @@ private:
 	void SpawnFirstProjectile();
 	void SpawnSecondProjectile();
 
+	/** 캐싱된 Ares 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Ares> CachedAresOwner;
 };

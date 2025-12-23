@@ -165,6 +165,7 @@ protected:
 	
 private:
 	FTimerHandle ReverseTimerHandle;
+	FTimerHandle DamageRecoveryTimerHandle;
 	
 	UGS_ArrowTypeWidget* ArrowTypeWidget;
 

@@ -19,4 +19,8 @@ public:
 	virtual void OnSkillCanceledByDebuff() override;
 	virtual void OnSkillAnimationEnd() override;
 	virtual void InterruptSkill() override;
+
+	/** 캐싱된 Ares 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Ares> CachedAresOwner;
 };

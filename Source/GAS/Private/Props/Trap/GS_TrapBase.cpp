@@ -1,5 +1,6 @@
 #include "Props/Trap/GS_TrapBase.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/GS_Character.h"
 #include "Engine/DamageEvents.h"
 #include "Props/Trap/TrapMotion/GS_TrapMotionCompBase.h"
 #include "EngineUtils.h"
@@ -84,18 +85,17 @@ void AGS_TrapBase::BeginPlay()
 
     RefreshTrapAudioSetup(true);
 
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	TArray<UActorComponent*> PrimComponents;
+	GetComponents(UPrimitiveComponent::StaticClass(), PrimComponents);
+	for (UActorComponent* Comp : PrimComponents)
 	{
 		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
 		{
 			if (Prim->ComponentHasTag("OptimizedCollision"))
 			{
+				OptimizedCollisionComponents.Add(Prim);
 				Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			}
-
-
 		}
 	}
 	
@@ -345,16 +345,11 @@ void AGS_TrapBase::ActivateTrap_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_EnableOptimizedCollision_Implementation()
 {
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	for (auto& WeakPrim : OptimizedCollisionComponents)
 	{
-		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
+		if (UPrimitiveComponent* Prim = WeakPrim.Get())
 		{
-			if (Prim->ComponentHasTag("OptimizedCollision"))
-			{
-				Prim->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			}
+			Prim->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		}
 	}
 }
@@ -388,16 +383,11 @@ void AGS_TrapBase::DeActivateTrap_Implementation()
 
 void AGS_TrapBase::Multicast_DisableOptimizedCollision_Implementation()
 {
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	for (auto& WeakPrim : OptimizedCollisionComponents)
 	{
-		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
+		if (UPrimitiveComponent* Prim = WeakPrim.Get())
 		{
-			if (Prim->ComponentHasTag("OptimizedCollision"))
-			{
-				Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			}
+			Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 }
@@ -652,6 +642,36 @@ void AGS_TrapBase::CustomTrapEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLocation)
 {
+	// VFX 거리 기반 컬링 (Dedicated Server 체크)
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// 발동 쿨다운 체크
+	const double CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - LastBloodVFXTime < BloodVFXCooldown)
+	{
+		return;
+	}
+	LastBloodVFXTime = CurrentTime;
+
+	// 카메라 거리 체크
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+		{
+			const FVector CameraLocation = CameraManager->GetCameraLocation();
+			const float DistanceSquared = FVector::DistSquared(HitLocation, CameraLocation);
+			const float MaxDistanceSquared = 3000.0f * 3000.0f;
+
+			if (DistanceSquared > MaxDistanceSquared)
+			{
+				return;
+			}
+		}
+	}
+
 	// 함정 데이터에서 혈흔 이펙트 가져오기 (개별 함정에서 오버라이드 가능)
 	UNiagaraSystem* BloodEffectToUse = TrapData.TrapHitBloodEffect;
 
@@ -712,19 +732,17 @@ bool AGS_TrapBase::IsBlockedInDirection(const FVector& Start, const FVector& Dir
 //Trap Motion
 AGS_TrapManager* AGS_TrapBase::GetTrapManager() const
 {
-	/*if (UWorld* World = GetWorld())
+	if (CachedTrapManager.IsValid())
 	{
-		if (AGS_InGameGM* GM = Cast<AGS_InGameGM>(World->GetAuthGameMode()))
-		{
-			return GM->GetTrapManager();
-		}
+		return CachedTrapManager.Get();
 	}
-	return nullptr;*/
 
 	for (TActorIterator<AGS_TrapManager> It(GetWorld()); It; ++It)
 	{
+		CachedTrapManager = *It;
 		return *It;
 	}
+
 	return nullptr;
 }
 
@@ -1015,7 +1033,7 @@ void AGS_TrapBase::PlayActivationSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayActivationSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Activation);
 	}
 }
 
@@ -1029,7 +1047,7 @@ void AGS_TrapBase::PlayDeactivationSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayDeactivationSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Deactivation);
 	}
 }
 
@@ -1043,11 +1061,11 @@ void AGS_TrapBase::PlayHitSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayHitSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Hit);
 	}
 }
 
-void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
+void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundType)
 {
 	// 데디케이티드 서버에서는 오디오 처리 불필요
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
@@ -1067,7 +1085,25 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
+	UAkAudioEvent* SoundEvent = nullptr;
+	FString DebugSoundName;
+
+	switch (SoundType)
+	{
+	case ETrapSoundType::Activation:
+		SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
+		DebugSoundName = TEXT("Activation");
+		break;
+	case ETrapSoundType::Deactivation:
+		SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
+		DebugSoundName = TEXT("Deactivation");
+		break;
+	case ETrapSoundType::Hit:
+		SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
+		DebugSoundName = TEXT("Hit");
+		break;
+	}
+
 	if (SoundEvent)
 	{
 		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
@@ -1082,84 +1118,6 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Activation SoundEvent is None for %s. Please check Trap DataTable or BP settings."), *GetName());
-	}
-}
-
-void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
-{
-	// 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
-		return;
-	}
-
-	// Actor 유효성 체크 (서버 안정성)
-	if (!IsValid(this))
-	{
-		return;
-	}
-
-	// 거리 기반 최적화 체크
-	if (!ShouldPlayTrapSoundAtLocation(GetActorLocation()))
-	{
-		return;
-	}
-
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
-	if (SoundEvent)
-	{
-		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
-		if (IsValid(TrapAkComponent))
-		{
-			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
-		}
-		else
-		{
-			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Deactivation SoundEvent is None for %s."), *GetName());
-	}
-}
-
-void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
-{
-	// 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
-		return;
-	}
-
-	// Actor 유효성 체크 (서버 안정성)
-	if (!IsValid(this))
-	{
-		return;
-	}
-
-	// 거리 기반 최적화 체크
-	if (!ShouldPlayTrapSoundAtLocation(GetActorLocation()))
-	{
-		return;
-	}
-
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
-	if (SoundEvent)
-	{
-		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
-		if (IsValid(TrapAkComponent))
-		{
-			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
-		}
-		else
-		{
-			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Hit SoundEvent is None for %s."), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] %s SoundEvent is None for %s."), *DebugSoundName, *GetName());
 	}
 }

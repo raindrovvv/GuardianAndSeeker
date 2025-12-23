@@ -33,15 +33,7 @@ public:
 
 	virtual void ServerAttackMontage() override;
 
-	virtual void MulticastPlayComboSection() override;
-
-	// ===============
-	// 사운드 시스템 (GS_SeekerAudioComponent로 통합됨)
-	// ===============
-	// 모든 사운드는 GS_SeekerAudioComponent에서 처리됨
-	// - 콤보 공격 사운드: PlayAresComboAttackSound() 함수 사용
-	// - 콤보 공격 사운드 (추가 사운드 포함): PlayAresComboAttackSoundWithExtra() 함수 사용
-	// - 사운드 배열들은 GS_SeekerAudioComponent의 AresComboXXX 프로퍼티들에서 설정
+	virtual void MulticastPlayComboSection_Implementation(int32 ComboIndex) override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "VFX|Attack")
 	class UNiagaraSystem* FinalAttackHitVFX; // 4번째 공격 추가 VFX

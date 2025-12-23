@@ -25,4 +25,8 @@ public:
 
 private:
 	virtual void DeactiveSkill() override;
+
+	/** 캐싱된 Merci 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
 };
