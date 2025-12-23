@@ -404,6 +404,8 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AGS_Monster>> NearbyMonsters;
 
+	void ClearNearbyMonsters();
+
 	UFUNCTION()
 	void HandleMonsterDeath(AGS_Monster* DeadMonster);
 

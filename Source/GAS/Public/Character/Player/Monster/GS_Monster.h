@@ -136,5 +136,4 @@ private:
 	/** Tracks previous HP for damage detection (not healing) */
 	float LastKnownHP;
 
-	void UpdateSkillCooldownWidget();
 };

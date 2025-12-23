@@ -257,7 +257,7 @@ void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AGS_Seeker, SeekerState);
 
 	DOREPLIFETIME(AGS_Seeker, bIsDetectedByGuardian);
-	DOREPLIFETIME_CONDITION(AGS_Seeker, DetectionIntensity, COND_SkipOwner);
+	DOREPLIFETIME(AGS_Seeker, DetectionIntensity);
 	
 	// 빈사 상태 변수들
 	DOREPLIFETIME(AGS_Seeker, bIsInDyingState);
@@ -793,6 +793,18 @@ void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
 	}
 }
 
+void AGS_Seeker::ClearNearbyMonsters()
+{
+	for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
+	{
+		if (NearbyMonsters[i].IsValid())
+		{
+			NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
+		}
+	}
+	NearbyMonsters.Reset();
+}
+
 void AGS_Seeker::RemoveCombatMonster(AGS_Monster* Monster)
 {
 	if (!Monster) return;
@@ -926,15 +938,7 @@ void AGS_Seeker::OnDeath()
 	Super::OnDeath();
 
 	ClientRPCStopCombatMusic();
-	
-	for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
-	{
-		if (NearbyMonsters[i].IsValid())
-		{
-			NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
-		}
-	}
-	NearbyMonsters.Empty();
+	ClearNearbyMonsters();
 }
 
 void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, bool bIsNowAlive)
@@ -954,15 +958,7 @@ void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, b
 	if (!bIsNowAlive) // 자신이 죽었을 때
 	{
 		ClientRPCStopCombatMusic();
-		
-		for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
-		{
-			if (NearbyMonsters[i].IsValid())
-			{
-				NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
-			}
-		}
-		NearbyMonsters.Empty();
+		ClearNearbyMonsters();
 	}
 }
 

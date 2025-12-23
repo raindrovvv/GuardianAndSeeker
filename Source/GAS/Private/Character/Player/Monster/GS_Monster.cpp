@@ -64,7 +64,7 @@ AGS_Monster::AGS_Monster()
 	Tags.Add("Monster");
 	
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// RTS 선택을 위한 콜리전 설정 (모든 몬스터에 적용)
 	if (GetCapsuleComponent())
@@ -83,12 +83,13 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// === 서버 성능 최적화: 데디케이티드 서버에서는 틱을 비활성화 ===
+
 	if (IsRunningDedicatedServer())
 	{
 		PrimaryActorTick.bCanEverTick = false;
 		SetActorTickEnabled(false);
 	}
+
 	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
@@ -159,17 +160,6 @@ void AGS_Monster::BeginPlay()
 		{
 			Registry->RegisterMonster(this);
 		}
-	}
-}
-
-void AGS_Monster::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	// 클라이언트 또는 리슨 서버 호스트에서만 위젯 회전 업데이트 (데디케이티드 서버는 위에서 틱 비활성화됨)
-	if (IsValid(SkillCooldownWidgetComp) && !IsRunningDedicatedServer())
-	{
-		UpdateSkillCooldownWidget();
 	}
 }
 
@@ -250,7 +240,12 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
-} 
+}
+
+void AGS_Monster::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+}
 
 void AGS_Monster::OnDeath()
 {
@@ -463,24 +458,6 @@ void AGS_Monster::UpdateDecal()
 bool AGS_Monster::ShowDecal()
 {
 	return true;
-}
-
-void AGS_Monster::UpdateSkillCooldownWidget()
-{
-	if (!IsValid(SkillCooldownWidgetComp))
-	{
-		return;
-	}
-
-	if (APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		FVector CameraForward = CameraManager->GetCameraRotation().Vector();
-		FVector CameraRight = FVector::CrossProduct(CameraForward, FVector::UpVector).GetSafeNormal();
-		FVector CameraUp = FVector::CrossProduct(CameraRight, CameraForward).GetSafeNormal();
-		FRotator WidgetRotation = UKismetMathLibrary::MakeRotFromXZ(-CameraForward, CameraUp);
-
-		SkillCooldownWidgetComp->SetWorldRotation(WidgetRotation);
-	}
 }
 
 void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
