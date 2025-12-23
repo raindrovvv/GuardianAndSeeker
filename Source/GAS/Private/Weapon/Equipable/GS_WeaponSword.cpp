@@ -170,7 +170,7 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
 			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
-			HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SafeDisableHitBoxCollision(HitBox);
 		}
 	}
 
@@ -241,8 +241,8 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 	DamageEvent.HitReactType =  EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
-	// 한 번의 공격에 한 명의 적만 맞도록 히트박스 비활성화
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// 한 번의 공격에 한 명의 적만 맞도록 히트박스 비활성화 (다음 프레임에 안전하게)
+	SafeDisableHitBoxCollision(HitBox);
 }
 
 ESwordHitTargetType AGS_WeaponSword::DetermineTargetType(AActor* OtherActor) const

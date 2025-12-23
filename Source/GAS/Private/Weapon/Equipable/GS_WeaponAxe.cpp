@@ -88,7 +88,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
 			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
-			HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SafeDisableHitBoxCollision(HitBox);
 		}
 	}
 
@@ -142,7 +142,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 	
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SafeDisableHitBoxCollision(HitBox);
 }
 
 EAxeHitTargetType AGS_WeaponAxe::DetermineTargetType(AActor* OtherActor) const

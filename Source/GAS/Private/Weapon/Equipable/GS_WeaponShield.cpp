@@ -221,7 +221,7 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
 			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
-			AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SafeDisableHitBoxCollision(AttackHitBox);
 		}
 	}
 
@@ -268,8 +268,8 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 	
-	// 공격 후 콜리전 비활성화 (지속 데미지 방지)
-	AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// 공격 후 콜리전 비활성화 (지속 데미지 방지, 다음 프레임에 안전하게)
+	SafeDisableHitBoxCollision(AttackHitBox);
 }
 
 EShieldHitTargetType AGS_WeaponShield::DetermineTargetType(AActor* OtherActor) const
