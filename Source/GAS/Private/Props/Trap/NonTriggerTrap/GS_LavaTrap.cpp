@@ -1,6 +1,7 @@
 #include "Props/Trap/NonTriggerTrap/GS_LavaTrap.h"
 #include "Engine/DamageEvents.h"
 #include "EngineUtils.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 AGS_LavaTrap::AGS_LavaTrap()
@@ -23,6 +24,32 @@ void AGS_LavaTrap::Tick(float DeltaTime)
 void AGS_LavaTrap::CheckAndActivateFireEffects_Implementation()
 {
 
+}
+
+void AGS_LavaTrap::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterLavaTrap(this);
+		}
+	}
+}
+
+void AGS_LavaTrap::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterLavaTrap(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 
@@ -93,13 +120,20 @@ void AGS_LavaTrap::OnSeekerExitLava(AGS_Seeker* Seeker)
 			}
 			bool bStillInAnyLava = false;
 
-			for (TActorIterator<AGS_LavaTrap> It(GetWorld()); It; ++It)
+			if (UWorld* World = GetWorld())
 			{
-				AGS_LavaTrap* LavaTrap = *It;
-				if (IsValid(LavaTrap) && LavaTrap->DamageBoxComp->IsOverlappingActor(Seeker))
+				if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 				{
-					bStillInAnyLava = true;
-					break;
+					const TArray<TWeakObjectPtr<AGS_LavaTrap>>& LavaTraps = Registry->GetLavaTraps();
+					for (const TWeakObjectPtr<AGS_LavaTrap>& TrapPtr : LavaTraps)
+					{
+						AGS_LavaTrap* LavaTrap = TrapPtr.Get();
+						if (IsValid(LavaTrap) && LavaTrap->DamageBoxComp->IsOverlappingActor(Seeker))
+						{
+							bStillInAnyLava = true;
+							break;
+						}
+					}
 				}
 			}
 

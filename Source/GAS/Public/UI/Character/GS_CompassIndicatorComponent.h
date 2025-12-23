@@ -14,6 +14,8 @@ class GAS_API UGS_CompassIndicatorComponent : public UActorComponent
 
 public:	
 	UGS_CompassIndicatorComponent();
+	virtual void InitializeComponent() override;
+	virtual void UninitializeComponent() override;
 
 	// Blueprint Callable Functions
 	UFUNCTION(BlueprintCallable, Category = "Compass Indicator")

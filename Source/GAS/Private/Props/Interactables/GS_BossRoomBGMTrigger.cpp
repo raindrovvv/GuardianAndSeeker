@@ -7,6 +7,7 @@
 #include "Net/UnrealNetwork.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "EngineUtils.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 
 AGS_BossRoomBGMTrigger::AGS_BossRoomBGMTrigger()
@@ -44,10 +45,12 @@ void AGS_BossRoomBGMTrigger::BeginPlay()
 
 void AGS_BossRoomBGMTrigger::CacheRTSController()
 {
-	for (TActorIterator<AGS_RTSController> It(GetWorld()); It; ++It)
+	if (UWorld* World = GetWorld())
 	{
-		CachedRTSController = *It;
-		break;
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			CachedRTSController = Registry->GetRTSController();
+		}
 	}
 }
 
