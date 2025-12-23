@@ -89,4 +89,9 @@ protected:
 	FTimerHandle NavMeshBuildTimerHandle;
 	int32 NavMeshCheckCount = 0;
 	const int32 MaxNavMeshChecks = 30; // 0.5초 간격으로 최대 15초 대기
+
+	/** 캐싱된 클레스 데이터 (LoadClass 성능 최적화) */
+	UPROPERTY()
+	TMap<FString, TSubclassOf<AActor>> ClassCache;
 };
+

@@ -241,10 +241,12 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 	}
 	else
 	{
-		// 아직 모든 방이 도착하지 않았습니다. 0.1초 뒤에 이 함수를 다시 실행하여 재검사합니다.
-		GetWorld()->GetTimerManager().SetTimer(RoomVerifyTimerHandle, this, &AGS_InGameGS::Client_VerifyRoomSpawning, 0.1f, false);
+		// 아직 모든 방이 도착하지 않았습니다. 
+		// OnActorSpawned에서 다음 방이 들어올 때마다 다시 검사하므로 별도의 타이머는 필요하지 않습니다.
+		UE_LOG(LogTemp, Log, TEXT("[로딩] CLIENT: 모든 방이 아직 스폰되지 않았습니다. 대기 중..."));
 	}
 }
+
 
 void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
 {
@@ -259,6 +261,12 @@ void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
 		{
 			CachedRoomCount++;
 			UE_LOG(LogTemp, VeryVerbose, TEXT("[로딩] Room/Door 스폰 감지: %s (총 %d개)"), *SpawnedActor->GetName(), CachedRoomCount);
+
+			// Optimization: 모든 방이 스폰되었는지 즉시 확인하여 타이머 의존성 제거
+			if (bDungeonDataReady && TotalRoomCount > 0 && CachedRoomCount >= TotalRoomCount)
+			{
+				Client_VerifyRoomSpawning();
+			}
 		}
 	}
 }

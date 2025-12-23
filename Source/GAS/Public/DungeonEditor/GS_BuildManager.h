@@ -105,6 +105,7 @@ public:
 	
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// 저장할 슬롯 이름을 지정합니다.
 	// 추후에 배열형태로 변경해 프리셋으로 사용해주어야 할 것 같다.
@@ -149,4 +150,12 @@ private:
 	TObjectPtr<AGS_PlacerBase> SelectedPlacableObject;
 	bool bPlaceableObjectSelected;
 	FVector StartLocationUnderCursor;
+
+	/** Optimization: Update logic moved from Tick to Timer */
+	FTimerHandle BuildingUpdateTimerHandle;
+
+	/** 캐싱된 클레스 데이터 (LoadClass 성능 최적화) */
+	UPROPERTY()
+	TMap<FString, TSubclassOf<AActor>> ClassCache;
 };
+
