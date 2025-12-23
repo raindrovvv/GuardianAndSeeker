@@ -35,6 +35,8 @@ AGS_Door::AGS_Door()
 	DoorMeshComp->SetCollisionObjectType(ECC_WorldStatic);
 	DoorMeshComp->SetCollisionResponseToAllChannels(ECR_Block);
 	DoorMeshComp->SetupAttachment(DoorFrameMeshComp);
+	// 문이 닫혀있어도 AI가 경로를 찾을 수 있도록 DoorMeshComp가 NavMesh에 영향을 주지 않도록 설정
+	DoorMeshComp->SetCanEverAffectNavigation(false);
 	DoorMeshComp->PrimaryComponentTick.bCanEverTick = false;
 	DoorMeshComp->PrimaryComponentTick.bStartWithTickEnabled = false;
 	DoorMeshComp->PrimaryComponentTick.bAllowTickOnDedicatedServer = false;
@@ -188,18 +190,20 @@ void AGS_Door::DoorClose_Implementation()
 
 bool AGS_Door::IsRTSMode() const
 {
-	if (!GetWorld())
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return false;
 	}
 
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	APlayerController* LocalPC = World->GetFirstPlayerController();
 	if (!LocalPC)
 	{
 		return false;
 	}
 
-	return Cast<AGS_RTSController>(LocalPC) != nullptr;
+	// 클래스 비교를 통한 최적화 (Cast 대비 오버헤드 감소)
+	return LocalPC->IsA<AGS_RTSController>();
 }
 
 UAkAudioEvent* AGS_Door::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const
