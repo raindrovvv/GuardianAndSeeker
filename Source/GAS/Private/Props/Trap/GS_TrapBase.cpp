@@ -12,6 +12,7 @@
 #include "AkAudioDevice.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Weapon/GS_Weapon.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -62,6 +63,7 @@ AGS_TrapBase::AGS_TrapBase()
 	DamageBoxComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Ignore);
 	//"OptimizedCollision" 태그가 있는 경우, 플레이어가 근접한 경우에만 콜리전 활성화됨
     DamageBoxComp->ComponentTags.Add("OptimizedCollision");
+    DamageBoxComp->ComponentTags.Add("DEFENSIBLE_ATTACK");
 
     AudioAnchorComponent = CreateDefaultSubobject<USceneComponent>(TEXT("AudioAnchor"));
     AudioAnchorComponent->SetupAttachment(RootComponent);
@@ -306,12 +308,12 @@ void AGS_TrapBase::OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp,
 		AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 		if (Seeker)
 		{
-			// 재발동 시에도 사운드가 들리도록 함정 활성화 사운드 재생
-			PlayActivationSound();
-
 			if (!bIsActivated)
 			{
 				bIsActivated = true;
+				// 재발동 시에도 사운드가 들리도록 함정 활성화 사운드 재생
+				PlayActivationSound();
+				
 				if (!HasAuthority())
 				{
 					Server_ActivateTrap(OtherActor);
@@ -429,8 +431,11 @@ void AGS_TrapBase::OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActo
         CustomTrapEffect(Seeker);
         HandleTrapDamage(Seeker);
 
-        // 함정 히트 사운드 재생
-        PlayHitSound();
+        // 함정 히트 사운드 재생 (단, 무기와의 충돌은 무시)
+        if (OtherActor && !OtherActor->IsA<AGS_Weapon>())
+        {
+            PlayHitSound();
+        }
         return;
     }
 
@@ -487,8 +492,8 @@ void AGS_TrapBase::OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 		return;
 	}
 
-	// 함정이 활성화되지 않았으면 Hit 사운드 무시 (초기 스폰 시 충돌 방지)
-	if (!bIsActivated)
+	// 함정이 활성화되지 않았거나 무기와 충돌한 경우 Hit 사운드 무시
+	if (!bIsActivated || (OtherActor && OtherActor->IsA<AGS_Weapon>()))
 	{
 		return;
 	}

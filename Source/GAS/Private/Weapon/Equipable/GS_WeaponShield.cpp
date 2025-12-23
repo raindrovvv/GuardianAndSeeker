@@ -60,11 +60,13 @@ AGS_WeaponShield::AGS_WeaponShield()
 	DefenseHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	DefenseHitBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	DefenseHitBox->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+	DefenseHitBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	DefenseHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel4, ECR_Overlap);
 	DefenseHitBox->SetGenerateOverlapEvents(true);
 	
-	// 방어용 콜리전 크기 설정 (방패 전체 영역)
-	DefenseHitBox->SetBoxExtent(FVector(100.0f, 140.0f, 170.0f));
-	DefenseHitBox->SetRelativeLocation(FVector(30.0f, 0.0f, 0.0f));
+	// 방어용 콜리전 크기 설정 (방패 주변으로 최적화)
+	DefenseHitBox->SetBoxExtent(FVector(50.0f, 70.0f, 90.0f));
+	DefenseHitBox->SetRelativeLocation(FVector(20.0f, 0.0f, 0.0f));
 	DefenseHitBox->OnComponentBeginOverlap.AddDynamic(this, &AGS_WeaponShield::OnDefenseHit);
 	DefenseHitBox->OnComponentEndOverlap.AddDynamic(this, &AGS_WeaponShield::OnDefenseEndOverlap);
 }
@@ -398,6 +400,8 @@ void AGS_WeaponShield::PlayGuardSuccessVFX(EShieldHitTargetType TargetType, cons
 		break;
 	case EShieldHitTargetType::Seeker:
 	case EShieldHitTargetType::Other:
+		// 함정 등 기타 대상 방어 시에는 기본 이펙트 재생 (또는 구조물 이펙트)
+		VFXToPlay = GuardSuccessPawnVFX;
 		break;
 	default:
 		break;
@@ -532,6 +536,7 @@ void AGS_WeaponShield::PlayGuardSuccessSound(EShieldHitTargetType TargetType, co
 		break;
 	case EShieldHitTargetType::Seeker:
 	case EShieldHitTargetType::Other:
+		// 함정 등 기타 대상 방어 시에는 사운드 재생 안함 (트리거 방지)
 		break;
 	default:
 		break;
@@ -780,14 +785,20 @@ void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResul
 		return;
 	}
 
-	// 상대방이 적인지 확인
-	if (OwnerChar->IsEnemy(Cast<AGS_Character>(AttackerActor)))
+	// 상대방이 적인지 확인 (AGS_Character가 아닌 함정 등의 경우에도 방어 대상으로 인정)
+	bool bIsEnemy = true;
+	if (AGS_Character* AttackerChar = Cast<AGS_Character>(AttackerActor))
+	{
+		bIsEnemy = OwnerChar->IsEnemy(AttackerChar);
+	}
+
+	if (bIsEnemy)
 	{
 		DefenseHitActors.Add(AttackerActor);
 	}
 	else
 	{
-		// 적이 아니면 방어 효과를 재생하지 않음
+		// 아군인 경우에만 방어 효과를 재생하지 않음
 		return;
 	}
 
@@ -812,7 +823,7 @@ void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResul
 		SeekerAudio->PlayDefenseSound();
 	}
 
-	// OnDefenseEndOverlap에서도 제거하므로, 둘 중 먼저 발생하는 쪽이 처리함
+	/* // 일괄 타이머로 대체하기 위해 개별 타이머 주석 처리
 	if (UWorld* World = GetWorld())
 	{
 		FTimerHandle ClearHandle;
@@ -824,7 +835,7 @@ void AGS_WeaponShield::PlayDefenseEffects(AActor* AttackerActor, const FHitResul
 				DefenseHitActors.Remove(WeakAttacker.Get());
 			}
 		}, 0.55f, false);
-	}
+	} */
 }
 
 void AGS_WeaponShield::OnDefenseEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
@@ -864,7 +875,11 @@ void AGS_WeaponShield::EnableDefenseHit()
 	// 방어용 히트 액터 목록 초기화 (새로운 방어 시작 시)
 	DefenseHitActors.Empty();
 	
-	SetActorTickEnabled(true);
+	// Start 1.5s Timer instead of Tick
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(DefenseTimerHandle, this, &AGS_WeaponShield::OnDefenseTimer, 1.0f, true);
+	}
 }
 
 void AGS_WeaponShield::DisableDefenseHit()
@@ -881,20 +896,10 @@ void AGS_WeaponShield::DisableDefenseHit()
 		DefenseHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	
-	// AttackHitBox 상태를 안전하게 확인하여 Tick 상태 결정
-	bool bShouldDisableTick = true;
-	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
+	// Clear Defense Timer
+	if (UWorld* World = GetWorld())
 	{
-		if (AttackHitBox->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
-		{
-			bShouldDisableTick = false;
-		}
-	}
-
-	// 모든 콜리전이 비활성화된 경우에만 Tick 비활성화
-	if (bShouldDisableTick)
-	{
-		SetActorTickEnabled(false);
+		World->GetTimerManager().ClearTimer(DefenseTimerHandle);
 	}
 }
 
@@ -986,4 +991,10 @@ void AGS_WeaponShield::DisableAllCollisions()
 	{
 		DefenseHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
+}
+
+void AGS_WeaponShield::OnDefenseTimer()
+{
+	// 1.5초마다 방어 히트 기록을 일괄 초기화하여 중복 방지 시스템 관리
+	DefenseHitActors.Empty();
 }
