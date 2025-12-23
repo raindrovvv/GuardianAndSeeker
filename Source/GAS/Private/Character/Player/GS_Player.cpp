@@ -47,6 +47,7 @@ AGS_Player::AGS_Player()
 	SteamNameWidgetComp->GetBodyInstance()->TermBody(); 
 	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SteamNameWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+	SteamNameWidgetComp->SetOwnerNoSee(true);
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlurMat(TEXT("/Game/VFX/MI_AbscureDebuff"));
 	if (BlurMat.Succeeded())
@@ -149,10 +150,41 @@ void AGS_Player::Tick(float DeltaSeconds)
 		ObscureTimeline.TickTimeline(DeltaSeconds);
 	}
 
-	//steam widget rotate
-	if (IsValid(SteamNameWidgetComp) && !HasAuthority())
+	// steam widget rotate with distance culling (only for non-server)
+	if (IsValid(SteamNameWidgetComp) && GetNetMode() != NM_DedicatedServer)
 	{
-		UpdateSteamNameWidgetRotation();
+		// 로컬 플레이어 본인의 네임태그는 항상 숨김
+		if (IsLocallyControlled())
+		{
+			if (SteamNameWidgetComp->IsVisible())
+			{
+				SteamNameWidgetComp->SetVisibility(false);
+			}
+			return;
+		}
+
+		// 다른 플레이어 거리 기반 컬링
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				float DistSq = FVector::DistSquared(CameraManager->GetCameraLocation(), GetActorLocation());
+				
+				// 30m (3000 units) 기준으로 컬링 (9,000,000 DistSq)
+				bool bInRange = (DistSq < 9000000.f);
+
+				if (SteamNameWidgetComp->IsVisible() != bInRange)
+				{
+					SteamNameWidgetComp->SetVisibility(bInRange);
+				}
+
+				// 범위 내에 있을 때만 회전 업데이트
+				if (bInRange)
+				{
+					UpdateSteamNameWidgetRotation();
+				}
+			}
+		}
 	}
 }
 
@@ -173,28 +205,14 @@ void AGS_Player::PossessedBy(AController* NewController)
 
 void AGS_Player::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	//// 2. 가시성 끄기
-	//SteamNameWidgetComp->SetVisibility(false);
-
-	//// 3. 콜리전 비활성화
-	//SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	//// 4. BodySetup 정리
-	//if (SteamNameWidgetComp->GetBodySetup())
-	//{
-	//	SteamNameWidgetComp->DestroyPhysicsState();
-	//}
-	//
-	//if (IsValid(SteamNameWidgetComp))
-	//{
-	//	if (UUserWidget* Widget = SteamNameWidgetComp->GetWidget())
-	//	{
-	//		Widget->RemoveFromParent();
-	//	}
-	//	SteamNameWidgetComp->SetWidget(nullptr);
-	//	SteamNameWidgetComp->DestroyComponent();
-	//}
-	//
+	// Stability: Securely clean up widget component
+	if (IsValid(SteamNameWidgetComp))
+	{
+		SteamNameWidgetComp->SetWidget(nullptr);
+		SteamNameWidgetComp->SetVisibility(false);
+		SteamNameWidgetComp->DestroyComponent();
+	}
+	
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -203,18 +221,12 @@ void AGS_Player::BeginDestroy()
 	// 1. 먼저 Super::BeginDestroy() 호출 (중요!)
 	Super::BeginDestroy();
 
-	//// 2. IsValid() 체크와 함께 안전하게 정리
-	//if (IsValid(SteamNameWidgetComp) && !SteamNameWidgetComp->IsBeingDestroyed())
-	//{
-	//	SteamNameWidgetComp->SetWidget(nullptr);
-	//	SteamNameWidgetComp->SetVisibility(false);
-	//	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	//	// BodySetup 정리 (필요한 경우만)
-	//	if (SteamNameWidgetComp->GetBodySetup())
-	//	{
-	//		SteamNameWidgetComp->DestroyPhysicsState();
-	//	}
+	// 2. IsValid() 체크와 함께 안전하게 정리
+	if (IsValid(SteamNameWidgetComp) && !SteamNameWidgetComp->IsBeingDestroyed())
+	{
+		SteamNameWidgetComp->SetWidget(nullptr);
+		SteamNameWidgetComp->SetVisibility(false);
+	}
 
 	//	// DestroyComponent() 호출하지 않음! - 자동으로 소멸됨
 	//}

@@ -20,6 +20,7 @@
 #include "Character/Component/GS_StatComp.h"
 #include "Components/DecalComponent.h"
 #include "Components/WidgetComponent.h"
+#include "UI/Character/GS_HPTextWidgetComp.h"
 // #include "BehaviorTree/BlackboardComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -88,6 +89,11 @@ void AGS_Monster::BeginPlay()
 	{
 		PrimaryActorTick.bCanEverTick = false;
 		SetActorTickEnabled(false);
+	}
+	else
+	{
+		// 클라이언트에서는 거리 기반 UI 컬링 등을 위해 틱 활성화
+		SetActorTickEnabled(true);
 	}
 
 	if (UWorld* World = GetWorld())
@@ -205,26 +211,6 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 공격 알림 델리게이트 해제
 	OnMonsterAttacked.RemoveAll(this);
 
-	// if (SkillCooldownWidgetComp && SkillCooldownWidgetComp->GetBodySetup())
-	// {
-	// 	SkillCooldownWidgetComp->DestroyPhysicsState();
-	// }
-
-	// 1. Widget 내용 제거
-	SkillCooldownWidgetComp->SetWidget(nullptr);
-
-	// 2. 가시성 끄기
-	SkillCooldownWidgetComp->SetVisibility(false);
-
-	// 3. 콜리전 비활성화
-	SkillCooldownWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 4. BodySetup 정리
-	if (SkillCooldownWidgetComp->GetBodySetup())
-	{
-		SkillCooldownWidgetComp->DestroyPhysicsState();
-	}
-
 	// Unregister from GameState and Subsystem
 	if (UWorld* World = GetWorld())
 	{
@@ -239,12 +225,69 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 
+	// Stability: Ensure widget components are properly cleaned up
+	if (IsValid(SkillCooldownWidgetComp))
+	{
+		SkillCooldownWidgetComp->SetWidget(nullptr);
+		SkillCooldownWidgetComp->SetVisibility(false);
+		SkillCooldownWidgetComp->DestroyComponent();
+	}
+
+	if (IsValid(TargetedUIComponent))
+	{
+		TargetedUIComponent->SetWidget(nullptr);
+		TargetedUIComponent->SetVisibility(false);
+		TargetedUIComponent->DestroyComponent();
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_Monster::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Monster HP Bar distance & LoS culling (Client only)
+	if (GetNetMode() != NM_DedicatedServer && IsValid(HPTextWidgetComp))
+	{
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				FVector CameraLocation = CameraManager->GetCameraLocation();
+				FVector WidgetLocation = GetActorLocation() + FVector(0.f, 0.f, 100.f); // HP 위젯 위치 근사값
+				
+				float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
+				
+				// 30m (3000cm) 기준으로 거리 체크
+				bool bInRange = (DistSq < 9000000.f);
+				bool bIsVisible = bInRange;
+
+				// 거리 내에 있다면 벽에 가려졌는지 체크 (LoS)
+				if (bInRange)
+				{
+					FHitResult HitResult;
+					FCollisionQueryParams Params(NAME_None, false, this);
+					Params.AddIgnoredActor(PC->GetPawn()); // 로컬 플레이어 무시
+					
+					// Visibility 채널을 사용하여 차폐 여부 확인
+					if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, WidgetLocation, ECC_Visibility, Params))
+					{
+						// 무언가에 맞았는데 그게 자기 자신이 아니라면 (벽 등에 가려짐)
+						if (HitResult.GetActor() != this)
+						{
+							bIsVisible = false;
+						}
+					}
+				}
+				
+				if (HPTextWidgetComp->IsVisible() != bIsVisible)
+				{
+					HPTextWidgetComp->SetVisibility(bIsVisible);
+				}
+			}
+		}
+	}
 }
 
 void AGS_Monster::OnDeath()

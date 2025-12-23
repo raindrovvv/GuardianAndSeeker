@@ -4,6 +4,9 @@
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
+#include "AI/RTS/GS_RTSController.h"
+#include "Props/Trap/NonTriggerTrap/GS_LavaTrap.h"
+#include "UI/Character/GS_CompassIndicatorComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 
@@ -44,6 +47,19 @@ void UGS_ActorRegistrySubsystem::CleanupInvalidEntries()
 	{
 		RegisteredGuardian = nullptr;
 	}
+
+	if (RegisteredRTSController.IsStale())
+	{
+		RegisteredRTSController = nullptr;
+	}
+
+	RegisteredLavaTraps.RemoveAllSwap([](const TWeakObjectPtr<AGS_LavaTrap>& Ptr) {
+		return !Ptr.IsValid();
+	});
+
+	RegisteredCompassIndicators.RemoveAllSwap([](const TWeakObjectPtr<UGS_CompassIndicatorComponent>& Ptr) {
+		return !Ptr.IsValid();
+	});
 }
 
 
@@ -92,6 +108,54 @@ void UGS_ActorRegistrySubsystem::UnregisterGuardian(AGS_Guardian* Guardian)
 	if (RegisteredGuardian == Guardian)
 	{
 		RegisteredGuardian = nullptr;
+	}
+}
+
+void UGS_ActorRegistrySubsystem::RegisterRTSController(AGS_RTSController* RTSController)
+{
+	if (IsValid(RTSController))
+	{
+		RegisteredRTSController = RTSController;
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterRTSController(AGS_RTSController* RTSController)
+{
+	if (RegisteredRTSController == RTSController)
+	{
+		RegisteredRTSController = nullptr;
+	}
+}
+
+void UGS_ActorRegistrySubsystem::RegisterLavaTrap(AGS_LavaTrap* LavaTrap)
+{
+	if (IsValid(LavaTrap))
+	{
+		RegisteredLavaTraps.AddUnique(LavaTrap);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterLavaTrap(AGS_LavaTrap* LavaTrap)
+{
+	if (LavaTrap)
+	{
+		RegisteredLavaTraps.Remove(LavaTrap);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::RegisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator)
+{
+	if (IsValid(CompassIndicator))
+	{
+		RegisteredCompassIndicators.AddUnique(CompassIndicator);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator)
+{
+	if (CompassIndicator)
+	{
+		RegisteredCompassIndicators.Remove(CompassIndicator);
 	}
 }
 

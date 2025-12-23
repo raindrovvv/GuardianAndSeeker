@@ -8,6 +8,7 @@
 #include "System/GS_PlayerState.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "UObject/UObjectGlobals.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 UGS_CompassIndicatorComponent::UGS_CompassIndicatorComponent()
 {
@@ -18,6 +19,34 @@ UGS_CompassIndicatorComponent::UGS_CompassIndicatorComponent()
 	MaxDisplayDistance = 10000.0f;
 	bCheckPlayerStatus = true;
 	bIsManuallyHidden = false;
+
+	bWantsInitializeComponent = true;
+}
+
+void UGS_CompassIndicatorComponent::InitializeComponent()
+{
+	Super::InitializeComponent();
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterCompassIndicator(this);
+		}
+	}
+}
+
+void UGS_CompassIndicatorComponent::UninitializeComponent()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterCompassIndicator(this);
+		}
+	}
+
+	Super::UninitializeComponent();
 }
 
 FVector UGS_CompassIndicatorComponent::GetWorldLocation() const
@@ -111,30 +140,16 @@ TArray<UGS_CompassIndicatorComponent*> UGS_CompassIndicatorComponent::GetAllComp
 		return FoundComponents;
 	}
 
-	// Iterate through all actors in the world
-	for (TActorIterator<AActor> ActorIterator(World); ActorIterator; ++ActorIterator)
+	// Iterate through all registered compass indicators
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AActor* Actor = *ActorIterator;
-		if (IsValid(Actor))
+		const TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>>& RegisteredIndicators = Registry->GetCompassIndicators();
+		for (const TWeakObjectPtr<UGS_CompassIndicatorComponent>& IndicatorPtr : RegisteredIndicators)
 		{
-			// Skip actors that are not replicated to this client in multiplayer
-			if (World->GetNetMode() != NM_Standalone)
+			UGS_CompassIndicatorComponent* CompassComponent = IndicatorPtr.Get();
+			if (IsValid(CompassComponent) && CompassComponent->IsValidForCompass())
 			{
-				// In multiplayer, only show actors that are properly replicated
-				if (!Actor->GetIsReplicated() && Actor->GetRemoteRole() == ROLE_None)
-				{
-					continue;
-				}
-			}
-
-			// Find compass indicator component
-			if (UGS_CompassIndicatorComponent* CompassComponent = Actor->FindComponentByClass<UGS_CompassIndicatorComponent>())
-			{
-				// Additional multiplayer safety checks
-				if (IsValid(CompassComponent) && CompassComponent->IsValidForCompass())
-				{
-					FoundComponents.Add(CompassComponent);
-				}
+				FoundComponents.Add(CompassComponent);
 			}
 		}
 	}
