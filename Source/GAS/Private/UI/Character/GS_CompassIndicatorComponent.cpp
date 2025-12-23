@@ -64,26 +64,8 @@ bool UGS_CompassIndicatorComponent::IsValidForCompass() const
 	{
 		return false;
 	}
-
-	// If owner is a player pawn, check their status from PlayerState.
-	if (bCheckPlayerStatus)
-	{
-		if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
-		{
-			// If PlayerState is available, its bIsAlive status is the definitive answer.
-			if (const AGS_PlayerState* PS = OwnerPawn->GetPlayerState<AGS_PlayerState>())
-			{
-				return PS->bIsAlive;
-			}
-			// If PlayerState is not yet replicated/available, assume the player is alive temporarily.
-			// This prevents the icon from disappearing during network transitions.
-			return true;
-		}
-	}
-
-	// For non-player actors (like monsters), or if player status check is disabled,
-	// visibility is determined by bShowOnCompass and bIsManuallyHidden only.
-	return true;
+	
+	return bCachedIsValid;
 }
 
 ESeekerJob UGS_CompassIndicatorComponent::GetSeekerJob() const
@@ -155,4 +137,45 @@ TArray<UGS_CompassIndicatorComponent*> UGS_CompassIndicatorComponent::GetAllComp
 	}
     
 	return FoundComponents;
+}
+
+void UGS_CompassIndicatorComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Start caching timer
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(CacheTimerHandle, this, &UGS_CompassIndicatorComponent::UpdateCachedValidity, 0.5f, true);
+	}
+	// Initial update
+	UpdateCachedValidity();
+}
+
+void UGS_CompassIndicatorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(CacheTimerHandle);
+	}
+	
+	Super::EndPlay(EndPlayReason);
+}
+
+void UGS_CompassIndicatorComponent::UpdateCachedValidity()
+{
+	if (bCheckPlayerStatus)
+	{
+		if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		{
+			if (const AGS_PlayerState* PS = OwnerPawn->GetPlayerState<AGS_PlayerState>())
+			{
+				bCachedIsValid = PS->bIsAlive;
+				return;
+			}
+			bCachedIsValid = true; // Default to true if PS not found (yet)
+			return;
+		}
+	}
+	bCachedIsValid = true;
 } 
