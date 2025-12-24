@@ -1210,6 +1210,9 @@ void AGS_Seeker::EnterDyingState()
 		return;
 	}
 
+	// 즉시 네트워크 복제 (빈사 상태 진입은 최우선)
+	ForceNetUpdate();
+
 	// 빈사 상태 활성화
 	bIsInDyingState = true;
 	DyingTimeRemaining = MaxDyingTime;

@@ -272,9 +272,16 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 				if (IsSkillAllowed(Slot))
 				{
 					UE_LOG(LogTemp, Warning, TEXT("허용된 스킬이 Active 되기를 원한다."));
-					
+
 					SkillsInterrupt();
 					SkillMap[Slot]->ActiveSkill();
+
+					// 이동 스킬 사용 시 즉시 네트워크 복제 (위치 동기화 - 워프 현상 방지)
+					if (Slot == ESkillSlot::Moving || Slot == ESkillSlot::Rolling)
+					{
+						GetOwner()->ForceNetUpdate();
+					}
+
 					UE_LOG(LogTemp, Warning, TEXT("AllowSkillMask : %d"), SkillMap[Slot]->AllowSkillsMask);
 					ResetAllowedSkillsMask();
 					SetCurAllowedSkillsMask(SkillMap[Slot]->AllowSkillsMask);

@@ -9,6 +9,7 @@
 #include "GenericTeamAgentInterface.h"
 #include "AI/RTS/RTSCommand.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 UGS_BTS_SenseEnemy::UGS_BTS_SenseEnemy()
 {
@@ -85,9 +86,20 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	float ClosestDist = TNumericLimits<float>::Max();
 	AActor* NearestTarget = nullptr;
 
+	// 시점별 AI 인지 거리 제한
+	const float MaxPerceptionDistance = GS_Rendering::CalculateAIPerceptionDistance(ControlledPawn);
+	const float MaxPerceptionDistanceSq = MaxPerceptionDistance * MaxPerceptionDistance;
+
 	for (AActor* Target : HostileTargets)
 	{
 		const float Dist = FVector::DistSquared(ControlledPawn->GetActorLocation(),	Target->GetActorLocation());
+
+		// 인지 거리 제한 적용
+		if (Dist > MaxPerceptionDistanceSq)
+		{
+			continue; // 인지 거리 밖의 적은 무시
+		}
+
 		if (Dist < ClosestDist)
 		{
 			ClosestDist = Dist;
@@ -98,5 +110,13 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	if (NearestTarget)
 	{
 		AIController->SetNewTarget(NearestTarget);
+	}
+	else
+	{
+		// 인지 거리 내에 적이 없으면 타겟 해제
+		if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) != nullptr)
+		{
+			AIController->ClearCurrentTarget();
+		}
 	}
 }

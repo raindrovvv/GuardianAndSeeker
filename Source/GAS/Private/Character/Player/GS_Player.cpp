@@ -74,6 +74,11 @@ AGS_Player::AGS_Player()
 	CameraAudioListenerComponent->SetupAttachment(CameraComp);
 
 	bIsObscuring = false;
+
+	// 네트워크 최적화 초기화
+	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
+	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
+	LastNetUpdateFrequency = NetUpdateFrequency;
 }
 
 void AGS_Player::BeginPlay()
@@ -155,6 +160,24 @@ void AGS_Player::BeginPlay()
 		MeshComp->MinLodModel = MinLOD;
 
 		UE_LOG(LogTemp, Log, TEXT("[Player:%s] Rendering Optimization - Cull Distance: %.1f (Local Player excluded)"), *GetName(), CullDistance);
+	}
+
+	// === 네트워크 & 그림자 최적화 타이머 설정 (서버만) ===
+	if (HasAuthority() && !IsLocalPlayer())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			NetworkOptimizationTimerHandle,
+			this,
+			&AGS_Player::UpdateNetworkOptimization,
+			1.0f, // 1초마다 체크
+			true
+		);
+	}
+
+	// === 그림자 컬링 초기 설정 (클라이언트만, Local Player 제외) ===
+	if (!IsRunningDedicatedServer() && !IsLocalPlayer())
+	{
+		UpdateShadowCulling();
 	}
 }
 
@@ -580,4 +603,81 @@ float AGS_Player::GetOptimalCullDistance() const
 {
 	// 기본값: 중간 크기 플레이어 컬링 거리
 	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+}
+
+void AGS_Player::UpdateNetworkOptimization()
+{
+	// 서버에서만 실행
+	if (!HasAuthority()) return;
+
+	// 로컬 플레이어는 최적화 제외
+	if (IsLocalPlayer()) return;
+
+	// 거리 기반 네트워크 업데이트 빈도 계산
+	float NewFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
+
+	// === 전투 상태 체크: HP가 낮거나 최근 피격 시 최소 빈도 보장 ===
+	if (StatComp)
+	{
+		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
+
+		// HP가 90% 이하이면 전투 중으로 간주 (최소 10Hz 보장)
+		if (HealthRatio < 0.9f)
+		{
+			NewFrequency = FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
+		}
+	}
+
+	// 변경이 있을 때만 업데이트 (불필요한 연산 방지)
+	if (FMath::Abs(NewFrequency - LastNetUpdateFrequency) > 0.1f)
+	{
+		NetUpdateFrequency = NewFrequency;
+		LastNetUpdateFrequency = NewFrequency;
+
+		UE_LOG(LogTemp, Verbose, TEXT("[Player:%s] Network Optimization - NetUpdateFrequency: %.1fHz"), *GetName(), NewFrequency);
+	}
+}
+
+void AGS_Player::UpdateShadowCulling()
+{
+	// 클라이언트에서만 실행
+	if (IsRunningDedicatedServer()) return;
+
+	// 로컬 플레이어는 최적화 제외
+	if (IsLocalPlayer()) return;
+
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp) return;
+
+	// 카메라 위치 가져오기
+	if (UWorld* World = GetWorld())
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				FVector CameraLocation = CameraManager->GetCameraLocation();
+				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
+
+				// 거리 기반 그림자 설정
+				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
+				{
+					// 80m 이상: 그림자 완전 비활성화
+					MeshComp->SetCastShadow(false);
+				}
+				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
+				{
+					// 40-80m: 정적 그림자만 유지 (동적 그림자 비활성화)
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = false;
+				}
+				else
+				{
+					// 40m 이내: 모든 그림자 활성화
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = true;
+				}
+			}
+		}
+	}
 }

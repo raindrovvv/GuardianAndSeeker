@@ -179,6 +179,12 @@ void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)
 	{
 		CurrentHealth = FMath::Min(CurrentHealth, MaxHealth);
 		OnCurrentHPChanged.Broadcast(this);
+
+		// 큰 힐링 시 즉시 복제 (20% 이상)
+		if (MaxHealth > 0.0f && FMath::Abs(CurrentHealth - PreviousHealth) > MaxHealth * 0.2f)
+		{
+			GetOwner()->ForceNetUpdate();
+		}
 		return;
 	}
 
@@ -186,9 +192,25 @@ void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)
 	MulticastRPCPlayTakeDamageMontage();
 	HandleHealthDamage(PreviousHealth, CurrentHealth);
 
-	// 3. 체력 0 도달 시 처리
+	// 큰 데미지 시 즉시 복제 (20% 이상 또는 빈사 임계값)
+	if (MaxHealth > 0.0f)
+	{
+		float DamageRatio = FMath::Abs(CurrentHealth - PreviousHealth) / MaxHealth;
+		float HealthRatio = CurrentHealth / MaxHealth;
+
+		// 20% 이상 데미지이거나, HP가 30% 이하로 떨어지면 즉시 복제
+		if (DamageRatio > 0.2f || HealthRatio < 0.3f)
+		{
+			GetOwner()->ForceNetUpdate();
+		}
+	}
+
+	// 3. 체력 0 도달 시 처리 (즉시 복제 보장)
 	if (CurrentHealth <= KINDA_SMALL_NUMBER && PreviousHealth > KINDA_SMALL_NUMBER)
 	{
+		// 즉시 네트워크 복제 (빈사/사망은 최우선)
+		GetOwner()->ForceNetUpdate();
+
 		// 시커인 경우 빈사 상태로 전환
 		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
 		{

@@ -89,4 +89,64 @@ namespace GS_Rendering
 	 * 컬링 경계에서의 팝인 현상 방지를 위한 바운드 스케일 (25% 여유)
 	 */
 	constexpr float DEFAULT_BOUNDS_SCALE = 1.25f;
+
+	// ========================================
+	// Network Update Frequency Optimization
+	// ========================================
+
+	/** 근거리 네트워크 업데이트 빈도 (10Hz - 높은 정확도) */
+	constexpr float NET_UPDATE_FREQ_CLOSE = 10.0f;
+
+	/** 중거리 네트워크 업데이트 빈도 (8Hz - 전투 안정성) */
+	constexpr float NET_UPDATE_FREQ_MEDIUM = 8.0f;
+
+	/** 원거리 네트워크 업데이트 빈도 (4Hz - 성능/안정성 균형) */
+	constexpr float NET_UPDATE_FREQ_FAR = 4.0f;
+
+	/** 전투 중 최소 네트워크 업데이트 빈도 (10Hz - 동기화 품질 보장) */
+	constexpr float NET_UPDATE_FREQ_COMBAT = 10.0f;
+
+	/** 최소 네트워크 업데이트 빈도 */
+	constexpr float NET_UPDATE_FREQ_MIN = 2.0f;
+
+	/** 근거리 임계값 (80m - 전투 범위 확대) */
+	constexpr float NET_DISTANCE_CLOSE = 8000.0f;
+
+	/** 중거리 임계값 (150m - RTS 시야 고려) */
+	constexpr float NET_DISTANCE_MEDIUM = 15000.0f;
+
+	/**
+	 * 로컬 플레이어와의 거리에 따라 최적의 네트워크 업데이트 빈도를 계산합니다.
+	 * @param WorldContext 계산 기준이 되는 월드 컨텍스트
+	 * @param ActorLocation 액터의 위치
+	 * @return 거리 기반 최적 네트워크 업데이트 빈도
+	 */
+	float CalculateNetUpdateFrequency(const UObject* WorldContext, const FVector& ActorLocation);
+
+	// ========================================
+	// Shadow Casting Distance Optimization
+	// ========================================
+
+	/** 그림자 완전 비활성화 거리 (80m) */
+	constexpr float SHADOW_DISABLE_DISTANCE = 8000.0f;
+
+	/** 동적 그림자 비활성화 거리 (40m - 정적 그림자만 유지) */
+	constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 4000.0f;
+
+	// ========================================
+	// AI Perception Distance Optimization
+	// ========================================
+
+	/** TPS 모드 AI 인지 거리 (50m - 제한적) */
+	constexpr float AI_PERCEPTION_DISTANCE_TPS = 5000.0f;
+
+	/** RTS 모드 AI 인지 거리 (150m - 전략적 시야) */
+	constexpr float AI_PERCEPTION_DISTANCE_RTS = 15000.0f;
+
+	/**
+	 * 현재 시점에 맞는 AI 인지 거리를 계산합니다.
+	 * @param WorldContext 계산 기준이 되는 월드 컨텍스트
+	 * @return 시점 기반 AI 인지 거리
+	 */
+	float CalculateAIPerceptionDistance(const UObject* WorldContext);
 }
