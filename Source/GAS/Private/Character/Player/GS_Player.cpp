@@ -19,6 +19,7 @@
 #include "AkAudioDevice.h"
 #include "Sound/GS_AudioComponentBase.h"
 #include "Components/CapsuleComponent.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_Player::AGS_Player()
 {
@@ -138,6 +139,22 @@ void AGS_Player::BeginPlay()
 				AkComponent->OcclusionRefreshInterval = 0.0f;
 			}
 		}
+	}
+
+	// === Skeletal Mesh Distance Culling 설정 (클라이언트만, Local Player 제외) ===
+	if (!IsRunningDedicatedServer() && GetMesh() && !IsLocalPlayer())
+	{
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+		MeshComp->SetCullDistance(CullDistance);
+		MeshComp->SetCachedMaxDrawDistance(CullDistance);
+		MeshComp->bAllowCullDistanceVolume = true;
+		MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+		MeshComp->MinLodModel = MinLOD;
+
+		UE_LOG(LogTemp, Log, TEXT("[Player:%s] Rendering Optimization - Cull Distance: %.1f (Local Player excluded)"), *GetName(), CullDistance);
 	}
 }
 
@@ -558,3 +575,9 @@ void AGS_Player::Server_RestKey_Implementation()
 	};
 }
 */
+
+float AGS_Player::GetOptimalCullDistance() const
+{
+	// 기본값: 중간 크기 플레이어 컬링 거리
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+}

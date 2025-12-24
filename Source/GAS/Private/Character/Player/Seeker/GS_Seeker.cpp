@@ -28,6 +28,7 @@
 #include "Animation/Character/Seeker/GS_ChooserInputObj.h"
 #include "Character/GS_TpsController.h"
 #include "Character/Skill/GS_SkillComp.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "AkAudioEvent.h"
 /*#include "AkComponent.h"
 #include "AkAudioDevice.h"*/
@@ -1916,4 +1917,10 @@ void AGS_Seeker::Multicast_ActivateDyingFlame_Implementation()
 void AGS_Seeker::Multicast_DeactivateDyingFlame_Implementation()
 {
 	DeactivateDyingFlameEffects();
+}
+
+float AGS_Seeker::GetOptimalCullDistance() const
+{
+	// Seeker는 중간 크기 컬링 거리 (45m)
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }

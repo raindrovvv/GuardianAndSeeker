@@ -28,6 +28,7 @@
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "System/GameState/GS_InGameGS.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 
 AGS_Monster::AGS_Monster()
@@ -167,6 +168,35 @@ void AGS_Monster::BeginPlay()
 			Registry->RegisterMonster(this);
 		}
 	}
+
+	// === Skeletal Mesh Distance Culling 설정 (클라이언트만) ===
+	if (!IsRunningDedicatedServer() && GetMesh())
+	{
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+		MeshComp->SetCullDistance(CullDistance);
+		MeshComp->SetCachedMaxDrawDistance(CullDistance);
+		MeshComp->bAllowCullDistanceVolume = true;
+		MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+		MeshComp->MinLodModel = MinLOD;
+
+
+		// === Animation Optimization (Client) ===
+		MeshComp->bEnableUpdateRateOptimizations = true;
+		// 몽타주 재생 중에는 화면 밖이라도 틱을 유지하여 공격 판정(AnimNotify) 보장
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+
+		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
+	}
+
+	// === Animation Optimization (Server) ===
+	if (IsRunningDedicatedServer() && GetMesh())
+	{
+		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	}
 }
 
 void AGS_Monster::PostInitializeComponents()
@@ -255,16 +285,19 @@ void AGS_Monster::Tick(float DeltaSeconds)
 			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
 			{
 				FVector CameraLocation = CameraManager->GetCameraLocation();
-				FVector WidgetLocation = GetActorLocation() + FVector(0.f, 0.f, 100.f); // HP 위젯 위치 근사값
+				FVector WidgetLocation = GetActorLocation() + FVector(0.f, 0.f, 200.f); // HP 위젯 위치로 상향 조정
 				
 				float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
 				
-				// 30m (3000cm) 기준으로 거리 체크
-				bool bInRange = (DistSq < 9000000.f);
+				// 시점에 따른 동적 컬링 거리 계산 (RTS 모드 대응)
+				float MaxCullDist = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+				float MaxCullDistSq = MaxCullDist * MaxCullDist;
+
+				bool bInRange = (DistSq < MaxCullDistSq);
 				bool bIsVisible = bInRange;
 
-				// 거리 내에 있다면 벽에 가려졌는지 체크 (LoS)
-				if (bInRange)
+				// 거리 내에 있다면 차폐 여부 체크 (TPS 모드에서만 적용, RTS 모드에서는 항상 노출)
+				if (bInRange && !GS_Rendering::IsRTSMode(this))
 				{
 					FHitResult HitResult;
 					FCollisionQueryParams Params(NAME_None, false, this);
@@ -273,8 +306,8 @@ void AGS_Monster::Tick(float DeltaSeconds)
 					// Visibility 채널을 사용하여 차폐 여부 확인
 					if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, WidgetLocation, ECC_Visibility, Params))
 					{
-						// 무언가에 맞았는데 그게 자기 자신이 아니라면 (벽 등에 가려짐)
-						if (HitResult.GetActor() != this)
+						// 환경(지형, 벽)에 맞았을 때만 가림 처리. 다른 캐릭터에 의한 가림은 무시
+						if (HitResult.GetActor() != this && !HitResult.GetActor()->IsA<ACharacter>())
 						{
 							bIsVisible = false;
 						}
@@ -520,4 +553,10 @@ void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
 	}
 
 	LastKnownHP = CurrentHP;
+}
+
+float AGS_Monster::GetOptimalCullDistance() const
+{
+	// 기본값: 중간 크기 몬스터 컬링 거리
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }

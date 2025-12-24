@@ -241,5 +241,10 @@ protected:
 private:
 	void RefreshTrapAudioSetup(bool bForceFindComponent = false);
 	void AttachTrapAkComponentToAnchor();
-	
+
+	/** Distance Culling 적용 */
+	void ApplyDistanceCulling();
+
+	/** 함정 크기에 따른 최적 컬링 거리 계산 */
+	float GetTrapCullDistance() const;
 };

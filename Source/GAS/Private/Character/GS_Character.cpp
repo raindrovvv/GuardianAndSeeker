@@ -1,5 +1,6 @@
 #include "Character/GS_Character.h"
 #include "Character/Component/GS_StatComp.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/Component/GS_DebuffComp.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "UI/Character/GS_HPText.h"
@@ -85,11 +86,18 @@ void AGS_Character::BeginPlay()
 	//Set HP 3D widget (monster)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+		if (IsValid(HPTextWidgetComp))
 		{
-			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			// HP 위젯 거리 기반 컬링 설정 (RTS 시점 고려)
+			float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+			HPTextWidgetComp->SetCullDistance(CullDistance);
+
+			if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
 			{
-				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				{
+					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				}
 			}
 		}
 	}

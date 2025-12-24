@@ -7,6 +7,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Weapon/Equipable/GS_WeaponWand.h"
 #include "Weapon/Projectile/Guardian/GS_NeedleFangProjectile.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_NeedleFang::AGS_NeedleFang()
 {
@@ -91,4 +92,9 @@ void AGS_NeedleFang::Server_SpawnProjectile_Implementation()
 		   SpawnParams
 		);
 	}
+}
+
+float AGS_NeedleFang::GetOptimalCullDistance() const
+{
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }

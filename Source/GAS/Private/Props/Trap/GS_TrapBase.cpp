@@ -13,6 +13,9 @@
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Weapon/GS_Weapon.h"
+#include "Rendering/GS_RenderingConstants.h"
+#include "Components/StaticMeshComponent.h"
+#include "DungeonEditor/Component/PlaceInfoComponent.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -119,6 +122,12 @@ void AGS_TrapBase::BeginPlay()
 	DamageBoxComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnDamageBoxOverlap);
 	DamageBoxComp->OnComponentHit.AddDynamic(this, &AGS_TrapBase::OnDamageBoxHit);
 	ActivateSphereComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnActivSCompBeginOverlap);
+
+	// === Static Mesh Distance Culling 설정 (클라이언트만) ===
+	if (!IsRunningDedicatedServer())
+	{
+		ApplyDistanceCulling();
+	}
 }
 
 void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -1125,4 +1134,47 @@ void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundTy
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] %s SoundEvent is None for %s."), *DebugSoundName, *GetName());
 	}
+}
+
+void AGS_TrapBase::ApplyDistanceCulling()
+{
+	float CullDistance = GS_Rendering::CalculateCullDistance(this, GetTrapCullDistance());
+	int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+	// 모든 Static Mesh 컴포넌트에 적용
+	TArray<UStaticMeshComponent*> StaticMeshes;
+	GetComponents<UStaticMeshComponent>(StaticMeshes);
+
+	for (UStaticMeshComponent* MeshComp : StaticMeshes)
+	{
+		if (IsValid(MeshComp))
+		{
+			MeshComp->SetCullDistance(CullDistance);
+			MeshComp->SetCachedMaxDrawDistance(CullDistance);
+			MeshComp->bAllowCullDistanceVolume = true;
+			MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+			MeshComp->MinLOD = MinLOD;
+		}
+	}
+
+	UE_LOG(LogTemp, Verbose, TEXT("[Trap:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
+}
+
+float AGS_TrapBase::GetTrapCullDistance() const
+{
+	// PlaceInfoComponent의 CellCoord 크기로 함정 크기 판별
+	if (UPlaceInfoComponent* PlaceInfo = GetComponentByClass<UPlaceInfoComponent>())
+	{
+		int32 CellCount = PlaceInfo->GetCellCoord().Num();
+
+		if (CellCount <= 1)
+			return GS_Rendering::TRAP_SMALL_CULL_DISTANCE;
+		else if (CellCount <= 4)
+			return GS_Rendering::TRAP_MEDIUM_CULL_DISTANCE;
+		else
+			return GS_Rendering::TRAP_LARGE_CULL_DISTANCE;
+	}
+
+	// PlaceInfo가 없으면 기본값 (중간 크기)
+	return GS_Rendering::TRAP_MEDIUM_CULL_DISTANCE;
 }
