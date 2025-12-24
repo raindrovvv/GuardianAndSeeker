@@ -9,6 +9,7 @@
 #include "GS_WeaponEquipable.generated.h"
 
 class AGS_Seeker;
+class UBoxComponent;
 
 UCLASS()
 class GAS_API AGS_WeaponEquipable : public AGS_Weapon
@@ -28,6 +29,13 @@ protected:
 	void ClearHitActors();
 	virtual void ClearSafetyTimer();
 	virtual FHitResult CreateCorrectHitResult(const FHitResult& OriginalResult, bool bFromSweep) const;
+
+	/**
+	 * 다음 프레임에 안전하게 HitBox 콜리전을 비활성화합니다.
+	 * 물리 엔진이 현재 프레임의 오버랩 쿼리를 완료한 후 비활성화하여
+	 * ensure() 오류를 방지합니다.
+	 */
+	void SafeDisableHitBoxCollision(UBoxComponent* InHitBox);
 
 protected:
 	// 공통 멤버 변수들

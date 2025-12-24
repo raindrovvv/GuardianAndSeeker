@@ -13,7 +13,7 @@
 
 AGS_BuildManager::AGS_BuildManager()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	DefaultSceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultSceneRoot"));
 	SetRootComponent(DefaultSceneRoot);
@@ -126,19 +126,27 @@ void AGS_BuildManager::BeginPlay()
 
 	//넥타르_Nectar 초기화(BP에서 Nectar Max값 변경하기)
 	NectarComp->InitializeMaxAmount(NectarComp->GetMaxAmount());
+
+	// Optimization: Start timer for building manager updates (0.05s = 20 FPS update rate)
+	GetWorld()->GetTimerManager().SetTimer(BuildingUpdateTimerHandle, this, &AGS_BuildManager::UpdateBuildingManagerValue, 0.05f, true);
 }
+
 
 void AGS_BuildManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	if (bBuildToolEnabled || bDemolitionToolEnable)
-	{
-		UpdateBuildingManagerValue();
-
-		// 삭제, 드레그 추가해야함.
-	}
 }
+
+void AGS_BuildManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(BuildingUpdateTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 
 void AGS_BuildManager::InitGrid()
 {
@@ -166,6 +174,11 @@ void AGS_BuildManager::InitGrid()
 
 void AGS_BuildManager::UpdateBuildingManagerValue()
 {
+	if (!bBuildToolEnabled && !bDemolitionToolEnable)
+	{
+		return;
+	}
+
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
 		if (AGS_DEController* DEPC = Cast<AGS_DEController>(PC))
@@ -878,12 +891,20 @@ void AGS_BuildManager::SaveDungeonData()
     // 이전 데이터를 지우고 새로 채웁니다.
     SaveGameObject->ClearData();
 
-    // TActorIterator를 사용해 월드에 있는 모든 AMyCube 액터를 순회합니다.
-    // 'GetWorld()'는 현재 게임 월드에 대한 포인터를 반환합니다.
-    for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
+    // Optimization: Instead of TActorIterator (which scans all actors in world), 
+    // iterate over cached OccupancyData for better performance during save.
+    TSet<AActor*> UniqueActors;
+    for (const auto& Pair : OccupancyData)
     {
-        AActor* CurActor = *ActorItr;
-    	
+        const FDEOccupancyData& Data = Pair.Value;
+        if (IsValid(Data.FloorOccupancyActor)) UniqueActors.Add(Data.FloorOccupancyActor);
+        if (IsValid(Data.CeilingOccupancyActor)) UniqueActors.Add(Data.CeilingOccupancyActor);
+        if (IsValid(Data.RoomOccupancyActor)) UniqueActors.Add(Data.RoomOccupancyActor);
+        if (IsValid(Data.WallAndDoorOccupancyActor)) UniqueActors.Add(Data.WallAndDoorOccupancyActor);
+    }
+
+    for (AActor* CurActor : UniqueActors)
+    {
         // 액터가 유효하고, 파괴 중인 상태가 아닐 때만 저장합니다.
         if (IsValid(CurActor)
         	&& nullptr != CurActor->GetComponentByClass<UPlaceInfoComponent>())
@@ -908,6 +929,7 @@ void AGS_BuildManager::SaveDungeonData()
             SaveGameObject->AddSaveData(ObjectData);
         }
     }
+
 
 	// 3. OccupancyData 저장
 	for (const auto& Pair : OccupancyData)
@@ -977,7 +999,21 @@ void AGS_BuildManager::LoadDungeonData()
 		
 		for (const FDESaveData& ObjectData : SortedObjectData)
 		{
-			if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
+			TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+			if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+			{
+				ActorClassToSpawn = *CachedClass;
+			}
+			else
+			{
+				ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+				if (ActorClassToSpawn)
+				{
+					ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+				}
+			}
+
+			if (ActorClassToSpawn)
 			{
 				FActorSpawnParameters SpawnParams;
 				SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

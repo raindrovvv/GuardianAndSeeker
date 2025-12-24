@@ -25,9 +25,4 @@ void AGS_WeaponBow::BeginPlay()
 	
 }
 
-// Called every frame
-void AGS_WeaponBow::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
 

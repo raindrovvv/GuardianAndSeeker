@@ -14,6 +14,8 @@ class GAS_API UGS_CompassIndicatorComponent : public UActorComponent
 
 public:	
 	UGS_CompassIndicatorComponent();
+	virtual void InitializeComponent() override;
+	virtual void UninitializeComponent() override;
 
 	// Blueprint Callable Functions
 	UFUNCTION(BlueprintCallable, Category = "Compass Indicator")
@@ -54,6 +56,19 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compass Indicator|Range")
 	float MaxDisplayDistance = 10000.0f;
+
+	// Caching System
+	UPROPERTY(Transient)
+	bool bCachedIsValid = true;
+
+	FTimerHandle CacheTimerHandle;
+
+	UFUNCTION()
+	void UpdateCachedValidity();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	// Use this function from Blueprint (e.g., on monster death) to hide the icon.

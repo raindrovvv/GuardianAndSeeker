@@ -92,10 +92,9 @@ void UGS_SeekerRollSkill::OnRollMontageEnded(UAnimMontage* Montage, bool bInterr
 			AM_Wielding,
 			ESeekerMontageSlot::UpperBody);
 		}
-	}
 
-	if (CachedSeekerOwner.IsValid())
-	{
 		CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	}
+
+	DeactiveSkill();
 }

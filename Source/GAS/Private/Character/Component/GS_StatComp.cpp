@@ -334,43 +334,65 @@ void UGS_StatComp::HandleHealthDamage(float OldHealth, float NewHealth)
 	}
 
 	// === 시커 LowHP Pain 사운드 시작 체크 ===
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	const ECharacterType CharType = OwnerCharacter->GetCharacterType();
+	
+	switch (CharType)
 	{
-		if (Seeker->SeekerAudioComponent)
+	case ECharacterType::Ares:
+	case ECharacterType::Chan:
+	case ECharacterType::Merci:
+	case ECharacterType::Reina:
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 		{
-			const float HealthRatio = NewHealth / FMath::Max(1.0f, MaxHealth);
-			const float LowHPThreshold = Seeker->SeekerAudioComponent->LowHPThreshold;
-
-			// HP 30% 이하 진입 시 시작 (죽지 않은 경우만)
-			if (HealthRatio <= LowHPThreshold && NewHealth > KINDA_SMALL_NUMBER)
+			if (Seeker->SeekerAudioComponent)
 			{
-				Seeker->SeekerAudioComponent->StartLowHPPainSound();
-			}
+				const float HealthRatio = NewHealth / FMath::Max(1.0f, MaxHealth);
+				const float LowHPThreshold = Seeker->SeekerAudioComponent->LowHPThreshold;
 
-			// Hurt 사운드 재생 (로컬 전용 - LowHP Pain과 동시 재생)
-			Seeker->SeekerAudioComponent->PlayHurtSoundLocal();
+				// HP 30% 이하 진입 시 시작 (죽지 않은 경우만)
+				if (HealthRatio <= LowHPThreshold && NewHealth > KINDA_SMALL_NUMBER)
+				{
+					Seeker->SeekerAudioComponent->StartLowHPPainSound();
+				}
+
+				// Hurt 사운드 재생 (로컬 전용 - LowHP Pain과 동시 재생)
+				Seeker->SeekerAudioComponent->PlayHurtSoundLocal();
+			}
 		}
-	}
-	// Hurt 사운드 재생 (몬스터/가디언)
-	else if (AGS_Monster* Monster = Cast<AGS_Monster>(OwnerCharacter))
-	{
-		if (Monster->MonsterAudioComponent)
+		break;
+
+	case ECharacterType::SmallClaw:
+	case ECharacterType::NeedleFang:
+	case ECharacterType::IronFang:
+	case ECharacterType::ShadowFang:
+	case ECharacterType::StoneClaw:
+		if (AGS_Monster* Monster = Cast<AGS_Monster>(OwnerCharacter))
 		{
-			// Death 상태가 아닐 때만 Hurt 사운드 재생
-			if (Monster->MonsterAudioComponent->GetCurrentAudioState() != EMonsterAudioState::Death)
+			if (Monster->MonsterAudioComponent)
+			{
+				// Death 상태가 아닐 때만 Hurt 사운드 재생
+				if (Monster->MonsterAudioComponent->GetCurrentAudioState() != EMonsterAudioState::Death)
+				{
+					// 로컬 전용 Hurt 사운드 재생
+					Monster->MonsterAudioComponent->PlayHurtSoundLocal();
+				}
+			}
+		}
+		break;
+
+	case ECharacterType::Drakhar:
+		if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
+		{
+			if (Drakhar->GetAudioComponent())
 			{
 				// 로컬 전용 Hurt 사운드 재생
-				Monster->MonsterAudioComponent->PlayHurtSoundLocal();
+				Drakhar->GetAudioComponent()->PlayHurtSoundLocal();
 			}
 		}
-	}
-	else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
-	{
-		if (Drakhar->GetAudioComponent())
-		{
-			// 로컬 전용 Hurt 사운드 재생
-			Drakhar->GetAudioComponent()->PlayHurtSoundLocal();
-		}
+		break;
+
+	default:
+		break;
 	}
 }
 

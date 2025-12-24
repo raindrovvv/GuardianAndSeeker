@@ -327,6 +327,7 @@ protected:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual float GetOptimalCullDistance() const override;
 
 	// 상수들
 	static const FName HPRatioParamName;
@@ -403,6 +404,8 @@ private:
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AGS_Monster>> NearbyMonsters;
+
+	void ClearNearbyMonsters();
 
 	UFUNCTION()
 	void HandleMonsterDeath(AGS_Monster* DeadMonster);

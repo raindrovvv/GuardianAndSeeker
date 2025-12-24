@@ -126,7 +126,10 @@ protected:
 	virtual FLinearColor GetCurrentDecalColor() override;
 	virtual void UpdateDecal() override;
 	virtual bool ShowDecal() override;
-	
+
+	/** 몬스터 크기에 따른 최적 컬링 거리 반환 (자식 클래스에서 오버라이드) */
+	virtual float GetOptimalCullDistance() const;
+
 private:
 	bool bIsSelected;
 
@@ -136,5 +139,4 @@ private:
 	/** Tracks previous HP for damage detection (not healing) */
 	float LastKnownHP;
 
-	void UpdateSkillCooldownWidget();
 };

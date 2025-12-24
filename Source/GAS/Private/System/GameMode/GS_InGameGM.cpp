@@ -133,10 +133,25 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
     {
         for (const FDESaveData& ObjectData : SaveData)
         {
-            if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
+            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            {
+                ActorClassToSpawn = *CachedClass;
+            }
+            else
+            {
+                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+                if (ActorClassToSpawn)
+                {
+                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+                }
+            }
+
+            if (ActorClassToSpawn)
             {
                 if (!ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
+
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
                     AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);
@@ -231,10 +246,25 @@ void AGS_InGameGM::OnNavMeshBuildComplete()
     {
         for (const FDESaveData& ObjectData : CachedSaveData)
         {
-            if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
+            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            {
+                ActorClassToSpawn = *CachedClass;
+            }
+            else
+            {
+                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+                if (ActorClassToSpawn)
+                {
+                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+                }
+            }
+
+            if (ActorClassToSpawn)
             {
                 if (ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
+
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
                     AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);

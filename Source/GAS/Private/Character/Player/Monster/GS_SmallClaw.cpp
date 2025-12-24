@@ -10,6 +10,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_SmallClaw::AGS_SmallClaw()
 {
@@ -99,4 +100,9 @@ void AGS_SmallClaw::Multicast_PlayBloodEffect_Implementation(FVector HitLocation
 	{
 		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
 	}
+}
+
+float AGS_SmallClaw::GetOptimalCullDistance() const
+{
+	return GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
 }

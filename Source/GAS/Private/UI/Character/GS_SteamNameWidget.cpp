@@ -28,7 +28,12 @@ void UGS_SteamNameWidget::InitializeSteamNameWidget()
 			if (OwningPlayer->GetPlayerState())
 			{
 				SteamNameText->SetText(FText::FromString(OwningPlayer->GetPlayerState()->GetPlayerName()));
-				//UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("$@@@@@@@@@@@@@@@@ %s"),*OwningPlayer->GetPlayerState()->GetPlayerName()), true, true, FLinearColor::Red, 5.f);
+				
+				// 로컬 플레이어 본인이면 네임태그 위젯 숨김
+				if (OwningPlayer->IsLocallyControlled())
+				{
+					SetVisibility(ESlateVisibility::Collapsed);
+				}
 			}
 		}
 	}

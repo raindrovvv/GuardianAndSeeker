@@ -64,11 +64,19 @@ void UGS_SkillBase::DeactiveSkill()
 	StopCastVFX();
 	SetIsActive(false);
 
-	// 스킬 비활성화 시에도 스킬 마스크 리셋 (OnSkillAnimationEnd가 호출되지 않는 경우 대비)
-	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if(OwnerPlayer && OwnerPlayer->GetSkillComp())
+	// 시커 캐릭터라면 스킬 종료 시 상태를 복구함 (이동/회전 제어권 및 달리기 상태)
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 	{
-		OwnerPlayer->GetSkillComp()->ResetAllowedSkillsMask();
+		Seeker->StateReset();
+		Seeker->SetSeekerGait(EGait::Run);
+	}
+	else if (AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter))
+	{
+		// 시커가 아닌 플레이어(가디언 등)는 스킬 마스크만 리셋
+		if (OwnerPlayer->GetSkillComp())
+		{
+			OwnerPlayer->GetSkillComp()->ResetAllowedSkillsMask();
+		}
 	}
 }
 
@@ -89,13 +97,14 @@ bool UGS_SkillBase::GetIsActive() const
 void UGS_SkillBase::InterruptSkill()
 {
 	StopCastVFX();
+	SetIsActive(false);
 	
-	AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter);
-	
-	if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(OwnerCharacter->GetMesh()->GetAnimInstance()))
+	// Seeker의 경우 StateReset()이 이동/회전 제어, CanChangeSeekerGait 등을 복구함
+	// SetSeekerGait(Run)은 DeactiveSkill()에서 호출되므로 여기서는 StateReset만 호출
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 	{
+		Seeker->StateReset();
 		Seeker->SetSeekerGait(EGait::Run);
-		Seeker->CanChangeSeekerGait = true;
 	}
 }
 

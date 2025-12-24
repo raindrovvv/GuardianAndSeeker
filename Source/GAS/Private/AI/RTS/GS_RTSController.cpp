@@ -259,6 +259,14 @@ void AGS_RTSController::BeginPlay()
 		}
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterRTSController(this);
+		}
+	}
+
 	//[Aether] 준비 완료 시 broadcast
 	if (IsValid(AetherComp))
 	{
@@ -301,6 +309,14 @@ void AGS_RTSController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		GetWorldTimerManager().ClearTimer(DetectionTimerHandle);
 		GetWorldTimerManager().ClearTimer(CursorInitTimerHandle);
 		GetWorldTimerManager().ClearTimer(GroupDoubleClickTimerHandle);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterRTSController(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -694,15 +710,20 @@ void AGS_RTSController::Client_StartGame_Implementation()
 {
 	Super::Client_StartGame_Implementation();
 
-	for (AGS_Seeker* Seeker : TActorRange<AGS_Seeker>(GetWorld()))
+	if (UGS_ActorRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		if (IsValid(Seeker))
+		const TArray<TWeakObjectPtr<AGS_Seeker>>& Seekers = Registry->GetSeekers();
+		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : Seekers)
 		{
-			Seeker->HPTextWidgetComp->SetVisibility(true);
-			Seeker->OnSeekerHover.AddDynamic(this, &AGS_RTSController::HandleSeekerHover);
+			AGS_Seeker* Seeker = SeekerPtr.Get();
+			if (IsValid(Seeker))
+			{
+				Seeker->HPTextWidgetComp->SetVisibility(true);
+				Seeker->OnSeekerHover.AddDynamic(this, &AGS_RTSController::HandleSeekerHover);
 
-			// 시커 파괴 시 정리를 위한 델리게이트 바인딩
-			Seeker->OnDestroyed.AddDynamic(this, &AGS_RTSController::OnTrackedSeekerDestroyed);
+				// 시커 파괴 시 정리를 위한 델리게이트 바인딩
+				Seeker->OnDestroyed.AddDynamic(this, &AGS_RTSController::OnTrackedSeekerDestroyed);
+			}
 		}
 	}
 

@@ -8,6 +8,7 @@
 #include "System/GS_PlayerState.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "UObject/UObjectGlobals.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 UGS_CompassIndicatorComponent::UGS_CompassIndicatorComponent()
 {
@@ -18,6 +19,34 @@ UGS_CompassIndicatorComponent::UGS_CompassIndicatorComponent()
 	MaxDisplayDistance = 10000.0f;
 	bCheckPlayerStatus = true;
 	bIsManuallyHidden = false;
+
+	bWantsInitializeComponent = true;
+}
+
+void UGS_CompassIndicatorComponent::InitializeComponent()
+{
+	Super::InitializeComponent();
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterCompassIndicator(this);
+		}
+	}
+}
+
+void UGS_CompassIndicatorComponent::UninitializeComponent()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterCompassIndicator(this);
+		}
+	}
+
+	Super::UninitializeComponent();
 }
 
 FVector UGS_CompassIndicatorComponent::GetWorldLocation() const
@@ -35,26 +64,8 @@ bool UGS_CompassIndicatorComponent::IsValidForCompass() const
 	{
 		return false;
 	}
-
-	// If owner is a player pawn, check their status from PlayerState.
-	if (bCheckPlayerStatus)
-	{
-		if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
-		{
-			// If PlayerState is available, its bIsAlive status is the definitive answer.
-			if (const AGS_PlayerState* PS = OwnerPawn->GetPlayerState<AGS_PlayerState>())
-			{
-				return PS->bIsAlive;
-			}
-			// If PlayerState is not yet replicated/available, assume the player is alive temporarily.
-			// This prevents the icon from disappearing during network transitions.
-			return true;
-		}
-	}
-
-	// For non-player actors (like monsters), or if player status check is disabled,
-	// visibility is determined by bShowOnCompass and bIsManuallyHidden only.
-	return true;
+	
+	return bCachedIsValid;
 }
 
 ESeekerJob UGS_CompassIndicatorComponent::GetSeekerJob() const
@@ -111,33 +122,60 @@ TArray<UGS_CompassIndicatorComponent*> UGS_CompassIndicatorComponent::GetAllComp
 		return FoundComponents;
 	}
 
-	// Iterate through all actors in the world
-	for (TActorIterator<AActor> ActorIterator(World); ActorIterator; ++ActorIterator)
+	// Iterate through all registered compass indicators
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AActor* Actor = *ActorIterator;
-		if (IsValid(Actor))
+		const TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>>& RegisteredIndicators = Registry->GetCompassIndicators();
+		for (const TWeakObjectPtr<UGS_CompassIndicatorComponent>& IndicatorPtr : RegisteredIndicators)
 		{
-			// Skip actors that are not replicated to this client in multiplayer
-			if (World->GetNetMode() != NM_Standalone)
+			UGS_CompassIndicatorComponent* CompassComponent = IndicatorPtr.Get();
+			if (IsValid(CompassComponent) && CompassComponent->IsValidForCompass())
 			{
-				// In multiplayer, only show actors that are properly replicated
-				if (!Actor->GetIsReplicated() && Actor->GetRemoteRole() == ROLE_None)
-				{
-					continue;
-				}
-			}
-
-			// Find compass indicator component
-			if (UGS_CompassIndicatorComponent* CompassComponent = Actor->FindComponentByClass<UGS_CompassIndicatorComponent>())
-			{
-				// Additional multiplayer safety checks
-				if (IsValid(CompassComponent) && CompassComponent->IsValidForCompass())
-				{
-					FoundComponents.Add(CompassComponent);
-				}
+				FoundComponents.Add(CompassComponent);
 			}
 		}
 	}
     
 	return FoundComponents;
+}
+
+void UGS_CompassIndicatorComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Start caching timer
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(CacheTimerHandle, this, &UGS_CompassIndicatorComponent::UpdateCachedValidity, 0.5f, true);
+	}
+	// Initial update
+	UpdateCachedValidity();
+}
+
+void UGS_CompassIndicatorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(CacheTimerHandle);
+	}
+	
+	Super::EndPlay(EndPlayReason);
+}
+
+void UGS_CompassIndicatorComponent::UpdateCachedValidity()
+{
+	if (bCheckPlayerStatus)
+	{
+		if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		{
+			if (const AGS_PlayerState* PS = OwnerPawn->GetPlayerState<AGS_PlayerState>())
+			{
+				bCachedIsValid = PS->bIsAlive;
+				return;
+			}
+			bCachedIsValid = true; // Default to true if PS not found (yet)
+			return;
+		}
+	}
+	bCachedIsValid = true;
 } 

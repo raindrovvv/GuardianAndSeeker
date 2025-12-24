@@ -20,6 +20,7 @@
 #include "Character/Component/GS_StatComp.h"
 #include "Components/DecalComponent.h"
 #include "Components/WidgetComponent.h"
+#include "UI/Character/GS_HPTextWidgetComp.h"
 // #include "BehaviorTree/BlackboardComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -27,6 +28,7 @@
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "System/GameState/GS_InGameGS.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 
 AGS_Monster::AGS_Monster()
@@ -64,7 +66,7 @@ AGS_Monster::AGS_Monster()
 	Tags.Add("Monster");
 	
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// RTS 선택을 위한 콜리전 설정 (모든 몬스터에 적용)
 	if (GetCapsuleComponent())
@@ -83,12 +85,18 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// === 서버 성능 최적화: 데디케이티드 서버에서는 틱을 비활성화 ===
+
 	if (IsRunningDedicatedServer())
 	{
 		PrimaryActorTick.bCanEverTick = false;
 		SetActorTickEnabled(false);
 	}
+	else
+	{
+		// 클라이언트에서는 거리 기반 UI 컬링 등을 위해 틱 활성화
+		SetActorTickEnabled(true);
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
@@ -160,16 +168,34 @@ void AGS_Monster::BeginPlay()
 			Registry->RegisterMonster(this);
 		}
 	}
-}
 
-void AGS_Monster::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	// 클라이언트 또는 리슨 서버 호스트에서만 위젯 회전 업데이트 (데디케이티드 서버는 위에서 틱 비활성화됨)
-	if (IsValid(SkillCooldownWidgetComp) && !IsRunningDedicatedServer())
+	// === Skeletal Mesh Distance Culling 설정 (클라이언트만) ===
+	if (!IsRunningDedicatedServer() && GetMesh())
 	{
-		UpdateSkillCooldownWidget();
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+		MeshComp->SetCullDistance(CullDistance);
+		MeshComp->SetCachedMaxDrawDistance(CullDistance);
+		MeshComp->bAllowCullDistanceVolume = true;
+		MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+		MeshComp->MinLodModel = MinLOD;
+
+
+		// === Animation Optimization (Client) ===
+		MeshComp->bEnableUpdateRateOptimizations = true;
+		// 몽타주 재생 중에는 화면 밖이라도 틱을 유지하여 공격 판정(AnimNotify) 보장
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+
+		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
+	}
+
+	// === Animation Optimization (Server) ===
+	if (IsRunningDedicatedServer() && GetMesh())
+	{
+		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 }
 
@@ -215,26 +241,6 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 공격 알림 델리게이트 해제
 	OnMonsterAttacked.RemoveAll(this);
 
-	// if (SkillCooldownWidgetComp && SkillCooldownWidgetComp->GetBodySetup())
-	// {
-	// 	SkillCooldownWidgetComp->DestroyPhysicsState();
-	// }
-
-	// 1. Widget 내용 제거
-	SkillCooldownWidgetComp->SetWidget(nullptr);
-
-	// 2. 가시성 끄기
-	SkillCooldownWidgetComp->SetVisibility(false);
-
-	// 3. 콜리전 비활성화
-	SkillCooldownWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// 4. BodySetup 정리
-	if (SkillCooldownWidgetComp->GetBodySetup())
-	{
-		SkillCooldownWidgetComp->DestroyPhysicsState();
-	}
-
 	// Unregister from GameState and Subsystem
 	if (UWorld* World = GetWorld())
 	{
@@ -249,8 +255,73 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 
+	// Stability: Ensure widget components are properly cleaned up
+	if (IsValid(SkillCooldownWidgetComp))
+	{
+		SkillCooldownWidgetComp->SetWidget(nullptr);
+		SkillCooldownWidgetComp->SetVisibility(false);
+		SkillCooldownWidgetComp->DestroyComponent();
+	}
+
+	if (IsValid(TargetedUIComponent))
+	{
+		TargetedUIComponent->SetWidget(nullptr);
+		TargetedUIComponent->SetVisibility(false);
+		TargetedUIComponent->DestroyComponent();
+	}
+
 	Super::EndPlay(EndPlayReason);
-} 
+}
+
+void AGS_Monster::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// Monster HP Bar distance & LoS culling (Client only)
+	if (GetNetMode() != NM_DedicatedServer && IsValid(HPTextWidgetComp))
+	{
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				FVector CameraLocation = CameraManager->GetCameraLocation();
+				FVector WidgetLocation = GetActorLocation() + FVector(0.f, 0.f, 200.f); // HP 위젯 위치로 상향 조정
+				
+				float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
+				
+				// 시점에 따른 동적 컬링 거리 계산 (RTS 모드 대응)
+				float MaxCullDist = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+				float MaxCullDistSq = MaxCullDist * MaxCullDist;
+
+				bool bInRange = (DistSq < MaxCullDistSq);
+				bool bIsVisible = bInRange;
+
+				// 거리 내에 있다면 차폐 여부 체크 (TPS 모드에서만 적용, RTS 모드에서는 항상 노출)
+				if (bInRange && !GS_Rendering::IsRTSMode(this))
+				{
+					FHitResult HitResult;
+					FCollisionQueryParams Params(NAME_None, false, this);
+					Params.AddIgnoredActor(PC->GetPawn()); // 로컬 플레이어 무시
+					
+					// Visibility 채널을 사용하여 차폐 여부 확인
+					if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, WidgetLocation, ECC_Visibility, Params))
+					{
+						// 환경(지형, 벽)에 맞았을 때만 가림 처리. 다른 캐릭터에 의한 가림은 무시
+						if (HitResult.GetActor() != this && !HitResult.GetActor()->IsA<ACharacter>())
+						{
+							bIsVisible = false;
+						}
+					}
+				}
+				
+				if (HPTextWidgetComp->IsVisible() != bIsVisible)
+				{
+					HPTextWidgetComp->SetVisibility(bIsVisible);
+				}
+			}
+		}
+	}
+}
 
 void AGS_Monster::OnDeath()
 {
@@ -465,24 +536,6 @@ bool AGS_Monster::ShowDecal()
 	return true;
 }
 
-void AGS_Monster::UpdateSkillCooldownWidget()
-{
-	if (!IsValid(SkillCooldownWidgetComp))
-	{
-		return;
-	}
-
-	if (APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		FVector CameraForward = CameraManager->GetCameraRotation().Vector();
-		FVector CameraRight = FVector::CrossProduct(CameraForward, FVector::UpVector).GetSafeNormal();
-		FVector CameraUp = FVector::CrossProduct(CameraRight, CameraForward).GetSafeNormal();
-		FRotator WidgetRotation = UKismetMathLibrary::MakeRotFromXZ(-CameraForward, CameraUp);
-
-		SkillCooldownWidgetComp->SetWorldRotation(WidgetRotation);
-	}
-}
-
 void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
 {
 	if (!InStatComp)
@@ -500,4 +553,10 @@ void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
 	}
 
 	LastKnownHP = CurrentHP;
+}
+
+float AGS_Monster::GetOptimalCullDistance() const
+{
+	// 기본값: 중간 크기 몬스터 컬링 거리
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }

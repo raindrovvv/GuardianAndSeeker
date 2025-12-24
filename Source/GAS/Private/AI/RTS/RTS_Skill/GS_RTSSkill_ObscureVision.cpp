@@ -10,6 +10,7 @@
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 UGS_RTSSkill_ObscureVision::UGS_RTSSkill_ObscureVision()
 {
@@ -29,12 +30,16 @@ bool UGS_RTSSkill_ObscureVision::CanActivate(UGS_RTSSkillComponent* SkillCompone
 		return false;
 	}
 
-	for (TActorIterator<AGS_Seeker> It(World); It; ++It)
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AGS_Seeker* Seeker = *It;
-		if (IsValid(Seeker) && !Seeker->IsDead())
+		const TArray<TWeakObjectPtr<AGS_Seeker>>& Seekers = Registry->GetSeekers();
+		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : Seekers)
 		{
-			return true;  // 살아있는 시커가 최소 1명 있음
+			AGS_Seeker* Seeker = SeekerPtr.Get();
+			if (IsValid(Seeker) && !Seeker->IsDead())
+			{
+				return true;  // 살아있는 시커가 최소 1명 있음
+			}
 		}
 	}
 
@@ -101,49 +106,53 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 	int32 AffectedCount = 0;
 
 	// 월드 내 모든 시커 순회
-	for (TActorIterator<AGS_Seeker> It(World); It; ++It)
+	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
-		AGS_Seeker* Seeker = *It;
-		if (!IsValid(Seeker) || Seeker->IsDead())
+		const TArray<TWeakObjectPtr<AGS_Seeker>>& Seekers = Registry->GetSeekers();
+		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : Seekers)
 		{
-			continue;
-		}
+			AGS_Seeker* Seeker = SeekerPtr.Get();
+			if (!IsValid(Seeker) || Seeker->IsDead())
+			{
+				continue;
+			}
 
-		// 디버프 컴포넌트 가져오기
-		UGS_DebuffComp* DebuffComp = Seeker->GetDebuffComp();
-		if (DebuffComp)
-		{
-			// 기존 DebuffComp를 통해 디버프 적용
-			DebuffComp->ApplyDebuff(EDebuffType::Obscure, nullptr);
-			++AffectedCount;
-		}
-		else
-		{
-			// 디버프 컴포넌트가 없는 경우 직접 호출
-			Seeker->Client_StartVisionObscured();
+			// 디버프 컴포넌트 가져오기
+			UGS_DebuffComp* DebuffComp = Seeker->GetDebuffComp();
+			if (DebuffComp)
+			{
+				// 기존 DebuffComp를 통해 디버프 적용
+				DebuffComp->ApplyDebuff(EDebuffType::Obscure, nullptr);
+				++AffectedCount;
+			}
+			else
+			{
+				// 디버프 컴포넌트가 없는 경우 직접 호출
+				Seeker->Client_StartVisionObscured();
 
-			// 지속 시간 후 해제하는 타이머 설정
-			FTimerHandle TimerHandle;
-			World->GetTimerManager().SetTimer(
-				TimerHandle,
-				[WeakSeeker = TWeakObjectPtr<AGS_Seeker>(Seeker)]()
-				{
-					if (WeakSeeker.IsValid())
+				// 지속 시간 후 해제하는 타이머 설정
+				FTimerHandle TimerHandle;
+				World->GetTimerManager().SetTimer(
+					TimerHandle,
+					[WeakSeeker = TWeakObjectPtr<AGS_Seeker>(Seeker)]()
 					{
-						WeakSeeker->Client_StopVisionObscured();
-					}
-				},
-				ObscureDuration,
-				false
-			);
+						if (WeakSeeker.IsValid())
+						{
+							WeakSeeker->Client_StopVisionObscured();
+						}
+					},
+					ObscureDuration,
+					false
+				);
 
-			++AffectedCount;
-		}
+				++AffectedCount;
+			}
 
-		// 개별 시커에게 활성화 사운드 재생
-		if (ActivateSound)
-		{
-			PlaySkillSound(ActivateSound, Seeker->GetActorLocation());
+			// 개별 시커에게 활성화 사운드 재생
+			if (ActivateSound)
+			{
+				PlaySkillSound(ActivateSound, Seeker->GetActorLocation());
+			}
 		}
 	}
 }

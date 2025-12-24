@@ -3,6 +3,7 @@
 
 #include "Character/Player/Monster/GS_ShadowFang.h"
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 
 AGS_ShadowFang::AGS_ShadowFang()
@@ -32,4 +33,9 @@ void AGS_ShadowFang::UseSkill()
 	{
 		MonsterSkillComp->TryActivateSkill();
 	}
+}
+
+float AGS_ShadowFang::GetOptimalCullDistance() const
+{
+	return GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
 }

@@ -20,4 +20,5 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void UseSkill() override;
+	virtual float GetOptimalCullDistance() const override;
 };

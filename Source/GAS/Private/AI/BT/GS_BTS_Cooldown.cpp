@@ -11,6 +11,12 @@ UGS_BTS_Cooldown::UGS_BTS_Cooldown()
 {
 	NodeName = TEXT("Cooldown");
 	bNotifyTick = true;
+	
+	// [성능 최적화] 쿨다운 체크 주기를 0.1초로 설정 (약 10 FPS)
+	// 매 프레임 체크 대신 주기적 체크로 CPU 부하를 약 6배 감소
+	// RandomDeviation으로 다수 AI의 틱 동시 발생 방지
+	Interval = 0.1f;
+	RandomDeviation = 0.05f;
 }
 
 void UGS_BTS_Cooldown::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)

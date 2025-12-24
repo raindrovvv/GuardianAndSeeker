@@ -9,6 +9,9 @@
 class AGS_Monster;
 class AGS_Seeker;
 class AGS_Guardian;
+class AGS_RTSController;
+class AGS_LavaTrap;
+class UGS_CompassIndicatorComponent;
 
 /**
  * WorldSubsystem for managing and quickly accessing key game actors
@@ -35,10 +38,22 @@ public:
 	void RegisterGuardian(AGS_Guardian* Guardian);
 	void UnregisterGuardian(AGS_Guardian* Guardian);
 
+	void RegisterRTSController(AGS_RTSController* RTSController);
+	void UnregisterRTSController(AGS_RTSController* RTSController);
+
+	void RegisterLavaTrap(AGS_LavaTrap* LavaTrap);
+	void UnregisterLavaTrap(AGS_LavaTrap* LavaTrap);
+
+	void RegisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator);
+	void UnregisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator);
+
 	// --- Accessors ---
 	const TArray<TWeakObjectPtr<AGS_Monster>>& GetMonsters() const { return RegisteredMonsters; }
 	const TArray<TWeakObjectPtr<AGS_Seeker>>& GetSeekers() const { return RegisteredSeekers; }
 	AGS_Guardian* GetGuardian() const { return RegisteredGuardian.Get(); }
+	AGS_RTSController* GetRTSController() const { return RegisteredRTSController.Get(); }
+	const TArray<TWeakObjectPtr<AGS_LavaTrap>>& GetLavaTraps() const { return RegisteredLavaTraps; }
+	const TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>>& GetCompassIndicators() const { return RegisteredCompassIndicators; }
 
 	/** Combines Monsters and Guardians for Merci's ultimate or similar logic */
 	void GetAllHostileActors(TArray<AActor*>& OutActors) const;
@@ -52,6 +67,15 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AGS_Guardian> RegisteredGuardian;
+
+	UPROPERTY()
+	TWeakObjectPtr<AGS_RTSController> RegisteredRTSController;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AGS_LavaTrap>> RegisteredLavaTraps;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>> RegisteredCompassIndicators;
 
 	FTimerHandle CleanupTimerHandle;
 };

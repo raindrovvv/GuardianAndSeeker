@@ -113,8 +113,10 @@ public:
 	FORCEINLINE UGS_CameraShakeComponent* GetCameraShakeComponent() const { return CameraShakeComponent; }
 
 	float GetFlySpeed();
-	
+
 protected:
+	virtual float GetOptimalCullDistance() const override;
+
 	float NormalMoveSpeed;
 	float SpeedUpMoveSpeed;
 

@@ -25,6 +25,9 @@ AGS_InGameGS::AGS_InGameGS()
 	bIsBossMusicActive = false;
 	CurrentBossMusicStartEvent = nullptr;
 	CurrentBossMusicStopEvent = nullptr;
+
+	// Room/Door 캐싱 초기화
+	CachedRoomCount = 0;
 }
 
 void AGS_InGameGS::SetBossMusicState(bool bActive, UAkAudioEvent* StartEvent, UAkAudioEvent* StopEvent)
@@ -101,6 +104,28 @@ void AGS_InGameGS::BeginPlay()
 	{
 		GetWorldTimerManager().SetTimer(GameTimeHandle, this, &AGS_InGameGS::UpdateGameTime, 1.0f, true);
 	}
+	else
+	{
+		// 클라이언트에서만: Room/Door 액터 스폰 감지
+		if (UWorld* World = GetWorld())
+		{
+			World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &AGS_InGameGS::OnActorSpawned));
+		}
+	}
+}
+
+void AGS_InGameGS::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 타이머 정리
+	if (UWorld* World = GetWorld())
+	{
+		if (FTimerManager* TimerManager = &World->GetTimerManager())
+		{
+			TimerManager->ClearAllTimersForObject(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_InGameGS::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -194,33 +219,19 @@ void AGS_InGameGS::OnRep_DungeonDataReplicated()
 
 void AGS_InGameGS::Client_VerifyRoomSpawning()
 {
-	// 현재 내(클라이언트) 월드에 스폰된 Room과 Door/Wall 액터의 수를 셉니다.
-	int32 CurrentLocalRoomCount = 0;
-	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-	{
-		AActor* CurrentActor = *It;
-		if (!CurrentActor) continue;
+	UE_LOG(LogTemp, Log, TEXT("[로딩] CLIENT: 방 개수 %d / %d (캐시 기반)."), CachedRoomCount, TotalRoomCount);
 
-		// 액터가 UPlaceableInfoComponent를 가지고 있는지 확인합니다.
-		if (UPlaceInfoComponent* InfoComponent = CurrentActor->FindComponentByClass<UPlaceInfoComponent>())
-		{
-			EObjectType ObjectType = InfoComponent->GetObjectType();
-			if (InfoComponent->Is_ObjectTypeSynchronization &&
-				(ObjectType == EObjectType::Room ||
-				ObjectType == EObjectType::DoorAndWall))
-			{
-				CurrentLocalRoomCount++;
-			}
-		}
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("[로딩] CLIENT: 방 개수 %d / %d."), CurrentLocalRoomCount, TotalRoomCount);
-
-	// 내 월드의 방 개수가 서버가 알려준 총 개수와 일치하는지 확인합니다.
-	if (TotalRoomCount > 0 && CurrentLocalRoomCount >= TotalRoomCount)
+	// 캐시된 방 개수가 서버가 알려준 총 개수와 일치하는지 확인합니다.
+	if (TotalRoomCount > 0 && CachedRoomCount >= TotalRoomCount)
 	{
 		// **검증 성공!** 모든 방이 클라이언트에 도착했습니다.
 		UE_LOG(LogTemp, Warning, TEXT("[로딩] CLIENT: 검증 성공. All %d rooms are present. Hiding walls."), TotalRoomCount);
+
+		// 타이머 정리
+		if (RoomVerifyTimerHandle.IsValid())
+		{
+			GetWorld()->GetTimerManager().ClearTimer(RoomVerifyTimerHandle);
+		}
 
 		if (AGS_RTSController* MyController = Cast<AGS_RTSController>(GetGameInstance()->GetFirstLocalPlayerController()))
 		{
@@ -230,8 +241,32 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 	}
 	else
 	{
-		// 아직 모든 방이 도착하지 않았습니다. 0.1초 뒤에 이 함수를 다시 실행하여 재검사합니다.
-		FTimerHandle RetryTimer;
-		GetWorld()->GetTimerManager().SetTimer(RetryTimer, this, &AGS_InGameGS::Client_VerifyRoomSpawning, 0.1f, false);
+		// 아직 모든 방이 도착하지 않았습니다. 
+		// OnActorSpawned에서 다음 방이 들어올 때마다 다시 검사하므로 별도의 타이머는 필요하지 않습니다.
+		UE_LOG(LogTemp, Log, TEXT("[로딩] CLIENT: 모든 방이 아직 스폰되지 않았습니다. 대기 중..."));
+	}
+}
+
+
+void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
+{
+	if (!IsValid(SpawnedActor)) return;
+
+	// PlaceInfoComponent를 가진 Room/Door 액터만 카운트
+	if (UPlaceInfoComponent* InfoComponent = SpawnedActor->FindComponentByClass<UPlaceInfoComponent>())
+	{
+		EObjectType ObjectType = InfoComponent->GetObjectType();
+		if (InfoComponent->Is_ObjectTypeSynchronization &&
+			(ObjectType == EObjectType::Room || ObjectType == EObjectType::DoorAndWall))
+		{
+			CachedRoomCount++;
+			UE_LOG(LogTemp, VeryVerbose, TEXT("[로딩] Room/Door 스폰 감지: %s (총 %d개)"), *SpawnedActor->GetName(), CachedRoomCount);
+
+			// Optimization: 모든 방이 스폰되었는지 즉시 확인하여 타이머 의존성 제거
+			if (bDungeonDataReady && TotalRoomCount > 0 && CachedRoomCount >= TotalRoomCount)
+			{
+				Client_VerifyRoomSpawning();
+			}
+		}
 	}
 }

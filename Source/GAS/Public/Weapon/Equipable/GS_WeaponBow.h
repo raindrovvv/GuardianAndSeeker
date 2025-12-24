@@ -15,7 +15,6 @@ public:
 	// Sets default values for this actor's properties
 	AGS_WeaponBow();
 
-	virtual void Tick(float DeltaTime) override;
 
 protected:
 	// Called when the game starts or when spawned

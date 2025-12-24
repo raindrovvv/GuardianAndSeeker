@@ -1,5 +1,6 @@
 #include "Character/GS_Character.h"
 #include "Character/Component/GS_StatComp.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/Component/GS_DebuffComp.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "UI/Character/GS_HPText.h"
@@ -85,11 +86,18 @@ void AGS_Character::BeginPlay()
 	//Set HP 3D widget (monster)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+		if (IsValid(HPTextWidgetComp))
 		{
-			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			// HP 위젯 거리 기반 컬링 설정 (RTS 시점 고려)
+			float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+			HPTextWidgetComp->SetCullDistance(CullDistance);
+
+			if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
 			{
-				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				{
+					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				}
 			}
 		}
 	}
@@ -204,14 +212,41 @@ float AGS_Character::TakeDamage(float DamageAmount, FDamageEvent const& DamageEv
 	if (CanHitReact)
 	{
 		EHitReactType HitReactType = EHitReactType::DamageOnly;
+		FVector HitDirection = -GetActorForwardVector(); // 기본값
+
+		// FGS_DamageEvent 타입인 경우 (커스텀 데미지 이벤트)
 		if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
 		{
 			const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
 			HitReactType = MyDamageEvent.HitReactType;
+
+			// FGS_DamageEvent도 PointDamage나 RadialDamage를 상속받았을 수 있으므로 체크
+			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+			{
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+				HitDirection = -PointEvent->ShotDirection;
+			}
+			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+			{
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+			}
 		}
-		
-		const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
-		FVector HitDirection = -PointEvent->ShotDirection;
+		// FGS_DamageEvent가 아닌 일반 UE 데미지 이벤트인 경우 (폴백)
+		else
+		{
+			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+			{
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+				HitDirection = -PointEvent->ShotDirection;
+			}
+			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+			{
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+			}
+		}
+
 		if(UGS_HitReactComp* HitReactComponent = GetComponentByClass<UGS_HitReactComp>())
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
