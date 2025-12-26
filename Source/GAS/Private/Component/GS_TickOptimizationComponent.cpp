@@ -6,138 +6,159 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
-UGS_TickOptimizationComponent::UGS_TickOptimizationComponent() {
-  PrimaryComponentTick.bCanEverTick = false;
+UGS_TickOptimizationComponent::UGS_TickOptimizationComponent()
+{
+	PrimaryComponentTick.bCanEverTick = false;
 
-  CurrentDistanceBucket = ETickDistanceBucket::Close;
-  bIsCriticalState = false;
-  LastThrottledTickTime = -1.0f;
+	CurrentDistanceBucket = ETickDistanceBucket::Close;
+	bIsCriticalState = false;
+	LastThrottledTickTime = -1.0f;
 }
 
-void UGS_TickOptimizationComponent::BeginPlay() {
-  Super::BeginPlay();
+void UGS_TickOptimizationComponent::BeginPlay()
+{
+	Super::BeginPlay();
 
-  // 초기 거리 버킷 계산
-  UpdateDistanceBucket();
+	// 초기 거리 버킷 계산
+	UpdateDistanceBucket();
 
-  // 1초마다 거리 버킷 재계산
-  if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().SetTimer(
-        DistanceBucketUpdateTimer, this,
-        &UGS_TickOptimizationComponent::UpdateDistanceBucket,
-        BUCKET_UPDATE_INTERVAL, true);
-  }
+	// 1초마다 거리 버킷 재계산
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			DistanceBucketUpdateTimer, this,
+			&UGS_TickOptimizationComponent::UpdateDistanceBucket,
+			BUCKET_UPDATE_INTERVAL, true);
+	}
 }
 
-void UGS_TickOptimizationComponent::EndPlay(
-    const EEndPlayReason::Type EndPlayReason) {
-  // 타이머 정리
-  if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(DistanceBucketUpdateTimer);
-  }
+void UGS_TickOptimizationComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 타이머 정리
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DistanceBucketUpdateTimer);
+	}
 
-  Super::EndPlay(EndPlayReason);
+	Super::EndPlay(EndPlayReason);
 }
 
-void UGS_TickOptimizationComponent::SetCriticalState(bool bInCritical) {
-  if (bIsCriticalState != bInCritical) {
-    bIsCriticalState = bInCritical;
+void UGS_TickOptimizationComponent::SetCriticalState(bool bInCritical)
+{
+	if (bIsCriticalState != bInCritical)
+	{
+		bIsCriticalState = bInCritical;
 
-    // Critical 상태 변경 시 즉시 버킷 업데이트
-    UpdateDistanceBucket();
-  }
+		// Critical 상태 변경 시 즉시 버킷 업데이트
+		UpdateDistanceBucket();
+	}
 }
 
-bool UGS_TickOptimizationComponent::ShouldExecuteThrottledTick(
-    float CurrentTime) const {
-  // 첫 틱은 항상 실행
-  if (LastThrottledTickTime < 0.0f) {
-    return true;
-  }
+bool UGS_TickOptimizationComponent::ShouldExecuteThrottledTick(float CurrentTime) const
+{
+	// 첫 틱은 항상 실행
+	if (LastThrottledTickTime < 0.0f)
+	{
+		return true;
+	}
 
-  // 현재 버킷의 인터벌 가져오기
-  float TickInterval = GetTickIntervalForBucket(CurrentDistanceBucket);
+	// 현재 버킷의 인터벌 가져오기
+	float TickInterval = GetTickIntervalForBucket(CurrentDistanceBucket);
 
-  // 인터벌 경과 여부 확인
-  return (CurrentTime - LastThrottledTickTime) >= TickInterval;
+	// 인터벌 경과 여부 확인
+	return (CurrentTime - LastThrottledTickTime) >= TickInterval;
 }
 
-void UGS_TickOptimizationComponent::MarkThrottledTickExecuted(
-    float CurrentTime) {
-  LastThrottledTickTime = CurrentTime;
+void UGS_TickOptimizationComponent::MarkThrottledTickExecuted(float CurrentTime)
+{
+	LastThrottledTickTime = CurrentTime;
 }
 
-void UGS_TickOptimizationComponent::UpdateDistanceBucket() {
-  // 서버에서는 거리 기반 최적화 컴포넌트 로직을 수행하지 않음
-  if (GetWorld()->IsNetMode(NM_DedicatedServer)) {
-    return;
-  }
+void UGS_TickOptimizationComponent::UpdateDistanceBucket()
+{
+	// 서버에서는 거리 기반 최적화 컴포넌트 로직을 수행하지 않음
+	if (GetWorld()->IsNetMode(NM_DedicatedServer))
+	{
+		return;
+	}
 
-  // Critical 상태가 최우선
-  if (bIsCriticalState) {
-    CurrentDistanceBucket = ETickDistanceBucket::Critical;
-    return;
-  }
+	// Critical 상태가 최우선
+	if (bIsCriticalState)
+	{
+		CurrentDistanceBucket = ETickDistanceBucket::Critical;
+		return;
+	}
 
-  // 카메라와의 거리 계산
-  float Distance = CalculateCameraDistance();
+	// 카메라와의 거리 계산
+	float Distance = CalculateCameraDistance();
 
-  // 거리 계산에 실패한 경우 (카메라Manager가 아직 유효하지 않은 등) Close 유지
-  if (Distance < 0.0f) {
-    return;
-  }
+	// 거리 계산에 실패한 경우 (카메라Manager가 아직 유효하지 않은 등) Close 유지
+	if (Distance < 0.0f)
+	{
+		return;
+	}
 
-  // 거리 기반 버킷 결정
-  ETickDistanceBucket NewBucket;
-  if (Distance < DISTANCE_THRESHOLD_CLOSE) {
-    NewBucket = ETickDistanceBucket::Close;
-  } else if (Distance < DISTANCE_THRESHOLD_MEDIUM) {
-    NewBucket = ETickDistanceBucket::Medium;
-  } else {
-    NewBucket = ETickDistanceBucket::Far;
-  }
+	// 거리 기반 버킷 결정
+	ETickDistanceBucket NewBucket;
+	if (Distance < DISTANCE_THRESHOLD_CLOSE)
+	{
+		NewBucket = ETickDistanceBucket::Close;
+	}
+	else if (Distance < DISTANCE_THRESHOLD_MEDIUM)
+	{
+		NewBucket = ETickDistanceBucket::Medium;
+	}
+	else
+	{
+		NewBucket = ETickDistanceBucket::Far;
+	}
 
-  // 버킷 변경 로깅
-  if (NewBucket != CurrentDistanceBucket) {
-    CurrentDistanceBucket = NewBucket;
-    UE_LOG(LogTemp, Verbose,
-           TEXT("[TickOpt:%s] Distance Bucket changed to %d (Distance: %.1f)"),
-           *GetOwner()->GetName(), static_cast<int32>(CurrentDistanceBucket),
-           Distance);
-  }
+	// 버킷 변경 로깅
+	if (NewBucket != CurrentDistanceBucket)
+	{
+		CurrentDistanceBucket = NewBucket;
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[TickOpt:%s] Distance Bucket changed to %d (Distance: %.1f)"),
+			*GetOwner()->GetName(), static_cast<int32>(CurrentDistanceBucket),
+			Distance);
+	}
 }
 
-float UGS_TickOptimizationComponent::CalculateCameraDistance() const {
-  UWorld *World = GetWorld();
-  if (!World) {
-    return -1.0f;
-  }
+float UGS_TickOptimizationComponent::CalculateCameraDistance() const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return -1.0f;
+	}
 
-  // 로컬 플레이어 컨트롤러 가져오기
-  APlayerController *PC = World->GetFirstPlayerController();
-  if (!PC || !PC->PlayerCameraManager) {
-    return -1.0f;
-  }
+	// 로컬 플레이어 컨트롤러 가져오기
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC || !PC->PlayerCameraManager)
+	{
+		return -1.0f;
+	}
 
-  // 카메라 위치와 액터 위치 간 거리 계산
-  FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
-  FVector OwnerLocation = GetOwner()->GetActorLocation();
+	// 카메라 위치와 액터 위치 간 거리 계산
+	FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+	FVector OwnerLocation = GetOwner()->GetActorLocation();
 
-  return FVector::Dist(CameraLocation, OwnerLocation);
+	return FVector::Dist(CameraLocation, OwnerLocation);
 }
 
-float UGS_TickOptimizationComponent::GetTickIntervalForBucket(
-    ETickDistanceBucket Bucket) const {
-  switch (Bucket) {
-  case ETickDistanceBucket::Close:
-    return TICK_INTERVAL_CLOSE;
-  case ETickDistanceBucket::Medium:
-    return TICK_INTERVAL_MEDIUM;
-  case ETickDistanceBucket::Far:
-    return TICK_INTERVAL_FAR;
-  case ETickDistanceBucket::Critical:
-    return TICK_INTERVAL_CRITICAL;
-  default:
-    return TICK_INTERVAL_CLOSE;
-  }
+float UGS_TickOptimizationComponent::GetTickIntervalForBucket(ETickDistanceBucket Bucket) const
+{
+	switch (Bucket)
+	{
+	case ETickDistanceBucket::Close:
+		return TICK_INTERVAL_CLOSE;
+	case ETickDistanceBucket::Medium:
+		return TICK_INTERVAL_MEDIUM;
+	case ETickDistanceBucket::Far:
+		return TICK_INTERVAL_FAR;
+	case ETickDistanceBucket::Critical:
+		return TICK_INTERVAL_CRITICAL;
+	default:
+		return TICK_INTERVAL_CLOSE;
+	}
 }
