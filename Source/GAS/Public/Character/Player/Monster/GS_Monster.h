@@ -14,7 +14,6 @@ class UWidgetComponent;
 class UGS_MonsterSkillComp;
 class UGS_MonsterAnimInstance;
 class UGS_VFXComponent;
-class UGS_TickOptimizationComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterDead, AGS_Monster*,
 											DeadUnit);
@@ -68,10 +67,6 @@ public:
 	// VFX 컴포넌트 (디버프 등 모든 VFX)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UGS_VFXComponent* VFXComponent;
-
-	// 틱 최적화 컴포넌트
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Optimization")
-	UGS_TickOptimizationComponent* TickOptimizationComp;
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_OnDeath();

@@ -38,6 +38,10 @@ AGS_Character::AGS_Character()
 	CameraShakeComp =
 		CreateDefaultSubobject<UGS_CameraShakeComponent>(TEXT("CameraShakeComp"));
 
+	// 틱 최적화 컴포넌트 생성
+	TickOptimizationComp = CreateDefaultSubobject<UGS_TickOptimizationComponent>(
+		TEXT("TickOptimizationComp"));
+
 	HPTextWidgetComp =
 		CreateDefaultSubobject<UGS_HPTextWidgetComp>(TEXT("TextWidgetComp"));
 	HPTextWidgetComp->SetupAttachment(RootComponent);
@@ -126,6 +130,19 @@ void AGS_Character::BeginPlay()
 
 void AGS_Character::Tick(float DeltaTime)
 {
+	// Tick Optimization 적용
+	if (TickOptimizationComp)
+	{
+		// 쓰로틀링된 틱 실행 여부 확인
+		if (!TickOptimizationComp->ShouldExecuteThrottledTick(
+			GetWorld()->GetTimeSeconds()))
+		{
+			return;
+		}
+		TickOptimizationComp->MarkThrottledTickExecuted(
+			GetWorld()->GetTimeSeconds());
+	}
+
 	Super::Tick(DeltaTime);
 }
 

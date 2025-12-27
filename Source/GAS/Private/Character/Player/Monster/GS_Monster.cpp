@@ -5,7 +5,6 @@
 #include "AkComponent.h"
 #include "Animation/Character/GS_MonsterAnimInstance.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
-#include "Component/GS_TickOptimizationComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -38,10 +37,6 @@ AGS_Monster::AGS_Monster()
 
 	MonsterSkillComp =
 		CreateDefaultSubobject<UGS_MonsterSkillComp>(TEXT("MonsterSkillComp"));
-
-	// 틱 최적화 컴포넌트 생성
-	TickOptimizationComp = CreateDefaultSubobject<UGS_TickOptimizationComponent>(
-		TEXT("TickOptimizationComp"));
 
 	SkillCooldownWidgetComp =
 		CreateDefaultSubobject<UWidgetComponent>(TEXT("SkillCooldownWidgetComp"));

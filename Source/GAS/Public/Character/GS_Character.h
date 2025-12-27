@@ -7,6 +7,7 @@
 #include "Component/GS_HitReactComp.h"
 #include "CharacterDataAsset.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
+#include "Component/GS_TickOptimizationComponent.h"
 #include "GS_Character.generated.h"
 
 class UGS_StatComp;
@@ -97,6 +98,10 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComp;
+
+	// 틱 최적화 컴포넌트 (거리 기반 틱 쓰로틀링)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Optimization")
+	TObjectPtr<UGS_TickOptimizationComponent> TickOptimizationComp;
 
 	// EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake"
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
