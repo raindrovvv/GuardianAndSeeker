@@ -146,7 +146,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Trap|Audio")
 	void AdjustAudioAnchorByPlacement();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayTrapSound(ETrapSoundType SoundType);
 	void Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundType);
 
@@ -210,8 +210,8 @@ public:
 	//HitReactType 결정하는 함수
 	virtual EHitReactType GetHitReactType() const;
 
-	// 혈흔 이펙트 재생 (멀티캐스트)
-	UFUNCTION(NetMulticast, Reliable)
+	// 혈흔 이펙트 재생 (멀티캐스트) - 순수 연출용이므로 Unreliable
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayTrapHitBloodEffect(FVector HitLocation);
 	void Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLocation);
 
