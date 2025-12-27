@@ -1885,6 +1885,9 @@ void AGS_RTSController::OnTrackedSeekerDestroyed(AActor* DestroyedActor)
 	// RPC 쿨다운 추적 맵에서 제거
 	LastSeekerNotifyTimes.Remove(DestroyedSeeker);
 
+	// 근접도 캐시에서 제거
+	LastSeekerProximityValues.Remove(DestroyedSeeker);
+
 }
 
 void AGS_RTSController::UpdateSeekerDetection()
@@ -1914,8 +1917,13 @@ void AGS_RTSController::UpdateSeekerDetection()
 				// 화면 중앙과의 거리 계산 (0.0 = 중앙, 1.0 = 가장자리)
 				float DistanceFromCenter = CalculateSeekerDistanceFromScreenCenter(Seeker);
 
-				// 서버에 거리 정보 전송
-				Server_UpdateSeekerProximity(Seeker, DistanceFromCenter);
+				// 이전 값과 비교하여 유의미한 변화(5% 이상)가 있을 때만 서버로 전송
+				float* LastValue = LastSeekerProximityValues.Find(Seeker);
+				if (!LastValue || FMath::Abs(*LastValue - DistanceFromCenter) >= ProximityChangeThreshold)
+				{
+					LastSeekerProximityValues.Add(Seeker, DistanceFromCenter);
+					Server_UpdateSeekerProximity(Seeker, DistanceFromCenter);
+				}
 			}
 		}
 	}
@@ -1949,6 +1957,7 @@ void AGS_RTSController::UpdateSeekerDetection()
 		Server_UpdateSeekerProximity(Seeker, 1.0f);
 
 		LastSeekerNotifyTimes.Remove(Seeker);
+		LastSeekerProximityValues.Remove(Seeker);
 	}
 }
 

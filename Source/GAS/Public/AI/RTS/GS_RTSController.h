@@ -410,6 +410,13 @@ private:
 	UPROPERTY()
 	TMap<AGS_Seeker*, float> LastSeekerNotifyTimes;
 
+	// 시커 근접도 캐싱 (변화 필터링용)
+	UPROPERTY()
+	TMap<AGS_Seeker*, float> LastSeekerProximityValues;
+
+	// 근접도 변화 임계값 (5% = 0.05)
+	static constexpr float ProximityChangeThreshold = 0.05f;
+
 	FVector2D GetKeyboardDirection() const;
 	FVector2D CalculateMouseEdgeDirection(FVector2D MousePos, FIntPoint ViewportSize) const;
 	FVector2D GetFinalDirection() const;
