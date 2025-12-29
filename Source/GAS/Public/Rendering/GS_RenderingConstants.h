@@ -8,7 +8,8 @@
  * 렌더링 최적화 상수 정의
  * Distance Culling, LOD 등에 사용되는 전역 상수값
  */
-namespace GS_Rendering {
+namespace GS_Rendering
+{
 // ========================================
 // Skeletal Mesh Culling Distances
 // ========================================
@@ -60,7 +61,7 @@ constexpr float RTS_CULL_DISTANCE_SCALE = 3.5f;
  * @param BaseDistance 기본 컬링 거리
  * @return 시점 배율이 적용된 최종 컬링 거리
  */
-float CalculateCullDistance(const UObject *WorldContext, float BaseDistance);
+float CalculateCullDistance(const UObject* WorldContext, float BaseDistance);
 
 /**
  * 현재 시점에 맞는 최소 LOD 단계를 계산합니다.
@@ -68,10 +69,10 @@ float CalculateCullDistance(const UObject *WorldContext, float BaseDistance);
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
  * @return 강제할 최소 LOD 단계 (0: 제한 없음, 1 이상: 하위 단계 고정)
  */
-int32 CalculateMinLOD(const UObject *WorldContext);
+int32 CalculateMinLOD(const UObject* WorldContext);
 
 /** 현재 로컬 플레이어가 RTS 모드인지 확인합니다. */
-bool IsRTSMode(const UObject *WorldContext);
+bool IsRTSMode(const UObject* WorldContext);
 
 // ========================================
 // LOD Optimization Settings
@@ -94,17 +95,17 @@ constexpr float DEFAULT_BOUNDS_SCALE = 1.25f;
 // Network Update Frequency Optimization
 // ========================================
 
-/** 근거리 네트워크 업데이트 빈도 (30Hz - 높은 정확도) */
-constexpr float NET_UPDATE_FREQ_CLOSE = 30.0f;
+/** 근거리 네트워크 업데이트 빈도 (60Hz - 높은 정확도 및 TPS 대응) */
+constexpr float NET_UPDATE_FREQ_CLOSE = 60.0f;
 
-/** 중거리 네트워크 업데이트 빈도 (20Hz - 전투 안정성) */
-constexpr float NET_UPDATE_FREQ_MEDIUM = 20.0f;
+/** 중거리 네트워크 업데이트 빈도 (30Hz - 전투 안정성/대역폭 균형) */
+constexpr float NET_UPDATE_FREQ_MEDIUM = 30.0f;
 
-/** 원거리 네트워크 업데이트 빈도 (10Hz - 성능/안정성 균형) */
-constexpr float NET_UPDATE_FREQ_FAR = 10.0f;
+/** 원거리 네트워크 업데이트 빈도 (15Hz - 최소한의 동기화) */
+constexpr float NET_UPDATE_FREQ_FAR = 15.0f;
 
-/** 전투 중 최소 네트워크 업데이트 빈도 (30Hz - 동기화 품질 보장) */
-constexpr float NET_UPDATE_FREQ_COMBAT = 30.0f;
+/** 전투 중 최소 네트워크 업데이트 빈도 (60Hz - 동기화 품질 보장) */
+constexpr float NET_UPDATE_FREQ_COMBAT = 60.0f;
 
 /** 최소 네트워크 업데이트 빈도 */
 constexpr float NET_UPDATE_FREQ_MIN = 5.0f;
@@ -121,8 +122,8 @@ constexpr float NET_DISTANCE_MEDIUM = 15000.0f;
  * @param ActorLocation 액터의 위치
  * @return 거리 기반 최적 네트워크 업데이트 빈도
  */
-float CalculateNetUpdateFrequency(const UObject *WorldContext,
-                                  const FVector &ActorLocation);
+float CalculateNetUpdateFrequency(const UObject* WorldContext,
+                                  const FVector& ActorLocation);
 
 // ========================================
 // Shadow Casting Distance Optimization
@@ -149,5 +150,5 @@ constexpr float AI_PERCEPTION_DISTANCE_RTS = 15000.0f;
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
  * @return 시점 기반 AI 인지 거리
  */
-float CalculateAIPerceptionDistance(const UObject *WorldContext);
+float CalculateAIPerceptionDistance(const UObject* WorldContext);
 } // namespace GS_Rendering

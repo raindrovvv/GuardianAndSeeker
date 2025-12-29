@@ -26,7 +26,7 @@ enum class ETickDistanceBucket : uint8
  * 거리 기반 틱 최적화 컴포넌트
  * 카메라와의 거리에 따라 액터의 틱 빈도를 조절하여 CPU 부하를 감소시킵니다.
  */
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_TickOptimizationComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -100,14 +100,14 @@ private:
 	FTimerHandle DistanceBucketUpdateTimer;
 
 	// === 틱 인터벌 상수 ===
-	static constexpr float TICK_INTERVAL_CLOSE = 0.0167f;    // 60Hz (매 프레임 at 60fps)
-	static constexpr float TICK_INTERVAL_MEDIUM = 0.1f;      // 10Hz
-	static constexpr float TICK_INTERVAL_FAR = 0.5f;         // 2Hz
+	static constexpr float TICK_INTERVAL_CLOSE = 0.0167f; // 60Hz (매 프레임 at 60fps)
+	static constexpr float TICK_INTERVAL_MEDIUM = 0.1f; // 10Hz
+	static constexpr float TICK_INTERVAL_FAR = 0.5f; // 2Hz
 	static constexpr float TICK_INTERVAL_CRITICAL = 0.0167f; // 60Hz (강제)
 
 	// === 거리 임계값 상수 (cm) ===
-	static constexpr float DISTANCE_THRESHOLD_CLOSE = 3000.0f;  // 30m
-	static constexpr float DISTANCE_THRESHOLD_MEDIUM = 8000.0f; // 80m
+	static constexpr float DISTANCE_THRESHOLD_CLOSE = 6000.0f; // 60m
+	static constexpr float DISTANCE_THRESHOLD_MEDIUM = 12000.0f; // 120m
 
 	// === 버킷 업데이트 간격 ===
 	static constexpr float BUCKET_UPDATE_INTERVAL = 1.0f; // 1초마다 거리 버킷 재계산

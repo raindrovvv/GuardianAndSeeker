@@ -36,10 +36,10 @@ AGS_Monster::AGS_Monster()
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	MonsterSkillComp =
-		CreateDefaultSubobject<UGS_MonsterSkillComp>(TEXT("MonsterSkillComp"));
+	    CreateDefaultSubobject<UGS_MonsterSkillComp>(TEXT("MonsterSkillComp"));
 
 	SkillCooldownWidgetComp =
-		CreateDefaultSubobject<UWidgetComponent>(TEXT("SkillCooldownWidgetComp"));
+	    CreateDefaultSubobject<UWidgetComponent>(TEXT("SkillCooldownWidgetComp"));
 	SkillCooldownWidgetComp->SetupAttachment(RootComponent);
 	SkillCooldownWidgetComp->SetVisibility(false);
 	SkillCooldownWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
@@ -51,14 +51,14 @@ AGS_Monster::AGS_Monster()
 
 	// 몬스터 오디오 컴포넌트 생성
 	MonsterAudioComponent = CreateDefaultSubobject<UGS_MonsterAudioComponent>(
-		"MonsterAudioComponent");
+	    "MonsterAudioComponent");
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
 
 	// UI 컴포넌트 생성 및 초기화
 	TargetedUIComponent =
-		CreateDefaultSubobject<UWidgetComponent>(TEXT("TargetedUI"));
+	    CreateDefaultSubobject<UWidgetComponent>(TEXT("TargetedUI"));
 	TargetedUIComponent->SetupAttachment(RootComponent);
 	TargetedUIComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	TargetedUIComponent->SetWidgetSpace(EWidgetSpace::Screen);
@@ -75,7 +75,7 @@ AGS_Monster::AGS_Monster()
 	if (GetCapsuleComponent())
 	{
 		GetCapsuleComponent()->SetCollisionResponseToChannel(
-			ECC_GameTraceChannel1, ECR_Block); // Interactable
+		    ECC_GameTraceChannel1, ECR_Block); // Interactable
 	}
 
 	bCommandLocked = false;
@@ -108,7 +108,7 @@ void AGS_Monster::BeginPlay()
 	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry =
-			World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->RegisterMonster(this);
 		}
@@ -133,7 +133,7 @@ void AGS_Monster::BeginPlay()
 	if (IsValid(MonsterSkillComp))
 	{
 		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(
-			this, &AGS_Monster::HandleSkillCooldownChanged);
+		    this, &AGS_Monster::HandleSkillCooldownChanged);
 	}
 
 	// Bind to HP change for attack detection
@@ -141,7 +141,7 @@ void AGS_Monster::BeginPlay()
 	{
 		LastKnownHP = StatComp->GetCurrentHealth();
 		StatComp->OnCurrentHPChanged.AddUObject(this,
-			&AGS_Monster::HandleHPChanged);
+		                                        &AGS_Monster::HandleHPChanged);
 	}
 
 	// Bind to owner's RTSController for attack notifications
@@ -151,13 +151,13 @@ void AGS_Monster::BeginPlay()
 	{
 		// Find local player controller (RTS Player)
 		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(
-			UGameplayStatics::GetPlayerController(this, 0)))
+		        UGameplayStatics::GetPlayerController(this, 0)))
 		{
 			if (RTSController->AttackNotificationManager)
 			{
 				OnMonsterAttacked.AddUniqueDynamic(
-					RTSController->AttackNotificationManager,
-					&UGS_RTSAttackNotificationManager::OnUnitAttacked);
+				    RTSController->AttackNotificationManager,
+				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
 				// UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Attack notification delegate
 				// bound to local RTSController"), *GetName());
 			}
@@ -179,7 +179,7 @@ void AGS_Monster::BeginPlay()
 		}
 
 		if (UGS_ActorRegistrySubsystem* Registry =
-			World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->RegisterMonster(this);
 		}
@@ -190,7 +190,7 @@ void AGS_Monster::BeginPlay()
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
 		float CullDistance =
-			GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		    GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
 		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
 
 		MeshComp->SetCullDistance(CullDistance);
@@ -203,11 +203,11 @@ void AGS_Monster::BeginPlay()
 		MeshComp->bEnableUpdateRateOptimizations = true;
 		// 몽타주 재생 중에는 화면 밖이라도 틱을 유지하여 공격 판정(AnimNotify) 보장
 		MeshComp->VisibilityBasedAnimTickOption =
-			EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+		    EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 
 		UE_LOG(LogTemp, Log,
-			TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"),
-			*GetName(), CullDistance);
+		       TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"),
+		       *GetName(), CullDistance);
 	}
 
 	// === Animation Optimization (Server) ===
@@ -215,16 +215,16 @@ void AGS_Monster::BeginPlay()
 	{
 		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
 		GetMesh()->VisibilityBasedAnimTickOption =
-			EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 
 	// === 네트워크 최적화 타이머 설정 (서버만) ===
 	if (HasAuthority())
 	{
 		GetWorld()->GetTimerManager().SetTimer(
-			NetworkOptimizationTimerHandle, this,
-			&AGS_Monster::UpdateNetworkOptimization, 1.0f, // 1초마다 체크
-			true);
+		    NetworkOptimizationTimerHandle, this,
+		    &AGS_Monster::UpdateNetworkOptimization, 0.2f, // 0.2초마다 체크
+		    true);
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만) ===
@@ -242,7 +242,7 @@ void AGS_Monster::PostInitializeComponents()
 }
 
 void AGS_Monster::GetLifetimeReplicatedProps(
-	TArray<FLifetimeProperty>& OutLifetimeProps) const
+    TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -286,7 +286,7 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 
 		if (UGS_ActorRegistrySubsystem* Registry =
-			World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->UnregisterMonster(this);
 		}
@@ -317,12 +317,12 @@ void AGS_Monster::Tick(float DeltaSeconds)
 	{
 		// 쓰로틀링된 틱 실행 여부 확인
 		if (!TickOptimizationComp->ShouldExecuteThrottledTick(
-			GetWorld()->GetTimeSeconds()))
+		        GetWorld()->GetTimeSeconds()))
 		{
 			return;
 		}
 		TickOptimizationComp->MarkThrottledTickExecuted(
-			GetWorld()->GetTimeSeconds());
+		    GetWorld()->GetTimeSeconds());
 	}
 
 	// 최적화 체크를 통과한 경우에만 부모 틱 및 하위 로직 실행
@@ -340,14 +340,14 @@ void AGS_Monster::Tick(float DeltaSeconds)
 			{
 				FVector CameraLocation = CameraManager->GetCameraLocation();
 				FVector WidgetLocation =
-					GetActorLocation() +
-					FVector(0.f, 0.f, 200.f); // HP 위젯 위치로 상향 조정
+				    GetActorLocation() +
+				    FVector(0.f, 0.f, 200.f); // HP 위젯 위치로 상향 조정
 
 				float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
 
 				// 시점에 따른 동적 컬링 거리 계산 (RTS 모드 대응)
 				float MaxCullDist = GS_Rendering::CalculateCullDistance(
-					this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+				    this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
 				float MaxCullDistSq = MaxCullDist * MaxCullDist;
 
 				bool bInRange = (DistSq < MaxCullDistSq);
@@ -363,13 +363,13 @@ void AGS_Monster::Tick(float DeltaSeconds)
 
 					// Visibility 채널을 사용하여 차폐 여부 확인
 					if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation,
-						WidgetLocation,
-						ECC_Visibility, Params))
+					                                         WidgetLocation,
+					                                         ECC_Visibility, Params))
 					{
 						// 환경(지형, 벽)에 맞았을 때만 가림 처리. 다른 캐릭터에 의한 가림은
 						// 무시
 						if (HitResult.GetActor() != this &&
-							!HitResult.GetActor()->IsA<ACharacter>())
+						    !HitResult.GetActor()->IsA<ACharacter>())
 						{
 							bIsVisible = false;
 						}
@@ -394,13 +394,13 @@ void AGS_Monster::OnDeath()
 	if (AController* OwnerController = GetController())
 	{
 		if (AGS_RTSController* RTSController =
-			Cast<AGS_RTSController>(OwnerController))
+		        Cast<AGS_RTSController>(OwnerController))
 		{
 			if (RTSController->AttackNotificationManager)
 			{
 				OnMonsterAttacked.RemoveDynamic(
-					RTSController->AttackNotificationManager,
-					&UGS_RTSAttackNotificationManager::OnUnitAttacked);
+				    RTSController->AttackNotificationManager,
+				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
 			}
 		}
 	}
@@ -421,10 +421,10 @@ void AGS_Monster::OnDeath()
 	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry =
-			World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs =
-				Registry->GetSeekers();
+			    Registry->GetSeekers();
 
 			for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 			{
@@ -441,7 +441,7 @@ void AGS_Monster::OnDeath()
 
 	FTimerHandle DestroyTimerHandle;
 	GetWorldTimerManager().SetTimer(
-		DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, 2.f, false);
+	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, 2.f, false);
 }
 
 void AGS_Monster::HandleDelayedDestroy()
@@ -487,7 +487,7 @@ void AGS_Monster::SetCanUseSkill(bool bCanUse)
 }
 
 void AGS_Monster::HandleSkillCooldownChanged(float InCurrentCoolTime,
-	float InMaxCoolTime)
+                                             float InMaxCoolTime)
 {
 	if (SkillCooldownWidgetComp)
 	{
@@ -585,9 +585,9 @@ void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
 	if (CurrentHP < LastKnownHP && !IsDead())
 	{
 		UE_LOG(LogTemp, Log,
-			TEXT("[Monster:%s] HP decreased %.1f -> %.1f, Broadcasting attack "
-				"notification!"),
-			*GetName(), LastKnownHP, CurrentHP);
+		       TEXT("[Monster:%s] HP decreased %.1f -> %.1f, Broadcasting attack "
+		            "notification!"),
+		       *GetName(), LastKnownHP, CurrentHP);
 		OnMonsterAttacked.Broadcast(this, GetActorLocation());
 	}
 
@@ -608,45 +608,56 @@ void AGS_Monster::UpdateNetworkOptimization()
 
 	// 거리 기반 네트워크 업데이트 빈도 계산
 	float NewFrequency =
-		GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
+	    GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
 
-	// === 전투 상태 체크: HP가 낮거나 AI 타겟이 있으면 최소 빈도 보장 ===
+	// === 전투 상태 체크: HP가 낮거나 AI 타겟이 있으면 최상위 빈도 보장 ===
+	bool bIsAggressiveState = false;
 	if (StatComp)
 	{
 		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
 
-		// HP가 90% 이하이면 전투 중으로 간주 (최소 10Hz 보장)
-		if (HealthRatio < 0.9f)
+		// HP가 조금이라도 깎였다면 (99% 이하) 전투 상태로 간주
+		if (HealthRatio < 0.99f)
 		{
-			NewFrequency =
-				FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
+			bIsAggressiveState = true;
 		}
 	}
 
 	// AI가 타겟을 추적 중이면 전투 중으로 간주
 	if (AGS_AIController* AIController =
-		Cast<AGS_AIController>(GetController()))
+	        Cast<AGS_AIController>(GetController()))
 	{
 		if (UBlackboardComponent* Blackboard =
-			AIController->GetBlackboardComponent())
+		        AIController->GetBlackboardComponent())
 		{
 			if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) !=
-				nullptr)
+			    nullptr)
 			{
-				NewFrequency =
-					FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
+				bIsAggressiveState = true;
 			}
 		}
+	}
+
+	if (bIsAggressiveState)
+	{
+		NewFrequency =
+		    FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
 	}
 
 	// === 이동 상태 체크: 이동 중이면 최소 중거리 빈도 보장 ===
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		if (MoveComp->Velocity.SizeSquared() >
-			100.0f) // 움직이고 있다면 (약 10cm/s 이상)
+		    100.0f) // 움직이고 있다면 (약 10cm/s 이상)
 		{
 			NewFrequency =
-				FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_MEDIUM);
+			    FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_MEDIUM);
+
+			// 이동 중에는 스무딩 방식을 지수적으로 강제하여 더 부드럽게 보이도록 설정
+			if (MoveComp->NetworkSmoothingMode != ENetworkSmoothingMode::Exponential)
+			{
+				MoveComp->NetworkSmoothingMode = ENetworkSmoothingMode::Exponential;
+			}
 		}
 	}
 
@@ -657,9 +668,9 @@ void AGS_Monster::UpdateNetworkOptimization()
 		LastNetUpdateFrequency = NewFrequency;
 
 		UE_LOG(
-			LogTemp, Verbose,
-			TEXT("[Monster:%s] Network Optimization - NetUpdateFrequency: %.1fHz"),
-			*GetName(), NewFrequency);
+		    LogTemp, Verbose,
+		    TEXT("[Monster:%s] Network Optimization - NetUpdateFrequency: %.1fHz"),
+		    *GetName(), NewFrequency);
 	}
 }
 

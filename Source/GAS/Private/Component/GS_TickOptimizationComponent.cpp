@@ -26,9 +26,9 @@ void UGS_TickOptimizationComponent::BeginPlay()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
-			DistanceBucketUpdateTimer, this,
-			&UGS_TickOptimizationComponent::UpdateDistanceBucket,
-			BUCKET_UPDATE_INTERVAL, true);
+		    DistanceBucketUpdateTimer, this,
+		    &UGS_TickOptimizationComponent::UpdateDistanceBucket,
+		    BUCKET_UPDATE_INTERVAL, true);
 	}
 }
 
@@ -76,9 +76,11 @@ void UGS_TickOptimizationComponent::MarkThrottledTickExecuted(float CurrentTime)
 
 void UGS_TickOptimizationComponent::UpdateDistanceBucket()
 {
-	// 서버에서는 거리 기반 최적화 컴포넌트 로직을 수행하지 않음
-	if (GetWorld()->IsNetMode(NM_DedicatedServer))
+	// 서버(Listen Server 포함)에서는 이동 및 AI 로직의 정확성을 위해 틱 최적화를 수행하지 않음
+	// 오직 클라이언트(SimulatedProxy, Proxy)에서만 시각적 최적화를 위해 수행
+	if (GetOwner()->HasAuthority())
 	{
+		CurrentDistanceBucket = ETickDistanceBucket::Critical;
 		return;
 	}
 
@@ -98,7 +100,7 @@ void UGS_TickOptimizationComponent::UpdateDistanceBucket()
 		return;
 	}
 
-	// 거리 기반 버킷 결정
+	// 거리 기반 버킷 결정 (TPS 시점을 고려하여 임계값 상향)
 	ETickDistanceBucket NewBucket;
 	if (Distance < DISTANCE_THRESHOLD_CLOSE)
 	{
@@ -118,9 +120,9 @@ void UGS_TickOptimizationComponent::UpdateDistanceBucket()
 	{
 		CurrentDistanceBucket = NewBucket;
 		UE_LOG(LogTemp, Verbose,
-			TEXT("[TickOpt:%s] Distance Bucket changed to %d (Distance: %.1f)"),
-			*GetOwner()->GetName(), static_cast<int32>(CurrentDistanceBucket),
-			Distance);
+		       TEXT("[TickOpt:%s] Distance Bucket changed to %d (Distance: %.1f)"),
+		       *GetOwner()->GetName(), static_cast<int32>(CurrentDistanceBucket),
+		       Distance);
 	}
 }
 
