@@ -21,7 +21,11 @@ void UGS_AN_SetState::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase
 
 	if (SeekerSlot != ESeekerMontageSlot::End)
 	{
-		Seeker->Multicast_SetMontageSlot(SeekerSlot);
+		// Multicast RPC는 서버에서만 호출해야 함
+		if (Seeker->HasAuthority())
+		{
+			Seeker->Multicast_SetMontageSlot(SeekerSlot);
+		}
 	}
 
 	if (Seeker->CanChangeSeekerGait != bCanChangeSeekerGait)

@@ -11,6 +11,9 @@
 #include "Character/Component/GS_VFXComponent.h"
 #include "Props/Interactables/GS_BridgePiece.h"
 #include "Components/WidgetComponent.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "Rendering/GS_RenderingConstants.h"
+
 
 AGS_Guardian::AGS_Guardian()
 {
@@ -39,6 +42,47 @@ AGS_Guardian::AGS_Guardian()
 void AGS_Guardian::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Register to Subsystem for optimization
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterGuardian(this);
+		}
+	}
+
+	// === 애니메이션 틱 최적화 설정 ===
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		if (IsRunningDedicatedServer())
+		{
+			// 서버는 화면이 없으므로 항상 틱을 수행하여 판정(AnimNotify) 누락 방지
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		}
+		else
+		{
+			// 클라이언트는 최적화를 하되, 공격(몽타주) 중에는 화면 밖이라도 틱을 유지하여 노티파이 보장
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+			
+			// 추가 최적화: URO(Update Rate Optimization) 활성화
+			MeshComp->bEnableUpdateRateOptimizations = true;
+		}
+	}
+}
+
+void AGS_Guardian::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Unregister from Subsystem
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterGuardian(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_Guardian::PostInitializeComponents()
@@ -95,15 +139,17 @@ void AGS_Guardian::MeleeAttackCheck()
 		const float MeleeAttackRange = 200.f;
 		const float MeleeAttackRadius = 200.f;
 		
-		TSet<AGS_Character*> DamagedCharacters = DetectPlayerInRange(Start, MeleeAttackRange, MeleeAttackRadius);
+		TSet<AGS_Character*> DamagedCharacters;
+		DetectPlayerInRange(DamagedCharacters, Start, MeleeAttackRange, MeleeAttackRadius);
 		ApplyDamageToDetectedPlayer(DamagedCharacters, 0.f);
 	}
 }
 
-TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, float SkillRange, float Radius)
+void AGS_Guardian::DetectPlayerInRange(TSet<AGS_Character*>& OutDamagedCharacters, const FVector& Start, float SkillRange, float Radius)
 {
+	OutDamagedCharacters.Reset();
+
 	TArray<FHitResult> OutHitResults;
-	TSet<AGS_Character*> DamagedPlayers;
 	FCollisionQueryParams Params(NAME_None, false, this);
 	Params.AddIgnoredActor(this);
 
@@ -125,7 +171,7 @@ TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, flo
 			AGS_Character* DamagedCharacter = Cast<AGS_Character>(OutHitResult.GetActor());
 			if (IsValid(DamagedCharacter))
 			{
-				DamagedPlayers.Add(DamagedCharacter);
+				OutDamagedCharacters.Add(DamagedCharacter);
 			}
 			//break bridge
 			if (OutHitResult.GetActor()->IsA<AGS_BridgePiece>())
@@ -138,8 +184,6 @@ TSet<AGS_Character*> AGS_Guardian::DetectPlayerInRange(const FVector& Start, flo
 			}
 		}
 	}
-
-	return DamagedPlayers;
 }
 
 void AGS_Guardian::ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& DamagedCharacters, float PlusDamge)
@@ -229,6 +273,12 @@ FName AGS_Guardian::GetManualRowName_Implementation() const
 float AGS_Guardian::GetFlySpeed()
 {
 	return SpeedUpMoveSpeed;
+}
+
+float AGS_Guardian::GetOptimalCullDistance() const
+{
+	// 대형 보스 캐릭터이므로 가장 먼 거리에서 컬링되도록 설정
+	return GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
 }
 
 void AGS_Guardian::MulticastRPCApplyHitStop_Implementation(AGS_Character* InDamagedCharacter)

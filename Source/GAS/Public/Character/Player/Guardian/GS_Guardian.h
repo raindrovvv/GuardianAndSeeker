@@ -41,6 +41,7 @@ public:
 	AGS_Guardian();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
@@ -82,7 +83,7 @@ public:
 	virtual void MeleeAttackCheck();
 	
 	//check player in attack range
-	TSet<AGS_Character*> DetectPlayerInRange(const FVector& Start, float SkillRange, float Radius);
+	void DetectPlayerInRange(TSet<AGS_Character*>& OutDamagedCharacters, const FVector& Start, float SkillRange, float Radius);
 	
 	//damage player in TSet
 	void ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& DamagedCharacters, float PlusDamge);
@@ -112,8 +113,10 @@ public:
 	FORCEINLINE UGS_CameraShakeComponent* GetCameraShakeComponent() const { return CameraShakeComponent; }
 
 	float GetFlySpeed();
-	
+
 protected:
+	virtual float GetOptimalCullDistance() const override;
+
 	float NormalMoveSpeed;
 	float SpeedUpMoveSpeed;
 

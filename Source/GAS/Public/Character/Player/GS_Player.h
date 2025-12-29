@@ -138,18 +138,35 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_SkillComp> SkillComp;
+
+	void UpdateSteamNameWidgetRotation();
+
+	/** 플레이어 타입에 따른 최적 컬링 거리 반환 (자식 클래스에서 오버라이드) */
+	virtual float GetOptimalCullDistance() const;
+
+	/** 네트워크 업데이트 빈도 최적화 (거리 기반) */
+	void UpdateNetworkOptimization();
+
+	/** 그림자 컬링 최적화 (거리 기반) */
+	void UpdateShadowCulling();
+
 private:
 	// Input Control Flag
 	UPROPERTY(Replicated)
 	FSkillInputControl SkillInputControl;
-	
+
 	FTimeline ObscureTimeline;
 
 	bool bIsObscuring;
 
-	void UpdateSteamNameWidgetRotation();
 
 	// 오디오 디바이스 캐싱
 	FAkAudioDevice* CachedAudioDevice = nullptr;
+
+	/** 네트워크 최적화 업데이트 타이머 (1초마다 체크) */
+	FTimerHandle NetworkOptimizationTimerHandle;
+
+	/** 마지막으로 설정한 NetUpdateFrequency (변경 감지용) */
+	float LastNetUpdateFrequency;
 
 };

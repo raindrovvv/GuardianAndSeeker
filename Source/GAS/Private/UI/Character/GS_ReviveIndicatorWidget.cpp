@@ -115,13 +115,19 @@ void UGS_ReviveIndicatorWidget::UpdateProgress(float Progress)
 		// 진행도가 있으면 프로그레스 바 표시
 		if (ReviveProgressBar)
 		{
-			ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (ReviveProgressBar->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 			ReviveProgressBar->SetPercent(Progress);
 		}
 
 		if (ProgressText)
 		{
-			ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (ProgressText->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 			int32 ProgressPercent = FMath::RoundToInt(Progress * 100.0f);
 			ProgressText->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), ProgressPercent)));
 		}
@@ -129,7 +135,10 @@ void UGS_ReviveIndicatorWidget::UpdateProgress(float Progress)
 		// 진행도가 있으면 E키 안내 숨김
 		if (InstructionText)
 		{
-			InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+			if (InstructionText->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 	}
 	else
@@ -137,20 +146,29 @@ void UGS_ReviveIndicatorWidget::UpdateProgress(float Progress)
 		// 진행도가 0이면 프로그레스 바 숨기고 E키 안내 표시
 		if (ReviveProgressBar)
 		{
-			ReviveProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+			if (ReviveProgressBar->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				ReviveProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+			}
 			ReviveProgressBar->SetPercent(0.0f);
 		}
 
 		if (ProgressText)
 		{
-			ProgressText->SetVisibility(ESlateVisibility::Collapsed);
+			if (ProgressText->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				ProgressText->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 
 		// E키 안내 다시 표시
 		if (InstructionText)
 		{
 			InstructionText->SetText(FText::FromString(TEXT("E키를 눌러 구조")));
-			InstructionText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (InstructionText->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				InstructionText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 		}
 	}
 }
@@ -188,17 +206,26 @@ void UGS_ReviveIndicatorWidget::ShowNearbyIndicator(AGS_Seeker* TargetSeeker)
 		// 진행도가 남아있음 - 프로그레스 바 표시 (진행도 감소 중)
 		if (InstructionText)
 		{
-			InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+			if (InstructionText->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 
 		if (ReviveProgressBar)
 		{
-			ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (ReviveProgressBar->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 		}
 
 		if (ProgressText)
 		{
-			ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (ProgressText->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 		}
 	}
 	else
@@ -207,17 +234,26 @@ void UGS_ReviveIndicatorWidget::ShowNearbyIndicator(AGS_Seeker* TargetSeeker)
 		if (InstructionText)
 		{
 			InstructionText->SetText(FText::FromString(TEXT("E키를 눌러 구조")));
-			InstructionText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (InstructionText->GetVisibility() != ESlateVisibility::HitTestInvisible)
+			{
+				InstructionText->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
 		}
 
 		if (ReviveProgressBar)
 		{
-			ReviveProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+			if (ReviveProgressBar->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				ReviveProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 
 		if (ProgressText)
 		{
-			ProgressText->SetVisibility(ESlateVisibility::Collapsed);
+			if (ProgressText->GetVisibility() != ESlateVisibility::Collapsed)
+			{
+				ProgressText->SetVisibility(ESlateVisibility::Collapsed);
+			}
 		}
 	}
 }
@@ -237,18 +273,27 @@ void UGS_ReviveIndicatorWidget::StopReviveProgress()
 	// E키 안내는 숨김 (진행도 감소 중에는 안내 텍스트 불필요)
 	if (InstructionText)
 	{
-		InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+		if (InstructionText->GetVisibility() != ESlateVisibility::Collapsed)
+		{
+			InstructionText->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 
 	// 프로그레스 바는 명시적으로 표시 (진행도 감소를 보여주기 위해)
 	if (ReviveProgressBar)
 	{
-		ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+		if (ReviveProgressBar->GetVisibility() != ESlateVisibility::HitTestInvisible)
+		{
+			ReviveProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
 	}
 
 	if (ProgressText)
 	{
-		ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		if (ProgressText->GetVisibility() != ESlateVisibility::HitTestInvisible)
+		{
+			ProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
 	}
 }
 

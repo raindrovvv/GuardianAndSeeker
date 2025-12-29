@@ -15,6 +15,8 @@ class UInputAction;
 struct FInputActionValue;
 class AGS_Seeker;
 class UGS_ReviveIndicatorWidget;
+class IGS_InteractableInterface;
+class UGS_InteractionWidget;
 
 UCLASS()
 class GAS_API AGS_TpsController : public AGS_BasePlayerController
@@ -23,7 +25,7 @@ class GAS_API AGS_TpsController : public AGS_BasePlayerController
 
 public:
 	AGS_TpsController();
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputMappingContext* InputMappingContext;
 
@@ -53,18 +55,18 @@ public:
 	// ==========================================
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input|Revive")
 	UInputAction* ReviveAction;
-	
+
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PlayerWidgetInstance;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TMap<ECharacterType, TSubclassOf<UUserWidget>> PlayerWidgetClasses;
-	
+
 	UFUNCTION(BlueprintCallable)
 	UUserWidget* GetPlayerWidget();
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Audio")
-    void SetupPlayerAudioListener();
+	void SetupPlayerAudioListener();
 
 	void Move(const FInputActionValue& InputValue);
 	void Look(const FInputActionValue& InputValue);
@@ -74,11 +76,18 @@ public:
 	void PageDown(const FInputActionValue& InputValue);
 
 	void InitControllerPerWorld();
-	
+
 	//[Spectate Other Player]
 	UFUNCTION(Server, Unreliable)
-	void ServerRPCSpectatePlayer();
-	
+	void ServerRPCSpectatePlayer(int32 Step = 1);
+
+	/** 관전 모드 진입 시 UI 처리를 위한 클라이언트 RPC */
+	UFUNCTION(Client, Reliable)
+	void ClientRPC_OnSpectatorModeStarted();
+
+	/** 현재 관전 중인 플레이어 인덱스 */
+	int32 SpectatorIndex = -1;
+
 	UFUNCTION()
 	FControlValue GetControlValue() const;
 
@@ -90,7 +99,7 @@ public:
 
 	UFUNCTION()
 	void SetLookControlValue(bool CanLookRight, bool CanLookUp);
-	
+
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Control")
 	FControlValue ControlValues;
 
@@ -107,7 +116,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void TestFunction();
-	
+
 	//마우스 민감도 관련 함수
 	UFUNCTION(BlueprintCallable, Category = "Settings")
 	float GetCurrentMouseSensitivity() const;
@@ -127,19 +136,19 @@ public:
 	// Debug
 	UFUNCTION(Client, Unreliable)
 	void Client_DrawAimAssistDebug(const FVector& Start, const FVector& End, const FVector& TargetLocation, float Duration); // SJE
-	
+
 	void SetIsAutoMoving(bool InIsAutoMoving);
 
 	// ==========================================
 	// 빈사 플레이어 구조 시스템
 	// ==========================================
-	
+
 	/** E키 누름 - 구조 시작 시도 */
 	void TryStartRevive(const FInputActionValue& InputValue);
-	
+
 	/** E키 떼기 - 구조 취소 */
 	void StopRevive(const FInputActionValue& InputValue);
-	
+
 	/** 현재 구조 중인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Revive")
 	bool IsReviving() const { return bIsReviving; }
@@ -155,7 +164,7 @@ public:
 	/** 구조 시작 서버 RPC */
 	UFUNCTION(Server, Reliable, Category = "Revive")
 	void Server_RequestRevive(AGS_Seeker* Target);
-	
+
 	/** 구조 취소 서버 RPC */
 	UFUNCTION(Server, Reliable, Category = "Revive")
 	void Server_CancelRevive();
@@ -163,6 +172,29 @@ public:
 	/** E키 홀드 상태 서버로 전달 */
 	UFUNCTION(Server, Unreliable, Category = "Revive")
 	void Server_SetHoldingReviveKey(bool bIsHolding);
+
+	// ==========================================
+	// 일반 상호작용 시스템 (IInteractable)
+	// ==========================================
+
+	/** 근처 상호작용 가능 액터 찾기 (캐싱됨) */
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	AActor* GetNearbyInteractable() const { return CachedInteractable.Get(); }
+
+	/** 현재 상호작용 중인지 확인 */
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsInteracting() const { return bIsInteracting; }
+
+	/** 상호작용 진행률 (0.0 ~ 1.0) */
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	float GetInteractionProgress() const;
+
+	/** 상호작용 완료 서버 RPC */
+	UFUNCTION(Server, Reliable, Category = "Interaction")
+	void Server_CompleteInteraction(AActor* Target);
+
+	/** 상호작용 가능 대상 감지 (오버랩 기반) */
+	void UpdateNearbyInteractable();
 
 protected:
 	virtual void BeginPlay() override;
@@ -188,14 +220,16 @@ protected:
 private:
 	// Auto Moving (KCY)
 	FTimerHandle AutoMoveTickHandle;
-	
+	FTimerHandle ReviveIndicatorTimerHandle;
+	FTimerHandle InteractableUpdateTimerHandle;
+
 	UPROPERTY(Replicated)
 	bool bIsAutoMoving = false;
 
 	// ==========================================
 	// 빈사 플레이어 구조 시스템 변수들
 	// ==========================================
-	
+
 	/** 현재 구조 중인지 여부 */
 	bool bIsReviving = false;
 
@@ -214,7 +248,7 @@ private:
 
 	/** 근처 빈사 상태 시커 찾기 */
 	AGS_Seeker* FindNearbyDyingSeeker() const;
-	
+
 	/** 구조 가능 거리 */
 	UPROPERTY(EditDefaultsOnly, Category = "Revive", meta = (ClampMin = "100.0", ClampMax = "500.0"))
 	float ReviveDistance = 200.0f;
@@ -226,6 +260,15 @@ private:
 	/** 현재 생성된 구조 표시 위젯 */
 	UPROPERTY()
 	UGS_ReviveIndicatorWidget* ReviveIndicatorWidget;
+
+	/** 상호작용 위젯 클래스 (BP에서 할당) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGS_InteractionWidget> InteractionWidgetClass;
+
+	/** 현재 생성된 상호작용 위젯 */
+	UPROPERTY()
+	UGS_InteractionWidget* InteractionWidget;
+
 
 	void AutoMoveTick();
 	void ApplyChargeCameraSettings(bool bCharging);
@@ -245,4 +288,36 @@ private:
 	bool bOriginalEnableCameraLag = true;
 	bool bOriginalEnableCameraRotationLag = true;
 	bool bOriginalInheritYaw = true;
+
+	// ==========================================
+	// 일반 상호작용 시스템 변수들
+	// ==========================================
+
+	/** 현재 상호작용 중인지 여부 */
+	bool bIsInteracting = false;
+
+	/** 상호작용 시작 시간 */
+	float InteractionStartTime = 0.0f;
+
+	/** 상호작용 소요 시간 */
+	float CurrentInteractionDuration = 0.0f;
+
+	/** 현재 상호작용 대상 (WeakPtr로 안전하게 참조) */
+	TWeakObjectPtr<AActor> CurrentInteractTarget;
+
+	/** 근처 상호작용 가능 액터 캐싱 (매 Tick 검색 방지) */
+	TWeakObjectPtr<AActor> CachedInteractable;
+
+
+	/** 상호작용 시작 */
+	void StartInteraction(AActor* Target);
+
+	/** 상호작용 취소 */
+	void CancelInteraction();
+
+	/** 상호작용 완료 */
+	void CompleteInteraction();
+
+	/** 상호작용 진행 업데이트 (Tick에서 호출) */
+	void UpdateInteractionProgress(float DeltaTime);
 };

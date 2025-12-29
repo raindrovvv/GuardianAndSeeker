@@ -11,6 +11,7 @@ UGS_DrakharAudioComponent::UGS_DrakharAudioComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 	bDraconicFurySoundPlayed = false;
 	bHurtSoundPlayed = false;
+	bDashSkillSoundPlayed = false;
 	FeverModeStateSoundPlayingID = AK_INVALID_PLAYING_ID;
 }
 
@@ -39,6 +40,12 @@ void UGS_DrakharAudioComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 			{
 				TimerManager.ClearTimer(HurtSoundCooldownTimer);
 				HurtSoundCooldownTimer.Invalidate();
+			}
+
+			if (DashSkillSoundCooldownTimer.IsValid())
+			{
+				TimerManager.ClearTimer(DashSkillSoundCooldownTimer);
+				DashSkillSoundCooldownTimer.Invalidate();
 			}
 		}
 	}
@@ -76,9 +83,24 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboAttackSound_Implementation()
 
 void UGS_DrakharAudioComponent::PlayDashSkillSound()
 {
-	if (!ValidateServerRPCCall())
+	if (bDashSkillSoundPlayed || !ValidateServerRPCCall())
 	{
 		return;
+	}
+
+	// 서버에서도 쿨다운 플래그를 즉시 설정하여 중복 RPC 송신 방지
+	bDashSkillSoundPlayed = true;
+	
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(
+			DashSkillSoundCooldownTimer,
+			this,
+			&UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
+			DashSkillSoundCooldown,
+			false
+		);
 	}
 
 	LastMulticastTime = GetWorld()->GetTimeSeconds();
@@ -98,7 +120,26 @@ void UGS_DrakharAudioComponent::Multicast_PlayDashSkillSound_Implementation()
 		return;
 	}
 
+	if (bDashSkillSoundPlayed)
+	{
+		return;
+	}
+
 	PlaySoundEvent(OwnerDrakhar->DashSkillSoundEvent, OwnerDrakhar->GetActorLocation());
+	bDashSkillSoundPlayed = true;
+
+	// 클라이언트에서도 로컬 중복 재생 방지를 위해 타이머 설정
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(
+			DashSkillSoundCooldownTimer,
+			this,
+			&UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
+			DashSkillSoundCooldown,
+			false
+		);
+	}
 }
 
 void UGS_DrakharAudioComponent::PlayEarthquakeSkillSound()
@@ -286,11 +327,12 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStartSound_Implementation
 		return;
 	}
 
-	if (!OwnerDrakhar->FeverModeStartSoundEvent)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("DrakharAudioComponent: FeverModeStartSoundEvent is null"));
-		return;
-	}
+	PlayFeverModeStartSoundLocal();
+}
+
+void UGS_DrakharAudioComponent::PlayFeverModeStartSoundLocal()
+{
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStartSoundEvent) return;
 
 	PlaySoundEvent(OwnerDrakhar->FeverModeStartSoundEvent, OwnerDrakhar->GetActorLocation());
 }
@@ -319,10 +361,12 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeEndSound_Implementation()
 		return;
 	}
 
-	if (!OwnerDrakhar->FeverModeEndSoundEvent)
-	{
-		return;
-	}
+	PlayFeverModeEndSoundLocal();
+}
+
+void UGS_DrakharAudioComponent::PlayFeverModeEndSoundLocal()
+{
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeEndSoundEvent) return;
 
 	PlaySoundEvent(OwnerDrakhar->FeverModeEndSoundEvent, OwnerDrakhar->GetActorLocation());
 }
@@ -383,17 +427,12 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStateSound_Implementation
 		return;
 	}
 
-	if (!OwnerDrakhar->FeverModeStateSoundEvent)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("DrakharAudioComponent: FeverModeStateSoundEvent is null"));
-		return;
-	}
+	PlayFeverModeStateSoundLocal();
+}
 
-	// 오디오 시스템 검증
-	if (!IsAudioSystemValid())
-	{
-		return;
-	}
+void UGS_DrakharAudioComponent::PlayFeverModeStateSoundLocal()
+{
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStateSoundEvent || !IsAudioSystemValid()) return;
 
 	// 피버모드 스테이트 사운드 재생 및 Playing ID 저장
 	FeverModeStateSoundPlayingID = UAkGameplayStatics::PostEvent(
@@ -402,7 +441,6 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStateSound_Implementation
 		0,
 		FOnAkPostEventCallback()
 	);
-
 }
 
 void UGS_DrakharAudioComponent::StopFeverModeStateSound()
@@ -429,6 +467,11 @@ void UGS_DrakharAudioComponent::Multicast_StopFeverModeStateSound_Implementation
 		return;
 	}
 
+	StopFeverModeStateSoundLocal();
+}
+
+void UGS_DrakharAudioComponent::StopFeverModeStateSoundLocal()
+{
 	// Playing ID가 유효하면 FAkAudioDevice를 통해 중지
 	if (FeverModeStateSoundPlayingID != AK_INVALID_PLAYING_ID)
 	{
@@ -576,6 +619,13 @@ void UGS_DrakharAudioComponent::PlayLandingSound()
 
 	LastMulticastTime = GetWorld()->GetTimeSeconds();
 	Multicast_PlayLandingSound();
+}
+
+void UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown()
+{
+	if (!IsValid(this)) return;
+
+	bDashSkillSoundPlayed = false;
 }
 
 void UGS_DrakharAudioComponent::Multicast_PlayLandingSound_Implementation()

@@ -91,4 +91,8 @@ public:
 	// ===================
 	// VFX: DT_SkillSet의 Skill Cast VFX, Skill Impact VFX 등을 사용
 	// SFX: DT_SkillSet의 사운드 이벤트를 PlaySkillStartSound()로 재생
+
+	// 캐싱된 Seeker 소유자
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Seeker> CachedSeekerOwner;
 };

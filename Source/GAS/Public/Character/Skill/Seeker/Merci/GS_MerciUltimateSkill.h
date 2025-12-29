@@ -22,6 +22,7 @@ public:
 	virtual void InterruptSkill() override;
 
 private:
+	UFUNCTION()
 	virtual void DeactiveSkill() override;
 
 	// 스탠스 관리
@@ -33,11 +34,16 @@ private:
 	float AutoAimingStateTime = 10.0f;
 
 	AActor* FindCloseTarget();
-	UPROPERTY()
-	TArray<AActor*> AllMonsterActors;
 
+	UFUNCTION()
 	void TickAutoAimTarget();
+
 	void UpdateMonsterList();
 
-	AActor* CurrentTarget;
+	// 캐싱된 Merci 소유자 (ActiveSkill에서 설정)
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
+
+	UPROPERTY()
+	TObjectPtr<AActor> CurrentTarget;
 };

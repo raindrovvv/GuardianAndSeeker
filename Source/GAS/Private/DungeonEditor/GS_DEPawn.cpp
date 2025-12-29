@@ -7,7 +7,7 @@
 
 AGS_DEPawn::AGS_DEPawn()
 {
- 	PrimaryActorTick.bCanEverTick = true;
+ 	PrimaryActorTick.bCanEverTick = false;
 	
 	SceneComp = CreateDefaultSubobject<USceneComponent>("Scene");
 	SetRootComponent(SceneComp);
@@ -35,11 +35,6 @@ void AGS_DEPawn::BeginPlay()
 	SpringArmComp->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
 }
 
-void AGS_DEPawn::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
 
 // void AGS_DEPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 // {

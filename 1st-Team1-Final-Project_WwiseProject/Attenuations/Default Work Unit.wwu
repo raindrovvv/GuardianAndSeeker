@@ -232,7 +232,7 @@
 				</Attenuation>
 				<Attenuation Name="RTS_Attenuation" ID="{BA588512-4963-42D7-AD9C-A02AD9F2F4F8}" ShortID="845504517">
 					<PropertyList>
-						<Property Name="RadiusMax" Type="Real64" Value="3800"/>
+						<Property Name="RadiusMax" Type="Real64" Value="4800"/>
 					</PropertyList>
 					<ObjectLists>
 						<ObjectList Name="RTPC">
@@ -288,13 +288,13 @@
 											<SegmentShape>Exp2</SegmentShape>
 										</Point>
 										<Point>
-											<XPos>3074.54275</XPos>
-											<YPos>-1.04932</YPos>
+											<XPos>3694.57226</XPos>
+											<YPos>-1.55959</YPos>
 											<Flags>0</Flags>
 											<SegmentShape>Exp2</SegmentShape>
 										</Point>
 										<Point>
-											<XPos>3800</XPos>
+											<XPos>4800</XPos>
 											<YPos>-200</YPos>
 											<Flags>37</Flags>
 										</Point>
@@ -321,7 +321,7 @@
 											<Flags>5</Flags>
 										</Point>
 										<Point>
-											<XPos>3800</XPos>
+											<XPos>4800</XPos>
 											<YPos>100</YPos>
 											<Flags>37</Flags>
 										</Point>

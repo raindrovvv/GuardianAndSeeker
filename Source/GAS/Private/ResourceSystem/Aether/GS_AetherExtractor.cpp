@@ -1,5 +1,6 @@
 #include "ResourceSystem/Aether/GS_AetherExtractor.h"
 #include "AI/RTS/GS_RTSController.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_AetherExtractor::AGS_AetherExtractor()
 {
@@ -22,7 +23,35 @@ AGS_AetherExtractor::AGS_AetherExtractor()
 void AGS_AetherExtractor::BeginPlay()
 {
 	Super::BeginPlay();
-	StatComp->InitStat(FName("AetherExtractor"));
+	// HP 위젯 거리 기반 컬링 설정 (클라이언트 전용)
+	if (GetNetMode() != NM_DedicatedServer && IsValid(HPTextWidgetComp))
+	{
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+		HPTextWidgetComp->SetCullDistance(CullDistance);
+	}
+
+	// 본체 메시 LOD 설정 (클라이언트 전용)
+	if (!IsRunningDedicatedServer())
+	{
+		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+		TArray<UMeshComponent*> MeshComponents;
+		GetComponents<UMeshComponent>(MeshComponents);
+
+		for (UMeshComponent* MeshComp : MeshComponents)
+		{
+			if (MeshComp)
+			{
+				if (UStaticMeshComponent* StaticMesh = Cast<UStaticMeshComponent>(MeshComp))
+				{
+					StaticMesh->MinLOD = MinLOD;
+				}
+				else if (USkeletalMeshComponent* SkeletalMesh = Cast<USkeletalMeshComponent>(MeshComp))
+				{
+					SkeletalMesh->MinLodModel = MinLOD;
+				}
+			}
+		}
+	}
 
 
 	if (!HasAuthority())
@@ -172,19 +201,17 @@ void AGS_AetherExtractor::SetHPTextWidget(UGS_HPText* InHPTextWidget)
 
 void AGS_AetherExtractor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::EndPlay(EndPlayReason);
-
-	if (HPTextWidgetComp)
+	if (StatComp)
 	{
-		if (UGS_HPText* HPText = Cast<UGS_HPText>(HPTextWidgetComp->GetWidget()))
-		{
-			if (StatComp)
-			{
-				StatComp->OnCurrentHPChanged.RemoveAll(HPText);
-			}
-		}
+		StatComp->OnCurrentHPChanged.Clear();
 	}
 
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(AetherExtractTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
 
 	if (!GetWorld())
 	{

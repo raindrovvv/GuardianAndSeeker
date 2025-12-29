@@ -37,10 +37,11 @@ public:
 		const FHitResult& SweepResult
 	);
 
-private:
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal);
-	
 protected:
 	virtual void BeginPlay() override;
+	virtual float GetOptimalCullDistance() const override;
+
+private:
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal);
 }; 

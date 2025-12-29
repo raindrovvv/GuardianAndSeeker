@@ -20,15 +20,18 @@ const FName AGS_AIController::CanAttackKey(TEXT("bCanAttack"));
 const FName AGS_AIController::LastAttackTimeKey(TEXT("LastAttackTime"));
 
 AGS_AIController::AGS_AIController(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCrowdFollowingComponent>("PathFollowingComponent"))
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UCrowdFollowingComponent>("PathFollowingComponent"))
 {
 	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
+
+	// DetectionByAffiliation 설정을 ConfigureSense 전에 해야 함
+	SightConfig->DetectionByAffiliation.bDetectEnemies = true;
+	SightConfig->DetectionByAffiliation.bDetectNeutrals = false;
+	SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
+
 	PerceptionComponent->ConfigureSense(*SightConfig);
-	
-    SightConfig->DetectionByAffiliation.bDetectEnemies   = true;
-    SightConfig->DetectionByAffiliation.bDetectNeutrals  = false;
-    SightConfig->DetectionByAffiliation.bDetectFriendlies= false;
+	PerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 }
 
 void AGS_AIController::BeginPlay()
@@ -36,7 +39,7 @@ void AGS_AIController::BeginPlay()
 	Super::BeginPlay();
 
 	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AGS_AIController::TargetPerceptionUpdated);
-	
+
 	if (UCrowdFollowingComponent* CrowdComp = Cast<UCrowdFollowingComponent>(GetPathFollowingComponent()))
 	{
 		CrowdComp->SetCrowdSimulationState(ECrowdSimulationState::Enabled);
@@ -47,7 +50,7 @@ void AGS_AIController::BeginPlay()
 		CrowdComp->SetCrowdPathOptimizationRange(100.0f);
 		CrowdComp->SetCrowdSeparation(true);
 		CrowdComp->SetCrowdSeparationWeight(0.2f);
-		
+
 		CrowdComp->SetCrowdOptimizeVisibility(false);
 		CrowdComp->SetCrowdOptimizeTopology(false);
 		CrowdComp->SetCrowdRotateToVelocity(false);
@@ -57,7 +60,7 @@ void AGS_AIController::BeginPlay()
 void AGS_AIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-	
+
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(InPawn))
 	{
 		BTAsset = Monster->BTAsset;
@@ -87,6 +90,46 @@ FGenericTeamId AGS_AIController::GetGenericTeamId() const
 	return FGenericTeamId::NoTeam;
 }
 
+ETeamAttitude::Type AGS_AIController::GetTeamAttitudeTowards(const AActor& Other) const
+{
+	const IGenericTeamAgentInterface* OtherTeamAgent = Cast<IGenericTeamAgentInterface>(&Other);
+	if (!OtherTeamAgent)
+	{
+		return ETeamAttitude::Neutral;
+	}
+
+	const FGenericTeamId MyTeamId = GetGenericTeamId();
+	const FGenericTeamId OtherTeamId = OtherTeamAgent->GetGenericTeamId();
+
+	// 몬스터(TeamId=2)의 특수 로직
+	if (MyTeamId == FGenericTeamId(2))
+	{
+		if (OtherTeamId == FGenericTeamId(2))
+		{
+			// 몬스터끼리는 아군
+			return ETeamAttitude::Friendly;
+		}
+		else if (OtherTeamId == FGenericTeamId(1))
+		{
+			// 시커는 적
+			return ETeamAttitude::Hostile;
+		}
+		else
+		{
+			// 가디언(TeamId=0) 등은 중립
+			return ETeamAttitude::Neutral;
+		}
+	}
+
+	// 다른 팀들은 기본 로직 (같은 팀 = 아군, 다른 팀 = 적)
+	if (MyTeamId == OtherTeamId)
+	{
+		return ETeamAttitude::Friendly;
+	}
+
+	return ETeamAttitude::Hostile;
+}
+
 void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	if (Blackboard->GetValueAsBool(DebuffLockedKey))
@@ -99,59 +142,71 @@ void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimul
 		return;
 	}
 
-	// 현재 타겟이 죽었는지 확인하고 클리어
-	/*if (AActor* CurrentTarget = Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey)))
+	AActor* CurrentTarget = Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey));
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
 	{
-		if (AGS_Character* CurrentCharacter = Cast<AGS_Character>(CurrentTarget))
+		return;
+	}
+
+	// 1. 새로운 자극이 감지된 경우 (시야에 들어옴)
+	if (Stimulus.WasSuccessfullySensed())
+	{
+		// 적대적인 대상인지 확인
+		if (Actor && GetTeamAttitudeTowards(*Actor) == ETeamAttitude::Hostile)
 		{
-			if (CurrentCharacter->IsDead())
+			if (!CurrentTarget)
+			{
+				// 타겟이 없으면 즉시 설정
+				SetNewTarget(Actor);
+			}
+			else
+			{
+				// 이미 타겟이 있다면, 새로운 적이 현재 타겟보다 더 가까운지 확인
+				const float CurrentDistSq = FVector::DistSquared(ControlledPawn->GetActorLocation(), CurrentTarget->GetActorLocation());
+				const float NewDistSq = FVector::DistSquared(ControlledPawn->GetActorLocation(), Actor->GetActorLocation());
+
+				if (NewDistSq < CurrentDistSq)
+				{
+					SetNewTarget(Actor);
+				}
+			}
+		}
+	}
+	// 2. 자극을 놓친 경우 (시야에서 사라짐)
+	else
+	{
+		// 시야에서 사라진 게 현재 타겟인 경우에만 새로운 타겟 재탐색
+		if (Actor == CurrentTarget)
+		{
+			TArray<AActor*> PerceivedActors;
+			PerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+
+			AActor* NearestTarget = nullptr;
+			float ClosestDistSq = TNumericLimits<float>::Max();
+
+			for (AActor* PotentialTarget : PerceivedActors)
+			{
+				if (PotentialTarget && GetTeamAttitudeTowards(*PotentialTarget) == ETeamAttitude::Hostile)
+				{
+					const float DistSq = FVector::DistSquared(ControlledPawn->GetActorLocation(), PotentialTarget->GetActorLocation());
+					if (DistSq < ClosestDistSq)
+					{
+						ClosestDistSq = DistSq;
+						NearestTarget = PotentialTarget;
+					}
+				}
+			}
+
+			if (NearestTarget)
+			{
+				SetNewTarget(NearestTarget);
+			}
+			else
 			{
 				ClearCurrentTarget();
 			}
 		}
-	}*/
-
-	// 지금 시야 감지 범위 안에 있는 타겟들
-	TArray<AActor*> Targets;
-	PerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), Targets);
-
-	if (Targets.IsEmpty()) 
-	{
-		if (Blackboard->GetValueAsObject(TargetActorKey) != nullptr)
-		{
-			ClearCurrentTarget();
-		}
-		
-		return;
-	}
-	
-	// 가장 가까운 타겟 찾기
-	APawn* ControlledPawn = GetPawn();
-	float ClosestDist = TNumericLimits<float>::Max();
-	AActor* NearestTarget = nullptr;
-
-	for (AActor* Target : Targets)
-	{
-		// 죽은 캐릭터는 타겟에서 제외
-		/*if (AGS_Character* CandidateChar = Cast<AGS_Character>(Target))
-		{
-			if (CandidateChar->IsDead())
-			{
-				continue;
-			}
-		}*/
-
-		const float Dist = FVector::DistSquared(ControlledPawn->GetActorLocation(),	Target->GetActorLocation());
-		if (Dist < ClosestDist)
-		{
-			ClosestDist = Dist;
-			NearestTarget = Target;
-		}
-	}
-
-	if (NearestTarget)
-	{
-		SetNewTarget(NearestTarget);
 	}
 }
 
@@ -160,7 +215,7 @@ void AGS_AIController::SetNewTarget(AActor* NewTarget)
 	if (NewTarget)
 	{
 		Blackboard->SetValueAsObject(TargetActorKey, NewTarget);
-        
+
 		// 새 타겟인 경우 델리게이트 연결
 		AGS_Character* NewTargetCharacter = Cast<AGS_Character>(NewTarget);
 		if (NewTargetCharacter && TargetCharacter.Get() != NewTargetCharacter)
@@ -169,7 +224,7 @@ void AGS_AIController::SetNewTarget(AActor* NewTarget)
 			{
 				TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);
 			}
-			
+
 			TargetCharacter = NewTargetCharacter;
 			if (!NewTargetCharacter->IsDead())
 			{
@@ -186,14 +241,14 @@ void AGS_AIController::OnTargetDied()
 		Blackboard->ClearValue(TargetActorKey);
 		Blackboard->SetValueAsEnum(CommandKey, 0);
 	}
-	
+
 	TargetCharacter = nullptr;
 }
 
 void AGS_AIController::ClearCurrentTarget()
 {
 	Blackboard->ClearValue(TargetActorKey);
-	
+
 	if (TargetCharacter.IsValid())
 	{
 		TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);

@@ -39,6 +39,25 @@ struct FGS_MinimapIconData
 	{}
 };
 
+/**
+ * 미니맵 공격 경고 구조체
+ */
+USTRUCT()
+struct FGS_MinimapAttackWarning
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UImage> IconWidget;
+
+	FVector WorldLocation;
+	float ExpirationTime;
+
+	FGS_MinimapAttackWarning()
+		: WorldLocation(FVector::ZeroVector), ExpirationTime(0.0f)
+	{}
+};
+
 UCLASS()
 class GAS_API UGS_MinimapWidget : public UUserWidget
 {
@@ -105,6 +124,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Performance")
 	int32 MaxIconPoolSize = 50;
 
+	/** Attack warning icon texture */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Icons")
+	TObjectPtr<UTexture2D> AttackWarningIconTexture;
+
+	/** Attack warning icon size (larger than unit icons) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Icons")
+	FVector2D AttackWarningIconSize = FVector2D(32.0f, 32.0f);
+
 private:
 	// ========== Cached References ==========
 
@@ -128,6 +155,10 @@ private:
 	/** 재사용 가능한 아이콘 위젯 풀 */
 	UPROPERTY()
 	TArray<TObjectPtr<UImage>> InactiveIconPool;
+
+	/** Active attack warning icons */
+	UPROPERTY()
+	TArray<FGS_MinimapAttackWarning> ActiveAttackWarnings;
 
 	// ========== Drag State ==========
 
@@ -225,4 +256,14 @@ private:
 
 	/** FBox2D -> 미니맵 스크린 좌표 변환 */
 	void CalculateViewBoxScreenRect(const FBox2D& ViewBounds, FVector2D& OutPosition, FVector2D& OutSize) const;
+
+public:
+	// ========== Attack Warning System ==========
+
+	/** Show attack warning on minimap */
+	void ShowAttackWarning(const FVector& WorldLocation);
+
+private:
+	/** Update and fade out attack warnings */
+	void UpdateAttackWarnings(float DeltaTime);
 };

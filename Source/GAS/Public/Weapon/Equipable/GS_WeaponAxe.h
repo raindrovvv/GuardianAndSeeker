@@ -27,7 +27,6 @@ public:
 	// Sets default values for this actor's properties
 	AGS_WeaponAxe();
 
-	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, Category = "Mesh")
 	USkeletalMeshComponent* AxeMeshComponent;
@@ -89,17 +88,17 @@ protected:
 	virtual void ClearSafetyTimer() override;
 
 	// 멀티캐스트 함수들
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitSound_Validate(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitSound_Implementation(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitVFX(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitVFX_Validate(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 };
 

@@ -8,7 +8,7 @@
 AGS_WeaponBow::AGS_WeaponBow()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	BowMeshcomponent = CreateDefaultSubobject<USkeletalMeshComponent>("BowMesh");
 	RootComponent = BowMeshcomponent;
@@ -25,9 +25,4 @@ void AGS_WeaponBow::BeginPlay()
 	
 }
 
-// Called every frame
-void AGS_WeaponBow::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
 

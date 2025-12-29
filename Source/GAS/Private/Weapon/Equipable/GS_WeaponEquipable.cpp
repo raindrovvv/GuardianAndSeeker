@@ -9,6 +9,7 @@
 #include "Character/Player/Seeker/GS_Merci.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
+#include "Components/BoxComponent.h"
 
 AGS_WeaponEquipable::AGS_WeaponEquipable()
 {
@@ -116,4 +117,25 @@ bool AGS_WeaponEquipable::ShouldTriggerAuraOnHit(AGS_Character* HitTarget) const
 {
 	// 기본 조건: 가디언이나 몬스터를 타격했을 때만 아우라 활성화
 	return Cast<AGS_Guardian>(HitTarget) || Cast<AGS_Monster>(HitTarget);
+}
+
+void AGS_WeaponEquipable::SafeDisableHitBoxCollision(UBoxComponent* InHitBox)
+{
+	if (!InHitBox || !IsValid(InHitBox))
+	{
+		return;
+	}
+
+	// 다음 프레임에 콜리전 비활성화 (물리 쿼리 충돌 방지)
+	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown)
+	{
+		TWeakObjectPtr<UBoxComponent> WeakHitBox = InHitBox;
+		World->GetTimerManager().SetTimerForNextTick([WeakHitBox]()
+		{
+			if (WeakHitBox.IsValid() && IsValid(WeakHitBox.Get()) && !WeakHitBox->IsBeingDestroyed())
+			{
+				WeakHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			}
+		});
+	}
 }

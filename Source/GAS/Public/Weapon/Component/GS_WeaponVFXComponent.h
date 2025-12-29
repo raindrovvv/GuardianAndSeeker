@@ -164,13 +164,13 @@ private:
 	// VFX 재생 (멀티캐스트)
 	// ======================
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_ActivateHitAura(ESeekerAuraType SeekerType, FVector LocationOffset, FRotator RotationOffset, FVector Scale, float Duration);
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_DeactivateHitAura();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySlashVFX(FVector ImpactPoint, FVector WeaponVelocity, ESeekerAuraType SeekerType);
 	
 	// 확장 VFX용 멀티캐스트 함수들
@@ -180,13 +180,13 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ActivateChargeVFX(float ChargeLevel, ESeekerAuraType SeekerType);
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpecialAttackVFX(ESeekerAuraType SeekerType);
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ActivateEnchantVFX(ESeekerAuraType SeekerType, float Duration);
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayGuardSuccessVFX(FVector ImpactPoint, FVector ImpactNormal, ESeekerAuraType DefenderSeekerType);
 
 	// ======================

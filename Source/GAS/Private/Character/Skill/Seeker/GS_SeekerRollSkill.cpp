@@ -20,12 +20,14 @@ void UGS_SeekerRollSkill::ActiveSkill()
 
 	UE_LOG(LogTemp, Warning, TEXT("SeekerRollSkill")); // SJE
 	
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
+
+	if (CachedSeekerOwner.IsValid())
 	{
-		if (Seeker->HasAuthority())
+		if (CachedSeekerOwner->HasAuthority())
 		{
-			Seeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-			Seeker->CanChangeSeekerGait = false;
+			CachedSeekerOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+			CachedSeekerOwner->CanChangeSeekerGait = false;
 
 			const FName RollDirection = CalRollDirection();
 			UAnimMontage* AM_Roll = SkillAnimMontages[0];
@@ -33,11 +35,11 @@ void UGS_SeekerRollSkill::ActiveSkill()
 			{
 				if (RollDirection == FName("00"))
 				{
-					Seeker->Multicast_PlaySkillMontage(AM_Roll, FName("F0"));
+					CachedSeekerOwner->Multicast_PlaySkillMontage(AM_Roll, FName("F0"));
 				}
 				else
 				{
-					Seeker->Multicast_PlaySkillMontage(AM_Roll, RollDirection);
+					CachedSeekerOwner->Multicast_PlaySkillMontage(AM_Roll, RollDirection);
 				}
 			}
 			
@@ -48,10 +50,10 @@ void UGS_SeekerRollSkill::ActiveSkill()
 				SeekerAnimInstance->Montage_SetEndDelegate(EndDelegate, AM_Roll);
 			}
 
-			Seeker->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+			CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 
 			// 스킬 시작 사운드 재생 (멀티캐스트)
-			if (UGS_SeekerAudioComponent* AudioComp = Seeker->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedSeekerOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
@@ -77,23 +79,22 @@ void UGS_SeekerRollSkill::InterruptSkill()
 
 void UGS_SeekerRollSkill::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	if (CachedSeekerOwner.IsValid())
 	{
-		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(Seeker->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
+		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(CachedSeekerOwner->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
 		if (HealSkill)
 		{
 			UAnimMontage* AM_Wielding = HealSkill->SkillAnimMontages[2]; // Hard coding // SJE
 
-			Seeker->TransWeaponHandingState(
+			CachedSeekerOwner->TransWeaponHandingState(
 			EWeaponHandlingState::Sheathing,
 			EWeaponHandlingState::Wielding,
 			AM_Wielding,
 			ESeekerMontageSlot::UpperBody);
 		}
+
+		CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	}
 
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
-	{
-		Seeker->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
-	}
+	DeactiveSkill();
 }

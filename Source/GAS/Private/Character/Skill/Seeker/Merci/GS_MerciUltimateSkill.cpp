@@ -8,6 +8,7 @@
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/GS_SeekerAudioComponent.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 UGS_MerciUltimateSkill::UGS_MerciUltimateSkill()
 {
@@ -22,38 +23,31 @@ void UGS_MerciUltimateSkill::ActiveSkill()
 	// 쿨타임 측정 시작
 	StartCoolDown();
 
-	if(OwnerCharacter)
+	// 소유자 캐싱 (매번 Cast를 피하기 위해)
+	CachedMerciOwner = Cast<AGS_Merci>(OwnerCharacter);
+
+	if(CachedMerciOwner.IsValid())
 	{
-		//OwnerCharacter->Server_SetCanHitReact(false); // 서버에 전달
 		const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
-		if (AGS_Merci* OwnerPlayer = Cast<AGS_Merci>(OwnerCharacter))
+		
+		// 스킬 시작 사운드 재생 (멀티캐스트)
+		if (CachedMerciOwner->HasAuthority())
 		{
-			// 스킬 시작 사운드 재생 (멀티캐스트)
-			if (OwnerPlayer->HasAuthority())
+			if (UGS_SeekerAudioComponent* AudioComp = CachedMerciOwner->SeekerAudioComponent)
 			{
-				if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
-				{
-					AudioComp->RequestSkillAudio(CurrentSkillType, 0);
-				}
+				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
 			}
-
-			OwnerPlayer->SetAutoAimTarget(nullptr);
 		}
 
-		// 줌인 효과
-		AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-
-		if (MerciCharacter)
-		{
-			MerciCharacter->Client_StartZoom(); // Set Merci Aim Mode Duration on Ultimate Skill
-		}
+		CachedMerciOwner->SetAutoAimTarget(nullptr);
+		CachedMerciOwner->Client_StartZoom();
 
 		// 타이머 설정
-		OwnerCharacter->GetWorldTimerManager().SetTimer(AutoAimingHandle, this, &UGS_MerciUltimateSkill::DeactiveSkill, AutoAimingStateTime, false);
-		OwnerCharacter->GetWorldTimerManager().SetTimer(AutoAimTickHandle, this, &UGS_MerciUltimateSkill::TickAutoAimTarget, AutoAimTickInterval, true);
+		CachedMerciOwner->GetWorldTimerManager().SetTimer(AutoAimingHandle, this, &UGS_MerciUltimateSkill::DeactiveSkill, AutoAimingStateTime, false);
+		CachedMerciOwner->GetWorldTimerManager().SetTimer(AutoAimTickHandle, this, &UGS_MerciUltimateSkill::TickAutoAimTarget, AutoAimTickInterval, true);
 
 		// 입력 제한 설정
-		OwnerCharacter->SetSkillInputControl(true, true, false, false);
+		CachedMerciOwner->SetSkillInputControl(true, true, false, false);
 	}
 
 	// 몬스터 리스트 업데이트
@@ -70,9 +64,8 @@ void UGS_MerciUltimateSkill::OnSkillAnimationEnd()
 void UGS_MerciUltimateSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-
-	AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-	//SetIsActive(false);
+	// 궁극기는 InterruptSkill로 중단되지 않음 (AutoAimingHandle 타이머가 끝날 때까지 유지)
+	// DeactiveSkill은 타이머 종료 시에만 호출됨
 }
 
 void UGS_MerciUltimateSkill::AutoAimingStart()
@@ -81,24 +74,26 @@ void UGS_MerciUltimateSkill::AutoAimingStart()
 	AActor* Target = FindCloseTarget();
 
 	// 타겟 설정
-	AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-	if (Target && OwnerCharacter->HasAuthority())
+	if (Target && CachedMerciOwner.IsValid() && CachedMerciOwner->HasAuthority())
 	{
-		if (MerciCharacter)
-		{
-			MerciCharacter->SetAutoAimTarget(Target);
-		}
+		CachedMerciOwner->SetAutoAimTarget(Target);
 	}
 }
 
 AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 {
-	if (!OwnerCharacter)
+	if (!CachedMerciOwner.IsValid())
+	{
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return nullptr;
 	}
 	
-	AController* Controller = OwnerCharacter->GetController();
+	AController* Controller = CachedMerciOwner->GetController();
 	if (!Controller) 
 	{
 		return nullptr;
@@ -112,7 +107,15 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 	float CloseDot = 0.8f; // 최소 허용 Dot
 	AActor* BestTarget = nullptr;
 
-	for (AActor* Target : AllMonsterActors)
+	TArray<AActor*> HostileActors;
+	UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>();
+	if (!Registry)
+	{
+		return nullptr;
+	}
+	Registry->GetAllHostileActors(HostileActors);
+
+	for (AActor* Target : HostileActors)
 	{
 		if (!IsValid(Target)) continue;
 
@@ -130,9 +133,9 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 			// LineTrace로 시야 확인
 			FHitResult Hit;
 			FCollisionQueryParams Params;
-			Params.AddIgnoredActor(OwnerCharacter);
+			Params.AddIgnoredActor(CachedMerciOwner.Get());
 
-			bool bHit = OwnerCharacter->GetWorld()->LineTraceSingleByChannel(
+			bool bHit = World->LineTraceSingleByChannel(
 				Hit,
 				CamLoc,
 				Target->GetActorLocation(),
@@ -157,101 +160,65 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 
 void UGS_MerciUltimateSkill::TickAutoAimTarget()
 {
-	if (!OwnerCharacter) 
+	if (!CachedMerciOwner.IsValid()) 
 	{
-		UE_LOG(LogTemp, Warning, TEXT("OwnerCharacter null"));
 		return;
 	}
 
 	if (!GetIsActive())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("IsActive is false"));
 		return;
 	}
 
 	// 가까운 타겟 찾기
 	AActor* NewTarget = FindCloseTarget();
 
-	if (OwnerCharacter->HasAuthority())
+	if (CachedMerciOwner->HasAuthority())
 	{
-		// 화살에 타겟 전달
-		if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter))
-		{
-			// 타겟 설정
-			MerciCharacter->SetAutoAimTarget(NewTarget);
+		// 타겟 설정
+		CachedMerciOwner->SetAutoAimTarget(NewTarget);
 
-			if (NewTarget != CurrentTarget)
-			{
-				// 플레이어를 통해 클라이언트로 전송
-				MerciCharacter->Client_UpdateTargetUI(NewTarget, CurrentTarget);
-				CurrentTarget = NewTarget;
-			}
+		if (NewTarget != CurrentTarget)
+		{
+			// 플레이어를 통해 클라이언트로 전송
+			CachedMerciOwner->Client_UpdateTargetUI(NewTarget, CurrentTarget);
+			CurrentTarget = NewTarget;
 		}
 	}
 }
 
 void UGS_MerciUltimateSkill::UpdateMonsterList()
 {
-	AllMonsterActors.Empty();
-
-	TArray<AActor*> FoundActors;
-
-	// AGS_Monster 찾기
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGS_Monster::StaticClass(), FoundActors);
-
-	for (AActor* Actor : FoundActors)
-	{
-		if (IsValid(Actor)) AllMonsterActors.Add(Actor);
-	}
-
-	FoundActors.Empty(); // 배열 재사용
-
-	// AGS_Guardian 찾기
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGS_Guardian::StaticClass(), FoundActors);
-	for (AActor* Actor : FoundActors)
-	{
-		if (IsValid(Actor)) AllMonsterActors.Add(Actor);
-	}
+	// RegistrySubsystem을 사용하므로 더 이상 개별적으로 리스트를 수집할 필요가 없음
 }
 
 void UGS_MerciUltimateSkill::DeactiveSkill()
 {
-	if (OwnerCharacter)
+	if (CachedMerciOwner.IsValid())
 	{
 		// 현재 표시된 타겟 UI 정리
-		if (CurrentTarget && OwnerCharacter->HasAuthority())
+		if (CurrentTarget && CachedMerciOwner->HasAuthority())
 		{
-			if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter))
-			{
-				MerciCharacter->Client_UpdateTargetUI(nullptr, CurrentTarget);
-			}
+			CachedMerciOwner->Client_UpdateTargetUI(nullptr, CurrentTarget);
 			CurrentTarget = nullptr;
 		}
 
 		// 줌 아웃
-		AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter);
-		if (MerciCharacter)
-		{
-			MerciCharacter->Client_StopZoom(0.f);
-		}
+		CachedMerciOwner->Client_StopZoom(0.f);
 
 		// 타이머 정리
-		OwnerCharacter->GetWorldTimerManager().ClearTimer(AutoAimTickHandle);
-		OwnerCharacter->GetWorldTimerManager().ClearTimer(AutoAimingHandle);
+		CachedMerciOwner->GetWorldTimerManager().ClearTimer(AutoAimTickHandle);
+		CachedMerciOwner->GetWorldTimerManager().ClearTimer(AutoAimingHandle);
 
 		// 스킬 Input 수정
-		OwnerCharacter->SetSkillInputControl(true, true, true);
-		//OwnerCharacter->Server_SetCanHitReact(true); // 서버에 전달
+		CachedMerciOwner->SetSkillInputControl(true, true, true);
 
 		// 스킬 종료 사운드 재생 (멀티캐스트)
-		if (OwnerCharacter->HasAuthority())
+		if (CachedMerciOwner->HasAuthority())
 		{
-			if (AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter))
+			if (UGS_SeekerAudioComponent* AudioComp = CachedMerciOwner->SeekerAudioComponent)
 			{
-				if (UGS_SeekerAudioComponent* AudioComp = OwnerSeeker->SeekerAudioComponent)
-				{
-					AudioComp->RequestSkillAudio(CurrentSkillType, 1);
-				}
+				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
 		}
 	}

@@ -2,6 +2,7 @@
 #include "Character/Player/GS_Player.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Skill/GS_SkillComp.h"
+#include "Character/Player/Guardian/GS_Drakhar.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Templates/SharedPointer.h"
 
@@ -18,6 +19,8 @@ void UGS_DrakharWingRush::ActiveSkill()
 	{
 		return;
 	}
+
+	CachedDrakharOwner = Cast<AGS_Drakhar>(OwnerCharacter);
 	
 	ExecuteSkillEffect();
 }
@@ -32,10 +35,9 @@ void UGS_DrakharWingRush::ExecuteSkillEffect()
 	}
 
 	//server logic
-	AGS_Guardian* Guardian = Cast<AGS_Guardian>(OwnerCharacter);
-	if (Guardian)
+	if (CachedDrakharOwner.IsValid())
 	{
-		Guardian->GuardianDoSkillState = EGuardianDoSkill::Moving;	
+		CachedDrakharOwner->GuardianDoSkillState = EGuardianDoSkill::Moving;	
 	}
 	
 	StartCoolDown();

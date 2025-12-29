@@ -27,44 +27,77 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 	AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter);
 	if (OwnerCharacter)
 	{
+		// ============================================
+		// Hit React Cooldown System
+		// ============================================
+		float CurrentTime = GetWorld()->GetTimeSeconds();
+
+		// Interrupt 타입이고 쿨다운 시간 내라면 DamageOnly로 변경
+		if (ReactType == EHitReactType::Interrupt &&
+			(CurrentTime - LastHitReactTime) < HitReactCooldown)
+		{
+			ReactType = EHitReactType::DamageOnly;
+		}
+
+		// 메르시 궁극기 상태인지 확인
+		bool bIsMerciUltimate = false;
+		if (OwnerSeeker && OwnerSeeker->IsMerci())
+		{
+			if (OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+			{
+				bIsMerciUltimate = true;
+			}
+		}
+
 		if (ReactType == EHitReactType::Interrupt)
 		{			
 			if (OwnerSeeker)
 			{
-				OwnerSeeker->GetSkillComp()->SkillsInterrupt();
-
-				UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance());
-
-				OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-				
-				UAnimMontage* AM_HitReact = AM_HitReacts[static_cast<int>(ReactType)];
-				if (AM_HitReact)
+				// 메르시 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
+				if (!bIsMerciUltimate)
 				{
-					OwnerCharacter->Multicast_PlaySkillMontage(AM_HitReact, Section);
-					HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::OnEndDelegate);
-					SeekerAnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, AM_HitReact);
+					OwnerSeeker->GetSkillComp()->SkillsInterrupt();
+
+					OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+
+					UAnimMontage* AM_HitReact = AM_HitReacts[static_cast<int>(ReactType)];
+					if (AM_HitReact)
+					{
+						OwnerCharacter->Multicast_PlaySkillMontage(AM_HitReact, Section);
+
+						UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance());
+						if (SeekerAnimInstance)
+						{
+							HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::OnEndDelegate);
+							SeekerAnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, AM_HitReact);
+						}
+					}
+
+					// 피격모션 재생 시간 기록 (쿨다운용)
+					LastHitReactTime = CurrentTime;
 				}
 			}
-			
-			OwnerCharacter->DisableHitReact(4.0f);
+			OwnerCharacter->DisableHitReact(3.0f);
 		}
 		else if (ReactType == EHitReactType::Additive)
 		{
-			if (OwnerSeeker) // 추후 수정. // SJE
+			if (OwnerSeeker && !bIsMerciUltimate)
 			{
 				OwnerSeeker->StateReset();
+				OwnerSeeker->SetSeekerGait(EGait::Run);
 			}
 		}
 		else if (ReactType == EHitReactType::DamageOnly)
 		{
 			if (OwnerSeeker)
 			{
-				//OwnerSeeker->StateReset(); // KCY(주석처리함!)
+				// 단순 데미지만 입을 때는 상태를 초기화하지 않음
 			}
 		}
 
 
-		if (OwnerSeeker)
+		// 메르시 궁극기 중이 아니며, 단순 데미지 피격이 아닐 때만 활 조준 상태를 해제함
+		if (OwnerSeeker && !bIsMerciUltimate && ReactType != EHitReactType::DamageOnly)
 		{
 			OwnerSeeker->SetAimState(false);
 			OwnerSeeker->SetDrawState(false);
@@ -115,9 +148,13 @@ FName UGS_HitReactComp::CalculateHitDirection(FVector HitDirection)
 }
 
 void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
-{	
+{
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
 	{
+		// HitReact 애니메이션 종료 후 상태 복구
+		Seeker->StateReset();
+		Seeker->SetSeekerGait(EGait::Run);
+
 		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(Seeker->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
 		if (HealSkill)
 		{

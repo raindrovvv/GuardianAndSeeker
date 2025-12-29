@@ -82,14 +82,17 @@ void UGS_CompassWidget::UpdateCompassElements(float PlayerYaw)
 		if (DirInfo.Widget)
 		{
 			const float XPos = GetHorizontalPositionForAngle(DirInfo.Angle, PlayerYaw);
-			if (FMath::Abs(XPos) <= HalfWidth)
+			const bool bIsVisible = FMath::Abs(XPos) <= HalfWidth;
+			const ESlateVisibility NewVisibility = bIsVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed;
+
+			if (DirInfo.Widget->GetVisibility() != NewVisibility)
 			{
-				DirInfo.Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
-				DirInfo.Widget->SetRenderTranslation(FVector2D(XPos, 0));
+				DirInfo.Widget->SetVisibility(NewVisibility);
 			}
-			else
+
+			if (bIsVisible)
 			{
-				DirInfo.Widget->SetVisibility(ESlateVisibility::Collapsed);
+				DirInfo.Widget->SetRenderTranslation(FVector2D(XPos, 0));
 			}
 		}
 	}
@@ -108,6 +111,10 @@ void UGS_CompassWidget::UpdateCompassElements(float PlayerYaw)
 		{
 			IconWidget->SetIconAppearance(Indicator);
 			
+			ESlateVisibility NewVisibility = ESlateVisibility::Collapsed;
+			float XPos = 0.0f;
+			bool bVisible = false;
+
 			if (Indicator->IsValidForCompass())
 			{
 				const FVector TargetLocation = Indicator->GetWorldLocation();
@@ -116,19 +123,20 @@ void UGS_CompassWidget::UpdateCompassElements(float PlayerYaw)
 				if (Distance <= Indicator->GetMaxDisplayDistance())
 				{
 					const float TargetAngle = FMath::RadiansToDegrees(FMath::Atan2(TargetLocation.Y - PlayerLocation.Y, TargetLocation.X - PlayerLocation.X));
-					const float XPos = GetHorizontalPositionForAngle(TargetAngle, PlayerYaw);
-
-					IconWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
-					IconWidget->SetRenderTranslation(FVector2D(FMath::Clamp(XPos, -HalfWidth, HalfWidth), 0));
-				}
-				else
-				{
-					IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+					XPos = GetHorizontalPositionForAngle(TargetAngle, PlayerYaw);
+					NewVisibility = ESlateVisibility::HitTestInvisible;
+					bVisible = true;
 				}
 			}
-			else
+
+			if (IconWidget->GetVisibility() != NewVisibility)
 			{
-				IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+				IconWidget->SetVisibility(NewVisibility);
+			}
+
+			if (bVisible)
+			{
+				IconWidget->SetRenderTranslation(FVector2D(FMath::Clamp(XPos, -HalfWidth, HalfWidth), 0));
 			}
 		}
 	}

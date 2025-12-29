@@ -30,7 +30,7 @@ UGS_ArcaneBoardManager::UGS_ArcaneBoardManager()
 		GridLayoutTable = GridLayoutTableFinder.Object;
 	}
 
-	InitDataCache();
+	/*InitDataCache();*/
 }
 
 bool UGS_ArcaneBoardManager::SetCurrClass(ECharacterClass NewClass)

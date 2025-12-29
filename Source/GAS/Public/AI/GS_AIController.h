@@ -45,10 +45,13 @@ public:
 	void EnterConfuseState();
 	void ExitConfuseState();
 
+	// IGenericTeamAgentInterface 구현
+	virtual FGenericTeamId GetGenericTeamId() const override;
+	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
-	virtual FGenericTeamId GetGenericTeamId() const override;
 	
 	UPROPERTY()
 	UBehaviorTree* BTAsset;

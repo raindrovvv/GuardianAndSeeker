@@ -2,6 +2,7 @@
 
 #include "Character/Component/GS_FootManagerComponent.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
+#include "Character/GS_Character.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/DecalComponent.h"
 #include "Engine/World.h"
@@ -431,7 +432,7 @@ void UGS_FootManagerComponent::SpawnFootstepDecal(EPhysicalSurface Surface, cons
 
 void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const FVector& Location)
 {
-	if (!FAkAudioDevice::IsInitialized())
+	if (IsRunningDedicatedServer() || !FAkAudioDevice::IsInitialized())
 	{
 		return;
 	}
@@ -442,20 +443,17 @@ void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const
 		return;
 	}
 
-	// Check if we have a footstep sound event
 	if (!FootstepSoundEvent)
 	{
 		return;
 	}
 
-	// Find switch value for this surface
 	const FString* SwitchValue = SurfaceSwitchValues.Find(Surface);
 	if (!SwitchValue || SwitchValue->IsEmpty())
 	{
 		return;
 	}
 
-	// Set switch value before playing sound
 	AkAudioDevice->SetSwitch(
 		*SwitchGroupName,
 		**SwitchValue,
@@ -468,7 +466,6 @@ void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const
 		return;
 	}
 
-	// Transform 검증
 	if (!UGS_AudioComponentBase::IsLocationValid(Location))
 	{
 		UE_LOG(LogTemp, Error, TEXT("[GS_FootManagerComponent] Invalid footstep location - %s"),
@@ -488,22 +485,26 @@ void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const
 
 void UGS_FootManagerComponent::SpawnFootDustEffect(EPhysicalSurface Surface, const FVector& Location, const FVector& Normal)
 {
-	// Water surface special handling with enhanced VFX system
+	// VFX 거리 기반 컬링
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!Character->ShouldPlayVFXAtLocation(Location, 3000.0f))
+		{
+			return;
+		}
+	}
+
 	if (Surface == SurfaceType6) // Water surface
 	{
 		if (!bEnableWaterEffects)
 		{
-			return; // Water effects disabled
+			return;
 		}
 
-		// Use enhanced water VFX system
-		// Estimate water depth based on trace distance (simple approximation)
-		const float EstimatedWaterDepth = 10.0f; // Default depth, can be improved with additional tracing
+		const float EstimatedWaterDepth = 10.0f;
 		SpawnCombinedWaterEffects(Location, EstimatedWaterDepth);
 		return;
 	}
-
-	// Default behavior for non-water surfaces
 	UNiagaraSystem* VFXToSpawn = nullptr;
 
 	if (OverriddenFootDustEffect)
@@ -569,10 +570,7 @@ USkeletalMeshComponent* UGS_FootManagerComponent::GetOwnerSkeletalMesh() const
 
 void UGS_FootManagerComponent::TestWaterFootstep()
 {
-	// Force play water footstep sound
 	PlayFootstepSound(SurfaceType6, GetOwner()->GetActorLocation());
-	
-	// Force spawn water splash effect
 	const FVector Location = GetOwner()->GetActorLocation();
 	const FVector Normal = FVector::UpVector;
 	SpawnFootDustEffect(SurfaceType6, Location, Normal);
@@ -585,14 +583,12 @@ int32 UGS_FootManagerComponent::GetCurrentSurfaceType()
 		return -1;
 	}
 
-	// Perform trace to detect current surface
 	FHitResult HitResult;
 	if (!PerformFootTrace(EFootStep::LeftFoot, HitResult))
 	{
 		return -1;
 	}
 
-	// Get the physical surface from hit result
 	EPhysicalSurface SurfaceType = SurfaceType_Default;
 	if (HitResult.PhysMaterial.IsValid())
 	{
@@ -628,7 +624,6 @@ void UGS_FootManagerComponent::SetWaterVFX(int32 EffectType, UNiagaraSystem* Nia
 
 UNiagaraSystem* UGS_FootManagerComponent::GetWaterEffectByDepth(float WaterDepth)
 {
-	// Choose effect based on water depth
 	if (WaterDepth >= DeepWaterThreshold && DeepWaterSplashEffect)
 	{
 		return DeepWaterSplashEffect;
@@ -638,7 +633,6 @@ UNiagaraSystem* UGS_FootManagerComponent::GetWaterEffectByDepth(float WaterDepth
 		return WaterSplashEffect;
 	}
 	
-	// Fallback to FootDustEffects map
 	UNiagaraSystem* const* FoundVFX = FootDustEffects.Find(SurfaceType6);
 	return (FoundVFX && *FoundVFX) ? *FoundVFX : nullptr;
 }
@@ -648,6 +642,15 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (!bEnableWaterEffects)
 	{
 		return;
+	}
+
+	// VFX 거리 기반 컬링 (물 이펙트도 작은 이펙트)
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!Character->ShouldPlayVFXAtLocation(Location, 3000.0f))
+		{
+			return;
+		}
 	}
 
 	const FVector Normal = FVector::UpVector;

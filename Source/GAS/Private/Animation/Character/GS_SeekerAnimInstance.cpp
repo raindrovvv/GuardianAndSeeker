@@ -189,20 +189,21 @@ FVector2D UGS_SeekerAnimInstance::Get_AOValue()
 {
 	FVector2D AO = FVector2D::ZeroVector;
 	
-	if (OwnerCharacter && OwnerCharacter->GetController())
-	{	const FRotator ControllerRot = OwnerCharacter->GetController()->GetControlRotation();
-		const FRotator RootRot = ChooserInputObj->RootTransform.Rotator();
-		
-		FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(ControllerRot, RootRot);
+	if (OwnerCharacter)
+	{
+		if (AController* Controller = OwnerCharacter->GetController())
+		{
+			const FRotator ControllerRot = Controller->GetControlRotation();
+			const FRotator RootRot = ChooserInputObj->RootTransform.Rotator();
+			
+			FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(ControllerRot, RootRot);
 
-		const float PitchMin = -80.f;
-		const float PitchMax = 60.f;
+			const float PitchMin = -80.f;
+			const float PitchMax = 60.f;
 
-		AO.X = FMath::GetMappedRangeValueClamped(FVector2D(PitchMin, PitchMax), FVector2D(-100.f, 100.f), DeltaRot.Pitch);
-		AO.Y = DeltaRot.Yaw;
-
-		/*AO.X = DeltaRot.Pitch;
-		AO.Y = DeltaRot.Yaw;*/
+			AO.X = FMath::GetMappedRangeValueClamped(FVector2D(PitchMin, PitchMax), FVector2D(-100.f, 100.f), DeltaRot.Pitch);
+			AO.Y = DeltaRot.Yaw;
+		}
 	}
 	return AO;
 }

@@ -1,5 +1,6 @@
 #include "Props/Trap/GS_TrapBase.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/GS_Character.h"
 #include "Engine/DamageEvents.h"
 #include "Props/Trap/TrapMotion/GS_TrapMotionCompBase.h"
 #include "EngineUtils.h"
@@ -11,6 +12,10 @@
 #include "AkAudioDevice.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Weapon/GS_Weapon.h"
+#include "Rendering/GS_RenderingConstants.h"
+#include "Components/StaticMeshComponent.h"
+#include "DungeonEditor/Component/PlaceInfoComponent.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -61,6 +66,7 @@ AGS_TrapBase::AGS_TrapBase()
 	DamageBoxComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Ignore);
 	//"OptimizedCollision" 태그가 있는 경우, 플레이어가 근접한 경우에만 콜리전 활성화됨
     DamageBoxComp->ComponentTags.Add("OptimizedCollision");
+    DamageBoxComp->ComponentTags.Add("DEFENSIBLE_ATTACK");
 
     AudioAnchorComponent = CreateDefaultSubobject<USceneComponent>(TEXT("AudioAnchor"));
     AudioAnchorComponent->SetupAttachment(RootComponent);
@@ -84,18 +90,17 @@ void AGS_TrapBase::BeginPlay()
 
     RefreshTrapAudioSetup(true);
 
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	TArray<UActorComponent*> PrimComponents;
+	GetComponents(UPrimitiveComponent::StaticClass(), PrimComponents);
+	for (UActorComponent* Comp : PrimComponents)
 	{
 		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
 		{
 			if (Prim->ComponentHasTag("OptimizedCollision"))
 			{
+				OptimizedCollisionComponents.Add(Prim);
 				Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			}
-
-
 		}
 	}
 	
@@ -117,6 +122,35 @@ void AGS_TrapBase::BeginPlay()
 	DamageBoxComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnDamageBoxOverlap);
 	DamageBoxComp->OnComponentHit.AddDynamic(this, &AGS_TrapBase::OnDamageBoxHit);
 	ActivateSphereComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnActivSCompBeginOverlap);
+
+	// === Static Mesh Distance Culling 설정 (클라이언트만) ===
+	if (!IsRunningDedicatedServer())
+	{
+		ApplyDistanceCulling();
+	}
+}
+
+void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 타이머 정리
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(CheckOverlapTimerHandle);
+	}
+
+	// 델리게이트 해제 (객체 파괴 시 안정성)
+	if (DamageBoxComp)
+	{
+		DamageBoxComp->OnComponentBeginOverlap.RemoveAll(this);
+		DamageBoxComp->OnComponentHit.RemoveAll(this);
+	}
+
+	if (ActivateSphereComp)
+	{
+		ActivateSphereComp->OnComponentBeginOverlap.RemoveAll(this);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_TrapBase::OnConstruction(const FTransform& Transform)
@@ -146,6 +180,22 @@ void AGS_TrapBase::RefreshTrapAudioSetup(bool bForceFindComponent)
     if (!GetWorld() || !IsValid(this))
     {
         return;
+    }
+
+    // === 데디케이티드 서버 크래시 방지 ===
+    // BP에서 추가된 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+    if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+    {
+        TrapAkComponent = FindComponentByClass<UAkComponent>();
+        if (IsValid(TrapAkComponent))
+        {
+            TrapAkComponent->Stop();
+            TrapAkComponent->SetComponentTickEnabled(false);
+            TrapAkComponent->UnregisterComponent();
+            TrapAkComponent->DestroyComponent();
+            TrapAkComponent = nullptr;
+        }
+        return; // 서버에서는 오디오 설정 중단
     }
 
     if (IsValid(AudioAnchorComponent))
@@ -267,12 +317,12 @@ void AGS_TrapBase::OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp,
 		AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 		if (Seeker)
 		{
-			// 재발동 시에도 사운드가 들리도록 함정 활성화 사운드 재생
-			PlayActivationSound();
-
 			if (!bIsActivated)
 			{
 				bIsActivated = true;
+				// 재발동 시에도 사운드가 들리도록 함정 활성화 사운드 재생
+				PlayActivationSound();
+				
 				if (!HasAuthority())
 				{
 					Server_ActivateTrap(OtherActor);
@@ -306,16 +356,11 @@ void AGS_TrapBase::ActivateTrap_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_EnableOptimizedCollision_Implementation()
 {
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	for (auto& WeakPrim : OptimizedCollisionComponents)
 	{
-		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
+		if (UPrimitiveComponent* Prim = WeakPrim.Get())
 		{
-			if (Prim->ComponentHasTag("OptimizedCollision"))
-			{
-				Prim->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			}
+			Prim->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		}
 	}
 }
@@ -349,16 +394,11 @@ void AGS_TrapBase::DeActivateTrap_Implementation()
 
 void AGS_TrapBase::Multicast_DisableOptimizedCollision_Implementation()
 {
-	TArray<UActorComponent*> Components;
-	GetComponents(UPrimitiveComponent::StaticClass(), Components);
-	for (UActorComponent* Comp : Components)
+	for (auto& WeakPrim : OptimizedCollisionComponents)
 	{
-		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
+		if (UPrimitiveComponent* Prim = WeakPrim.Get())
 		{
-			if (Prim->ComponentHasTag("OptimizedCollision"))
-			{
-				Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			}
+			Prim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 }
@@ -395,19 +435,16 @@ void AGS_TrapBase::OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActo
 
     if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Overlapped Actor: %s (%s)"), *OtherActor->GetName(), *OtherActor->GetClass()->GetName());
-        if (OtherComp)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Overlapped Component: %s (%s)"), *OtherComp->GetName(), *OtherComp->GetClass()->GetName());
-        }
-
         // 서버
         DamageBoxEffect(Seeker);
         CustomTrapEffect(Seeker);
         HandleTrapDamage(Seeker);
 
-        // 함정 히트 사운드 재생
-        PlayHitSound();
+        // 함정 히트 사운드 재생 (단, 무기와의 충돌은 무시)
+        if (OtherActor && !OtherActor->IsA<AGS_Weapon>())
+        {
+            PlayHitSound();
+        }
         return;
     }
 
@@ -464,8 +501,8 @@ void AGS_TrapBase::OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 		return;
 	}
 
-	// 함정이 활성화되지 않았으면 Hit 사운드 무시 (초기 스폰 시 충돌 방지)
-	if (!bIsActivated)
+	// 함정이 활성화되지 않았거나 무기와 충돌한 경우 Hit 사운드 무시
+	if (!bIsActivated || (OtherActor && OtherActor->IsA<AGS_Weapon>()))
 	{
 		return;
 	}
@@ -523,10 +560,6 @@ EHitReactType AGS_TrapBase::GetHitReactType() const
 
 void AGS_TrapBase::HandleTrapDamage(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Trap: %s / Class: %s / HitReactType: %s"),
-		*GetName(),
-		*GetClass()->GetName(),
-		*UEnum::GetValueAsString(GetHitReactType()));
 	if (!OtherActor) return;
 	AGS_Seeker* DamagedSeeker = Cast<AGS_Seeker>(OtherActor);
 	if (!DamagedSeeker) return;
@@ -608,7 +641,6 @@ void AGS_TrapBase::Multicast_DamageBoxEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::DamageBoxEffect_Implementation(AActor* OtherActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("DamageBoxEffect Applied"));
 }
 
 
@@ -624,6 +656,36 @@ void AGS_TrapBase::CustomTrapEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLocation)
 {
+	// VFX 거리 기반 컬링 (Dedicated Server 체크)
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// 발동 쿨다운 체크
+	const double CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - LastBloodVFXTime < BloodVFXCooldown)
+	{
+		return;
+	}
+	LastBloodVFXTime = CurrentTime;
+
+	// 카메라 거리 체크
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+		{
+			const FVector CameraLocation = CameraManager->GetCameraLocation();
+			const float DistanceSquared = FVector::DistSquared(HitLocation, CameraLocation);
+			const float MaxDistanceSquared = 3000.0f * 3000.0f;
+
+			if (DistanceSquared > MaxDistanceSquared)
+			{
+				return;
+			}
+		}
+	}
+
 	// 함정 데이터에서 혈흔 이펙트 가져오기 (개별 함정에서 오버라이드 가능)
 	UNiagaraSystem* BloodEffectToUse = TrapData.TrapHitBloodEffect;
 
@@ -684,19 +746,17 @@ bool AGS_TrapBase::IsBlockedInDirection(const FVector& Start, const FVector& Dir
 //Trap Motion
 AGS_TrapManager* AGS_TrapBase::GetTrapManager() const
 {
-	/*if (UWorld* World = GetWorld())
+	if (CachedTrapManager.IsValid())
 	{
-		if (AGS_InGameGM* GM = Cast<AGS_InGameGM>(World->GetAuthGameMode()))
-		{
-			return GM->GetTrapManager();
-		}
+		return CachedTrapManager.Get();
 	}
-	return nullptr;*/
 
 	for (TActorIterator<AGS_TrapManager> It(GetWorld()); It; ++It)
 	{
+		CachedTrapManager = *It;
 		return *It;
 	}
+
 	return nullptr;
 }
 
@@ -987,7 +1047,7 @@ void AGS_TrapBase::PlayActivationSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayActivationSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Activation);
 	}
 }
 
@@ -1001,7 +1061,7 @@ void AGS_TrapBase::PlayDeactivationSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayDeactivationSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Deactivation);
 	}
 }
 
@@ -1015,11 +1075,11 @@ void AGS_TrapBase::PlayHitSound()
 	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
 	if (SoundEvent)
 	{
-		Multicast_PlayHitSound();
+		Multicast_PlayTrapSound(ETrapSoundType::Hit);
 	}
 }
 
-void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
+void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundType)
 {
 	// 데디케이티드 서버에서는 오디오 처리 불필요
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
@@ -1039,7 +1099,25 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
+	UAkAudioEvent* SoundEvent = nullptr;
+	FString DebugSoundName;
+
+	switch (SoundType)
+	{
+	case ETrapSoundType::Activation:
+		SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
+		DebugSoundName = TEXT("Activation");
+		break;
+	case ETrapSoundType::Deactivation:
+		SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
+		DebugSoundName = TEXT("Deactivation");
+		break;
+	case ETrapSoundType::Hit:
+		SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
+		DebugSoundName = TEXT("Hit");
+		break;
+	}
+
 	if (SoundEvent)
 	{
 		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
@@ -1051,75 +1129,52 @@ void AGS_TrapBase::Multicast_PlayActivationSound_Implementation()
 		{
 			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] %s SoundEvent is None for %s."), *DebugSoundName, *GetName());
 	}
 }
 
-void AGS_TrapBase::Multicast_PlayDeactivationSound_Implementation()
+void AGS_TrapBase::ApplyDistanceCulling()
 {
-	// 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
-		return;
-	}
+	float CullDistance = GS_Rendering::CalculateCullDistance(this, GetTrapCullDistance());
+	int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
 
-	// Actor 유효성 체크 (서버 안정성)
-	if (!IsValid(this))
-	{
-		return;
-	}
+	// 모든 Static Mesh 컴포넌트에 적용
+	TArray<UStaticMeshComponent*> StaticMeshes;
+	GetComponents<UStaticMeshComponent>(StaticMeshes);
 
-	// 거리 기반 최적화 체크
-	if (!ShouldPlayTrapSoundAtLocation(GetActorLocation()))
+	for (UStaticMeshComponent* MeshComp : StaticMeshes)
 	{
-		return;
-	}
-
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
-	if (SoundEvent)
-	{
-		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
-		if (IsValid(TrapAkComponent))
+		if (IsValid(MeshComp))
 		{
-			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
-		}
-		else
-		{
-			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
+			MeshComp->SetCullDistance(CullDistance);
+			MeshComp->SetCachedMaxDrawDistance(CullDistance);
+			MeshComp->bAllowCullDistanceVolume = true;
+			MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+			MeshComp->MinLOD = MinLOD;
 		}
 	}
+
+	UE_LOG(LogTemp, Verbose, TEXT("[Trap:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
 }
 
-void AGS_TrapBase::Multicast_PlayHitSound_Implementation()
+float AGS_TrapBase::GetTrapCullDistance() const
 {
-	// 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	// PlaceInfoComponent의 CellCoord 크기로 함정 크기 판별
+	if (UPlaceInfoComponent* PlaceInfo = GetComponentByClass<UPlaceInfoComponent>())
 	{
-		return;
-	}
+		int32 CellCount = PlaceInfo->GetCellCoord().Num();
 
-	// Actor 유효성 체크 (서버 안정성)
-	if (!IsValid(this))
-	{
-		return;
-	}
-
-	// 거리 기반 최적화 체크
-	if (!ShouldPlayTrapSoundAtLocation(GetActorLocation()))
-	{
-		return;
-	}
-
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
-	if (SoundEvent)
-	{
-		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
-		if (IsValid(TrapAkComponent))
-		{
-			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
-		}
+		if (CellCount <= 1)
+			return GS_Rendering::TRAP_SMALL_CULL_DISTANCE;
+		else if (CellCount <= 4)
+			return GS_Rendering::TRAP_MEDIUM_CULL_DISTANCE;
 		else
-		{
-			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
-		}
+			return GS_Rendering::TRAP_LARGE_CULL_DISTANCE;
 	}
+
+	// PlaceInfo가 없으면 기본값 (중간 크기)
+	return GS_Rendering::TRAP_MEDIUM_CULL_DISTANCE;
 }

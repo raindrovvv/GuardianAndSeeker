@@ -131,16 +131,16 @@ private:
 	// VFX 재생 (멀티캐스트)
 	// ======================
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDebuffVFX(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_RemoveDebuffVFX(EDebuffType DebuffType);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDebuffExpireVFX(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayOneShotVFX(UNiagaraSystem* VFXSystem, FVector LocationOffset, FVector Scale);
 
 	// ======================

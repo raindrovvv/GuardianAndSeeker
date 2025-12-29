@@ -39,6 +39,10 @@ public:
 	void PlayLandingSound();
 
 	// === 로컬 전용 사운드 재생 (RPC 없음 - RepNotify에서 호출) ===
+	void PlayFeverModeStartSoundLocal();
+	void PlayFeverModeEndSoundLocal();
+	void PlayFeverModeStateSoundLocal();
+	void StopFeverModeStateSoundLocal();
 	void PlayHurtSoundLocal();
 	void PlayDeathSoundLocal();
 	void PlayDraconicProjectileImpactSoundLocal(const FVector& ImpactLocation, bool bHitCharacter);
@@ -49,40 +53,40 @@ public:
 
 private:
 	// === 멀티캐스트 RPC 함수 ===
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayComboAttackSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDashSkillSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayEarthquakeSkillSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDraconicFurySkillSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDraconicProjectileSound(const FVector& Location);
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayAttackHitSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStartSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeEndSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStateSound();
 	
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StopFeverModeStateSound();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayComboFinisherSound();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayLandingSound();
 
 	UPROPERTY()
@@ -91,6 +95,7 @@ private:
 	// 사운드 중복 재생 방지
 	bool bDraconicFurySoundPlayed;
 	bool bHurtSoundPlayed;
+	bool bDashSkillSoundPlayed;
 
 	// 피버모드 스테이트 사운드 Playing ID 저장
 	int32 FeverModeStateSoundPlayingID;
@@ -102,6 +107,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta=(ClampMin="0.1"))
 	float HurtSoundCooldown = 1.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta=(ClampMin="0.1"))
+	float DashSkillSoundCooldown = 1.5f;
+
 	// 페이드아웃 시간 (ms)
 	UPROPERTY(EditDefaultsOnly, Category = "Audio|FadeOut", meta=(ClampMin="0", ClampMax="5000"))
 	int32 FeverModeStateFadeOutDuration = 500;
@@ -109,6 +117,7 @@ private:
 	// === 타이머 핸들 ===
 	FTimerHandle DraconicFurySoundCooldownTimer;
 	FTimerHandle HurtSoundCooldownTimer;
+	FTimerHandle DashSkillSoundCooldownTimer;
 
 	// === 타이머 콜백 함수 ===
 	UFUNCTION()
@@ -116,6 +125,9 @@ private:
 
 	UFUNCTION()
 	void ResetHurtSoundCooldown();
+
+	UFUNCTION()
+	void ResetDashSkillSoundCooldown();
 
 	// === Wwise 관련 헬퍼 함수 ===
 	void PlaySoundEvent(UAkAudioEvent* SoundEvent, const FVector& Location = FVector::ZeroVector);

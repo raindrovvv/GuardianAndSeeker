@@ -56,7 +56,13 @@ void UGS_StatComp::BeginPlay()
 		}
 	}
 }
-
+ 
+void UGS_StatComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	OnCurrentHPChanged.Clear();
+	Super::EndPlay(EndPlayReason);
+}
+ 
 void UGS_StatComp::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);	
@@ -173,6 +179,12 @@ void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)
 	{
 		CurrentHealth = FMath::Min(CurrentHealth, MaxHealth);
 		OnCurrentHPChanged.Broadcast(this);
+
+		// 큰 힐링 시 즉시 복제 (20% 이상)
+		if (MaxHealth > 0.0f && FMath::Abs(CurrentHealth - PreviousHealth) > MaxHealth * 0.2f)
+		{
+			GetOwner()->ForceNetUpdate();
+		}
 		return;
 	}
 
@@ -180,9 +192,25 @@ void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)
 	MulticastRPCPlayTakeDamageMontage();
 	HandleHealthDamage(PreviousHealth, CurrentHealth);
 
-	// 3. 체력 0 도달 시 처리
+	// 큰 데미지 시 즉시 복제 (20% 이상 또는 빈사 임계값)
+	if (MaxHealth > 0.0f)
+	{
+		float DamageRatio = FMath::Abs(CurrentHealth - PreviousHealth) / MaxHealth;
+		float HealthRatio = CurrentHealth / MaxHealth;
+
+		// 20% 이상 데미지이거나, HP가 30% 이하로 떨어지면 즉시 복제
+		if (DamageRatio > 0.2f || HealthRatio < 0.3f)
+		{
+			GetOwner()->ForceNetUpdate();
+		}
+	}
+
+	// 3. 체력 0 도달 시 처리 (즉시 복제 보장)
 	if (CurrentHealth <= KINDA_SMALL_NUMBER && PreviousHealth > KINDA_SMALL_NUMBER)
 	{
+		// 즉시 네트워크 복제 (빈사/사망은 최우선)
+		GetOwner()->ForceNetUpdate();
+
 		// 시커인 경우 빈사 상태로 전환
 		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
 		{
@@ -328,43 +356,65 @@ void UGS_StatComp::HandleHealthDamage(float OldHealth, float NewHealth)
 	}
 
 	// === 시커 LowHP Pain 사운드 시작 체크 ===
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	const ECharacterType CharType = OwnerCharacter->GetCharacterType();
+	
+	switch (CharType)
 	{
-		if (Seeker->SeekerAudioComponent)
+	case ECharacterType::Ares:
+	case ECharacterType::Chan:
+	case ECharacterType::Merci:
+	case ECharacterType::Reina:
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 		{
-			const float HealthRatio = NewHealth / FMath::Max(1.0f, MaxHealth);
-			const float LowHPThreshold = Seeker->SeekerAudioComponent->LowHPThreshold;
-
-			// HP 30% 이하 진입 시 시작 (죽지 않은 경우만)
-			if (HealthRatio <= LowHPThreshold && NewHealth > KINDA_SMALL_NUMBER)
+			if (Seeker->SeekerAudioComponent)
 			{
-				Seeker->SeekerAudioComponent->StartLowHPPainSound();
-			}
+				const float HealthRatio = NewHealth / FMath::Max(1.0f, MaxHealth);
+				const float LowHPThreshold = Seeker->SeekerAudioComponent->LowHPThreshold;
 
-			// Hurt 사운드 재생 (로컬 전용 - LowHP Pain과 동시 재생)
-			Seeker->SeekerAudioComponent->PlayHurtSoundLocal();
+				// HP 30% 이하 진입 시 시작 (죽지 않은 경우만)
+				if (HealthRatio <= LowHPThreshold && NewHealth > KINDA_SMALL_NUMBER)
+				{
+					Seeker->SeekerAudioComponent->StartLowHPPainSound();
+				}
+
+				// Hurt 사운드 재생 (로컬 전용 - LowHP Pain과 동시 재생)
+				Seeker->SeekerAudioComponent->PlayHurtSoundLocal();
+			}
 		}
-	}
-	// Hurt 사운드 재생 (몬스터/가디언)
-	else if (AGS_Monster* Monster = Cast<AGS_Monster>(OwnerCharacter))
-	{
-		if (Monster->MonsterAudioComponent)
+		break;
+
+	case ECharacterType::SmallClaw:
+	case ECharacterType::NeedleFang:
+	case ECharacterType::IronFang:
+	case ECharacterType::ShadowFang:
+	case ECharacterType::StoneClaw:
+		if (AGS_Monster* Monster = Cast<AGS_Monster>(OwnerCharacter))
 		{
-			// Death 상태가 아닐 때만 Hurt 사운드 재생
-			if (Monster->MonsterAudioComponent->GetCurrentAudioState() != EMonsterAudioState::Death)
+			if (Monster->MonsterAudioComponent)
+			{
+				// Death 상태가 아닐 때만 Hurt 사운드 재생
+				if (Monster->MonsterAudioComponent->GetCurrentAudioState() != EMonsterAudioState::Death)
+				{
+					// 로컬 전용 Hurt 사운드 재생
+					Monster->MonsterAudioComponent->PlayHurtSoundLocal();
+				}
+			}
+		}
+		break;
+
+	case ECharacterType::Drakhar:
+		if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
+		{
+			if (Drakhar->GetAudioComponent())
 			{
 				// 로컬 전용 Hurt 사운드 재생
-				Monster->MonsterAudioComponent->PlayHurtSoundLocal();
+				Drakhar->GetAudioComponent()->PlayHurtSoundLocal();
 			}
 		}
-	}
-	else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(OwnerCharacter))
-	{
-		if (Drakhar->GetAudioComponent())
-		{
-			// 로컬 전용 Hurt 사운드 재생
-			Drakhar->GetAudioComponent()->PlayHurtSoundLocal();
-		}
+		break;
+
+	default:
+		break;
 	}
 }
 

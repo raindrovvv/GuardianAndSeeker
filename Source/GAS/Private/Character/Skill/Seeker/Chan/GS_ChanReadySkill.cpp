@@ -15,22 +15,24 @@ void UGS_ChanReadySkill::ActiveSkill()
 {
 	Super::ActiveSkill();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	CachedChanOwner = Cast<AGS_Chan>(OwnerCharacter);
+
+	if (CachedChanOwner.IsValid())
 	{
 		// Change Slot
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::UpperBody);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::UpperBody);
 
-		OwnerPlayer->Multicast_SetMustTurnInPlace(true);
-		OwnerPlayer->SetSeekerGait(EGait::Walk);
+		CachedChanOwner->Multicast_SetMustTurnInPlace(true);
+		CachedChanOwner->SetSeekerGait(EGait::Walk);
 
 		// Play Montage
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
-		OwnerPlayer->CanChangeSeekerGait = false;
+		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		CachedChanOwner->CanChangeSeekerGait = false;
 
-		// 스킬 시작 사운드 재생
-		if (UGS_SeekerAudioComponent* AudioComp = OwnerPlayer->SeekerAudioComponent)
+		// 스킬 시작 사운드 재생 (멀티캐스트)
+		if (UGS_SeekerAudioComponent* AudioComp = CachedChanOwner->SeekerAudioComponent)
 		{
-			AudioComp->PlaySkillSoundFromDataTable(CurrentSkillType, true);
+			AudioComp->RequestSkillAudio(CurrentSkillType, 0); // 0 = 스킬 시작
 		}
 
 		if (OwningComp)
@@ -43,16 +45,16 @@ void UGS_ChanReadySkill::ActiveSkill()
 		}
 
 		// 방어 상태 활성화
-		OwnerPlayer->SetDefending(true);
+		CachedChanOwner->SetDefending(true);
 
-		if (UAnimInstance* AnimInstance = OwnerPlayer->GetMesh()->GetAnimInstance())
+		if (UAnimInstance* AnimInstance = CachedChanOwner->GetMesh()->GetAnimInstance())
 		{
 			AnimInstance->OnMontageEnded.AddUniqueDynamic(this, &UGS_ChanReadySkill::OnMontageEnded);
 			ActiveMontage = TargetMontage; // 추적용 변수
 		}
 
 		// 스테미나 이벤트 구독
-		OwnerPlayer->OnStaminaDepleted.AddUniqueDynamic(this, &UGS_ChanReadySkill::HandleStaminaDepleted);
+		CachedChanOwner->OnStaminaDepleted.AddUniqueDynamic(this, &UGS_ChanReadySkill::HandleStaminaDepleted);
 	}
 
 	// DeactiveMontageIndex 초기화
@@ -64,9 +66,9 @@ void UGS_ChanReadySkill::OnSkillCanceledByDebuff()
 	Super::OnSkillCanceledByDebuff();
 
 	// 방어 상태 비활성화
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
-		OwnerPlayer->SetDefending(false);
+		CachedChanOwner->SetDefending(false);
 	}
 }
 
@@ -75,18 +77,18 @@ void UGS_ChanReadySkill::OnSkillAnimationEnd()
 	UE_LOG(LogTemp, Error, TEXT("OnSkillAnimationEnd - ChanReadySkill"));
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
 		// Change Slot
-		OwnerPlayer->Multicast_SetMustTurnInPlace(false);
-		OwnerPlayer->SetSeekerGait(EGait::Run);
+		CachedChanOwner->Multicast_SetMustTurnInPlace(false);
+		CachedChanOwner->SetSeekerGait(EGait::Run);
 		// Change Slot
-		OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 
-		OwnerPlayer->CanChangeSeekerGait = true;
+		CachedChanOwner->CanChangeSeekerGait = true;
 
-		OwnerPlayer->SetMoveControlValue(true, true);
-		OwnerPlayer->SetLookControlValue(true, true);
+		CachedChanOwner->SetMoveControlValue(true, true);
+		CachedChanOwner->SetLookControlValue(true, true);
 
 		// =======================
 		// 스킬 종료 VFX 재생
@@ -107,13 +109,14 @@ void UGS_ChanReadySkill::InterruptSkill()
 {
 	Super::InterruptSkill();
 
-	AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter);
-
-	OwnerPlayer->SetLookControlValue(true, true);
+	if (CachedChanOwner.IsValid())
+	{
+		CachedChanOwner->SetLookControlValue(true, true);
+		// 방어 상태 비활성화 (스킬이 중단될 때)
+		CachedChanOwner->SetDefending(false);
+	}
+	
 	SetIsActive(false);
-
-	// 방어 상태 비활성화 (스킬이 중단될 때)
-	OwnerPlayer->SetDefending(false);
 }
 
 void UGS_ChanReadySkill::HandleStaminaDepleted(bool bByDamage)
@@ -162,12 +165,12 @@ void UGS_ChanReadySkill::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted
 
 void UGS_ChanReadySkill::DeactiveSkill()
 {
-	if (AGS_Chan* OwnerPlayer = Cast<AGS_Chan>(OwnerCharacter))
+	if (CachedChanOwner.IsValid())
 	{
 		// Set HitReact
-		OwnerPlayer->SetCanHitReact(true);
-		OwnerPlayer->CanChangeSeekerGait = true;
-		OwnerPlayer->SetSeekerGait(EGait::Run);
+		CachedChanOwner->SetCanHitReact(true);
+		CachedChanOwner->CanChangeSeekerGait = true;
+		CachedChanOwner->SetSeekerGait(EGait::Run);
 
 		// 애니메이션 재생
 		FName SectionName = NAME_None;
@@ -177,22 +180,25 @@ void UGS_ChanReadySkill::DeactiveSkill()
 		}
 		else if (DeactiveMontageIndex == 1)
 		{
-			OwnerPlayer->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+			CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 		}
 
 		
-		OwnerPlayer->Multicast_PlaySkillMontage(SkillAnimMontages[DeactiveMontageIndex], SectionName);
+		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[DeactiveMontageIndex], SectionName);
 
 		// 현재 재생 중인 몽타주가 있으면
 		FName CurrentMontageName = NAME_None;
-		if (UAnimMontage* CurrentMontage = OwnerCharacter->GetMesh()->GetAnimInstance()->GetCurrentActiveMontage())
+		if (UAnimInstance* AnimInstance = CachedChanOwner->GetMesh()->GetAnimInstance())
 		{
-			CurrentMontageName = CurrentMontage->GetFName();
+			if (UAnimMontage* CurrentMontage = AnimInstance->GetCurrentActiveMontage())
+			{
+				CurrentMontageName = CurrentMontage->GetFName();
+			}
 		}
 		UE_LOG(LogTemp, Warning, TEXT("현재 애니메이션 몽타주: %s"), *CurrentMontageName.ToString());
 
 		// 방어 상태 비활성화 (스킬 완전 종료 시)
-		OwnerPlayer->SetDefending(false);
+		CachedChanOwner->SetDefending(false);
 	}
 
 	// 스킬 상태 업데이트

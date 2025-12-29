@@ -19,13 +19,13 @@ void UGS_MerciRollingSkill::ActiveSkill()
 	{
 		return;
 	}
-	AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter);
-	if (!Seeker)
+	CachedMerciOwner = Cast<AGS_Merci>(OwnerCharacter);
+	if (!CachedMerciOwner.IsValid())
 	{
 		return;
 	}
-	Seeker->SetAimState(false);
-	Seeker->SetDrawState(false);
+	CachedMerciOwner->SetAimState(false);
+	CachedMerciOwner->SetDrawState(false);
 	Super::ActiveSkill();
 }
 
@@ -33,23 +33,23 @@ void UGS_MerciRollingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(OwnerCharacter))
+	if (CachedMerciOwner.IsValid())
 	{
-		if (MerciCharacter->HasAuthority())
+		if (CachedMerciOwner->HasAuthority())
 		{
-			MerciCharacter->Multicast_StopSkillMontage(SkillAnimMontages[0]);
-			MerciCharacter->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			MerciCharacter->CanChangeSeekerGait = true;
+			CachedMerciOwner->Multicast_StopSkillMontage(SkillAnimMontages[0]);
+			CachedMerciOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedMerciOwner->CanChangeSeekerGait = true;
 
 			// 스킬 종료 사운드 재생 (멀티캐스트)
-			if (UGS_SeekerAudioComponent* AudioComp = MerciCharacter->SeekerAudioComponent)
+			if (UGS_SeekerAudioComponent* AudioComp = CachedMerciOwner->SeekerAudioComponent)
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
 
 			SetIsActive(false);
 
-			MerciCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			CachedMerciOwner->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 		}
 	}
 }
@@ -57,11 +57,13 @@ void UGS_MerciRollingSkill::OnSkillAnimationEnd()
 void UGS_MerciRollingSkill::InterruptSkill()
 {
 	Super::InterruptSkill();
-	AGS_Merci* AresCharacter = Cast<AGS_Merci>(OwnerCharacter);
-	if (AresCharacter->GetSkillComp())
+	if (CachedMerciOwner.IsValid())
 	{
-		AresCharacter->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		AresCharacter->SetMoveControlValue(true, true);
-		SetIsActive(false);
+		if (CachedMerciOwner->GetSkillComp())
+		{
+			CachedMerciOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedMerciOwner->SetMoveControlValue(true, true);
+		}
 	}
+	SetIsActive(false);
 }

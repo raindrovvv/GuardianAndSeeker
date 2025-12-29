@@ -101,16 +101,16 @@ private:
 	FHitResult CreateCorrectHitResult(const FHitResult& OriginalResult, bool bFromSweep) const override;
 
 	// 멀티캐스트 함수들
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitSound_Validate(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitSound_Implementation(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitVFX(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitVFX_Validate(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 };

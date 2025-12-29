@@ -18,6 +18,11 @@ void UGS_ANS_Aggro::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBas
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 	if (AGS_Chan* Character = Cast<AGS_Chan>(MeshComp->GetOwner()))
 	{
-		Character->GetSkillComp()->Server_TrySkillAnimationEnd(ESkillSlot::Moving);
+		// Server RPC는 로컬에서 조종하는 캐릭터에서만 호출
+		// (Simulated Proxy에서 중복 호출 방지)
+		if (Character->IsLocallyControlled())
+		{
+			Character->GetSkillComp()->Server_TrySkillAnimationEnd(ESkillSlot::Moving);
+		}
 	}
 }

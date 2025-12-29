@@ -166,6 +166,9 @@ void UGS_SkillComp::InitSkills()
 		SetSkill(ESkillSlot::Rolling, SkillSet->RollingSkill);
 		SetSkill(ESkillSlot::Combo, SkillSet->ComboSkill);
 		SetSkill(ESkillSlot::HealPotion, SkillSet->HealPotionSkill);
+		
+		// 스킬 초기화 후 마스크 리셋 (초기 상태에서 스킬 사용 가능하도록)
+		ResetAllowedSkillsMask();
 	}
 }
 
@@ -198,7 +201,7 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 {
 	if (!Info.SkillClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT(">>> SetSkill: Invalid SkillClass"));
+		UE_LOG(LogTemp, Verbose, TEXT(">>> SetSkill: Invalid SkillClass"));
 		return;
 	}
 
@@ -269,9 +272,16 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 				if (IsSkillAllowed(Slot))
 				{
 					UE_LOG(LogTemp, Warning, TEXT("허용된 스킬이 Active 되기를 원한다."));
-					
+
 					SkillsInterrupt();
 					SkillMap[Slot]->ActiveSkill();
+
+					// 이동 스킬 사용 시 즉시 네트워크 복제 (위치 동기화 - 워프 현상 방지)
+					if (Slot == ESkillSlot::Moving || Slot == ESkillSlot::Rolling)
+					{
+						GetOwner()->ForceNetUpdate();
+					}
+
 					UE_LOG(LogTemp, Warning, TEXT("AllowSkillMask : %d"), SkillMap[Slot]->AllowSkillsMask);
 					ResetAllowedSkillsMask();
 					SetCurAllowedSkillsMask(SkillMap[Slot]->AllowSkillsMask);
@@ -703,6 +713,11 @@ void UGS_SkillComp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	OnSkillCooldownChanged.Clear();
+	OnHealCountChanged.Clear();
+	OnSkillActivated.Clear();
+	OnSkillCooldownBlocked.Clear();
+
 	Super::EndPlay(EndPlayReason);
 
 	if (GetWorld())

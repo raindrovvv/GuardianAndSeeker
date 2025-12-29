@@ -23,7 +23,7 @@
 AGS_WeaponAxe::AGS_WeaponAxe()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	AxeMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("AxeMeshComponent"));
 	RootComponent = AxeMeshComponent;
@@ -88,7 +88,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
 			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
-			HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SafeDisableHitBoxCollision(HitBox);
 		}
 	}
 
@@ -142,7 +142,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 	
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SafeDisableHitBoxCollision(HitBox);
 }
 
 EAxeHitTargetType AGS_WeaponAxe::DetermineTargetType(AActor* OtherActor) const
@@ -288,7 +288,13 @@ void AGS_WeaponAxe::Multicast_PlayHitVFX_Implementation(EAxeHitTargetType Target
 		return;
 	}
 
-	PlayHitVFX(TargetType, SweepResult);
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
+		{
+			PlayHitVFX(TargetType, SweepResult);
+		}
+	}
 }
 
 void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
@@ -299,17 +305,23 @@ void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* V
 		return;
 	}
 
-	if (VFXToPlay && GetWorld())
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			HitResult.ImpactPoint,
-			HitResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
+		{
+			if (VFXToPlay && GetWorld())
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					GetWorld(),
+					VFXToPlay,
+					HitResult.ImpactPoint,
+					HitResult.ImpactNormal.Rotation(),
+					FVector(1.0f),
+					true,
+					true
+				);
+			}
+		}
 	}
 }
 
@@ -431,14 +443,13 @@ void AGS_WeaponAxe::BeginPlay()
 	// OwnerChar 설정
 	OwnerChar = Cast<AGS_Character>(GetOwner());
 
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// === HitBox에 방어 가능 태그 추가 ===
+	if (HitBox)
+	{
+		HitBox->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
+	}
 }
 
-// Called every frame
-void AGS_WeaponAxe::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
 
 bool AGS_WeaponAxe::GetListenerLocation(FVector& OutLocation) const
 {
@@ -476,4 +487,3 @@ void AGS_WeaponAxe::ClearSafetyTimer()
 {
 	Super::ClearSafetyTimer();
 }
-

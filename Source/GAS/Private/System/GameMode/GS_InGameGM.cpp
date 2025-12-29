@@ -133,10 +133,25 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
     {
         for (const FDESaveData& ObjectData : SaveData)
         {
-            if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
+            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            {
+                ActorClassToSpawn = *CachedClass;
+            }
+            else
+            {
+                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+                if (ActorClassToSpawn)
+                {
+                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+                }
+            }
+
+            if (ActorClassToSpawn)
             {
                 if (!ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
+
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
                     AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);
@@ -182,12 +197,13 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
         // 모든 내비메시를 새로 빌드하도록 요청. 이 작업은 즉시 끝나지 않음
         NavSystem->Build();
 
-        // 빌드가 완료되었는지 0.1초마다 확인하는 타이머 시작
+        // 빌드가 완료되었는지 0.5초마다 확인하는 타이머 시작 (서버 부하 감소)
+        NavMeshCheckCount = 0;
         GetWorld()->GetTimerManager().SetTimer(
             NavMeshBuildTimerHandle,
             this,
             &AGS_InGameGM::CheckNavMeshBuildStatus,
-            0.1f,
+            0.5f,
             true); // 반복 실행
     }
 }
@@ -195,6 +211,8 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
 void AGS_InGameGM::CheckNavMeshBuildStatus()
 {
     UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    NavMeshCheckCount++;
+
     // 내비메시 빌드가 진행 중이 아닌지(=완료되었는지) 확인
     if (IsValid(NavSystem) && !NavSystem->IsNavigationBuildInProgress())
     {
@@ -202,9 +220,15 @@ void AGS_InGameGM::CheckNavMeshBuildStatus()
         GetWorld()->GetTimerManager().ClearTimer(NavMeshBuildTimerHandle);
         OnNavMeshBuildComplete();
     }
+    else if (NavMeshCheckCount >= MaxNavMeshChecks)
+    {
+        UE_LOG(LogTemp, Error, TEXT("NavMesh build timed out! Proceeding and spawning monsters anyway."));
+        GetWorld()->GetTimerManager().ClearTimer(NavMeshBuildTimerHandle);
+        OnNavMeshBuildComplete();
+    }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("... Waiting for NavMesh build to finish ..."));
+        UE_LOG(LogTemp, Log, TEXT("... Waiting for NavMesh build to finish (%d/%d) ..."), NavMeshCheckCount, MaxNavMeshChecks);
     }
 }
 
@@ -222,10 +246,25 @@ void AGS_InGameGM::OnNavMeshBuildComplete()
     {
         for (const FDESaveData& ObjectData : CachedSaveData)
         {
-            if (TSubclassOf<AActor> ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath))
+            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            {
+                ActorClassToSpawn = *CachedClass;
+            }
+            else
+            {
+                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+                if (ActorClassToSpawn)
+                {
+                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+                }
+            }
+
+            if (ActorClassToSpawn)
             {
                 if (ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
+
                     FActorSpawnParameters SpawnParams;
                     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
                     AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);

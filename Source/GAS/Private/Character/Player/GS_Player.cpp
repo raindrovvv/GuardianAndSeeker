@@ -19,6 +19,7 @@
 #include "AkAudioDevice.h"
 #include "Sound/GS_AudioComponentBase.h"
 #include "Components/CapsuleComponent.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_Player::AGS_Player()
 {
@@ -47,6 +48,7 @@ AGS_Player::AGS_Player()
 	SteamNameWidgetComp->GetBodyInstance()->TermBody(); 
 	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SteamNameWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+	SteamNameWidgetComp->SetOwnerNoSee(true);
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlurMat(TEXT("/Game/VFX/MI_AbscureDebuff"));
 	if (BlurMat.Succeeded())
@@ -72,11 +74,39 @@ AGS_Player::AGS_Player()
 	CameraAudioListenerComponent->SetupAttachment(CameraComp);
 
 	bIsObscuring = false;
+
+	// 네트워크 최적화 초기화
+	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
+	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
+	LastNetUpdateFrequency = NetUpdateFrequency;
 }
 
 void AGS_Player::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// === 데디케이티드 서버 크래시 방지 ===
+	// 생성자에서 만든 AkComponent들이 리스너 없는 서버에서 Tick하면 크래시 발생
+	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	{
+		if (IsValid(AkComponent))
+		{
+			AkComponent->Stop();
+			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->UnregisterComponent();
+			AkComponent->DestroyComponent();
+			AkComponent = nullptr;
+		}
+		if (IsValid(CameraAudioListenerComponent))
+		{
+			CameraAudioListenerComponent->Stop();
+			CameraAudioListenerComponent->SetComponentTickEnabled(false);
+			CameraAudioListenerComponent->UnregisterComponent();
+			CameraAudioListenerComponent->DestroyComponent();
+			CameraAudioListenerComponent = nullptr;
+		}
+		return; // 서버에서는 오디오 관련 초기화 중단
+	}
 
 	// 오디오 디바이스 캐싱
 	CachedAudioDevice = FAkAudioDevice::Get();
@@ -115,6 +145,40 @@ void AGS_Player::BeginPlay()
 			}
 		}
 	}
+
+	// === Skeletal Mesh Distance Culling 설정 (클라이언트만, Local Player 제외) ===
+	if (!IsRunningDedicatedServer() && GetMesh() && !IsLocalPlayer())
+	{
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+		MeshComp->SetCullDistance(CullDistance);
+		MeshComp->SetCachedMaxDrawDistance(CullDistance);
+		MeshComp->bAllowCullDistanceVolume = true;
+		MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+		MeshComp->MinLodModel = MinLOD;
+
+		UE_LOG(LogTemp, Log, TEXT("[Player:%s] Rendering Optimization - Cull Distance: %.1f (Local Player excluded)"), *GetName(), CullDistance);
+	}
+
+	// === 네트워크 & 그림자 최적화 타이머 설정 (서버만) ===
+	if (HasAuthority() && !IsLocalPlayer())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			NetworkOptimizationTimerHandle,
+			this,
+			&AGS_Player::UpdateNetworkOptimization,
+			1.0f, // 1초마다 체크
+			true
+		);
+	}
+
+	// === 그림자 컬링 초기 설정 (클라이언트만, Local Player 제외) ===
+	if (!IsRunningDedicatedServer() && !IsLocalPlayer())
+	{
+		UpdateShadowCulling();
+	}
 }
 
 void AGS_Player::Tick(float DeltaSeconds)
@@ -126,10 +190,41 @@ void AGS_Player::Tick(float DeltaSeconds)
 		ObscureTimeline.TickTimeline(DeltaSeconds);
 	}
 
-	//steam widget rotate
-	if (IsValid(SteamNameWidgetComp) && !HasAuthority())
+	// steam widget rotate with distance culling (only for non-server)
+	if (IsValid(SteamNameWidgetComp) && GetNetMode() != NM_DedicatedServer)
 	{
-		UpdateSteamNameWidgetRotation();
+		// 로컬 플레이어 본인의 네임태그는 항상 숨김
+		if (IsLocallyControlled())
+		{
+			if (SteamNameWidgetComp->IsVisible())
+			{
+				SteamNameWidgetComp->SetVisibility(false);
+			}
+			return;
+		}
+
+		// 다른 플레이어 거리 기반 컬링
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				float DistSq = FVector::DistSquared(CameraManager->GetCameraLocation(), GetActorLocation());
+				
+				// 30m (3000 units) 기준으로 컬링 (9,000,000 DistSq)
+				bool bInRange = (DistSq < 9000000.f);
+
+				if (SteamNameWidgetComp->IsVisible() != bInRange)
+				{
+					SteamNameWidgetComp->SetVisibility(bInRange);
+				}
+
+				// 범위 내에 있을 때만 회전 업데이트
+				if (bInRange)
+				{
+					UpdateSteamNameWidgetRotation();
+				}
+			}
+		}
 	}
 }
 
@@ -150,28 +245,14 @@ void AGS_Player::PossessedBy(AController* NewController)
 
 void AGS_Player::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	//// 2. 가시성 끄기
-	//SteamNameWidgetComp->SetVisibility(false);
-
-	//// 3. 콜리전 비활성화
-	//SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	//// 4. BodySetup 정리
-	//if (SteamNameWidgetComp->GetBodySetup())
-	//{
-	//	SteamNameWidgetComp->DestroyPhysicsState();
-	//}
-	//
-	//if (IsValid(SteamNameWidgetComp))
-	//{
-	//	if (UUserWidget* Widget = SteamNameWidgetComp->GetWidget())
-	//	{
-	//		Widget->RemoveFromParent();
-	//	}
-	//	SteamNameWidgetComp->SetWidget(nullptr);
-	//	SteamNameWidgetComp->DestroyComponent();
-	//}
-	//
+	// Stability: Securely clean up widget component
+	if (IsValid(SteamNameWidgetComp))
+	{
+		SteamNameWidgetComp->SetWidget(nullptr);
+		SteamNameWidgetComp->SetVisibility(false);
+		SteamNameWidgetComp->DestroyComponent();
+	}
+	
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -180,18 +261,12 @@ void AGS_Player::BeginDestroy()
 	// 1. 먼저 Super::BeginDestroy() 호출 (중요!)
 	Super::BeginDestroy();
 
-	//// 2. IsValid() 체크와 함께 안전하게 정리
-	//if (IsValid(SteamNameWidgetComp) && !SteamNameWidgetComp->IsBeingDestroyed())
-	//{
-	//	SteamNameWidgetComp->SetWidget(nullptr);
-	//	SteamNameWidgetComp->SetVisibility(false);
-	//	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	//	// BodySetup 정리 (필요한 경우만)
-	//	if (SteamNameWidgetComp->GetBodySetup())
-	//	{
-	//		SteamNameWidgetComp->DestroyPhysicsState();
-	//	}
+	// 2. IsValid() 체크와 함께 안전하게 정리
+	if (IsValid(SteamNameWidgetComp) && !SteamNameWidgetComp->IsBeingDestroyed())
+	{
+		SteamNameWidgetComp->SetWidget(nullptr);
+		SteamNameWidgetComp->SetVisibility(false);
+	}
 
 	//	// DestroyComponent() 호출하지 않음! - 자동으로 소멸됨
 	//}
@@ -523,3 +598,86 @@ void AGS_Player::Server_RestKey_Implementation()
 	};
 }
 */
+
+float AGS_Player::GetOptimalCullDistance() const
+{
+	// 기본값: 중간 크기 플레이어 컬링 거리
+	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+}
+
+void AGS_Player::UpdateNetworkOptimization()
+{
+	// 서버에서만 실행
+	if (!HasAuthority()) return;
+
+	// 로컬 플레이어는 최적화 제외
+	if (IsLocalPlayer()) return;
+
+	// 거리 기반 네트워크 업데이트 빈도 계산
+	float NewFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
+
+	// === 전투 상태 체크: HP가 낮거나 최근 피격 시 최소 빈도 보장 ===
+	if (StatComp)
+	{
+		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
+
+		// HP가 90% 이하이면 전투 중으로 간주 (최소 10Hz 보장)
+		if (HealthRatio < 0.9f)
+		{
+			NewFrequency = FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
+		}
+	}
+
+	// 변경이 있을 때만 업데이트 (불필요한 연산 방지)
+	if (FMath::Abs(NewFrequency - LastNetUpdateFrequency) > 0.1f)
+	{
+		NetUpdateFrequency = NewFrequency;
+		LastNetUpdateFrequency = NewFrequency;
+
+		UE_LOG(LogTemp, Verbose, TEXT("[Player:%s] Network Optimization - NetUpdateFrequency: %.1fHz"), *GetName(), NewFrequency);
+	}
+}
+
+void AGS_Player::UpdateShadowCulling()
+{
+	// 클라이언트에서만 실행
+	if (IsRunningDedicatedServer()) return;
+
+	// 로컬 플레이어는 최적화 제외
+	if (IsLocalPlayer()) return;
+
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp) return;
+
+	// 카메라 위치 가져오기
+	if (UWorld* World = GetWorld())
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				FVector CameraLocation = CameraManager->GetCameraLocation();
+				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
+
+				// 거리 기반 그림자 설정
+				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
+				{
+					// 80m 이상: 그림자 완전 비활성화
+					MeshComp->SetCastShadow(false);
+				}
+				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
+				{
+					// 40-80m: 정적 그림자만 유지 (동적 그림자 비활성화)
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = false;
+				}
+				else
+				{
+					// 40m 이내: 모든 그림자 활성화
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = true;
+				}
+			}
+		}
+	}
+}

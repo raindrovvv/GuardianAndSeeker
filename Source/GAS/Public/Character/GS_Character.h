@@ -7,6 +7,7 @@
 #include "Component/GS_HitReactComp.h"
 #include "CharacterDataAsset.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
+#include "Component/GS_TickOptimizationComponent.h"
 #include "GS_Character.generated.h"
 
 class UGS_StatComp;
@@ -20,6 +21,22 @@ class UGS_HPText;
 class UGS_HPWidget;
 class AGS_Weapon;
 class UDecalComponent;
+class UNiagaraSystem;
+
+USTRUCT(BlueprintType)
+struct FImpactVFXInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> VFXAsset = nullptr;
+
+	UPROPERTY()
+	FVector Scale = FVector::OneVector;
+
+	UPROPERTY()
+	uint8 Counter = 0;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDeath);
 
@@ -82,6 +99,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComp;
 
+	// 틱 최적화 컴포넌트 (거리 기반 틱 쓰로틀링)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Optimization")
+	TObjectPtr<UGS_TickOptimizationComponent> TickOptimizationComp;
+
 	// EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake"
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
 	FGS_CameraShakeInfo TakeDamageShake;
@@ -129,10 +150,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_PlayTakeDamageShake(APlayerController* TargetPC);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShake(APlayerController* TargetPC);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShakeWithInfo(APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo);
 
 	//character death play ragdoll
@@ -163,9 +184,9 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulicastRPCStopCurrentSkillMontage(UAnimMontage* CurrentSkillMontage);
 
-	// Impact VFX 재생
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale);
+	// Impact VFX 재생 (내부적으로 OnRep을 통해 동기화)
+	UFUNCTION(BlueprintCallable, Category = "Effects")
+	void PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale = FVector(1.0f, 1.0f, 1.0f));
 
 	UFUNCTION(BlueprintCallable)
 	AGS_Weapon* GetWeaponByIndex(int32 Index) const;
@@ -195,6 +216,12 @@ public:
 	void SetCanHitReact(bool bCanReact);
 
 	void SetInvincible(bool bEnable);
+
+	// VFX 거리 기반 컬링 (성능 최적화)
+	// @param Location VFX를 재생할 월드 위치
+	// @param MaxDistance 최대 재생 거리 (cm, 기본값 4000cm)
+	// @return VFX를 재생해야 하면 true, 아니면 false
+	bool ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance = 4000.0f) const;
 
 protected:
 	virtual void NotifyActorBeginCursorOver() override;
@@ -246,9 +273,18 @@ private:
 	UFUNCTION()
 	void OnRep_CharacterSpeed();
 
+protected:
 	UFUNCTION()
-	void OnRep_IsDead();
+	virtual void OnRep_IsDead();
 
+	UFUNCTION()
+	void OnRep_ImpactVFX();
+
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_ImpactVFX)
+	FImpactVFXInfo RepImpactVFX;
+
+private:
 	void SpawnAndAttachWeapons();
 	
 	void SetHovered(bool bHovered);

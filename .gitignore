@@ -31,6 +31,9 @@ Saved/
 .claude/
 *.md
 
+# Antigravity
+!.agent/
+
 # Windsurf
 Documentation/windsurf-guide.txt
 Config/WindsurfSettings.ini

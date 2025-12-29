@@ -18,4 +18,8 @@ public:
 	virtual void ActiveSkill() override;
 	virtual void OnSkillAnimationEnd() override;
 	virtual void InterruptSkill() override;
+
+	/** 캐싱된 Merci 소유자 */
+	UPROPERTY()
+	TWeakObjectPtr<class AGS_Merci> CachedMerciOwner;
 };

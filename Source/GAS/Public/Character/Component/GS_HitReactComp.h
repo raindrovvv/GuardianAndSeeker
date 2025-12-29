@@ -38,4 +38,14 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	// ============================================
+	// Hit React Cooldown System
+	// ============================================
+	/** 마지막 피격모션이 재생된 시간 */
+	float LastHitReactTime = 0.f;
+
+	/** 피격모션 쿨다운 시간 (이 시간 내 연속 피격 시 DamageOnly 처리) */
+	UPROPERTY(EditDefaultsOnly, Category = "Hit React")
+	float HitReactCooldown = 1.5f;
 };

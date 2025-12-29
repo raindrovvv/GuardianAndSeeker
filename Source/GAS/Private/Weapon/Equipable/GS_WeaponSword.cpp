@@ -36,6 +36,12 @@ void AGS_WeaponSword::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerChar = Cast<AGS_Character>(GetOwner());
+
+	// === HitBox에 방어 가능 태그 추가 ===
+	if (HitBox)
+	{
+		HitBox->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
+	}
 }
 
 void AGS_WeaponSword::EnableHit()
@@ -164,7 +170,7 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
 			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
-			HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SafeDisableHitBoxCollision(HitBox);
 		}
 	}
 
@@ -235,8 +241,8 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 	DamageEvent.HitReactType =  EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
-	// 한 번의 공격에 한 명의 적만 맞도록 히트박스 비활성화
-	HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// 한 번의 공격에 한 명의 적만 맞도록 히트박스 비활성화 (다음 프레임에 안전하게)
+	SafeDisableHitBoxCollision(HitBox);
 }
 
 ESwordHitTargetType AGS_WeaponSword::DetermineTargetType(AActor* OtherActor) const
@@ -385,7 +391,13 @@ void AGS_WeaponSword::Multicast_PlayHitVFX_Implementation(ESwordHitTargetType Ta
 		return;
 	}
 
-	PlayHitVFX(TargetType, SweepResult);
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	{
+		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
+		{
+			PlayHitVFX(TargetType, SweepResult);
+		}
+	}
 }
 
 void AGS_WeaponSword::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
@@ -396,17 +408,23 @@ void AGS_WeaponSword::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem*
 		return;
 	}
 
-	if (VFXToPlay && GetWorld())
+	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			HitResult.ImpactPoint,
-			HitResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
+		{
+			if (VFXToPlay && GetWorld())
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					GetWorld(),
+					VFXToPlay,
+					HitResult.ImpactPoint,
+					HitResult.ImpactNormal.Rotation(),
+					FVector(1.0f),
+					true,
+					true
+				);
+			}
+		}
 	}
 }
 

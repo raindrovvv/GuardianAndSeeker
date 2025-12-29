@@ -81,6 +81,8 @@ void AGS_Merci::Client_UpdateTargetUI_Implementation(AActor* NewTarget, AActor* 
 void AGS_Merci::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	SetActorTickEnabled(true);
 
 	CurrentArrowType = EArrowType::Normal;
 
@@ -107,6 +109,12 @@ void AGS_Merci::BeginPlay()
 
 void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 {
+	// 빈사 상태에서는 공격 불가
+	if (IsInDyingState())
+	{
+		return;
+	}
+
 	if (!HasAuthority())
 	{
 		// 서버에 요청
@@ -177,7 +185,7 @@ void AGS_Merci::ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float
 	// 줌 중지
 	if (!(this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate)))
 	{
-		Client_StopZoom(5.f);
+		Client_StopZoom(5.0f);
 	}
 	
 	// 몽타주 정지
@@ -520,6 +528,13 @@ void AGS_Merci::Client_StartZoom_Implementation()
 
 void AGS_Merci::Client_StopZoom_Implementation(float Duration)
 {
+	if (Duration <= 0.0f)
+	{
+		ZoomTimelineReverse();
+		GetWorldTimerManager().ClearTimer(ReverseTimerHandle);
+		return;
+	}
+
 	GetWorldTimerManager().SetTimer(
 		ReverseTimerHandle,
 		this,
@@ -527,8 +542,6 @@ void AGS_Merci::Client_StopZoom_Implementation(float Duration)
 		Duration,
 		false
 		);
-	
-	//GetWorldTimerManager().ClearTimer(ReverseTimerHandle);
 }
 
 void AGS_Merci::SetCrosshairWidget(UGS_CrossHairImage* InCrosshairWidget)
@@ -605,8 +618,14 @@ void AGS_Merci::LeftClickRelease_Implementation()
 
 float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	// 활을 들고 있는 경우
-	if (GetDrawState() || GetAimState())
+	// 이미 빈사 상태인 경우 데미지 및 로직 무시
+	if (IsInDyingState())
+	{
+		return 0.0f;
+	}
+
+	// 활을 들고 있는 경우 (궁극기 상태가 아닐 때만 피격 시 해제)
+	if ((GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 	{
 		// 활 쏘기 애니메이션 재생 정지
 		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
@@ -614,11 +633,8 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 			AnimInst->StopAllMontages(0.2f);
 		}
 
-		// 활 쏘기 줌 아웃 (궁극기 상태가 아닐 때만)
-		if (!this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
-		{
-			Client_StopZoom(0.f);
-		}
+		// 활 쏘기 줌 아웃
+		Client_StopZoom(0.f);
 
 		// 활 쏘기 조준 상태 해제
 		SetDrawState(false);
@@ -627,6 +643,10 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 
 		// 키 제한
 		GetSkillComp()->SetCurAllowedSkillsMask(0);
+
+		// 0.5초 뒤 상태 리셋 (피격 후 복구 보장)
+		GetWorldTimerManager().ClearTimer(DamageRecoveryTimerHandle);
+		GetWorldTimerManager().SetTimer(DamageRecoveryTimerHandle, this, &AGS_Merci::StateReset, 0.5f, false);
 
 		// 달리기 상태 설정
 		SetSeekerGait(EGait::Run);

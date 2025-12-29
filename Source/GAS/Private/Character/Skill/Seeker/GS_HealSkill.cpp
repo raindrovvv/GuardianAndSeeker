@@ -37,15 +37,17 @@ void UGS_HealSkill::ActiveSkill()
 	OwnerCharacter->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
 	bIsCoolingDown = true;
 
-	AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter);
-
-	if (!Seeker)
+	// 캐싱
+	if (!CachedSeekerOwner.IsValid())
 	{
-		return;
+		CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
 	}
-	
-	Seeker->Multicast_SetMontageSlot(ESeekerMontageSlot::UpperBody);
-	Seeker->Server_SetSeekerGait(EGait::Walk);
+
+	if (CachedSeekerOwner.IsValid())
+	{
+		CachedSeekerOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::UpperBody);
+		CachedSeekerOwner->Server_SetSeekerGait(EGait::Walk);
+	}
 }
 
 void UGS_HealSkill::DeactiveSkill()
@@ -55,23 +57,15 @@ void UGS_HealSkill::DeactiveSkill()
 	
 	bIsCoolingDown = false;
 	
-	// 서버 권한에서만 종료 사운드 재생 (Multicast로 모든 클라이언트에 동기화)
+	// 서버 권한에서 스킬 마스크 리셋
 	if (OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
-		//if (UGS_SeekerAudioComponent* AudioComp = OwnerCharacter->FindComponentByClass<UGS_SeekerAudioComponent>()) // SJE
-		// UGS_SeekerAudioComponent* AudioComp = OwnerCharacter->FindComponentByClass<UGS_SeekerAudioComponent>();
-		// if (IsValid(AudioComp))
-		// {
-		// 	// Multicast RPC 직접 호출 (CanSendRPC 체크 우회)
-		// 	// AudioEventType 1 = 스킬 종료 사운드
-		// 	AudioComp->Multicast_RequestSkillAudio(CurrentSkillType, 1, OwnerCharacter->GetActorLocation());
-		// }
-		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+		if (CachedSeekerOwner.IsValid())
 		{
-			if (Seeker->GetSkillComp())
+			if (CachedSeekerOwner->GetSkillComp())
 			{
-				Seeker->GetSkillComp()->SetCurAllowedSkillsMask(0);
-				Seeker->GetSkillComp()->SetCurAllowedSkillsMask(static_cast<int16>(ESkillSlot::HealPotion));
+				// 모든 스킬을 다시 허용하도록 리셋
+				CachedSeekerOwner->GetSkillComp()->ResetAllowedSkillsMask();
 			}
 		}
 	}
@@ -86,23 +80,23 @@ void UGS_HealSkill::InterruptSkill()
 		return;
 	}
 
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	if (CachedSeekerOwner.IsValid())
 	{
-		if (Seeker->IsDead())
+		if (CachedSeekerOwner->IsDead())
 		{
 			return;
 		}
 		
-		if (Seeker->GetSkillComp())
+		if (CachedSeekerOwner->GetSkillComp())
 		{
-			Seeker->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			Seeker->SetMoveControlValue(true, true);
+			CachedSeekerOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+			CachedSeekerOwner->SetMoveControlValue(true, true);
 			
 			// Potion 떨구기
 			SetIsActive(false);
 			bIsCoolingDown = false; // hard coding // SJE
 
-			AGS_HP_Potion* Potion = Cast<AGS_HP_Potion>(Seeker->GetItem(EItemType::HP_Potion));
+			AGS_HP_Potion* Potion = Cast<AGS_HP_Potion>(CachedSeekerOwner->GetItem(EItemType::HP_Potion));
 			if (Potion)
 			{
 				Potion->DropFromSocket();
@@ -115,7 +109,7 @@ void UGS_HealSkill::InterruptSkill()
 					Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 				}
 			}
-			Seeker->GetSkillComp()->ResetAllowedSkillsMask();
+			CachedSeekerOwner->GetSkillComp()->ResetAllowedSkillsMask();
 		}
 	}
 }
@@ -229,7 +223,14 @@ void UGS_HealSkill::InitializeDelegate()
 {
 	Super::InitializeDelegate();
 
-	OwnerCharacter->OnTakeAnyDamage.AddDynamic(this, &UGS_HealSkill::OnOwnerDamaged);
+	if (OwnerCharacter)
+	{
+		OwnerCharacter->OnTakeAnyDamage.AddDynamic(this, &UGS_HealSkill::OnOwnerDamaged);
+		if (!CachedSeekerOwner.IsValid())
+		{
+			CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
+		}
+	}
 }
 
 float UGS_HealSkill::GetHealAmount()

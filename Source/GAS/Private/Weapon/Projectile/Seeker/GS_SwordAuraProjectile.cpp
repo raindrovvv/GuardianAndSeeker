@@ -166,13 +166,22 @@ void AGS_SwordAuraProjectile::Multicast_PlayHitEffects_Implementation(ESwordAura
 		return;
 	}
 
+	// VFX 거리 기반 컬링
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		if (!OwnerChar->ShouldPlayVFXAtLocation(HitLocation, 4000.0f))
+		{
+			return;
+		}
+	}
+
 	// 궁극기 활성화 상태 확인
 	bool bIsBuffed = (EffectType == ESwordAuraEffectType::LeftBuff || EffectType == ESwordAuraEffectType::RightBuff);
 
 	// =============================
 	// VFX 재생
 	// =============================
-	
+
 	// 타격 이펙트
 	UNiagaraSystem* SelectedHitVFX = bIsBuffed ? BuffHitVFX : NormalHitVFX;
 	if (SelectedHitVFX)

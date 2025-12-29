@@ -49,12 +49,11 @@ void AGS_TrigTrapBase::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp
 		AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 		if (Seeker)
 		{
-		//함정 트리거 이후, 동작 전 경고 사운드 함수(BP에서 구현)
-		// 재발동 시에도 사운드가 들리도록 조건 밖에 호출
-		CallTrapAlertSound(Seeker);
-
 			if (!bIsTriggered)
 			{
+				//함정 트리거 이후, 동작 전 경고 사운드 함수(BP에서 구현)
+				CallTrapAlertSound(Seeker);
+
 				if (!HasAuthority())
 				{
 					//클라이언트
@@ -131,7 +130,7 @@ void AGS_TrigTrapBase::Server_DelayTrapEffect_Implementation(AActor* TargetActor
 
 void AGS_TrigTrapBase::ApplyTrapEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("ApplyTrapEffect_Implementation Applied"));
+	//함정 발동
 }
 
 void AGS_TrigTrapBase::DelayTrapEffect(AActor* TargetActor)
@@ -266,7 +265,7 @@ UAkComponent* AGS_TrigTrapBase::GetOrCreateTrapAkComponent()
 
 void AGS_TrigTrapBase::EndTrapEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("TrapEffect Ended"));
+	//함정 동작 끝
 }
 
 

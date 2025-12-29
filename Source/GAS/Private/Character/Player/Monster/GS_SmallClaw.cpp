@@ -10,6 +10,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 AGS_SmallClaw::AGS_SmallClaw()
 {
@@ -22,7 +23,13 @@ AGS_SmallClaw::AGS_SmallClaw()
 void AGS_SmallClaw::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	// === BiteCollision에 방어 가능 태그 추가 ===
+	if (BiteCollision)
+	{
+		BiteCollision->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
+	}
+
 	// SmallClaw 전용 몬스터 오디오 설정 (컴포넌트 사용)
 	if (MonsterAudioComponent)
 	{
@@ -89,5 +96,13 @@ void AGS_SmallClaw::OnAttackBiteboxOverlap(UPrimitiveComponent* OverlappedCompon
 
 void AGS_SmallClaw::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal)
 {
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
+	if (ShouldPlayVFXAtLocation(HitLocation, 3000.0f))
+	{
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
+	}
+}
+
+float AGS_SmallClaw::GetOptimalCullDistance() const
+{
+	return GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
 }

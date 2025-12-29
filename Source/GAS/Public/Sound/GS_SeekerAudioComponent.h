@@ -45,6 +45,16 @@ struct FSeekerAudioConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Death Sound"))
     UAkAudioEvent* RTS_DeathSound;
 
+	// 빈사 상태 불꽃 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame Spawn Sound"))
+	UAkAudioEvent* DyingFlameSpawnSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame Loop Sound"))
+	UAkAudioEvent* DyingFlameLoopSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame End Sound"))
+	UAkAudioEvent* DyingFlameEndSound = nullptr;
+
     // 거리 설정
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0"))
     float MaxAudioDistance = 1500.0f; // 이 거리 밖에서는 아예 사운드 이벤트 발생 안함
@@ -233,6 +243,10 @@ public:
     // UI Sounds
     // ===================
     
+	/** 빈사 타이머 경고음 (UI Sound, 10초 이하일 때) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|UI Sounds", meta = (DisplayName = "⏳ Dying Timer Warning Sound"))
+	USoundBase* DyingTimerWarningSound = nullptr;
+
     /** 가디언 감지 경고음 (UI Sound) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|UI Sounds", meta = (DisplayName = "🔔 Detection Warning Sound"))
     USoundBase* DetectionWarningSound = nullptr;
@@ -325,6 +339,26 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Seeker Audio|LowHP Pain")
     void UpdateLowHPPainVolume(float CurrentHP, float MaxHP);
 
+	// ===================
+	// 빈사 상태 불꽃 사운드
+	// ===================
+
+	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|Dying Flame")
+	void PlayDyingFlameSpawnSound();
+
+	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|Dying Flame")
+	void PlayDyingFlameLoopSound();
+
+	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|Dying Flame")
+	void StopDyingFlameLoopSound();
+
+	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|Dying Flame")
+	void PlayDyingFlameEndSound();
+
+	/** 빈사 타이머 경고음 재생 (UI Sound) */
+	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|UI Sounds")
+	void PlayDyingTimerWarningSound();
+
     // ===================
     // 스킬 관련 함수
     // ===================
@@ -394,7 +428,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sound|EventDriven")
     void RequestSkillAudio(ESkillSlot SkillSlot, int32 AudioEventType, FVector Location = FVector::ZeroVector);
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_RequestSkillAudio(ESkillSlot SkillSlot, int32 AudioEventType, FVector Location = FVector::ZeroVector);
 
     // 스킬셋 데이터 기반 사운드 재생 헬퍼 함수
@@ -422,18 +456,18 @@ public:
     // ===================
     
     // 찬 전용 TPS 콤보 공격 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayChanComboAttackSound(int32 ComboIndex);
 
     // 아레스 전용 TPS 콤보 공격 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayAresComboAttackSound(int32 ComboIndex);
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayAresComboAttackSoundWithExtra(int32 ComboIndex);
 
     // 찬 전용 방어 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayDefenseSound();
 
     // ===================
@@ -519,6 +553,9 @@ private:
     /** LowHP Pain Playing ID (중지 시 사용) */
     AkPlayingID LowHPPainPlayingID = AK_INVALID_PLAYING_ID;
 
+	/** 빈사 상태 불꽃 루프 Playing ID */
+	AkPlayingID DyingFlameLoopPlayingID = AK_INVALID_PLAYING_ID;
+
     /** LowHP 체크 타이머 핸들 (0.5초마다 HP 체크) */
     FTimerHandle LowHPCheckTimerHandle;
 
@@ -575,25 +612,25 @@ private:
     void OnRep_CurrentAudioState();
 
     // 클라이언트 사운드 재생 트리거용 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_TriggerSound(ESeekerAudioState SoundTypeToTrigger, bool bIsImmediate);
 
     // 조준 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayBowDrawSound();
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayBowReleaseSound();
 
     // 방패 슬램 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayShieldSlamStartSound();
 
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayShieldSlamImpactSound();
 
     // 화살 사운드 멀티캐스트 RPC
-    UFUNCTION(NetMulticast, Reliable)
+    UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayArrowShotSound();
 
     // ===================

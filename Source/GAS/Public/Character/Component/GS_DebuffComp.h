@@ -54,6 +54,7 @@ public:
 	void ClearAllDebuffs();
 
 protected:
+	virtual void BeginPlay() override;
 	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	const FDebuffData* GetDebuffData(EDebuffType Type) const;
 	UGS_DebuffBase* GetActiveDebuff(EDebuffType Type) const;
@@ -72,6 +73,12 @@ protected:
 	void TriggerDebuffVFX(EDebuffType Type);
 	void TriggerDebuffExpireVFX(EDebuffType Type);
 	void RemoveDebuffVFX(EDebuffType Type);
+
+	/** 사용할 디버프 객체를 반환 (풀에서 꺼내거나 새로 생성) */
+	UGS_DebuffBase* GetOrCreateDebuffObject(EDebuffType Type, TSubclassOf<UGS_DebuffBase> DebuffClass);
+	
+	/** 만료된 디버프 객체를 풀에 반환 */
+	void ReturnDebuffToPool(UGS_DebuffBase* Debuff);
 
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyDebuff(EDebuffType Type, AActor* Attacker);
@@ -93,6 +100,17 @@ protected:
 
 	UPROPERTY()
 	TMap<UGS_DebuffBase*, FTimerHandle> DebuffTimers;
+
+	/** 디버프 객체 풀링 */
+	UPROPERTY()
+	TMap<EDebuffType, UGS_DebuffBase*> DebuffPool;
+
+	/** 캐싱된 VFX 컴포넌트 */
+	UPROPERTY()
+	class UGS_DrakharVFXComponent* CachedDrakharVFXComp;
+
+	UPROPERTY()
+	class UGS_VFXComponent* CachedVFXComp;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

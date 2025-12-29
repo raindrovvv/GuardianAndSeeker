@@ -25,6 +25,7 @@ public:
     void InitializeDefaults();
     virtual void BeginPlay() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     //virtual void CopyProperties(APlayerState* OtherPlayerState) override;
     virtual void SeamlessTravelTo(APlayerState* NewPlayerState) override;
 
@@ -68,7 +69,7 @@ public:
     UPROPERTY(/*Replicated*/)
     TArray<FDESaveData> ObjectData;
 	
-    UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SetObjectData(const TArray<FDESaveData>& InObjectData);
 	
     FString CurrentSaveSlotName = TEXT("Preset_0");

@@ -31,7 +31,7 @@ public:
 
 	/*virtual void OnComboAttack() override;*/
 
-	virtual void MulticastPlayComboSection() override;
+	virtual void MulticastPlayComboSection_Implementation(int32 ComboIndex) override;
 
 	// Aim Skill
 	/*void OnReadyAimSkill();*/
