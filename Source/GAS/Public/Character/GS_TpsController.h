@@ -25,7 +25,7 @@ class GAS_API AGS_TpsController : public AGS_BasePlayerController
 
 public:
 	AGS_TpsController();
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputMappingContext* InputMappingContext;
 
@@ -55,18 +55,18 @@ public:
 	// ==========================================
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input|Revive")
 	UInputAction* ReviveAction;
-	
+
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PlayerWidgetInstance;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TMap<ECharacterType, TSubclassOf<UUserWidget>> PlayerWidgetClasses;
-	
+
 	UFUNCTION(BlueprintCallable)
 	UUserWidget* GetPlayerWidget();
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Audio")
-    void SetupPlayerAudioListener();
+	void SetupPlayerAudioListener();
 
 	void Move(const FInputActionValue& InputValue);
 	void Look(const FInputActionValue& InputValue);
@@ -76,11 +76,18 @@ public:
 	void PageDown(const FInputActionValue& InputValue);
 
 	void InitControllerPerWorld();
-	
+
 	//[Spectate Other Player]
 	UFUNCTION(Server, Unreliable)
-	void ServerRPCSpectatePlayer();
-	
+	void ServerRPCSpectatePlayer(int32 Step = 1);
+
+	/** 관전 모드 진입 시 UI 처리를 위한 클라이언트 RPC */
+	UFUNCTION(Client, Reliable)
+	void ClientRPC_OnSpectatorModeStarted();
+
+	/** 현재 관전 중인 플레이어 인덱스 */
+	int32 SpectatorIndex = -1;
+
 	UFUNCTION()
 	FControlValue GetControlValue() const;
 
@@ -92,7 +99,7 @@ public:
 
 	UFUNCTION()
 	void SetLookControlValue(bool CanLookRight, bool CanLookUp);
-	
+
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Control")
 	FControlValue ControlValues;
 
@@ -109,7 +116,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void TestFunction();
-	
+
 	//마우스 민감도 관련 함수
 	UFUNCTION(BlueprintCallable, Category = "Settings")
 	float GetCurrentMouseSensitivity() const;
@@ -129,19 +136,19 @@ public:
 	// Debug
 	UFUNCTION(Client, Unreliable)
 	void Client_DrawAimAssistDebug(const FVector& Start, const FVector& End, const FVector& TargetLocation, float Duration); // SJE
-	
+
 	void SetIsAutoMoving(bool InIsAutoMoving);
 
 	// ==========================================
 	// 빈사 플레이어 구조 시스템
 	// ==========================================
-	
+
 	/** E키 누름 - 구조 시작 시도 */
 	void TryStartRevive(const FInputActionValue& InputValue);
-	
+
 	/** E키 떼기 - 구조 취소 */
 	void StopRevive(const FInputActionValue& InputValue);
-	
+
 	/** 현재 구조 중인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Revive")
 	bool IsReviving() const { return bIsReviving; }
@@ -157,7 +164,7 @@ public:
 	/** 구조 시작 서버 RPC */
 	UFUNCTION(Server, Reliable, Category = "Revive")
 	void Server_RequestRevive(AGS_Seeker* Target);
-	
+
 	/** 구조 취소 서버 RPC */
 	UFUNCTION(Server, Reliable, Category = "Revive")
 	void Server_CancelRevive();
@@ -215,14 +222,14 @@ private:
 	FTimerHandle AutoMoveTickHandle;
 	FTimerHandle ReviveIndicatorTimerHandle;
 	FTimerHandle InteractableUpdateTimerHandle;
-	
+
 	UPROPERTY(Replicated)
 	bool bIsAutoMoving = false;
 
 	// ==========================================
 	// 빈사 플레이어 구조 시스템 변수들
 	// ==========================================
-	
+
 	/** 현재 구조 중인지 여부 */
 	bool bIsReviving = false;
 
@@ -241,7 +248,7 @@ private:
 
 	/** 근처 빈사 상태 시커 찾기 */
 	AGS_Seeker* FindNearbyDyingSeeker() const;
-	
+
 	/** 구조 가능 거리 */
 	UPROPERTY(EditDefaultsOnly, Category = "Revive", meta = (ClampMin = "100.0", ClampMax = "500.0"))
 	float ReviveDistance = 200.0f;

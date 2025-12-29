@@ -19,12 +19,12 @@ class UInputAction;
 class UGS_AetherComp;
 class UGS_RTSSkillComponent;
 
-// 지정된 부대 
+// 지정된 부대
 USTRUCT(BlueprintType)
 struct FUnitGroup
 {
 	GENERATED_BODY()
-	
+
 	UPROPERTY()
 	TArray<AGS_Monster*> Units;
 };
@@ -44,62 +44,62 @@ class GAS_API AGS_RTSController : public AGS_BasePlayerController
 
 public:
 	AGS_RTSController();
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputMappingContext* InputMappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* CameraMoveAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* MoveAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* AttackAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* StopAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* HoldAction;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* SkillAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* LeftClickAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* RightClickAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* CtrlAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* ShiftAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* DoubleClickAction;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	TArray<UInputAction*> GroupKeyActions;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	TArray<UInputAction*> CameraKeyActions;
 
 	// Guardian RTS 스킬 입력 (1-4 키)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	TArray<UInputAction*> RTSSkillKeyActions;
 
 	// 공격 알림 발생 시 카메라 이동 (스페이스바)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* JumpToAttackAction;
 
 	// 선택 변경 델리게이트
-	UPROPERTY(BlueprintAssignable, Category="Selection")
+	UPROPERTY(BlueprintAssignable, Category = "Selection")
 	FOnSelectionChanged OnSelectionChanged;
 
-	UPROPERTY(BlueprintAssignable, Category="Command")
+	UPROPERTY(BlueprintAssignable, Category = "Command")
 	FOnRTSCommandChanged OnRTSCommandChanged;
 
 	UPROPERTY(BlueprintAssignable, Category = "Selection")
@@ -107,12 +107,12 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnSeekerSelectionChanged OnSeekerSelectionChanged;
-	
+
 	//[Aether]AetherComp + 생성 완료 알리는 델리게이트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resource")
 	TObjectPtr<UGS_AetherComp> AetherComp;
 
-	UPROPERTY(BlueprintAssignable, Category="Resource")
+	UPROPERTY(BlueprintAssignable, Category = "Resource")
 	FOnAetherCompReady OnAetherCompReady;
 
 	// Guardian RTS 스킬 컴포넌트
@@ -133,10 +133,10 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool IsCtrlDown() const { return bCtrlDown; }
-	
+
 	UFUNCTION(BlueprintCallable)
 	bool IsShiftDown() const { return bShiftDown; }
-	
+
 	// 카메라 이동 입력 처리
 	void CameraMove(const FInputActionValue& InputValue);
 	void CameraMoveEnd();
@@ -149,30 +149,30 @@ public:
 	void OnCommandSkill(const FInputActionValue& Value);
 
 	// 실제 구현 + HUD 버튼 클릭시
-	UFUNCTION(BlueprintCallable, Category="RTS")
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void MoveSelectedUnits();
-	
-	UFUNCTION(BlueprintCallable, Category="RTS")
+
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void AttackSelectedUnits();
-	
-	UFUNCTION(BlueprintCallable, Category="RTS")
+
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void StopSelectedUnits();
-	
-	UFUNCTION(BlueprintCallable, Category="RTS")
+
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void HoldSelectedUnits();
 
-	UFUNCTION(BlueprintCallable, Category="RTS")
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void SkillSelectedUnits();
 
 	// Guardian RTS 스킬 발동 (1-4 키)
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void ActivateGuardianSkill(int32 SkillIndex);
 
 	// 타겟팅 모드 관련
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	bool IsInGuardianSkillTargetingMode() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void CancelGuardianSkillTargeting();
 
 	// 마지막 공격 위치로 카메라 이동 (스페이스바)
@@ -186,19 +186,19 @@ public:
 	// 유닛 선택
 	UFUNCTION(BlueprintCallable)
 	void AddUnitToSelection(AGS_Monster* Unit);
-	
+
 	void AddMultipleUnitsToSelection(const TArray<AGS_Monster*>& Units); // 다중 선택
 
 	UFUNCTION(BlueprintCallable)
 	void SelectSameTypeFromSelection(AGS_Monster* Unit);
-	
+
 	UFUNCTION(BlueprintCallable)
 	void RemoveUnitFromSelection(AGS_Monster* Unit);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearUnitSelection();
 
-	// 부대 지정, 호출 
+	// 부대 지정, 호출
 	void OnCtrlPressed(const FInputActionInstance& InputInstance);
 	void OnCtrlReleased(const FInputActionInstance& InputInstance);
 	void OnShiftPressed(const FInputActionInstance& InputInstance);
@@ -207,19 +207,19 @@ public:
 
 	// 미니맵
 	void OnCameraKey(const FInputActionInstance& InputInstance, int32 CameraIndex);
-	
+
 	UFUNCTION(BlueprintCallable)
 	void MoveAIViaMinimap(const FVector& WorldLocation);
-	
+
 	UFUNCTION(BlueprintCallable)
 	void AttackAIViaMinimap(const FVector& WorldLocation);
-	
+
 	UFUNCTION(BlueprintCallable)
 	void MoveCameraViaMinimap(const FVector& WorldLocation);
 
 	UFUNCTION(BlueprintCallable)
 	ERTSCommand GetCurrentCommand() const { return CurrentCommand; }
-	
+
 	// 선택 동기화 RPC (클라이언트 → 서버)
 	UFUNCTION(Server, Reliable)
 	void Server_AddUnitToSelection(AGS_Monster* Unit);
@@ -264,22 +264,25 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_StopBossBGM();
 
+	UFUNCTION(Client, Reliable)
+	void Client_PlayInvalidCommandSound();
+
 	UFUNCTION()
 	void HideDungeonElements();
-	
+
 	// UI 버튼 클릭 함수
-	UFUNCTION(BlueprintCallable, Category="RTS")
+	UFUNCTION(BlueprintCallable, Category = "RTS")
 	void OnEscapeButtonClicked();
 
 	bool HasAnySelectedUnitSkill() const;
-	
-	UFUNCTION(BlueprintCallable, Category="Cursor")
+
+	UFUNCTION(BlueprintCallable, Category = "Cursor")
 	void SetRTSCursor(const FName& CursorPath);
 
 	UFUNCTION()
 	void HandleSeekerHover(bool bIsHover);
 
-	//[Aether]AetherComp 추가 
+	//[Aether]AetherComp 추가
 	UGS_AetherComp* GetAetherComp() const;
 
 	//마우스 설정 함수
@@ -297,7 +300,7 @@ private:
 	// 입력 상태
 	ERTSCommand CurrentCommand;
 
-	// 카메라 
+	// 카메라
 	FVector2D KeyboardDir;
 	FVector2D MouseEdgeDir;
 
@@ -306,7 +309,7 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	float CameraSpeed;
-	
+
 	UPROPERTY(EditAnywhere, Category = "Camera", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float EdgeScreenRatio;
 
@@ -314,7 +317,7 @@ private:
 	TArray<AGS_Monster*> UnitSelection; // 현재 선택된 유닛 (서버 동기화)
 
 	UPROPERTY()
-	AGS_Seeker* SelectedSeeker; 
+	AGS_Seeker* SelectedSeeker;
 
 	UPROPERTY()
 	TArray<FUnitGroup> UnitGroups; // 지정된 부대
@@ -322,15 +325,15 @@ private:
 	bool bCtrlDown;
 	bool bShiftDown;
 	int32 MaxSelectableUnits;
-	
+
 	UPROPERTY()
 	TMap<int32, FVector> SavedCameraPositions; // 카메라 저장 위치
 
-	UPROPERTY(EditAnywhere, Category="UI")
+	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UUserWidget> RTSWidgetClass;
 
 	// RTS 스킬 바 위젯 클래스
-	UPROPERTY(EditDefaultsOnly, Category="UI|RTS Skill")
+	UPROPERTY(EditDefaultsOnly, Category = "UI|RTS Skill")
 	TSubclassOf<class UGS_RTSSkillBarWidget> RTSSkillBarWidgetClass;
 
 	// 생성된 스킬 바 위젯 인스턴스
@@ -338,7 +341,7 @@ private:
 	UGS_RTSSkillBarWidget* SkillBarWidget;
 
 	// Attack warning widget class
-	UPROPERTY(EditDefaultsOnly, Category="UI|RTS Notification")
+	UPROPERTY(EditDefaultsOnly, Category = "UI|RTS Notification")
 	TSubclassOf<class UGS_RTSAttackWarningWidget> AttackWarningWidgetClass;
 
 	bool bSeekerHovered;
@@ -410,15 +413,22 @@ private:
 	UPROPERTY()
 	TMap<AGS_Seeker*, float> LastSeekerNotifyTimes;
 
+	// 시커 근접도 캐싱 (변화 필터링용)
+	UPROPERTY()
+	TMap<AGS_Seeker*, float> LastSeekerProximityValues;
+
+	// 근접도 변화 임계값 (5% = 0.05)
+	static constexpr float ProximityChangeThreshold = 0.05f;
+
 	FVector2D GetKeyboardDirection() const;
 	FVector2D CalculateMouseEdgeDirection(FVector2D MousePos, FIntPoint ViewportSize) const;
 	FVector2D GetFinalDirection() const;
 	void MoveCamera(const FVector2D& Direction, float DeltaTime);
 	void InitCameraActor();
-	
+
 	void SelectOnCtrlClick();
 	void ToggleOnShiftClick();
-	
+
 	// 명령 가능한 유닛들
 	void GatherCommandableUnits(TArray<AGS_Monster*>& Out) const;
 
@@ -426,7 +436,7 @@ private:
 	mutable TArray<AGS_Monster*> CachedCommandableUnits;
 
 	bool CheckMonsterSelectable(AGS_Monster* Monster) const;
-	
+
 	UFUNCTION()
 	void OnSelectedUnitDead(AGS_Monster* Monster);
 

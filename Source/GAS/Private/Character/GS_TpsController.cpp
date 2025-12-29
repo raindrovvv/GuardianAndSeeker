@@ -27,11 +27,14 @@
 #include "GameFramework/PlayerController.h"
 #include "Character/Component/GS_DebuffComp.h"
 #include "System/GameMode/GS_InGameGM.h"
-#include "EngineUtils.h"  // TActorIterator
+#include "EngineUtils.h" // TActorIterator
 #include "UI/Character/GS_ReviveIndicatorWidget.h"
 #include "Interface/GS_InteractableInterface.h"
 #include "UI/Interaction/GS_InteractionWidget.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "Blueprint/WidgetTree.h"
+#include "UI/Character/GS_Timer.h"
+#include "Components/PanelWidget.h"
 
 
 AGS_TpsController::AGS_TpsController()
@@ -98,14 +101,14 @@ void AGS_TpsController::Look(const FInputActionValue& InputValue)
 	const FVector2D InputAxisVector = InputValue.Get<FVector2D>();
 	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
 	{
-		if(GameInstance)
+		if (GameInstance)
 		{
 			float SensitivityMultiplier = GameInstance->GetMouseSensitivity();
 			if (ControlValues.bCanLookRight)
 			{
 				ControlledPawn->AddControllerYawInput(InputAxisVector.X * SensitivityMultiplier);
-			}			
-			
+			}
+
 			if (ControlValues.bCanLookUp)
 			{
 				FRotator CurrentRot = GetControlRotation();
@@ -119,7 +122,7 @@ void AGS_TpsController::Look(const FInputActionValue& InputValue)
 
 				CurrentRot.Pitch = NewPitch;
 				SetControlRotation(CurrentRot);
-				
+
 				//ControlledPawn->AddControllerPitchInput(InputAxisVector.Y * SensitivityMultiplier);
 			}
 		}
@@ -133,7 +136,7 @@ void AGS_TpsController::WalkToggle(const FInputActionValue& InputValue)
 		if (ControlledPawn->CanChangeSeekerGait)
 		{
 			EGait CurGait = ControlledPawn->GetSeekerGait();
-		
+
 			if (CurGait == EGait::Walk)
 			{
 				ControlledPawn->Server_SetSeekerGait(EGait::Run);
@@ -166,13 +169,16 @@ void AGS_TpsController::PageUp(const FInputActionValue& InputValue)
 {
 	if (IsLocalController())
 	{
-		ServerRPCSpectatePlayer();
+		ServerRPCSpectatePlayer(1);
 	}
 }
 
 void AGS_TpsController::PageDown(const FInputActionValue& InputValue)
 {
-
+	if (IsLocalController())
+	{
+		ServerRPCSpectatePlayer(-1);
+	}
 }
 
 void AGS_TpsController::SetMoveControlValue(bool CanMoveRight, bool CanMoveForward)
@@ -244,51 +250,117 @@ void AGS_TpsController::InitControllerPerWorld()
 		// 오디오 리스너 설정 (약간의 지연을 두고 실행)
 		FTimerHandle TimerHandle;
 		GetWorld()->GetTimerManager().SetTimer(
-			TimerHandle,
-			this,
-			&AGS_TpsController::SetupPlayerAudioListener,
-			0.1f,
-			false
-		);
+		    TimerHandle,
+		    this,
+		    &AGS_TpsController::SetupPlayerAudioListener,
+		    0.1f,
+		    false);
 	}
 }
 
-void AGS_TpsController::ServerRPCSpectatePlayer_Implementation()
+void AGS_TpsController::ServerRPCSpectatePlayer_Implementation(int32 Step)
 {
-	if (GetWorld()->GetGameState()->PlayerArray.IsEmpty())
+	UWorld* World = GetWorld();
+	if (!World || !World->GetGameState())
 	{
 		return;
 	}
-	
-	for (const auto& PS : GetWorld()->GetGameState()->PlayerArray)
+
+	// 1. 자신의 폰 해제 (최초 관전 진입 시 1회 수행)
+	if (GetPawn())
+	{
+		APawn* DeadPawn = GetPawn();
+		UnPossess();
+		if (DeadPawn)
+		{
+			DeadPawn->SetLifeSpan(2.0f);
+		}
+
+		// 관전자 모드 진입 알림 및 UI 처리
+		ClientRPC_OnSpectatorModeStarted();
+	}
+
+	// 2. 생존한 시커 목록 필터링 (관전 가능 대상)
+	TArray<AGS_PlayerState*> AliveSeekers;
+	for (APlayerState* PS : World->GetGameState()->PlayerArray)
 	{
 		AGS_PlayerState* GS_PS = Cast<AGS_PlayerState>(PS);
-		if (IsValid(GS_PS))
+		if (GS_PS && GS_PS->bIsAlive && GS_PS->CurrentPlayerRole == EPlayerRole::PR_Seeker)
 		{
-			if (GS_PS->bIsAlive && GS_PS->CurrentPlayerRole == EPlayerRole::PR_Seeker) 
-			{
-				AGS_TpsController* AlivePlayerController = Cast<AGS_TpsController>(GS_PS->GetPlayerController());
-				
-				if (IsValid(AlivePlayerController))
+			AliveSeekers.Add(GS_PS);
+		}
+	}
+
+	if (AliveSeekers.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Spectator] No alive seekers to spectate."));
+		return;
+	}
+
+	// 3. 관전 인덱스 계산 (사이클링)
+	if (SpectatorIndex == -1)
+	{
+		SpectatorIndex = 0;
+	}
+	else
+	{
+		SpectatorIndex = (SpectatorIndex + Step) % AliveSeekers.Num();
+		if (SpectatorIndex < 0)
+		{
+			SpectatorIndex += AliveSeekers.Num();
+		}
+	}
+
+	// 4. 관전 대상 설정
+	AGS_PlayerState* TargetPS = AliveSeekers[SpectatorIndex];
+	if (IsValid(TargetPS))
+	{
+		APawn* TargetPawn = TargetPS->GetPawn();
+		if (IsValid(TargetPawn))
+		{
+			// 부드러운 카메라 전환 (0.5초 블렌딩)
+			SetViewTargetWithBlend(TargetPawn, 0.5f, EViewTargetBlendFunction::VTBlend_Linear, 0.0f, true);
+			UE_LOG(LogTemp, Log, TEXT("[Spectator] Now spectating: %s"), *TargetPS->GetPlayerName());
+		}
+	}
+}
+
+void AGS_TpsController::ClientRPC_OnSpectatorModeStarted_Implementation()
+{
+	// TODO: 관전자 전용 전용 UI로 교체하는 로직 구현 필요 (예: 관전 대상 이름 표시 등)
+
+	if (IsValid(PlayerWidgetInstance))
+	{
+		UWidgetTree* Tree = PlayerWidgetInstance->WidgetTree;
+		if (Tree)
+		{
+			// 1. 모든 위젯을 일단 숨김.
+			Tree->ForEachWidget([&](UWidget* Widget)
+			                    {
+				if (Widget)
 				{
-					APlayerController* DeadPlayerPC = Cast<APlayerController>(this);
-					if (DeadPlayerPC)
+					Widget->SetVisibility(ESlateVisibility::Collapsed);
+				} });
+
+			// 2. 타이머 위젯(UGS_Timer)을 찾아 그 부모 계층까지 다시 보이도록 설정.
+			TArray<UWidget*> AllWidgets;
+			Tree->GetAllWidgets(AllWidgets);
+			for (UWidget* Widget : AllWidgets)
+			{
+				if (Widget && Widget->IsA<UGS_Timer>())
+				{
+					UWidget* Temp = Widget;
+					while (Temp)
 					{
-						APawn* DeadPawn = Cast<APawn>(DeadPlayerPC->GetPawn());
-						
-						DeadPlayerPC->UnPossess();
-						DeadPlayerPC->SetViewTargetWithBlend(AlivePlayerController);
-						
-						if (DeadPawn)
-						{
-							DeadPawn->SetLifeSpan(2.f);
-						}
+						// 부모들은 SelfHitTestInvisible로 설정하여 자신은 입력을 안 받지만 자식은 보이게 함
+						Temp->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+						Temp = Temp->GetParent();
 					}
+					// 타이머 본체는 Visible
+					Widget->SetVisibility(ESlateVisibility::Visible);
 				}
 			}
 		}
-		//Game Over?
-		//all players dead
 	}
 }
 
@@ -301,7 +373,7 @@ void AGS_TpsController::TestFunction()
 {
 	AGS_Character* GS_Character = Cast<AGS_Character>(GetPawn());
 	if (IsValid(GS_Character))
-	{		
+	{
 		TSubclassOf<UUserWidget> Widget = PlayerWidgetClasses[GS_Character->GetCharacterType()];
 		if (IsValid(Widget))
 		{
@@ -324,7 +396,7 @@ void AGS_TpsController::TestFunction()
 				UGS_HPBoardWidget* HPBoardWidget = Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
 				UGS_BossHP* BossWidget = Cast<UGS_BossHP>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_BossHPBoard")));
 				UGS_FeverGaugeBoard* FeverWidget = Cast<UGS_FeverGaugeBoard>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_FeverBoard")));
-				
+
 				if (BossWidget)
 				{
 					BossWidget->SetOwningActor(GS_Character);
@@ -335,7 +407,7 @@ void AGS_TpsController::TestFunction()
 				{
 					FeverWidget->InitDrakharFeverWidget();
 				}
-				
+
 				if (HPBoardWidget)
 				{
 					HPBoardWidget->InitBoardWidget();
@@ -366,7 +438,7 @@ void AGS_TpsController::TestFunction()
 void AGS_TpsController::StartAutoMoveForward()
 {
 	bIsAutoMoving = true;
-	Client_StartAutoMoveForward(); // 돌진 시작	
+	Client_StartAutoMoveForward(); // 돌진 시작
 }
 
 void AGS_TpsController::StopAutoMoveForward()
@@ -418,7 +490,7 @@ void AGS_TpsController::SnapCameraToCharacterYaw()
 
 void AGS_TpsController::SetIsAutoMoving(bool InIsAutoMoving)
 {
-	if(HasAuthority())
+	if (HasAuthority())
 	{
 		bIsAutoMoving = InIsAutoMoving;
 	}
@@ -430,7 +502,7 @@ void AGS_TpsController::AutoMoveTick()
 	{
 		return;
 	}
-	
+
 	if (!bIsAutoMoving)
 	{
 		return;
@@ -539,7 +611,7 @@ void AGS_TpsController::ApplyChargeCameraSettings(bool bCharging)
 }
 
 void AGS_TpsController::Client_DrawAimAssistDebug_Implementation(const FVector& Start, const FVector& End,
-	const FVector& TargetLocation, float Duration)
+                                                                 const FVector& TargetLocation, float Duration)
 {
 	if (UWorld* World = GetWorld())
 	{
@@ -587,7 +659,7 @@ void AGS_TpsController::BeginPlay()
 
 		// 빈사 상태 체크 타이머 시작 (0.2초 간격)
 		GetWorldTimerManager().SetTimer(ReviveIndicatorTimerHandle, this, &AGS_TpsController::UpdateReviveIndicatorVisibility, 0.2f, true);
-		
+
 		// 상호작용 가능 대상 감지 타이머 시작 (0.1초 간격)
 		GetWorldTimerManager().SetTimer(InteractableUpdateTimerHandle, this, &AGS_TpsController::UpdateNearbyInteractable, 0.1f, true);
 	}
@@ -604,16 +676,16 @@ UUserWidget* AGS_TpsController::GetPlayerWidget()
 
 void AGS_TpsController::SetupPlayerAudioListener()
 {
-    if (!IsLocalController())
-    {
-        return;
-    }
+	if (!IsLocalController())
+	{
+		return;
+	}
 
-    if (AGS_Player* ControlledPlayer = Cast<AGS_Player>(GetPawn()))
-    {
-        ControlledPlayer->SetupLocalAudioListener();
-        UE_LOG(LogAudio, Log, TEXT("Audio listener setup initiated from controller for: %s"), *ControlledPlayer->GetName());
-    }
+	if (AGS_Player* ControlledPlayer = Cast<AGS_Player>(GetPawn()))
+	{
+		ControlledPlayer->SetupLocalAudioListener();
+		UE_LOG(LogAudio, Log, TEXT("Audio listener setup initiated from controller for: %s"), *ControlledPlayer->GetName());
+	}
 }
 
 void AGS_TpsController::SetupInputComponent()
@@ -644,7 +716,7 @@ void AGS_TpsController::SetupInputComponent()
 	{
 		EnhancedInputComponent->BindAction(PlaceMarkerAction, ETriggerEvent::Started, this, &AGS_TpsController::PlaceMarker);
 	}
-	
+
 	// 빈사 플레이어 구조 (E키)
 	if (ReviveAction)
 	{
@@ -906,7 +978,8 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 		{
 			AGS_Seeker* OtherSeeker = SeekerPtr.Get();
-			if (!IsValid(OtherSeeker)) continue;
+			if (!IsValid(OtherSeeker))
+				continue;
 
 			// 자기 자신 제외
 			if (OtherSeeker == MySeeker)
@@ -930,7 +1003,7 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 				FCollisionQueryParams Params;
 				Params.AddIgnoredActor(MySeeker);
 				Params.AddIgnoredActor(OtherSeeker);
-				
+
 				if (!World->LineTraceSingleByChannel(LOSHit, MyLocation, OtherSeeker->GetActorLocation(), ECC_Visibility, Params))
 				{
 					// 가려진 것 없음
@@ -969,7 +1042,7 @@ void AGS_TpsController::Server_RequestRevive_Implementation(AGS_Seeker* Target)
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(MySeeker);
 	Params.AddIgnoredActor(Target);
-	
+
 	if (GetWorld()->LineTraceSingleByChannel(LOSHit, MySeeker->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params))
 	{
 		// 무언가에 가려짐
@@ -1207,4 +1280,3 @@ void AGS_TpsController::UpdateInteractionProgress(float DeltaTime)
 		CompleteInteraction();
 	}
 }
-
