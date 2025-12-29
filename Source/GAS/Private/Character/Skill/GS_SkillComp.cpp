@@ -121,8 +121,6 @@ bool UGS_SkillComp::IsSkillAllowed(ESkillSlot CompareSkillType)
 {
 	uint16 BitFlag = 0;
 	BitFlag |= (1 << static_cast<int32>(CompareSkillType));
-	UE_LOG(LogTemp, Warning, TEXT("UGS_SkillComp::IsSkillAllowed BitFlag :%d"), BitFlag);
-	UE_LOG(LogTemp, Warning, TEXT("UGS_SkillComp::IsSkillAllowed CurAllowedSkillsMask :%d"), CurAllowedSkillsMask);
 	return CurAllowedSkillsMask & BitFlag;
 }
 
@@ -174,7 +172,6 @@ void UGS_SkillComp::InitSkills()
 
 void UGS_SkillComp::ResetAllowedSkillsMask()
 {
-	UE_LOG(LogTemp, Warning, TEXT("ResetAllowedSkillsMask"));
 	CurAllowedSkillsMask = DefaultAllowedSkillsMask;
 }
 
@@ -215,7 +212,14 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 	Skill->InitSkill(Cast<AGS_Player>(GetOwner()), this, Slot);
 	Skill->Cooltime = Info.Cooltime;
 	Skill->Damage = Info.Damage;
-	Skill->SkillAnimMontages = Info.Montages;
+
+	// TArray<UAnimMontage*>를 TArray<TSoftObjectPtr<UAnimMontage>>로 변환
+	Skill->SkillAnimMontages.Empty();
+	for (UAnimMontage* Montage : Info.Montages)
+	{
+		Skill->SkillAnimMontages.Add(TSoftObjectPtr<UAnimMontage>(Montage));
+	}
+
 	Skill->SkillImage = Info.Image;
 
 
@@ -258,10 +262,9 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 {
 	if (!bCanUseSkill)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("TryActivateSkill failed: bCanUseSkill = false"));
 		return;
 	}
-	
+
 	if (SkillMap.Contains(Slot))
 	{
 		if (SkillMap[Slot]->CanActive())
@@ -271,8 +274,6 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 			{
 				if (IsSkillAllowed(Slot))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("허용된 스킬이 Active 되기를 원한다."));
-
 					SkillsInterrupt();
 					SkillMap[Slot]->ActiveSkill();
 
@@ -282,10 +283,8 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 						GetOwner()->ForceNetUpdate();
 					}
 
-					UE_LOG(LogTemp, Warning, TEXT("AllowSkillMask : %d"), SkillMap[Slot]->AllowSkillsMask);
 					ResetAllowedSkillsMask();
 					SetCurAllowedSkillsMask(SkillMap[Slot]->AllowSkillsMask);
-					UE_LOG(LogTemp, Warning, TEXT("CurAllowedSkillsMask : %d"),GetCurAllowedSkillsMask());
 
 					// 스킬 활성화 알림
 					if (GetOwner()->GetLocalRole() == ROLE_Authority)
@@ -293,25 +292,16 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 						Client_BroadcastSkillActivation(Slot);
 					}
 				}
-				else
-				{
-					UE_LOG(LogTemp, Warning, TEXT("Active 되기를 원하는 스킬이 불허되었다."));
-				}
 			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("CanActive() = false"));
 			// 쿨타임 중이거나 사용할 수 없는 상태일 때 알림
 			if (GetOwner()->GetLocalRole() == ROLE_Authority)
 			{
 				Client_BroadcastSkillCooldownBlocked(Slot);
 			}
 		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("SkillMap does not contain slot"));
 	}
 }
 
@@ -673,11 +663,6 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 	if (LoopVFXComponent)
 	{
 		ActiveLoopVFXComponents.Add(Slot, LoopVFXComponent);
-		UE_LOG(LogTemp, Warning, TEXT("[SkillComp] Loop VFX 생성 성공: %s"), *SkillInfo->SkillLoopVFX->GetName());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[SkillComp] Loop VFX 컴포넌트 생성 실패!"));
 	}
 }
 
@@ -696,7 +681,6 @@ void UGS_SkillComp::Multicast_StopLoopVFX_Implementation(ESkillSlot Slot)
 		{
 			(*FoundComponent)->Deactivate();
 			(*FoundComponent)->DestroyComponent();
-			UE_LOG(LogTemp, Warning, TEXT("[SkillComp] Loop VFX 정지 성공"));
 		}
 		ActiveLoopVFXComponents.Remove(Slot);
 	}

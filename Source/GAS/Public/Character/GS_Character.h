@@ -29,7 +29,7 @@ struct FImpactVFXInfo
 	GENERATED_BODY()
 
 	UPROPERTY()
-	TObjectPtr<UNiagaraSystem> VFXAsset = nullptr;
+	TSoftObjectPtr<UNiagaraSystem> VFXAsset = nullptr;
 
 	UPROPERTY()
 	FVector Scale = FVector::OneVector;
@@ -44,14 +44,14 @@ USTRUCT(BlueprintType)
 struct FWeaponSlot
 {
 	GENERATED_BODY()
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<AGS_Weapon> WeaponClass = nullptr;
-	
+
 	UPROPERTY()
 	AGS_Weapon* WeaponInstance = nullptr;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	FName SocketName = NAME_None;
 };
 
@@ -70,18 +70,18 @@ public:
 	virtual void BeginDestroy() override;
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	virtual void OnDamageStart();
-	
+
 	// HitReact
 	bool CanHitReact = true;
 	FTimerHandle HitReactTimerHandle;
-	
+
 	void DisableHitReact(float CooldownTime);
 	void DisableHitReact(bool bAllowHitReact);
-	
+
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	/** 팀 ID (0: 중립, 1: 플레이어, 2: 몬스터) */
-	UPROPERTY(EditAnywhere, Category="Team")
+	UPROPERTY(EditAnywhere, Category = "Team")
 	FGenericTeamId TeamId;
 
 	// 죽음 사운드는 각 캐릭터 타입별 오디오 컴포넌트에서 처리됨
@@ -89,13 +89,13 @@ public:
 
 	//variable
 	float MaxSpeed;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	ECharacterType CharacterType;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_HitReactComp> HitReactComp;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComp;
 
@@ -113,11 +113,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stat", meta = (AllowPrivateAccess))
 	TObjectPtr<UGS_HPTextWidgetComp> HPTextWidgetComp;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Data")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
 	UCharacterDataAsset* CharacterData;
 
-	UFUNCTION(BlueprintCallable, Category="Data")
-	UTexture2D* GetPortrait() const { return CharacterData ? CharacterData->Portrait : nullptr; }
+	UFUNCTION(BlueprintCallable, Category = "Data")
+	UTexture2D* GetPortrait() const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "State", meta = (AllowPrivateAccess), Replicated)
 	bool bLockRotationToController = false; // Idle 상태에도 bUseControllerRotationYaw 를 true 로 두기 위한 flag.
@@ -127,21 +127,30 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "State")
 	void SetIsLockedRotationToController(bool InputIsRotationRoController);
-	
-	UFUNCTION(BlueprintCallable, Category="Data")
-	FText GetMonsterName() const { return CharacterData ? CharacterData->CharacterName : FText::GetEmpty(); }
 
-	UFUNCTION(BlueprintCallable, Category="Data")
-	FText GetDescription() const { return CharacterData ? CharacterData->Description : FText::GetEmpty(); }
+	UFUNCTION(BlueprintCallable, Category = "Data")
+	FText GetMonsterName() const
+	{
+		return CharacterData ? CharacterData->CharacterName : FText::GetEmpty();
+	}
 
-	UFUNCTION(BlueprintCallable, Category="Data")
-	FText GetTypeName() const { return CharacterData ? CharacterData->TypeName : FText::GetEmpty(); }
-	
+	UFUNCTION(BlueprintCallable, Category = "Data")
+	FText GetDescription() const
+	{
+		return CharacterData ? CharacterData->Description : FText::GetEmpty();
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "Data")
+	FText GetTypeName() const
+	{
+		return CharacterData ? CharacterData->TypeName : FText::GetEmpty();
+	}
+
 	//getter
 	FORCEINLINE UGS_StatComp* GetStatComp() const { return StatComp; }
 	FORCEINLINE UGS_DebuffComp* GetDebuffComp() const { return DebuffComp; }
 	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
-	
+
 	//serverRPC
 	UFUNCTION(Server, Reliable)
 	void ServerRPCMeleeAttack(AGS_Character* InDamagedCharacter);
@@ -159,7 +168,7 @@ public:
 	//character death play ragdoll
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCCharacterDeath();
-	
+
 	UFUNCTION()
 	void WatchOtherPlayer();
 
@@ -167,18 +176,18 @@ public:
 	virtual void OnDeath();
 	UFUNCTION()
 	void DestroyAllWeapons();
-	
+
 	//HP widget
 	void SetHPTextWidget(UGS_HPText* InHPTextWidget);
 	void SetHPBarWidget(UGS_HPWidget* InHPBarWidget);
 	void SetPlayerInfoWidget(UGS_PlayerInfoWidget* InPlayerInfoWidget);
 	virtual FGenericTeamId GetGenericTeamId() const override;
-	
+
 	UFUNCTION(BlueprintPure, Category = "Team")
 	bool IsEnemy(const AGS_Character* Other) const;
 
 	//play skill montage
-	UFUNCTION(NetMulticast,Reliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCPlaySkillMontage(UAnimMontage* SkillMontage);
 
 	UFUNCTION(NetMulticast, Reliable)
@@ -199,7 +208,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCanUseSkill(bool bCanUse) {}
-	
+
 	UFUNCTION()
 	void SetCharacterSpeed(float InRatio);
 
@@ -227,25 +236,25 @@ protected:
 	virtual void NotifyActorBeginCursorOver() override;
 	virtual void NotifyActorEndCursorOver() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
+
 	//component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_DebuffComp> DebuffComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_StatComp> StatComp;
-	
+
 	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TArray<FWeaponSlot> WeaponSlots;
 
 	UPROPERTY(Replicated)
 	EWeaponHandlingState WeaponHandlingState = EWeaponHandlingState::Wielding;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="RTS")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS")
 	TObjectPtr<UDecalComponent> SelectionDecal;
 
 	bool bIsHovered;
-	
+
 	virtual FLinearColor GetCurrentDecalColor();
 	virtual void UpdateDecal();
 	virtual bool ShowDecal();
@@ -258,7 +267,7 @@ public:
 	EWeaponHandlingState GetWeaponHandlingState();
 	UFUNCTION()
 	void SetWeaponHandlingState(EWeaponHandlingState InputWeaponHandlingState);
-	
+
 private:
 	UPROPERTY(ReplicatedUsing = OnRep_CharacterSpeed)
 	float CharacterSpeed;
@@ -286,11 +295,10 @@ private:
 
 private:
 	void SpawnAndAttachWeapons();
-	
+
 	void SetHovered(bool bHovered);
 
 	// 무적 상태
 	UPROPERTY(Replicated)
 	bool bIsInvincible = false;
 };
-

@@ -21,6 +21,7 @@
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 #include "System/GS_PlayerState.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "UI/Character/GS_HPText.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "UI/Character/GS_HPWidget.h"
@@ -36,14 +37,14 @@ AGS_Character::AGS_Character()
 	DebuffComp = CreateDefaultSubobject<UGS_DebuffComp>(TEXT("DebuffComp"));
 	HitReactComp = CreateDefaultSubobject<UGS_HitReactComp>(TEXT("HitReactComp"));
 	CameraShakeComp =
-		CreateDefaultSubobject<UGS_CameraShakeComponent>(TEXT("CameraShakeComp"));
+	    CreateDefaultSubobject<UGS_CameraShakeComponent>(TEXT("CameraShakeComp"));
 
 	// 틱 최적화 컴포넌트 생성
 	TickOptimizationComp = CreateDefaultSubobject<UGS_TickOptimizationComponent>(
-		TEXT("TickOptimizationComp"));
+	    TEXT("TickOptimizationComp"));
 
 	HPTextWidgetComp =
-		CreateDefaultSubobject<UGS_HPTextWidgetComp>(TEXT("TextWidgetComp"));
+	    CreateDefaultSubobject<UGS_HPTextWidgetComp>(TEXT("TextWidgetComp"));
 	HPTextWidgetComp->SetupAttachment(RootComponent);
 	HPTextWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -53,7 +54,7 @@ AGS_Character::AGS_Character()
 	HPTextWidgetComp->SetCullDistance(2000.0f);
 
 	SelectionDecal =
-		CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
+	    CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
 	SelectionDecal->SetupAttachment(RootComponent);
 	SelectionDecal->SetVisibility(false);
 
@@ -70,13 +71,13 @@ void AGS_Character::BeginPlay()
 
 	// Set Default Stats to Character
 	const UEnum* CharacterEnum =
-		FindObject<UEnum>(ANY_PACKAGE, TEXT("ECharacterType"), true);
+	    FindObject<UEnum>(ANY_PACKAGE, TEXT("ECharacterType"), true);
 	bool bStatInitialized = false;
 
 	if (CharacterEnum)
 	{
 		FString EnumToName =
-			CharacterEnum->GetNameStringByValue((int64)CharacterType);
+		    CharacterEnum->GetNameStringByValue((int64)CharacterType);
 		StatComp->InitStat(FName(EnumToName));
 		bStatInitialized = true;
 	}
@@ -99,7 +100,7 @@ void AGS_Character::BeginPlay()
 		{
 			// HP 위젯 거리 기반 컬링 설정 (RTS 시점 고려)
 			float CullDistance = GS_Rendering::CalculateCullDistance(
-				this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+			    this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
 			HPTextWidgetComp->SetCullDistance(CullDistance);
 
 			if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
@@ -115,7 +116,7 @@ void AGS_Character::BeginPlay()
 	if (SelectionDecal && SelectionDecal->GetDecalMaterial())
 	{
 		DynamicDecalMaterial = UMaterialInstanceDynamic::Create(
-			SelectionDecal->GetDecalMaterial(), this);
+		    SelectionDecal->GetDecalMaterial(), this);
 		SelectionDecal->SetDecalMaterial(DynamicDecalMaterial);
 	}
 
@@ -135,19 +136,19 @@ void AGS_Character::Tick(float DeltaTime)
 	{
 		// 쓰로틀링된 틱 실행 여부 확인
 		if (!TickOptimizationComp->ShouldExecuteThrottledTick(
-			GetWorld()->GetTimeSeconds()))
+		        GetWorld()->GetTimeSeconds()))
 		{
 			return;
 		}
 		TickOptimizationComp->MarkThrottledTickExecuted(
-			GetWorld()->GetTimeSeconds());
+		    GetWorld()->GetTimeSeconds());
 	}
 
 	Super::Tick(DeltaTime);
 }
 
 void AGS_Character::GetLifetimeReplicatedProps(
-	TArray<class FLifetimeProperty>& OutLifetimeProps) const
+    TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -208,9 +209,9 @@ void AGS_Character::BeginDestroy()
 }
 
 float AGS_Character::TakeDamage(float DamageAmount,
-	FDamageEvent const& DamageEvent,
-	AController* EventInstigator,
-	AActor* DamageCauser)
+                                FDamageEvent const& DamageEvent,
+                                AController* EventInstigator,
+                                AActor* DamageCauser)
 {
 	if (bIsInvincible)
 	{
@@ -223,7 +224,7 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	}
 
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent,
-		EventInstigator, DamageCauser);
+	                                       EventInstigator, DamageCauser);
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
 	OnDamageStart();
@@ -245,7 +246,7 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
 		{
 			const FGS_DamageEvent& MyDamageEvent =
-				static_cast<const FGS_DamageEvent&>(DamageEvent);
+			    static_cast<const FGS_DamageEvent&>(DamageEvent);
 			HitReactType = MyDamageEvent.HitReactType;
 
 			// FGS_DamageEvent도 PointDamage나 RadialDamage를 상속받았을 수 있으므로
@@ -253,15 +254,15 @@ float AGS_Character::TakeDamage(float DamageAmount,
 			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 			{
 				const FPointDamageEvent* PointEvent =
-					static_cast<const FPointDamageEvent*>(&DamageEvent);
+				    static_cast<const FPointDamageEvent*>(&DamageEvent);
 				HitDirection = -PointEvent->ShotDirection;
 			}
 			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
 			{
 				const FRadialDamageEvent* RadialEvent =
-					static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				    static_cast<const FRadialDamageEvent*>(&DamageEvent);
 				HitDirection =
-					(GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+				    (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
 			}
 		}
 		// FGS_DamageEvent가 아닌 일반 UE 데미지 이벤트인 경우 (폴백)
@@ -270,20 +271,20 @@ float AGS_Character::TakeDamage(float DamageAmount,
 			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 			{
 				const FPointDamageEvent* PointEvent =
-					static_cast<const FPointDamageEvent*>(&DamageEvent);
+				    static_cast<const FPointDamageEvent*>(&DamageEvent);
 				HitDirection = -PointEvent->ShotDirection;
 			}
 			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
 			{
 				const FRadialDamageEvent* RadialEvent =
-					static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				    static_cast<const FRadialDamageEvent*>(&DamageEvent);
 				HitDirection =
-					(GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+				    (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
 			}
 		}
 
 		if (UGS_HitReactComp* HitReactComponent =
-			GetComponentByClass<UGS_HitReactComp>())
+		        GetComponentByClass<UGS_HitReactComp>())
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
 		}
@@ -304,8 +305,9 @@ void AGS_Character::DisableHitReact(float CooldownTime)
 {
 	SetCanHitReact(false);
 	GetWorld()->GetTimerManager().SetTimer(
-		HitReactTimerHandle, [this]() { CanHitReact = true; }, CooldownTime,
-		false);
+	    HitReactTimerHandle, [this]()
+	    { CanHitReact = true; }, CooldownTime,
+	    false);
 }
 
 void AGS_Character::DisableHitReact(bool bAllowHitReact)
@@ -314,7 +316,7 @@ void AGS_Character::DisableHitReact(bool bAllowHitReact)
 }
 
 void AGS_Character::SetupPlayerInputComponent(
-	UInputComponent* PlayerInputComponent)
+    UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
@@ -325,7 +327,7 @@ bool AGS_Character::GetIsLockedRotationToController()
 }
 
 void AGS_Character::SetIsLockedRotationToController(
-	bool InputIsRotationRoController)
+    bool InputIsRotationRoController)
 {
 	bLockRotationToController = InputIsRotationRoController;
 }
@@ -387,7 +389,7 @@ void AGS_Character::SetHPTextWidget(UGS_HPText* InHPTextWidget)
 	{
 		HPTextWidget->InitializeHPTextWidget(GetStatComp());
 		StatComp->OnCurrentHPChanged.AddUObject(HPTextWidget,
-			&UGS_HPText::OnCurrentHPChanged);
+		                                        &UGS_HPText::OnCurrentHPChanged);
 	}
 }
 
@@ -398,23 +400,23 @@ void AGS_Character::SetHPBarWidget(UGS_HPWidget* InHPBarWidget)
 	{
 		HPBarWidget->InitializeHPWidget(GetStatComp());
 		StatComp->OnCurrentHPChanged.AddUObject(
-			HPBarWidget, &UGS_HPWidget::OnCurrentHPBarChanged);
+		    HPBarWidget, &UGS_HPWidget::OnCurrentHPBarChanged);
 	}
 }
 
 void AGS_Character::SetPlayerInfoWidget(
-	UGS_PlayerInfoWidget* InPlayerInfoWidget)
+    UGS_PlayerInfoWidget* InPlayerInfoWidget)
 {
 	if (IsValid(InPlayerInfoWidget))
 	{
 		InPlayerInfoWidget->InitializePlayerInfoWidget(Cast<AGS_Player>(this));
 		StatComp->OnCurrentHPChanged.AddUObject(
-			InPlayerInfoWidget, &UGS_PlayerInfoWidget::OnCurrentHPBarChanged);
+		    InPlayerInfoWidget, &UGS_PlayerInfoWidget::OnCurrentHPBarChanged);
 	}
 }
 
 void AGS_Character::ServerRPCMeleeAttack_Implementation(
-	AGS_Character* InDamagedCharacter)
+    AGS_Character* InDamagedCharacter)
 {
 	if (IsValid(InDamagedCharacter))
 	{
@@ -422,14 +424,14 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 		if (IsValid(DamagedCharacterStat))
 		{
 			float Damage =
-				DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter);
+			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter);
 			FDamageEvent DamageEvent;
 			InDamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(),
-				this);
+			                               this);
 
 			// 공격이 성공했을 때 공격자에게 카메라 쉐이크 적용
 			if (APlayerController* AttackerPC =
-				Cast<APlayerController>(GetController()))
+			        Cast<APlayerController>(GetController()))
 			{
 				Client_PlayAttackSuccessShake(AttackerPC);
 			}
@@ -438,33 +440,33 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 }
 
 void AGS_Character::Client_PlayTakeDamageShake_Implementation(
-	APlayerController* TargetPC)
+    APlayerController* TargetPC)
 {
 	if (TargetPC && TargetPC->IsLocalController() && TakeDamageShake.ShakeClass)
 	{
 		TargetPC->ClientStartCameraShake(TakeDamageShake.ShakeClass,
-			TakeDamageShake.Intensity);
+		                                 TakeDamageShake.Intensity);
 	}
 }
 
 void AGS_Character::Client_PlayAttackSuccessShake_Implementation(
-	APlayerController* TargetPC)
+    APlayerController* TargetPC)
 {
 	if (TargetPC && TargetPC->IsLocalController() &&
-		AttackSuccessShake.ShakeClass)
+	    AttackSuccessShake.ShakeClass)
 	{
 		TargetPC->ClientStartCameraShake(AttackSuccessShake.ShakeClass,
-			AttackSuccessShake.Intensity);
+		                                 AttackSuccessShake.Intensity);
 	}
 }
 
 void AGS_Character::Client_PlayAttackSuccessShakeWithInfo_Implementation(
-	APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo)
+    APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo)
 {
 	if (TargetPC && TargetPC->IsLocalController() && CustomShakeInfo.ShakeClass)
 	{
 		TargetPC->ClientStartCameraShake(CustomShakeInfo.ShakeClass,
-			CustomShakeInfo.Intensity);
+		                                 CustomShakeInfo.Intensity);
 	}
 }
 
@@ -496,7 +498,7 @@ bool AGS_Character::IsEnemy(const AGS_Character* Other) const
 AGS_Weapon* AGS_Character::GetWeaponByIndex(int32 Index) const
 {
 	return WeaponSlots.IsValidIndex(Index) ? WeaponSlots[Index].WeaponInstance
-		: nullptr;
+	                                       : nullptr;
 }
 
 AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
@@ -515,7 +517,7 @@ AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
 void AGS_Character::SetCharacterSpeed(float InRatio)
 {
 	if (InRatio >= 0.4f &&
-		this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
+	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
 		// CharacterSpeed);
@@ -541,7 +543,7 @@ bool AGS_Character::IsDead() const
 void AGS_Character::Server_SetCharacterSpeed_Implementation(float InRatio)
 {
 	if (InRatio >= 0.8f &&
-		this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
+	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
 		// CharacterSpeed);
@@ -570,13 +572,13 @@ void AGS_Character::MulticastRPCCharacterDeath_Implementation()
 }
 
 void AGS_Character::MulticastRPCPlaySkillMontage_Implementation(
-	UAnimMontage* SkillMontage)
+    UAnimMontage* SkillMontage)
 {
 	PlayAnimMontage(SkillMontage);
 }
 
 void AGS_Character::MulicastRPCStopCurrentSkillMontage_Implementation(
-	UAnimMontage* CurrentSkillMontage)
+    UAnimMontage* CurrentSkillMontage)
 {
 	StopAnimMontage(CurrentSkillMontage);
 }
@@ -599,13 +601,23 @@ void AGS_Character::PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale)
 
 void AGS_Character::OnRep_ImpactVFX()
 {
-	if (RepImpactVFX.VFXAsset)
+	// Soft Reference 로드 (Get()은 로컬 캐시 확인용)
+	UNiagaraSystem* LoadedVFX = RepImpactVFX.VFXAsset.Get();
+
+	if (!LoadedVFX && !RepImpactVFX.VFXAsset.IsNull())
+	{
+		// 이 시점에서 동기 로드를 수행하거나 (안전장치),
+		// 시스템적으로 미리 로드되어 있을 것으로 기대.
+		LoadedVFX = RepImpactVFX.VFXAsset.LoadSynchronous();
+	}
+
+	if (LoadedVFX)
 	{
 		UNiagaraComponent* SpawnedVFX =
-			UNiagaraFunctionLibrary::SpawnSystemAttached(
-				RepImpactVFX.VFXAsset, GetRootComponent(), NAME_None,
-				FVector::ZeroVector, FRotator::ZeroRotator,
-				EAttachLocation::SnapToTarget, true);
+		    UNiagaraFunctionLibrary::SpawnSystemAttached(
+		        LoadedVFX, GetRootComponent(), NAME_None,
+		        FVector::ZeroVector, FRotator::ZeroRotator,
+		        EAttachLocation::SnapToTarget, true);
 
 		if (SpawnedVFX)
 		{
@@ -632,15 +644,15 @@ void AGS_Character::SpawnAndAttachWeapons()
 		FActorSpawnParameters Params;
 		Params.Owner = this;
 		Slot.WeaponInstance =
-			World->SpawnActor<AGS_Weapon>(Slot.WeaponClass, Params);
+		    World->SpawnActor<AGS_Weapon>(Slot.WeaponClass, Params);
 		if (!Slot.WeaponInstance)
 		{
 			continue;
 		}
 
 		Slot.WeaponInstance->AttachToComponent(
-			GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale,
-			Slot.SocketName);
+		    GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale,
+		    Slot.SocketName);
 	}
 }
 
@@ -800,14 +812,25 @@ EWeaponHandlingState AGS_Character::GetWeaponHandlingState()
 }
 
 void AGS_Character::SetWeaponHandlingState(
-	EWeaponHandlingState InputWeaponHandlingState)
+    EWeaponHandlingState InputWeaponHandlingState)
 {
 	WeaponHandlingState = InputWeaponHandlingState;
 }
 
 bool AGS_Character::ShouldPlayVFXAtLocation(const FVector& Location,
-	float MaxDistance) const
+                                            float MaxDistance) const
 {
 	return UGS_VFX_FunctionLibrary::ShouldPlayVFXAtLocation(this, Location,
-		MaxDistance, true);
+	                                                        MaxDistance, true);
+}
+
+UTexture2D* AGS_Character::GetPortrait() const
+{
+	if (!CharacterData)
+	{
+		return nullptr;
+	}
+
+	// Soft Reference를 동기 로드 (UI는 즉시 표시되어야 하므로)
+	return UGS_AssetLoader::SyncLoadAsset(CharacterData->Portrait);
 }

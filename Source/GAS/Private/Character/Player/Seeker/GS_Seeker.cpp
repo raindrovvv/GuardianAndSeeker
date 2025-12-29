@@ -488,25 +488,37 @@ void AGS_Seeker::InitializeCameraManager()
 	{
 		LocalCameraManager = PC->PlayerCameraManager;
 
-        // Low Health: 컴포넌트 초기화
-        if (LowHealthEffectComp)
+        // Low Health: 컴포넌트 초기화 (Soft Reference 로드)
+        if (LowHealthEffectComp && !LowHealthEffectMaterial.IsNull())
         {
-            LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LowHealthEffectMaterial);
+            UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.LoadSynchronous();
+            if (LoadedMaterial)
+            {
+                LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LoadedMaterial);
+            }
         }
 
-        // Detection: 컴포넌트 초기화
-        if (DetectionEffectComp)
+        // Detection: 컴포넌트 초기화 (Soft Reference 로드)
+        if (DetectionEffectComp && !DetectionEffectMaterial.IsNull())
         {
-            DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, DetectionEffectMaterial);
+            UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.LoadSynchronous();
+            if (LoadedMaterial)
+            {
+                DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, LoadedMaterial);
+            }
         }
 
-		// Dying: PostProcess 초기화
-		if (DyingPostProcessComp && DyingEffectMaterial)
+		// Dying: PostProcess 초기화 (Soft Reference 로드)
+		if (DyingPostProcessComp && !DyingEffectMaterial.IsNull())
 		{
-			DyingDynamicMaterial = UMaterialInstanceDynamic::Create(DyingEffectMaterial, this);
-			DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
-			DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
-			DyingPostProcessComp->bEnabled = false;
+            UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
+            if (LoadedMaterial)
+            {
+			    DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
+			    DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
+			    DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
+			    DyingPostProcessComp->bEnabled = false;
+            }
 		}
 	}
 }
@@ -586,7 +598,6 @@ void AGS_Seeker::SetMoveControlValue(bool bMoveForward, bool bMoveRight)
 {
 	if (AGS_TpsController* TPSController = Cast<AGS_TpsController>(GetController()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SetMoveControlValue"));
 		TPSController->SetMoveControlValue(bMoveRight, bMoveForward);
 	}
 }
@@ -859,10 +870,11 @@ void AGS_Seeker::StartCombatMusic()
                 {
                     continue;
                 }
-                if (Monster->CombatMusicEvent)
+                // Soft Reference 로드
+                if (!Monster->CombatMusicEvent.IsNull())
                 {
-                    CombatStartEvent = Monster->CombatMusicEvent;
-                    CombatStopEvent = Monster->CombatMusicStopEvent;
+                    CombatStartEvent = Monster->CombatMusicEvent.LoadSynchronous();
+                    CombatStopEvent = Monster->CombatMusicStopEvent.IsNull() ? nullptr : Monster->CombatMusicStopEvent.LoadSynchronous();
                     break;
                 }
             }
@@ -900,9 +912,10 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 			{
 				CombatStopEventToUse = AudioManager->GetCurrentCombatMusicStopEvent();
 			}
-			else if (!NearbyMonsters.IsEmpty() && NearbyMonsters.Last().IsValid() && NearbyMonsters.Last().Get()->CombatMusicStopEvent) // 몬스터 배열에서 가져오기
+			else if (!NearbyMonsters.IsEmpty() && NearbyMonsters.Last().IsValid() && !NearbyMonsters.Last().Get()->CombatMusicStopEvent.IsNull()) // 몬스터 배열에서 가져오기
 			{
-				CombatStopEventToUse = NearbyMonsters.Last().Get()->CombatMusicStopEvent;
+				// Soft Reference 로드
+				CombatStopEventToUse = NearbyMonsters.Last().Get()->CombatMusicStopEvent.LoadSynchronous();
 			}
 
 			// EndCombatSequence 호출 시 CombatStopEvent도 전달
@@ -1158,14 +1171,18 @@ void AGS_Seeker::UpdateDetectionHUD_Implementation(bool bIsDetected)
 
 	if (bIsDetected)
 	{
-		// 감지되었을 때 UI 표시
-		if (!DetectionHUDWidget && DetectionHUDWidgetClass)
+		// 감지되었을 때 UI 표시 (Soft Reference 로드)
+		if (!DetectionHUDWidget && !DetectionHUDWidgetClass.IsNull())
 		{
-			DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), DetectionHUDWidgetClass);
-			if (DetectionHUDWidget)
-			{
-				DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
-			}
+            TSubclassOf<UUserWidget> LoadedClass = DetectionHUDWidgetClass.LoadSynchronous();
+            if (LoadedClass)
+            {
+			    DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), LoadedClass);
+			    if (DetectionHUDWidget)
+			    {
+				    DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
+			    }
+            }
 		}
 		else if (DetectionHUDWidget)
 		{
@@ -1762,12 +1779,16 @@ void AGS_Seeker::OnRep_IsInDyingState()
 			{
 				DyingPostProcessComp->bEnabled = true;
 
-				// 동적 머티리얼 생성 (첫 진입 시)
-				if (!DyingDynamicMaterial && DyingEffectMaterial)
+				// 동적 머티리얼 생성 (첫 진입 시, Soft Reference 로드)
+				if (!DyingDynamicMaterial && !DyingEffectMaterial.IsNull())
 				{
-					DyingDynamicMaterial = UMaterialInstanceDynamic::Create(DyingEffectMaterial, this);
-					DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
-					DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
+                    UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
+                    if (LoadedMaterial)
+                    {
+					    DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
+					    DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
+					    DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
+                    }
 				}
 			}
 		}

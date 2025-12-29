@@ -38,8 +38,10 @@ void UGS_AresMovingSkill::ActiveSkill()
 
 	if (CachedAresOwner.IsValid())
 	{
-		// 스킬 애니메이션 재생
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 
 		// 스킬 시작 사운드 재생 (멀티캐스트)
 		if (CachedAresOwner->HasAuthority())
@@ -114,7 +116,10 @@ void UGS_AresMovingSkill::OnSkillCommand()
 
 	if (CachedAresOwner.IsValid())
 	{
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(1))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 	}
 
 	Super::OnSkillCommand();

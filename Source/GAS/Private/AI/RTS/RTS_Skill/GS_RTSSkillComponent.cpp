@@ -119,7 +119,16 @@ void UGS_RTSSkillComponent::InitializeSkills()
 			continue;
 		}
 
-		UGS_RTSSkillBase* NewSkill = NewObject<UGS_RTSSkillBase>(this, SkillData->SkillClass);
+		// Soft Reference 로드
+		TSubclassOf<UGS_RTSSkillBase> LoadedSkillClass = SkillData->SkillClass.IsNull() ? nullptr : SkillData->SkillClass.LoadSynchronous();
+		if (!LoadedSkillClass)
+		{
+			Skills[i] = nullptr;
+			UE_LOG(LogTemp, Warning, TEXT("UGS_RTSSkillComponent: Failed to load skill class for %s"), *SkillData->GetName());
+			continue;
+		}
+
+		UGS_RTSSkillBase* NewSkill = NewObject<UGS_RTSSkillBase>(this, LoadedSkillClass);
 		if (!NewSkill)
 		{
 			Skills[i] = nullptr;

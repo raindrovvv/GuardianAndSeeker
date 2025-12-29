@@ -5,10 +5,10 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Character/Player/Monster/GS_Monster.h"
-// #include "Character/GS_Character.h"
 #include "Navigation/CrowdFollowingComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 const FName AGS_AIController::HomePosKey(TEXT("HomePosition"));
 const FName AGS_AIController::MoveLocationKey(TEXT("MoveLocation"));
@@ -63,18 +63,40 @@ void AGS_AIController::OnPossess(APawn* InPawn)
 
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(InPawn))
 	{
-		BTAsset = Monster->BTAsset;
-		BBAsset = Monster->BBAsset;
-	}
-
-	UBlackboardComponent* BlackboardComponent = Blackboard;
-	if (BBAsset && UseBlackboard(BBAsset, BlackboardComponent))
-	{
-		BlackboardComponent->SetValueAsVector(HomePosKey, InPawn->GetActorLocation());
-
-		if (BTAsset)
+		TArray<FSoftObjectPath> AssetsToLoad;
+		if (!Monster->BTAsset.IsNull())
 		{
-			RunBehaviorTree(BTAsset);
+			AssetsToLoad.Add(Monster->BTAsset.ToSoftObjectPath());
+		}
+		if (!Monster->BBAsset.IsNull())
+		{
+			AssetsToLoad.Add(Monster->BBAsset.ToSoftObjectPath());
+		}
+
+		if (AssetsToLoad.Num() > 0)
+		{
+			// 비동기 로드 시작
+			UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [this, Monster, InPawn]()
+			                                         {
+				// 로드 완료 후 컨트롤러가 여전히 이 폰을 소유하고 있는지 확인
+				if (!IsValid(this) || !IsValid(Monster) || GetPawn() != InPawn)
+				{
+					return;
+				}
+
+				UBehaviorTree* LoadedBT = Monster->BTAsset.Get();
+				UBlackboardData* LoadedBB = Monster->BBAsset.Get();
+
+				UBlackboardComponent* BlackboardComponent = Blackboard;
+				if (LoadedBB && UseBlackboard(LoadedBB, BlackboardComponent))
+				{
+					BlackboardComponent->SetValueAsVector(HomePosKey, InPawn->GetActorLocation());
+
+					if (LoadedBT)
+					{
+						RunBehaviorTree(LoadedBT);
+					}
+				} });
 		}
 	}
 

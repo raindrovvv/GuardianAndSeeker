@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GS_SkillComp.h"
 #include "NiagaraSystem.h"
+#include "Animation/AnimMontage.h"
 #include "GS_SkillBase.generated.h"
 
 class AGS_Player;
@@ -20,30 +21,30 @@ public:
 	float Damage;
 	
 	UPROPERTY(EditDefaultsOnly)
-	TArray<TObjectPtr<UAnimMontage>> SkillAnimMontages;
+	TArray<TSoftObjectPtr<UAnimMontage>> SkillAnimMontages;
 
 	UPROPERTY(EditDefaultsOnly)
-	TObjectPtr<UTexture2D> SkillImage;
+	TSoftObjectPtr<UTexture2D> SkillImage;
 
 	UPROPERTY(EditDefaultsOnly)
 	int16 AllowSkillsMask;
 
 	UPROPERTY(EditDefaultsOnly)
 	FControlValue AllowControlValue;
-	
 
-	// VFX 관련 속성들 (데이터 테이블에서 설정됨)
-	UPROPERTY(BlueprintReadOnly, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillCastVFX;
 
+	// VFX 관련 속성들 (데이터 테이블에서 설정됨) - Soft Reference로 메모리 최적화
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillRangeVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillCastVFX;
 
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillRangeVFX;
 
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillEndVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillImpactVFX;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VFX")
+	TSoftObjectPtr<UNiagaraSystem> SkillEndVFX;
 
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
 	FVector SkillVFXScale = FVector(1.0f, 1.0f, 1.0f);
@@ -82,6 +83,12 @@ public:
 	// Cast VFX 정리 함수
 	void StopCastVFX();
 
+	// VFX + 몽타주 에셋 프리로드 (InitSkill에서 호출)
+	void PreloadSkillAssets();
+
+	// 캐시된 몽타주 가져오기 (없으면 LoadSynchronous 폴백)
+	UAnimMontage* GetCachedMontage(int32 Index);
+
 	// 스킬 작동
 	virtual void ActiveSkill(); // 스킬 시작(서버 권한에서만 호출)
 	virtual void OnSkillCanceledByDebuff(); // 스킬 중도 종료(Mute 디버프)
@@ -117,6 +124,23 @@ protected:
 	// Cast VFX 컴포넌트 추적 (스킬 종료 시 정리를 위해)
 	UPROPERTY()
 	TObjectPtr<UNiagaraComponent> ActiveCastVFXComponent;
+
+	// 프리로드된 VFX 캐시 (메모리 최적화를 위한 로드된 에셋 저장)
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedCastVFX;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedRangeVFX;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedImpactVFX;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedEndVFX;
+
+	// 프리로드된 애니메이션 몽타주 캐시 (메모리 최적화를 위한 로드된 에셋 저장)
+	UPROPERTY()
+	TArray<TObjectPtr<UAnimMontage>> CachedAnimMontages;
 
 	void StartCoolDown();
 

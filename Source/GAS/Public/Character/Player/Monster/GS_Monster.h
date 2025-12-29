@@ -7,6 +7,8 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "Character/GS_Character.h"
 #include "Sound/GS_MonsterAudioComponent.h"
+#include "Animation/AnimMontage.h"
+#include "AkAudioEvent.h"
 #include "GS_Monster.generated.h"
 
 
@@ -35,14 +37,15 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "RTS")
 	bool bSelectionLocked;
 
+	// Soft Reference로 메모리 최적화
 	UPROPERTY(EditAnywhere, Category = "AI")
-	UBehaviorTree* BTAsset;
+	TSoftObjectPtr<UBehaviorTree> BTAsset;
 
 	UPROPERTY(EditAnywhere, Category = "AI")
-	UBlackboardData* BBAsset;
+	TSoftObjectPtr<UBlackboardData> BBAsset;
 
 	UPROPERTY(EditAnywhere, Category = "Attack")
-	UAnimMontage* AttackMontage;
+	TSoftObjectPtr<UAnimMontage> AttackMontage;
 
 	UPROPERTY(BlueprintAssignable, Category = "Dead")
 	FOnMonsterDead OnMonsterDead;
@@ -53,12 +56,12 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Skill")
 	TObjectPtr<UWidgetComponent> SkillCooldownWidgetComp;
 
-	// 전투 음악 관련 (BGM 이벤트만 유지, 트리거는 제거)
+	// 전투 음악 관련 - Soft Reference로 메모리 최적화
 	UPROPERTY(EditAnywhere, Category = "Combat")
-	UAkAudioEvent* CombatMusicEvent;
+	TSoftObjectPtr<UAkAudioEvent> CombatMusicEvent;
 
 	UPROPERTY(EditAnywhere, Category = "Combat")
-	UAkAudioEvent* CombatMusicStopEvent;
+	TSoftObjectPtr<UAkAudioEvent> CombatMusicStopEvent;
 
 	// 몬스터 오디오 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")

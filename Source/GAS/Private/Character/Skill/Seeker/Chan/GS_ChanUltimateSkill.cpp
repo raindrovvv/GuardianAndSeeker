@@ -279,10 +279,9 @@ void UGS_ChanUltimateSkill::StartCharge()
 		// 애니메이션 설정
 		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 
-		// 스킬 애니메이션 재생
-		if (SkillAnimMontages[0])
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
 		{
-			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+			CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
 		}
 
 		// =======================
@@ -305,18 +304,24 @@ void UGS_ChanUltimateSkill::EndCharge()
 {
 	if(bInStructureCrash) // 구조물에 부딪혔을 때
 	{
-		if (CachedChanOwner.IsValid() && SkillAnimMontages[2])
+		if (CachedChanOwner.IsValid())
 		{
-			// 애니메이션 재생만 (방패 공격 콜리전 비활성화)
-			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[2]);
+			if (UAnimMontage* LoadedMontage = GetCachedMontage(2))
+			{
+				// 애니메이션 재생만 (방패 공격 콜리전 비활성화)
+				CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
+			}
 		}
 	}
 	else // 구조물이 아닌 곳에 부딪혔을 때
 	{
-		if (CachedChanOwner.IsValid() && SkillAnimMontages[1])
+		if (CachedChanOwner.IsValid())
 		{
-			// 애니메이션 재생 (방패 공격은 애님님노티파이로 처리)
-			CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+			if (UAnimMontage* LoadedMontage = GetCachedMontage(1))
+			{
+				// 애니메이션 재생 (방패 공격은 애님님노티파이로 처리)
+				CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
+			}
 		}
 	}
 
@@ -327,10 +332,13 @@ void UGS_ChanUltimateSkill::OnMontageEnded(UAnimMontage* Montage, bool bInterrup
 {
 	if (!OwnerCharacter) return;
 
-	if (SkillAnimMontages.Contains(Montage))
+	UAnimMontage* LoadedMontage1 = GetCachedMontage(1);
+	UAnimMontage* LoadedMontage2 = GetCachedMontage(2);
+
+	if (Montage == LoadedMontage1 || Montage == LoadedMontage2)
 	{
 		// 애니메이션 종료 처리 (Notify가 빠졌을 경우에도 안전하게)
-		if (Montage == SkillAnimMontages[2] || Montage == SkillAnimMontages[1])
+		if (Montage == LoadedMontage2 || Montage == LoadedMontage1)
 		{
 			OnSkillAnimationEnd();
 			if (UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance())

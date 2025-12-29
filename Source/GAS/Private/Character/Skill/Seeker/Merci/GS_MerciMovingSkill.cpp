@@ -29,8 +29,10 @@ void UGS_MerciMovingSkill::ActiveSkill()
 
 		CachedMerciOwner->SetDrawState(false);
 
-		// 활 당기기
-		CachedMerciOwner->DrawBow(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedMerciOwner->DrawBow(LoadedMontage);
+		}
 		CachedMerciOwner->Client_StartZoom();
 	}
 }

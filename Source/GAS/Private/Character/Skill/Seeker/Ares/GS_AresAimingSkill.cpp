@@ -34,8 +34,10 @@ void UGS_AresAimingSkill::ActiveSkill()
 			}
 		}
 
-		// 스킬 애니메이션 재생
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 
 		// 입력 제한
 		CachedAresOwner->SetMoveControlValue(false, false);

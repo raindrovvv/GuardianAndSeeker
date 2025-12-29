@@ -25,8 +25,10 @@ void UGS_ChanReadySkill::ActiveSkill()
 		CachedChanOwner->Multicast_SetMustTurnInPlace(true);
 		CachedChanOwner->SetSeekerGait(EGait::Walk);
 
-		// Play Montage
-		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 		CachedChanOwner->CanChangeSeekerGait = false;
 
 		// 스킬 시작 사운드 재생 (멀티캐스트)
@@ -148,9 +150,10 @@ void UGS_ChanReadySkill::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted
 		}
 		UE_LOG(LogTemp, Warning, TEXT("AnimationEnded 현재 애니메이션 몽타주: %s"), *CurrentMontageName.ToString());
 
-		
+
 		// 애니메이션 종료 처리 (Notify가 빠졌을 경우에도 안전하게)
-		if (Montage == SkillAnimMontages[1])
+		UAnimMontage* LoadedMontage1 = GetCachedMontage(1);
+		if (Montage == LoadedMontage1)
 		{
 			OnSkillAnimationEnd();
 			if (UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance())
@@ -183,8 +186,11 @@ void UGS_ChanReadySkill::DeactiveSkill()
 			CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 		}
 
-		
-		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[DeactiveMontageIndex], SectionName);
+
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(DeactiveMontageIndex))
+		{
+			CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage, SectionName);
+		}
 
 		// 현재 재생 중인 몽타주가 있으면
 		FName CurrentMontageName = NAME_None;

@@ -14,6 +14,7 @@
 #include "Character/Component/GS_StatComp.h"
 #include "Character/Component/GS_StatRow.h"
 #include "Sound/GS_SeekerAudioComponent.h"
+#include "NiagaraSystem.h"
 
 UGS_ChanMovingSkill::UGS_ChanMovingSkill()
 {
@@ -37,8 +38,10 @@ void UGS_ChanMovingSkill::ActiveSkill()
 		// 입력 제한 설정
 		CachedChanOwner->SetMoveControlValue(false, false);
 
-		// 스킬 애니메이션 재생
-		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 
 		// =======================
 		// VFX 재생 - 컴포넌트 RPC 사용
@@ -194,17 +197,26 @@ void UGS_ChanMovingSkill::AggroToOwner()
 
 			HitActors.Add(HitActor);
 
+			// Soft Reference 로드
+			UNiagaraSystem* LoadedImpactVFX = SkillImpactVFX.IsNull() ? nullptr : SkillImpactVFX.LoadSynchronous();
+
 			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor)) // 몬스터일 경우
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
 				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				TargetMonster->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				if (LoadedImpactVFX)
+				{
+					TargetMonster->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
+				}
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
 				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				TargetGuardian->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				if (LoadedImpactVFX)
+				{
+					TargetGuardian->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
+				}
 			}
 		}
 	}

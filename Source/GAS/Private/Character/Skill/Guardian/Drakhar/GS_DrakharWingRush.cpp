@@ -44,8 +44,10 @@ void UGS_DrakharWingRush::ExecuteSkillEffect()
 	
 	if (OwnerCharacter)
 	{
-		//play montage, except server
-		OwnerCharacter->MulticastRPCPlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			OwnerCharacter->MulticastRPCPlaySkillMontage(LoadedMontage);
+		}
 	}
 	
 }

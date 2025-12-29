@@ -30,7 +30,7 @@ void UGS_SeekerRollSkill::ActiveSkill()
 			CachedSeekerOwner->CanChangeSeekerGait = false;
 
 			const FName RollDirection = CalRollDirection();
-			UAnimMontage* AM_Roll = SkillAnimMontages[0];
+			UAnimMontage* AM_Roll = GetCachedMontage(0);
 			if (AM_Roll)
 			{
 				if (RollDirection == FName("00"))
@@ -84,7 +84,7 @@ void UGS_SeekerRollSkill::OnRollMontageEnded(UAnimMontage* Montage, bool bInterr
 		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(CachedSeekerOwner->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
 		if (HealSkill)
 		{
-			UAnimMontage* AM_Wielding = HealSkill->SkillAnimMontages[2]; // Hard coding // SJE
+			UAnimMontage* AM_Wielding = HealSkill->GetCachedMontage(2);
 
 			CachedSeekerOwner->TransWeaponHandingState(
 			EWeaponHandlingState::Sheathing,

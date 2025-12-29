@@ -43,7 +43,10 @@ void UGS_AresUltimateSkill::ActiveSkill()
 		// 입력 제한 설정
 		//CachedAresOwner->Multicast_SetIsFullBodySlot(true);
 		CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 		//CachedAresOwner->SetSkillInputControl(false, false, false, false);
 		CachedAresOwner->SetMoveControlValue(false, false);
 	}
