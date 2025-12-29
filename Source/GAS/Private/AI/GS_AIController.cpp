@@ -154,6 +154,11 @@ ETeamAttitude::Type AGS_AIController::GetTeamAttitudeTowards(const AActor& Other
 
 void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	if (Blackboard->GetValueAsBool(DebuffLockedKey))
 	{
 		return;
@@ -234,24 +239,26 @@ void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimul
 
 void AGS_AIController::SetNewTarget(AActor* NewTarget)
 {
-	if (NewTarget)
+	if (!NewTarget || !IsValid(Blackboard))
 	{
-		Blackboard->SetValueAsObject(TargetActorKey, NewTarget);
+		return;
+	}
 
-		// 새 타겟인 경우 델리게이트 연결
-		AGS_Character* NewTargetCharacter = Cast<AGS_Character>(NewTarget);
-		if (NewTargetCharacter && TargetCharacter.Get() != NewTargetCharacter)
+	Blackboard->SetValueAsObject(TargetActorKey, NewTarget);
+
+	// 새 타겟인 경우 델리게이트 연결
+	AGS_Character* NewTargetCharacter = Cast<AGS_Character>(NewTarget);
+	if (NewTargetCharacter && TargetCharacter.Get() != NewTargetCharacter)
+	{
+		if (TargetCharacter.IsValid())
 		{
-			if (TargetCharacter.IsValid())
-			{
-				TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);
-			}
+			TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);
+		}
 
-			TargetCharacter = NewTargetCharacter;
-			if (!NewTargetCharacter->IsDead())
-			{
-				TargetCharacter->OnDeathDelegate.AddDynamic(this, &AGS_AIController::OnTargetDied);
-			}
+		TargetCharacter = NewTargetCharacter;
+		if (!NewTargetCharacter->IsDead())
+		{
+			TargetCharacter->OnDeathDelegate.AddDynamic(this, &AGS_AIController::OnTargetDied);
 		}
 	}
 }
@@ -269,6 +276,11 @@ void AGS_AIController::OnTargetDied()
 
 void AGS_AIController::ClearCurrentTarget()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->ClearValue(TargetActorKey);
 
 	if (TargetCharacter.IsValid())
@@ -281,17 +293,32 @@ void AGS_AIController::ClearCurrentTarget()
 
 void AGS_AIController::LockTarget(AGS_Character* Target)
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->SetValueAsObject(TargetActorKey, Target);
 	Blackboard->SetValueAsBool(TargetLockedKey, true);
 }
 
 void AGS_AIController::UnlockTarget()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->SetValueAsBool(TargetLockedKey, false);
 }
 
 void AGS_AIController::EnterConfuseState()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	PrevTargetActor = Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey));
 	Blackboard->ClearValue(TargetActorKey);
 	Blackboard->SetValueAsBool(DebuffLockedKey, true);
@@ -300,6 +327,11 @@ void AGS_AIController::EnterConfuseState()
 
 void AGS_AIController::ExitConfuseState()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	PerceptionComponent->SetSenseEnabled(UAISense_Sight::StaticClass(), true);
 	Blackboard->SetValueAsBool(DebuffLockedKey, false);
 

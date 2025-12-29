@@ -36,8 +36,13 @@ void UGS_BTS_Cooldown::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMe
 	}
 	
 	const float NowTime = OwnerComp.GetWorld()->GetTimeSeconds();
-	
+
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	const float LastTime = Blackboard->GetValueAsFloat(AGS_AIController::LastAttackTimeKey);
 	const float AttackSpeed = Character->GetStatComp()->GetAttackSpeed();
 	const bool bCanAttack = (NowTime - LastTime) >= AttackSpeed;
