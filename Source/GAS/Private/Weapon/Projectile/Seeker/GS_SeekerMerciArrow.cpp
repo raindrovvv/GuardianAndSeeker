@@ -22,7 +22,7 @@ AGS_SeekerMerciArrow::AGS_SeekerMerciArrow()
 {
 	// 화살 FX 컴포넌트 생성 (VFX + Sound)
 	ArrowFXComponent = CreateDefaultSubobject<UGS_ArrowFXComponent>(TEXT("ArrowFXComponent"));
-	
+
 	if (HasAuthority())
 	{
 		// 화살 스폰 직후
@@ -50,7 +50,7 @@ void AGS_SeekerMerciArrow::BeginPlay()
 		{
 			CollisionComponent->IgnoreActorWhenMoving(IgnoredActor, true);
 		}
-	}	
+	}
 }
 
 void AGS_SeekerMerciArrow::StickWithVisualOnly(const FHitResult& Hit)
@@ -92,11 +92,10 @@ void AGS_SeekerMerciArrow::StickWithVisualOnly(const FHitResult& Hit)
 	if (VisualArrowClass && GetWorld())
 	{
 		AGS_ArrowVisualActor* VisualArrow = GetWorld()->SpawnActor<AGS_ArrowVisualActor>(
-			VisualArrowClass,
-			SpawnLocation,
-			SpawnRotation,
-			Params
-		);
+		    VisualArrowClass,
+		    SpawnLocation,
+		    SpawnRotation,
+		    Params);
 
 		if (VisualArrow)
 		{
@@ -107,19 +106,17 @@ void AGS_SeekerMerciArrow::StickWithVisualOnly(const FHitResult& Hit)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Attaching arrow to bone: %s"), *Hit.BoneName.ToString());
 				VisualArrow->AttachToComponent(
-					Hit.Component.Get(),
-					FAttachmentTransformRules::KeepWorldTransform,
-					Hit.BoneName
-				);
+				    Hit.Component.Get(),
+				    FAttachmentTransformRules::KeepWorldTransform,
+				    Hit.BoneName);
 			}
 			else if (Hit.Component.IsValid())
 			{
 				// Bone은 없지만 Component는 있는 경우
 				UE_LOG(LogTemp, Warning, TEXT("Attaching arrow to component (no bone)"));
 				VisualArrow->AttachToComponent(
-					Hit.Component.Get(),
-					FAttachmentTransformRules::KeepWorldTransform
-				);
+				    Hit.Component.Get(),
+				    FAttachmentTransformRules::KeepWorldTransform);
 			}
 			else
 			{
@@ -147,55 +144,52 @@ void AGS_SeekerMerciArrow::Multicast_InitHomingTarget_Implementation(AActor* Tar
 		return;
 	}
 
-	if(Target)
+	if (Target && IsValid(Target))
 	{
-		if (!Target || !IsValid(Target))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("타겟이 유효하지 않거나 이미 제거됨. 화살 파괴."));
-			Destroy();  // 유효하지 않으면 화살도 제거
-			return;
-		}
-
 		UPrimitiveComponent* RootPrim = Cast<UPrimitiveComponent>(Target->GetRootComponent());
 		if (!RootPrim)
 		{
-			UE_LOG(LogTemp, Error, TEXT("HomingTargetComponent is not a primitive component!"));
+			// 루트 컴포넌트가 Primitive가 아니면 SkeletalMesh라도 시도
+			RootPrim = Cast<UPrimitiveComponent>(Target->GetComponentByClass(UMeshComponent::StaticClass()));
+		}
+
+		if (RootPrim)
+		{
+			ProjectileMovementComponent->bRotationFollowsVelocity = true;
+			ProjectileMovementComponent->HomingTargetComponent = RootPrim;
+			ProjectileMovementComponent->bIsHomingProjectile = true;
+
+			// 유도 성능 설정
+			ProjectileMovementComponent->InitialSpeed = 3000.f;
+			ProjectileMovementComponent->MaxSpeed = 4000.f;
+			ProjectileMovementComponent->HomingAccelerationMagnitude = 30000.f; // 유도성 강화
+			ProjectileMovementComponent->ProjectileGravityScale = 0.0f;
+
+			// 초기 속도 방향 설정 (서버/클라이언트 동기화)
+			ProjectileMovementComponent->Velocity = GetActorForwardVector() * ProjectileMovementComponent->InitialSpeed;
+
+			HomingTarget = Target;
+			if (AGS_Character* TargetCharacter = Cast<AGS_Character>(Target))
+			{
+				TargetCharacter->OnDeathDelegate.AddUniqueDynamic(this, &AGS_SeekerMerciArrow::OnTargetDied);
+			}
+
+			UE_LOG(LogTemp, Warning, TEXT("HomingTarget successfully set to %s"), *Target->GetName());
 			return;
 		}
-
-		ProjectileMovementComponent->bRotationFollowsVelocity = true;
-		ProjectileMovementComponent->HomingTargetComponent = RootPrim;
-		ProjectileMovementComponent->bIsHomingProjectile = true;
-		ProjectileMovementComponent->InitialSpeed = 3000.f;
-		ProjectileMovementComponent->MaxSpeed = 3000.f;
-		ProjectileMovementComponent->HomingAccelerationMagnitude = 20000.f;
-		ProjectileMovementComponent->ProjectileGravityScale = 0.0f;
-		ProjectileMovementComponent->Velocity = GetActorForwardVector() * ProjectileMovementComponent->InitialSpeed;
-
-		HomingTarget = Target;
-		if (AGS_Character* TargetCharacter = Cast<AGS_Character>(Target))
-		{
-			TargetCharacter->OnDeathDelegate.AddDynamic(this, &AGS_SeekerMerciArrow::OnTargetDied);
-		}
-		UE_LOG(LogTemp, Warning, TEXT("HomingTarget set to %s"), *Target->GetName());
-	}
-	else
-	{
-		// 유도 해제 : 일반 직선 화살로 설정
-		ProjectileMovementComponent->bRotationFollowsVelocity = true;
-		ProjectileMovementComponent->HomingTargetComponent = nullptr;
-		ProjectileMovementComponent->bIsHomingProjectile = false;
-		ProjectileMovementComponent->InitialSpeed = 5000.f;
-		ProjectileMovementComponent->MaxSpeed = 5000.0f;
-		ProjectileMovementComponent->ProjectileGravityScale = 1.0f;
-
-		HomingTarget = nullptr;
-		UE_LOG(LogTemp, Warning, TEXT("HomingTarget is null — switching to normal arrow"));
-
 	}
 
-	// 방향성 초기화
+	// 타겟이 없거나 유효하지 않으면 일반 화살로 동작
+	ProjectileMovementComponent->bRotationFollowsVelocity = true;
+	ProjectileMovementComponent->HomingTargetComponent = nullptr;
+	ProjectileMovementComponent->bIsHomingProjectile = false;
+	ProjectileMovementComponent->InitialSpeed = 5000.f;
+	ProjectileMovementComponent->MaxSpeed = 5000.0f;
+	ProjectileMovementComponent->ProjectileGravityScale = 1.0f;
 	ProjectileMovementComponent->Velocity = GetActorForwardVector() * ProjectileMovementComponent->InitialSpeed;
+
+	HomingTarget = nullptr;
+	UE_LOG(LogTemp, Warning, TEXT("HomingTarget invalid or null — switching to normal arrow"));
 }
 
 // === 개선된 FindClosestBoneName 함수 ===
@@ -219,14 +213,13 @@ FName AGS_SeekerMerciArrow::FindClosestBoneName(USkeletalMeshComponent* MeshComp
 
 	// === 주요 본들만 우선 검사 (성능 최적화) ===
 	TArray<FName> PriorityBones = {
-		TEXT("spine_01"), TEXT("spine_02"), TEXT("spine_03"),
-		TEXT("head"), TEXT("neck_01"),
-		TEXT("upperarm_l"), TEXT("upperarm_r"),
-		TEXT("lowerarm_l"), TEXT("lowerarm_r"),
-		TEXT("thigh_l"), TEXT("thigh_r"),
-		TEXT("calf_l"), TEXT("calf_r"),
-		TEXT("chest"), TEXT("pelvis")
-	};
+	    TEXT("spine_01"), TEXT("spine_02"), TEXT("spine_03"),
+	    TEXT("head"), TEXT("neck_01"),
+	    TEXT("upperarm_l"), TEXT("upperarm_r"),
+	    TEXT("lowerarm_l"), TEXT("lowerarm_r"),
+	    TEXT("thigh_l"), TEXT("thigh_r"),
+	    TEXT("calf_l"), TEXT("calf_r"),
+	    TEXT("chest"), TEXT("pelvis")};
 
 	// 1. 우선순위 본들부터 검사
 	for (const FName& PriorityBone : PriorityBones)
@@ -273,7 +266,7 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 
 	HitActors.Add(OtherActor);
 	UE_LOG(LogTemp, Error, TEXT("Arrow hit actor: %s"), *OtherActor->GetName());
-	
+
 	// 맞은 대상 구분
 	ETargetType TargetType = DetermineTargetType(OtherActor);
 
@@ -285,9 +278,6 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 	{
 		// 데미지 처리 (자식 클래스에서 구현)
 		ProcessDamageLogic(TargetType, SweepResult, OtherActor);
-
-		// 기존 타겟 타입별 처리 (박힘/파괴 등)
-		HandleTargetTypeGeneric(TargetType, SweepResult);
 	}
 	bool bShouldContinueMovement = false;
 
@@ -455,11 +445,10 @@ void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType Targe
 		ComponentTraceParams.AddIgnoredActor(GetInstigator());
 
 		bool bHit = TargetMesh->LineTraceComponent(
-			MeshHit,
-			TraceStart,
-			TraceEnd,
-			ComponentTraceParams
-		);
+		    MeshHit,
+		    TraceStart,
+		    TraceEnd,
+		    ComponentTraceParams);
 
 		// === Component Trace 실패 시 World Trace로 폴백 ===
 		if (!bHit)
@@ -472,12 +461,11 @@ void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType Targe
 			}
 
 			bHit = GetWorld()->LineTraceSingleByChannel(
-				MeshHit,
-				TraceStart,
-				TraceEnd,
-				ECC_Pawn, // 또는 커스텀 채널
-				WorldTraceParams
-			);
+			    MeshHit,
+			    TraceStart,
+			    TraceEnd,
+			    ECC_Pawn, // 또는 커스텀 채널
+			    WorldTraceParams);
 
 			// Hit한 Component가 TargetMesh가 아니면 무효
 			if (bHit && MeshHit.Component.Get() != TargetMesh)
@@ -490,8 +478,8 @@ void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType Targe
 		if (bHit && MeshHit.Component.Get() == TargetMesh)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Arrow hit mesh successfully! Bone: %s, Impact: %s"),
-				*MeshHit.BoneName.ToString(),
-				*MeshHit.ImpactPoint.ToString());
+			       *MeshHit.BoneName.ToString(),
+			       *MeshHit.ImpactPoint.ToString());
 #if WITH_EDITOR
 			/*FVector CapsuleHitLocation = SweepResult.ImpactPoint;
 			FVector MeshHitLocation = MeshHit.ImpactPoint;
@@ -508,8 +496,8 @@ void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType Targe
 			FHitResult FallbackHit = CreateFallbackHitResult(TargetMesh, HitActor, ArrowLocation, ArrowDirection, SweepResult);
 
 			UE_LOG(LogTemp, Warning, TEXT("Using fallback hit result. Bone: %s, Impact: %s"),
-				*FallbackHit.BoneName.ToString(),
-				*FallbackHit.ImpactPoint.ToString());
+			       *FallbackHit.BoneName.ToString(),
+			       *FallbackHit.ImpactPoint.ToString());
 			StickWithVisualOnly(FallbackHit);
 		}
 	}
@@ -523,8 +511,8 @@ void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType Targe
 
 // === 헬퍼 함수: 폴백 Hit 결과 생성 ===
 FHitResult AGS_SeekerMerciArrow::CreateFallbackHitResult(USkeletalMeshComponent* TargetMesh, AActor* HitActor,
-	const FVector& ArrowLocation, const FVector& ArrowDirection,
-	const FHitResult& OriginalSweepResult)
+                                                         const FVector& ArrowLocation, const FVector& ArrowDirection,
+                                                         const FHitResult& OriginalSweepResult)
 {
 	FHitResult FallbackHit;
 
@@ -582,7 +570,7 @@ void AGS_SeekerMerciArrow::OnTargetDestroyed(AActor* DestroyedActor)
 {
 	if (DestroyedActor == HomingTarget)
 	{
-		Destroy();  // 화살 제거
+		Destroy(); // 화살 제거
 	}
 }
 

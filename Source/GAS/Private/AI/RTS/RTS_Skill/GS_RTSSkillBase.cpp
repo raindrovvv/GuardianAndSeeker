@@ -67,7 +67,12 @@ float UGS_RTSSkillBase::GetEffectDuration() const
 
 UNiagaraSystem* UGS_RTSSkillBase::GetActivationVFX() const
 {
-	return SkillData ? SkillData->ActivationVFX.Get() : nullptr;
+	// Soft Reference 로드
+	if (SkillData && !SkillData->ActivationVFX.IsNull())
+	{
+		return SkillData->ActivationVFX.LoadSynchronous();
+	}
+	return nullptr;
 }
 
 UAkAudioEvent* UGS_RTSSkillBase::GetCastSound() const
@@ -76,7 +81,12 @@ UAkAudioEvent* UGS_RTSSkillBase::GetCastSound() const
 	{
 		return nullptr;
 	}
-	return SelectSoundEvent(SkillData->CastSound_TPS, SkillData->CastSound_RTS);
+
+	// Soft Reference 로드
+	UAkAudioEvent* TPSSound = SkillData->CastSound_TPS.IsNull() ? nullptr : SkillData->CastSound_TPS.LoadSynchronous();
+	UAkAudioEvent* RTSSound = SkillData->CastSound_RTS.IsNull() ? nullptr : SkillData->CastSound_RTS.LoadSynchronous();
+
+	return SelectSoundEvent(TPSSound, RTSSound);
 }
 
 void UGS_RTSSkillBase::SetSkillData(UGS_RTSSkillData* InSkillData)

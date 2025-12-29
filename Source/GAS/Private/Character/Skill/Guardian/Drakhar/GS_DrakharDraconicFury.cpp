@@ -51,8 +51,10 @@ void UGS_DrakharDraconicFury::ExecuteSkillEffect()
 	// 쿨다운 시작
 	StartCoolDown();
 
-	// 모든 클라이언트에서 몽타주 재생
-	OwnerCharacter->MulticastRPCPlaySkillMontage(SkillAnimMontages[0]);
+	if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+	{
+		OwnerCharacter->MulticastRPCPlaySkillMontage(LoadedMontage);
+	}
 }
 
 void UGS_DrakharDraconicFury::OnSkillAnimationEnd()

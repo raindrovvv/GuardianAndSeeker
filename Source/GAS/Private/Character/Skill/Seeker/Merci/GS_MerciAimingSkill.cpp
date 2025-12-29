@@ -58,8 +58,10 @@ void UGS_MerciAimingSkill::ActiveSkill()
 
 		CachedMerciOwner->SetDrawState(false);
 
-		// 활 당기기
-		CachedMerciOwner->DrawBow(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedMerciOwner->DrawBow(LoadedMontage);
+		}
 
 		// 5초 후 자동 조준 해제 타이머 시작 (서버에서 실행)
 		if (OwnerCharacter->HasAuthority())
@@ -103,8 +105,13 @@ void UGS_MerciAimingSkill::OnSkillCommand()
 		OwnerCharacter->GetWorldTimerManager().ClearTimer(AimTimeoutTimerHandle);
 	}
 
-	// 스킬 종료
-	DeactiveSkill();
+	// 궁극기가 활성화되어 있으면 조준 스킬을 종료하지 않음
+	// (궁극기 중에는 계속 화살을 쏠 수 있어야 함)
+	if (OwningComp && !OwningComp->IsSkillActive(ESkillSlot::Ultimate))
+	{
+		// 스킬 종료
+		DeactiveSkill();
+	}
 }
 
 void UGS_MerciAimingSkill::OnSkillAnimationEnd()

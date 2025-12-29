@@ -158,7 +158,7 @@ void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(Seeker->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
 		if (HealSkill)
 		{
-			UAnimMontage* AM_Wielding = HealSkill->SkillAnimMontages[2];
+			UAnimMontage* AM_Wielding = HealSkill->GetCachedMontage(2);
 
 			if (AM_Wielding)
 			{

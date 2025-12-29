@@ -39,12 +39,17 @@ void UGS_RTSSkill_SummonNormal::PlayCastEffects(const FVector& TargetLocation)
 	// 타겟 위치에 바로 VFX와 사운드를 재생합니다.
 	const FVector SpawnLocation = TargetLocation + FVector(0.f, 0.f, SummonData->SpawnHeightOffset);
 
-	if (SummonData->SummonVFX)
+	// Soft Reference 로드
+	UNiagaraSystem* LoadedSummonVFX = SummonData->SummonVFX.IsNull() ? nullptr : SummonData->SummonVFX.LoadSynchronous();
+	if (LoadedSummonVFX)
 	{
-		PlaySkillVFX(SummonData->SummonVFX, SpawnLocation);
+		PlaySkillVFX(LoadedSummonVFX, SpawnLocation);
 	}
 
-	UAkAudioEvent* SoundToPlay = SelectSoundEvent(SummonData->SummonSound_TPS, SummonData->SummonSound_RTS);
+	// Soft Reference 로드
+	UAkAudioEvent* SummonSoundTPS = SummonData->SummonSound_TPS.IsNull() ? nullptr : SummonData->SummonSound_TPS.LoadSynchronous();
+	UAkAudioEvent* SummonSoundRTS = SummonData->SummonSound_RTS.IsNull() ? nullptr : SummonData->SummonSound_RTS.LoadSynchronous();
+	UAkAudioEvent* SoundToPlay = SelectSoundEvent(SummonSoundTPS, SummonSoundRTS);
 	if (SoundToPlay)
 	{
 		PlaySkillSound(SoundToPlay, SpawnLocation);
@@ -80,7 +85,11 @@ FVector UGS_RTSSkill_SummonNormal::SpawnMonsterAtLocation(const FVector& Locatio
 	}
 
 	const int32 RandomIndex = FMath::RandRange(0, SummonData->MonsterClasses.Num() - 1);
-	TSubclassOf<AGS_Monster> MonsterClass = SummonData->MonsterClasses[RandomIndex];
+
+	// Soft Reference 로드
+	TSubclassOf<AGS_Monster> MonsterClass = SummonData->MonsterClasses[RandomIndex].IsNull()
+		? nullptr
+		: SummonData->MonsterClasses[RandomIndex].LoadSynchronous();
 
 	if (!MonsterClass)
 	{

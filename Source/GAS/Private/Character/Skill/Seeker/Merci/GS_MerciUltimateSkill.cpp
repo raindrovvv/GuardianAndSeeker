@@ -26,10 +26,10 @@ void UGS_MerciUltimateSkill::ActiveSkill()
 	// 소유자 캐싱 (매번 Cast를 피하기 위해)
 	CachedMerciOwner = Cast<AGS_Merci>(OwnerCharacter);
 
-	if(CachedMerciOwner.IsValid())
+	if (CachedMerciOwner.IsValid())
 	{
 		const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
-		
+
 		// 스킬 시작 사운드 재생 (멀티캐스트)
 		if (CachedMerciOwner->HasAuthority())
 		{
@@ -92,9 +92,9 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 	{
 		return nullptr;
 	}
-	
+
 	AController* Controller = CachedMerciOwner->GetController();
-	if (!Controller) 
+	if (!Controller)
 	{
 		return nullptr;
 	}
@@ -117,12 +117,14 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 
 	for (AActor* Target : HostileActors)
 	{
-		if (!IsValid(Target)) continue;
+		if (!IsValid(Target))
+			continue;
 
 		// 죽은 타겟은 건너뛰기
 		if (AGS_Character* CharacterTarget = Cast<AGS_Character>(Target))
 		{
-			if (CharacterTarget->IsDead()) continue;
+			if (CharacterTarget->IsDead())
+				continue;
 		}
 
 		FVector ToTarget = (Target->GetActorLocation() - CamLoc).GetSafeNormal();
@@ -136,12 +138,11 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 			Params.AddIgnoredActor(CachedMerciOwner.Get());
 
 			bool bHit = World->LineTraceSingleByChannel(
-				Hit,
-				CamLoc,
-				Target->GetActorLocation(),
-				ECC_Visibility,
-				Params
-			);
+			    Hit,
+			    CamLoc,
+			    Target->GetActorLocation(),
+			    ECC_Visibility,
+			    Params);
 
 			// 벽에 가려져 있다면 무시
 			if (bHit && Hit.GetActor() != Target)
@@ -160,7 +161,7 @@ AActor* UGS_MerciUltimateSkill::FindCloseTarget()
 
 void UGS_MerciUltimateSkill::TickAutoAimTarget()
 {
-	if (!CachedMerciOwner.IsValid()) 
+	if (!CachedMerciOwner.IsValid())
 	{
 		return;
 	}
@@ -196,11 +197,15 @@ void UGS_MerciUltimateSkill::DeactiveSkill()
 {
 	if (CachedMerciOwner.IsValid())
 	{
-		// 현재 표시된 타겟 UI 정리
-		if (CurrentTarget && CachedMerciOwner->HasAuthority())
+		// 현재 표시된 타겟 UI 정리 및 타겟 해제
+		if (CachedMerciOwner->HasAuthority())
 		{
-			CachedMerciOwner->Client_UpdateTargetUI(nullptr, CurrentTarget);
-			CurrentTarget = nullptr;
+			CachedMerciOwner->SetAutoAimTarget(nullptr);
+			if (CurrentTarget)
+			{
+				CachedMerciOwner->Client_UpdateTargetUI(nullptr, CurrentTarget);
+				CurrentTarget = nullptr;
+			}
 		}
 
 		// 줌 아웃

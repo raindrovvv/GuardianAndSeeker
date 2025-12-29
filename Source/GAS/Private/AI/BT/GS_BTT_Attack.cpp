@@ -98,7 +98,9 @@ void UGS_BTT_Attack::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemo
 	}
 
 	UAnimInstance* AnimInstance = Monster->GetMesh()->GetAnimInstance();
-	if (!AnimInstance->Montage_IsPlaying(Monster->AttackMontage))
+	// Soft Reference 로드
+	UAnimMontage* LoadedAttackMontage = Monster->AttackMontage.IsNull() ? nullptr : Monster->AttackMontage.LoadSynchronous();
+	if (!LoadedAttackMontage || !AnimInstance->Montage_IsPlaying(LoadedAttackMontage))
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}
@@ -110,7 +112,9 @@ EBTNodeResult::Type UGS_BTT_Attack::AbortTask(UBehaviorTreeComponent& OwnerComp,
 	if(Monster)
 	{
 		UAnimInstance* AnimInstance = Monster->GetMesh()->GetAnimInstance();
-		if (AnimInstance->Montage_IsPlaying(Monster->AttackMontage))
+		// Soft Reference 로드
+		UAnimMontage* LoadedAttackMontage = Monster->AttackMontage.IsNull() ? nullptr : Monster->AttackMontage.LoadSynchronous();
+		if (LoadedAttackMontage && AnimInstance->Montage_IsPlaying(LoadedAttackMontage))
 		{
 			AnimInstance->Montage_Stop(0.0f, nullptr);
 		}

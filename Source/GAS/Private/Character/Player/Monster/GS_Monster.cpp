@@ -519,7 +519,14 @@ void AGS_Monster::Attack()
 
 void AGS_Monster::Multicast_PlayAttackMontage_Implementation()
 {
-	MonsterAnim->Montage_Play(AttackMontage);
+	// Soft Reference 로드
+	if (!AttackMontage.IsNull())
+	{
+		if (UAnimMontage* LoadedMontage = AttackMontage.LoadSynchronous())
+		{
+			MonsterAnim->Montage_Play(LoadedMontage);
+		}
+	}
 }
 
 void AGS_Monster::SetSelected(bool bSelected, bool bPlaySound)

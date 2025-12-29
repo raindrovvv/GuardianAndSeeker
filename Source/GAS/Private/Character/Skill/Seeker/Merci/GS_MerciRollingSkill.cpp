@@ -37,7 +37,10 @@ void UGS_MerciRollingSkill::OnSkillAnimationEnd()
 	{
 		if (CachedMerciOwner->HasAuthority())
 		{
-			CachedMerciOwner->Multicast_StopSkillMontage(SkillAnimMontages[0]);
+			if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+			{
+				CachedMerciOwner->Multicast_StopSkillMontage(LoadedMontage);
+			}
 			CachedMerciOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 			CachedMerciOwner->CanChangeSeekerGait = true;
 

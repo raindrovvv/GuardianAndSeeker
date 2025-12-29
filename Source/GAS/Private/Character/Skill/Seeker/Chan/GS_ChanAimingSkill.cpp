@@ -14,6 +14,7 @@
 #include "Character/Player/GS_Player.h"
 #include "AkAudioEvent.h"
 #include "Sound/GS_SeekerAudioComponent.h"
+#include "NiagaraSystem.h"
 
 
 UGS_ChanAimingSkill::UGS_ChanAimingSkill()
@@ -50,8 +51,10 @@ void UGS_ChanAimingSkill::ActiveSkill()
 		// bitmask flag
 		CachedChanOwner->GetSkillComp()->SetCurAllowedSkillsMask(0);
 
-		// Play Montage
-		CachedChanOwner->Multicast_PlaySkillMontage(SkillAnimMontages[1]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(1))
+		{
+			CachedChanOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 
 		// Set HitReact
 		CachedChanOwner->SetCanHitReact(false);
@@ -218,18 +221,27 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 			// 충돌 액터 저장
 			HitActors.Add(HitActor);
 
+			// Soft Reference 로드
+			UNiagaraSystem* LoadedImpactVFX = SkillImpactVFX.IsNull() ? nullptr : SkillImpactVFX.LoadSynchronous();
+
 			// 충돌 효과 활성화
 			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor)) // 몬스터일 경우
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
 				// Impact VFX 재생
-				TargetMonster->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				if (LoadedImpactVFX)
+				{
+					TargetMonster->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
+				}
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
 				// Impact VFX 재생
-				TargetGuardian->PlayImpactVFX(SkillImpactVFX, SkillVFXScale);
+				if (LoadedImpactVFX)
+				{
+					TargetGuardian->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
+				}
 			}
 			else if (AGS_Character* Target = Cast<AGS_Character>(HitActor)) // 시커일 경우
 			{

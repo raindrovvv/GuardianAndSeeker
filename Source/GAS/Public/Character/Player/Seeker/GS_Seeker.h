@@ -9,6 +9,7 @@
 #include "Animation/Character/E_SeekerAnim.h"
 #include "Props/Item/E_ItemType.h"
 #include "Character/Skill/GS_SkillComp.h"
+#include "AkAudioEvent.h"
 
 #include "GS_Seeker.generated.h"
 
@@ -220,8 +221,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
 	UPostProcessComponent* LowHealthPostProcessComp;
 
+	// Soft Reference로 메모리 최적화
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
-	UMaterialInterface* LowHealthEffectMaterial;
+	TSoftObjectPtr<UMaterialInterface> LowHealthEffectMaterial;
 
 	// LowHealth 전용 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
@@ -233,8 +235,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Detection|Effects")
 	UPostProcessComponent* DetectionPostProcessComp;
 
+	// Soft Reference로 메모리 최적화
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Detection|Effects")
-	UMaterialInterface* DetectionEffectMaterial; // MPP_Detect
+	TSoftObjectPtr<UMaterialInterface> DetectionEffectMaterial; // MPP_Detect
 
 	// Detection 전용 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Detection|Effects")
@@ -285,15 +288,15 @@ public:
 	UNiagaraComponent* DyingMagicCircleComp;
 
 	// ================
-	// 빈사 상태 사운드
+	// 빈사 상태 사운드 - Soft Reference로 메모리 최적화
 	// ================
 	/** 빈사 상태 진입 시 불꽃 발동 사운드 ("화륵!") */
 	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
-	UAkAudioEvent* DyingFlameActivationSound;
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameActivationSound;
 
 	/** 빈사 타이머 위험 구간 경고 사운드 (10초 이하) */
 	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
-	UAkAudioEvent* DyingFlameDangerSound;
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameDangerSound;
 
 	// ================
 	// 전투 음악 관리
@@ -444,12 +447,12 @@ private:
 	void OnRep_DetectionIntensity();
 
 	// ==========================================
-	// 가디언 감지 HUD 시스템
+	// 가디언 감지 HUD 시스템 - Soft Reference로 메모리 최적화
 	// ==========================================
 
 	/** 감지 HUD 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Detection")
-	TSubclassOf<class UUserWidget> DetectionHUDWidgetClass;
+	TSoftClassPtr<class UUserWidget> DetectionHUDWidgetClass;
 
 	void StartCombatMusic();
 	void StopCombatMusic();
@@ -761,9 +764,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Dying|Effects")
 	UPostProcessComponent* DyingPostProcessComp;
 
-	/** 빈사 상태 PostProcess 머티리얼 */
+	/** 빈사 상태 PostProcess 머티리얼 - Soft Reference로 메모리 최적화 */
 	UPROPERTY(EditDefaultsOnly, Category = "Dying|Effects")
-	UMaterialInterface* DyingEffectMaterial;
+	TSoftObjectPtr<UMaterialInterface> DyingEffectMaterial;
 
 	/** 빈사 상태 동적 머티리얼 */
 	UPROPERTY()
