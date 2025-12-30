@@ -34,7 +34,7 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 
 		// Interrupt 타입이고 쿨다운 시간 내라면 DamageOnly로 변경
 		if (ReactType == EHitReactType::Interrupt &&
-			(CurrentTime - LastHitReactTime) < HitReactCooldown)
+		    (CurrentTime - LastHitReactTime) < HitReactCooldown)
 		{
 			ReactType = EHitReactType::DamageOnly;
 		}
@@ -50,7 +50,7 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		}
 
 		if (ReactType == EHitReactType::Interrupt)
-		{			
+		{
 			if (OwnerSeeker)
 			{
 				// 메르시 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
@@ -117,7 +117,7 @@ void UGS_HitReactComp::StopHitReact(UAnimMontage* TargetMontage)
 FName UGS_HitReactComp::CalculateHitDirection(FVector HitDirection)
 {
 	FName Section = NAME_None;
-	
+
 	if (AGS_Player* OwnerCharacter = Cast<AGS_Player>(GetOwner()))
 	{
 		FVector Front = OwnerCharacter->GetActorRotation().Vector();
@@ -143,12 +143,19 @@ FName UGS_HitReactComp::CalculateHitDirection(FVector HitDirection)
 			Section = FName("Left");
 		}
 	}
-	
+
 	return Section;
 }
 
 void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 {
+	// 다른 애니메이션(예: 구르기)에 의해 중단된 경우, 상태를 복구하지 않음.
+	// 중단시킨 애니메이션이 자신의 상태를 관리할 것이기 때문.
+	if (bInterrupted)
+	{
+		return;
+	}
+
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
 	{
 		// HitReact 애니메이션 종료 후 상태 복구
@@ -163,10 +170,10 @@ void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 			if (AM_Wielding)
 			{
 				Seeker->TransWeaponHandingState(
-				EWeaponHandlingState::Sheathing,
-				EWeaponHandlingState::Wielding,
-				AM_Wielding,
-				ESeekerMontageSlot::UpperBody);
+				    EWeaponHandlingState::Sheathing,
+				    EWeaponHandlingState::Wielding,
+				    AM_Wielding,
+				    ESeekerMontageSlot::UpperBody);
 			}
 		}
 	}
@@ -178,6 +185,4 @@ void UGS_HitReactComp::BeginPlay()
 	Super::BeginPlay();
 
 	// ...
-	
 }
-

@@ -231,6 +231,13 @@ public:
 	/** Significance Manager: 중요도 변경에 따른 자원(애니메이션, 틱 등) 조절 */
 	virtual void OnSignificanceChanged(float NewSignificance);
 
+	/** 현재 중요도 값 반환 */
+	FORCEINLINE float GetSignificance() const { return CurrentSignificance; }
+
+protected:
+	/** 현재 중요도 상태 저장 (0.0 ~ 1.0) */
+	float CurrentSignificance = 1.0f;
+
 protected:
 	/** Significance Manager 등록 로직 (가상 함수로 분리하여 중복 등록 방지) */
 	virtual void RegisterSignificanceManager();

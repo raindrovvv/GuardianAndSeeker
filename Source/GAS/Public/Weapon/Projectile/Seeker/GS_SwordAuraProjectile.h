@@ -43,8 +43,7 @@ public:
 	ESwordAuraEffectType EffectType = ESwordAuraEffectType::LeftNormal;
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_StartSwordSlashVFX();
-	void Multicast_StartSwordSlashVFX_Implementation();
+	void Multicast_StartSwordSlashVFX(ESwordAuraEffectType InEffectType);
 
 	// VFX와 사운드를 하나의 RPC로 통합 (네트워크 최적화)
 	UFUNCTION(NetMulticast, Unreliable)

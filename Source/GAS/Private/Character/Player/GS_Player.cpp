@@ -87,23 +87,22 @@ void AGS_Player::BeginPlay()
 
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent들이 리스너 없는 서버에서 Tick하면 크래시 발생
+	// DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
 	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
 	{
 		if (IsValid(AkComponent))
 		{
 			AkComponent->Stop();
 			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->Deactivate();
 			AkComponent->UnregisterComponent();
-			AkComponent->DestroyComponent();
-			AkComponent = nullptr;
 		}
 		if (IsValid(CameraAudioListenerComponent))
 		{
 			CameraAudioListenerComponent->Stop();
 			CameraAudioListenerComponent->SetComponentTickEnabled(false);
+			CameraAudioListenerComponent->Deactivate();
 			CameraAudioListenerComponent->UnregisterComponent();
-			CameraAudioListenerComponent->DestroyComponent();
-			CameraAudioListenerComponent = nullptr;
 		}
 		return; // 서버에서는 오디오 관련 초기화 중단
 	}
@@ -245,14 +244,14 @@ void AGS_Player::PossessedBy(AController* NewController)
 
 void AGS_Player::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// Stability: Securely clean up widget component
+	// Stability: DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
 	if (IsValid(SteamNameWidgetComp))
 	{
 		SteamNameWidgetComp->SetWidget(nullptr);
 		SteamNameWidgetComp->SetVisibility(false);
-		SteamNameWidgetComp->DestroyComponent();
+		SteamNameWidgetComp->SetComponentTickEnabled(false);
 	}
-	
+
 	Super::EndPlay(EndPlayReason);
 }
 
