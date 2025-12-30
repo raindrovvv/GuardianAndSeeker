@@ -289,6 +289,9 @@ protected:
 	UFUNCTION()
 	virtual void OnRep_IsDead();
 
+	/** Death 사운드 로컬 재생 (OnDeath, OnRep_IsDead에서 공통 사용) */
+	void PlayDeathSoundLocal();
+
 	UFUNCTION()
 	void OnRep_ImpactVFX();
 

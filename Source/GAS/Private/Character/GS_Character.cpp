@@ -363,34 +363,11 @@ void AGS_Character::OnDeath()
 
 	OnDeathDelegate.Broadcast();
 
-	// 서버/리슨 서버에서 로컬 Death 사운드 재생 (RPC 제거)
+	// 서버/리슨 서버에서 로컬 Death 사운드 재생
 	// 클라이언트는 OnRep_IsDead()에서 재생됨
 	if (HasAuthority())
 	{
-		// Seeker Death 사운드 (로컬 재생)
-		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
-		{
-			if (Seeker->SeekerAudioComponent)
-			{
-				Seeker->SeekerAudioComponent->PlayDeathSoundLocal();
-			}
-		}
-		// Monster Death 사운드 (로컬 재생)
-		else if (AGS_Monster* Monster = Cast<AGS_Monster>(this))
-		{
-			if (Monster->MonsterAudioComponent)
-			{
-				Monster->MonsterAudioComponent->PlayDeathSoundLocal();
-			}
-		}
-		// Drakhar Death 사운드 (로컬 재생)
-		else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(this))
-		{
-			if (Drakhar->GetAudioComponent())
-			{
-				Drakhar->GetAudioComponent()->PlayDeathSoundLocal();
-			}
-		}
+		PlayDeathSoundLocal();
 	}
 
 	// 모든 디버프 제거 (VFX 포함)
@@ -704,15 +681,8 @@ void AGS_Character::OnRep_CharacterSpeed()
 	GetCharacterMovement()->MaxWalkSpeed = CharacterSpeed;
 }
 
-void AGS_Character::OnRep_IsDead()
+void AGS_Character::PlayDeathSoundLocal()
 {
-	// 클라이언트에서 Death 사운드 재생 (RPC 없음!)
-	if (!bIsDead)
-	{
-		return; // 죽지 않은 상태면 무시
-	}
-
-	// Seeker Death 사운드 (로컬 재생)
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
 	{
 		if (Seeker->SeekerAudioComponent)
@@ -720,7 +690,6 @@ void AGS_Character::OnRep_IsDead()
 			Seeker->SeekerAudioComponent->PlayDeathSoundLocal();
 		}
 	}
-	// Monster Death 사운드 (로컬 재생)
 	else if (AGS_Monster* Monster = Cast<AGS_Monster>(this))
 	{
 		if (Monster->MonsterAudioComponent)
@@ -728,13 +697,21 @@ void AGS_Character::OnRep_IsDead()
 			Monster->MonsterAudioComponent->PlayDeathSoundLocal();
 		}
 	}
-	// Drakhar Death 사운드 (로컬 재생)
 	else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(this))
 	{
 		if (Drakhar->GetAudioComponent())
 		{
 			Drakhar->GetAudioComponent()->PlayDeathSoundLocal();
 		}
+	}
+}
+
+void AGS_Character::OnRep_IsDead()
+{
+	// 클라이언트에서 Death 사운드 재생
+	if (bIsDead)
+	{
+		PlayDeathSoundLocal();
 	}
 }
 
