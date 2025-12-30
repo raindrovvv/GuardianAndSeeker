@@ -29,7 +29,7 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stat")
 	TObjectPtr<UDataTable> StatDataTable;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<UAnimMontage*> TakeDamageMontages;
 
@@ -38,7 +38,7 @@ public:
 	//[Change Stats when use buff skills]
 	void ChangeStat(const FGS_StatRow& InChangeStat);
 	void ResetStat(const FGS_StatRow& InChangeStat);
-	
+
 	UFUNCTION(Server, Reliable)
 	void UpdateStat(const FGS_StatRow& RuneStats);
 
@@ -46,13 +46,13 @@ public:
 
 	//getter
 	UFUNCTION(BlueprintCallable, Category = "Stats")
-	FORCEINLINE float GetMaxHealth()const { return MaxHealth; }
+	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 	UFUNCTION(BlueprintCallable, Category = "Stats")
-	FORCEINLINE float GetCurrentHealth()const { return CurrentHealth; }
-	FORCEINLINE float GetAttackPower()const { return AttackPower; }
-	FORCEINLINE float GetDefense()const { return Defense; }
-	FORCEINLINE float GetAgility()const { return Agility; }
-	FORCEINLINE float GetAttackSpeed()const { return AttackSpeed; }
+	FORCEINLINE float GetCurrentHealth() const { return CurrentHealth; }
+	FORCEINLINE float GetAttackPower() const { return AttackPower; }
+	FORCEINLINE float GetDefense() const { return Defense; }
+	FORCEINLINE float GetAgility() const { return Agility; }
+	FORCEINLINE float GetAttackSpeed() const { return AttackSpeed; }
 
 	//setter
 	void SetCurrentHealth(float InHealth, bool bIsHealing);
@@ -61,8 +61,8 @@ public:
 	void SetDefense(float InDefense);
 	void SetAgility(float InAgility);
 	void SetAttackSpeed(float InAttackSpeed);
-	
-	UFUNCTION(NetMulticast, Reliable)
+
+	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCPlayTakeDamageMontage();
 
 	UFUNCTION()
@@ -71,7 +71,7 @@ public:
 	// heal system
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 	void ServerRPCHeal(float InHealAmount);
-	
+
 protected:
 	float CharacterWalkSpeed;
 
@@ -89,7 +89,7 @@ private:
 	float Agility;
 	UPROPERTY(EditDefaultsOnly)
 	float AttackSpeed;
-	
+
 	UFUNCTION()
 	void OnDamageMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 

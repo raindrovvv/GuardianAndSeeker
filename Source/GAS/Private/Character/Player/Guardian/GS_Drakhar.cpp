@@ -32,18 +32,18 @@
 AGS_Drakhar::AGS_Drakhar()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	
+
 	// Guardian의 VFXComponent를 제거하고 Drakhar 전용 컴포넌트로 교체
 	if (VFXComponent)
 	{
 		VFXComponent->DestroyComponent();
 		VFXComponent = nullptr;
 	}
-	
+
 	DrakharVFXComponent = CreateDefaultSubobject<UGS_DrakharVFXComponent>(TEXT("DrakharVFXComponent"));
 	AudioComponent = CreateDefaultSubobject<UGS_DrakharAudioComponent>(TEXT("AudioComponent"));
 	FootManagerComponent = CreateDefaultSubobject<UGS_FootManagerComponent>(TEXT("FootManagerComponent"));
-	
+
 	// === 어스퀘이크 카메라 쉐이크 기본값 설정 ===
 	EarthquakeShakeInfo.Intensity = 8.0f;
 	EarthquakeShakeInfo.MaxDistance = 2500.0f;
@@ -71,7 +71,7 @@ AGS_Drakhar::AGS_Drakhar()
 	//Guardian State Setting
 	GuardianState = EGuardianCtrlState::CtrlEnd;
 	GuardianDoSkillState = EGuardianDoSkill::None;
-	
+
 	//fever mode
 	MaxFeverGauge = 100.f;
 	CurrentFeverGauge = 0.f;
@@ -150,7 +150,7 @@ AGS_Drakhar::AGS_Drakhar()
 void AGS_Drakhar::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	UGS_DrakharAnimInstance* Anim = Cast<UGS_DrakharAnimInstance>(GetMesh()->GetAnimInstance());
 	if (IsValid(Anim))
 	{
@@ -161,7 +161,7 @@ void AGS_Drakhar::BeginPlay()
 void AGS_Drakhar::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
+
 	if (SpringArmComp && bIsFlying)
 	{
 		if (FMath::IsNearlyEqual(SpringArmComp->TargetArmLength, TargetSpringArmLength, 1.0f))
@@ -202,8 +202,8 @@ void AGS_Drakhar::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SafeClearTimer(ResetAttackTimer);
 	SafeClearTimer(HealthRegenTimer);
 	SafeClearTimer(HealthDelayTimer);
-	SafeClearTimer(DraconicAttackTimer);  // 궁극기 타이머
-	SafeClearTimer(CameraZoomTimer);      // 카메라 효과 타이머 (통합됨)
+	SafeClearTimer(DraconicAttackTimer); // 궁극기 타이머
+	SafeClearTimer(CameraZoomTimer); // 카메라 효과 타이머 (통합됨)
 }
 
 void AGS_Drakhar::OnDamageStart()
@@ -223,7 +223,7 @@ void AGS_Drakhar::OnDamageStart()
 void AGS_Drakhar::Ctrl()
 {
 	Super::Ctrl();
-	
+
 	if (!HasAuthority() && IsLocallyControlled())
 	{
 		if (FMath::IsNearlyZero(FlyingStaminaCoolTime))
@@ -250,7 +250,7 @@ void AGS_Drakhar::Ctrl()
 void AGS_Drakhar::CtrlStop()
 {
 	Super::CtrlStop();
-	
+
 	if (!HasAuthority() && IsLocallyControlled())
 	{
 		//stop flying
@@ -274,7 +274,7 @@ void AGS_Drakhar::LeftMouse()
 			//check earthquake skill
 			GetSkillComp()->Server_TryActivateSkill(ESkillSlot::Aiming);
 		}
-		
+
 		//not flying & not using skills
 		else if (GuardianDoSkillState == EGuardianDoSkill::None)
 		{
@@ -337,7 +337,8 @@ void AGS_Drakhar::OnRep_ComboAttackCount()
 	if (!IsLocallyControlled())
 	{
 		PlayComboAttackMontage();
-		if (AudioComponent) AudioComponent->PlayComboAttackSound();
+		if (AudioComponent)
+			AudioComponent->PlayComboAttackSound();
 	}
 }
 
@@ -350,9 +351,9 @@ void AGS_Drakhar::MeleeAttackCheck()
 		const FVector Start = GetActorLocation() + GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius();
 		const float MeleeAttackRange = 200.f;
 		const float MeleeAttackRadius = 200.f;
-		
+
 		DetectPlayerInRange(CachedDamagedCharacters, Start, MeleeAttackRange, MeleeAttackRadius);
-		
+
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
 		for (AGS_Character* DamagedCharacter : CachedDamagedCharacters)
 		{
@@ -364,9 +365,9 @@ void AGS_Drakhar::MeleeAttackCheck()
 					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
-					
+
 					float ActualDamage = DamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(), this);
-					
+
 					// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생 (기본 콤보는 1.0 스케일)
 					if (ActualDamage > 0.0f)
 					{
@@ -374,16 +375,16 @@ void AGS_Drakhar::MeleeAttackCheck()
 						FVector HitNormal = (HitLocation - GetActorLocation()).GetSafeNormal();
 						Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.0f);
 					}
-					
+
 					// 히트 스톱 효과
 					MulticastRPCApplyHitStop(DamagedCharacter);
-					
+
 					// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 					{
 						Client_PlayAttackSuccessShake(AttackerPC);
 					}
-					
+
 					// 서버에서 피버 게이지 증가
 					if (!GetIsFeverMode())
 					{
@@ -394,9 +395,10 @@ void AGS_Drakhar::MeleeAttackCheck()
 						bIsAttckingDuringFever = true;
 						ResetIsAttackingDuringFeverMode();
 					}
-					
+
 					// 히트 사운드 재생
-					if (AudioComponent) AudioComponent->PlayAttackHitSound();
+					if (AudioComponent)
+						AudioComponent->PlayAttackHitSound();
 				}
 			}
 		}
@@ -412,7 +414,7 @@ void AGS_Drakhar::ComboLastAttack()
 		const float PlusDamage = 20.f;
 
 		DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, Radius);
-		
+
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
 		for (AGS_Character* DamagedPlayer : CachedDamagedCharacters)
 		{
@@ -424,9 +426,9 @@ void AGS_Drakhar::ComboLastAttack()
 					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedPlayer);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
-					
+
 					float ActualDamage = DamagedPlayer->TakeDamage(Damage + PlusDamage, DamageEvent, GetController(), this);
-					
+
 					// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생 (마지막 공격은 더 큰 스케일)
 					if (ActualDamage > 0.0f)
 					{
@@ -434,10 +436,11 @@ void AGS_Drakhar::ComboLastAttack()
 						FVector HitNormal = (HitLocation - GetActorLocation()).GetSafeNormal();
 						Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.5f); // 마지막 공격은 1.5배 스케일
 					}
-					
+
 					MulticastRPC_PlayAttackHitVFX(DamagedPlayer->GetActorLocation());
-					if (AudioComponent) AudioComponent->PlayAttackHitSound();
-					
+					if (AudioComponent)
+						AudioComponent->PlayAttackHitSound();
+
 					// 공격 성공 시 공격자에게 강한 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 					{
@@ -448,12 +451,12 @@ void AGS_Drakhar::ComboLastAttack()
 				}
 			}
 		}
-		
+
 		if (IsFeverMode)
 		{
 			FeverComoLastAttack();
 		}
-	}	
+	}
 }
 
 void AGS_Drakhar::ServerRPCResetValue_Implementation()
@@ -464,14 +467,15 @@ void AGS_Drakhar::ServerRPCResetValue_Implementation()
 void AGS_Drakhar::ServerRPCNewComboAttack_Implementation()
 {
 	bCanCombo = false;
-	
+
 	// Increment counter to trigger OnRep on other clients
 	ComboAttackCount++;
-	
+
 	// Server also needs to play montage to trigger damage check notifies
 	PlayComboAttackMontage();
-	
-	if (AudioComponent) AudioComponent->PlayComboAttackSound();
+
+	if (AudioComponent)
+		AudioComponent->PlayComboAttackSound();
 }
 
 void AGS_Drakhar::MulticastRPCComboAttack_Implementation()
@@ -508,7 +512,7 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 
 	// Skill Input Reset
 	GetSkillComp()->ResetAllowedSkillsMask();
-	
+
 	if (DamagedCharactersFromDash.IsEmpty())
 	{
 		return;
@@ -521,7 +525,7 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::DamageOnly; // 가드 풀리지 않도록 변경
-		
+
 		float ActualDamage = DamagedCharacter->TakeDamage(RealDamage, DamageEvent, GetController(), this);
 
 		// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생
@@ -538,8 +542,9 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 		}
 
 		MulticastRPC_PlayAttackHitVFX(DamagedCharacter->GetActorLocation());
-		if (AudioComponent) AudioComponent->PlayAttackHitSound();
-		
+		if (AudioComponent)
+			AudioComponent->PlayAttackHitSound();
+
 		// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 		if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 		{
@@ -556,7 +561,7 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 
 		DamagedCharacter->LaunchCharacter(ResultVector.GetSafeNormal() * 10000.f, true, true);
 	}
-	
+
 	DamagedCharactersFromDash.Empty();
 	bCanCombo = true;
 
@@ -570,7 +575,8 @@ void AGS_Drakhar::ServerRPCCalculateDashLocation_Implementation()
 	DashStartLocation = GetActorLocation();
 	DashEndLocation = DashStartLocation + GetActorForwardVector() * DashPower;
 
-	if (AudioComponent) AudioComponent->PlayDashSkillSound();
+	if (AudioComponent)
+		AudioComponent->PlayDashSkillSound();
 	MulticastStartWingRushVFX();
 	MulticastStartDustVFX();
 
@@ -595,17 +601,18 @@ void AGS_Drakhar::DashAttackCheck()
 void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 {
 	MulticastRPC_OnEarthquakeStart();
-	if (AudioComponent) AudioComponent->PlayEarthquakeSkillSound();
+	if (AudioComponent)
+		AudioComponent->PlayEarthquakeSkillSound();
 
 	const FVector Start = GetActorLocation() + 100.f;
 	DetectPlayerInRange(CachedDamagedCharacters, Start, 200.f, EarthquakeRadius);
 
 	//Spawn Skill Effect
 	FVector SpawnLocation = Start + GetActorForwardVector() * 300.f;
-	AGS_EarthquakeEffect* GC_Earthquake = GetWorld()->SpawnActor<AGS_EarthquakeEffect>(GC_EarthquakeEffect, SpawnLocation + FVector(0.f,0.f,-200.f), GetActorRotation());
+	AGS_EarthquakeEffect* GC_Earthquake = GetWorld()->SpawnActor<AGS_EarthquakeEffect>(GC_EarthquakeEffect, SpawnLocation + FVector(0.f, 0.f, -200.f), GetActorRotation());
 	GC_Earthquake->SetOwner(this);
 	GC_Earthquake->MulticastTriggerDestruction(SpawnLocation, EarthquakeRadius, 3000.f);
-	
+
 	for (const auto& DamagedCharacter : CachedDamagedCharacters)
 	{
 		float SkillCoefficient = GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::Aiming)->Damage;
@@ -615,10 +622,10 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 		if (IsValid(DamagedCharacter))
 		{
 			DamageEvent.HitReactType = EHitReactType::DamageOnly; // 가드 풀리지 않도록 변경
-			
+
 			// 실제 데미지 적용
 			float ActualDamage = DamagedCharacter->TakeDamage(RealDamage, DamageEvent, GetController(), this);
-			
+
 			// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생
 			if (ActualDamage > 0.0f)
 			{
@@ -626,7 +633,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 				FVector HitNormal = FVector::UpVector; // 어스퀘이크는 위쪽에서 아래로
 				Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.3f);
 			}
-			
+
 			if (IsFeverMode)
 			{
 				DamagedCharacter->GetDebuffComp()->ApplyDebuff(EDebuffType::Bleed, this);
@@ -636,10 +643,11 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 			{
 				MulticastPlayEarthquakeImpactVFX(DamagedCharacter->GetActorLocation());
 			}
-			
+
 			// === 어스퀘이크 스킬 히트 사운드 재생 ===
 			MulticastRPC_PlayAttackHitVFX(DamagedCharacter->GetActorLocation());
-			if (AudioComponent) AudioComponent->PlayAttackHitSound();
+			if (AudioComponent)
+				AudioComponent->PlayAttackHitSound();
 
 			FVector DrakharLocation = GetActorLocation();
 			FVector DamagedLocation = DamagedCharacter->GetActorLocation();
@@ -665,7 +673,7 @@ void AGS_Drakhar::ServerRPCStartCtrl_Implementation()
 		}
 		isStartCoolTime = false;
 	}
-	
+
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 }
 
@@ -673,18 +681,18 @@ void AGS_Drakhar::ServerRPCStopCtrl_Implementation()
 {
 	GuardianState = EGuardianCtrlState::CtrlEnd;
 	GuardianDoSkillState = EGuardianDoSkill::None;
-	
+
 	MoveSpeed = NormalMoveSpeed;
 
 	isStartCoolTime = true;
 	SafeClearTimer(FlyingStartStaminaCoolTimeHandler);
-	
+
 	UWorld* World = GetWorld();
 	if (World)
 	{
 		World->GetTimerManager().SetTimer(FlyingEndStaminaCoolTimeHandler, this, &AGS_Drakhar::EndFlyingStaminaTimer, 1.f, true);
 	}
-	
+
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 
 	GetSkillComp()->ResetAllowedSkillsMask();
@@ -696,7 +704,7 @@ void AGS_Drakhar::StartCtrl()
 	{
 		ServerRPCStartCtrl();
 		GetSkillComp()->Server_TryActivateSkill(ESkillSlot::Ready);
-		
+
 		TargetSpringArmLength = 800.f;
 		bIsFlying = true;
 		SetActorTickEnabled(true);
@@ -710,7 +718,7 @@ void AGS_Drakhar::StopCtrl()
 	{
 		ServerRPCStopCtrl();
 		GetSkillComp()->Server_TrySkillCanceledByDebuff(ESkillSlot::Ready);
-		
+
 		TargetSpringArmLength = 500.f;
 		bIsFlying = true;
 		bCanCombo = true;
@@ -733,7 +741,8 @@ void AGS_Drakhar::ServerRPCSpawnDraconicFury_Implementation()
 	}
 
 	// 사운드 재생 (월드 검증 후)
-	if (AudioComponent) AudioComponent->PlayDraconicFurySkillSound();
+	if (AudioComponent)
+		AudioComponent->PlayDraconicFurySkillSound();
 
 	FActorSpawnParameters Params;
 	Params.Instigator = this;
@@ -762,10 +771,9 @@ void AGS_Drakhar::ServerRPCSpawnDraconicFury_Implementation()
 		// 일반 모드: 드라카의 현재 위치 기준으로 랜덤 위치에 투사체 소환
 		FVector BaseLocation = GetActorLocation();
 		FVector RandomOffset = GetActorForwardVector() * 200.f + FVector(
-			FMath::FRandRange(-300.f, 300.f),
-			FMath::FRandRange(-300.f, 300.f),
-			FMath::FRandRange(500.f, 600.f)
-		);
+		                                                             FMath::FRandRange(-300.f, 300.f),
+		                                                             FMath::FRandRange(-300.f, 300.f),
+		                                                             FMath::FRandRange(500.f, 600.f));
 
 		FVector SpawnLocation = BaseLocation + RandomOffset;
 		FRotator SpawnRotation = GetActorRotation();
@@ -773,11 +781,10 @@ void AGS_Drakhar::ServerRPCSpawnDraconicFury_Implementation()
 		SpawnRotation.Pitch += RandomPitch;
 
 		AGS_DrakharProjectile* DrakharProjectile = World->SpawnActor<AGS_DrakharProjectile>(
-			DraconicProjectile,
-			SpawnLocation,
-			SpawnRotation,
-			Params
-		);
+		    DraconicProjectile,
+		    SpawnLocation,
+		    SpawnRotation,
+		    Params);
 
 		if (DrakharProjectile)
 		{
@@ -787,7 +794,8 @@ void AGS_Drakhar::ServerRPCSpawnDraconicFury_Implementation()
 				DrakharProjectile->SetIndicatorVFX(DraconicFuryIndicatorVFX, NormalIndicatorRadius);
 			}
 
-			if (AudioComponent) AudioComponent->PlayDraconicProjectileSound(DrakharProjectile->GetActorLocation());
+			if (AudioComponent)
+				AudioComponent->PlayDraconicProjectileSound(DrakharProjectile->GetActorLocation());
 		}
 	}
 }
@@ -816,11 +824,11 @@ void AGS_Drakhar::ServerRPC_BeginDraconicFury_Implementation()
 		SafeClearTimer(DraconicAttackTimer);
 
 		World->GetTimerManager().SetTimer(
-			DraconicAttackTimer,  // 멤버 변수 사용!
-			this,
-			&AGS_Drakhar::EndDraconicFury,
-			DraconicAttackPersistenceTime,
-			false);
+		    DraconicAttackTimer, // 멤버 변수 사용!
+		    this,
+		    &AGS_Drakhar::EndDraconicFury,
+		    DraconicAttackPersistenceTime,
+		    false);
 	}
 }
 
@@ -857,12 +865,12 @@ void AGS_Drakhar::SetFeverGaugeWidget(UGS_DrakharFeverGauge* InDrakharFeverGauge
 	{
 		//client
 		DrakharFeverGaugeWidget->InitializeGauge(GetCurrentFeverGauge());
-		OnCurrentFeverGaugeChanged.AddUObject(DrakharFeverGaugeWidget ,&UGS_DrakharFeverGauge::OnCurrentFeverGaugeChanged);
+		OnCurrentFeverGaugeChanged.AddUObject(DrakharFeverGaugeWidget, &UGS_DrakharFeverGauge::OnCurrentFeverGaugeChanged);
 	}
 }
 
 void AGS_Drakhar::SetFeverGauge(float InValue)
-{	
+{
 	//server
 	if (HasAuthority())
 	{
@@ -881,7 +889,7 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 				GetStatComp()->ResetStat(Stat);
 
 				IsFeverMode = false;
-				
+
 				// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 				if (GetNetMode() != NM_DedicatedServer)
 				{
@@ -901,12 +909,12 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 			IsFeverMode = true;
 			StartFeverMode();
 		}
-				
+
 		if (CurrentFeverGauge > 0.f)
 		{
 			DecreaseFeverGauge();
 		}
-		
+
 		OnRep_FeverGauge();
 	}
 }
@@ -960,7 +968,7 @@ void AGS_Drakhar::FeverComoLastAttack()
 			DetectPlayerInRange(DamagedThisPillar, PillarLocation, 0.f, PillarRadius);
 			CachedDamagedCharacters.Append(DamagedThisPillar);
 		}
-		
+
 		// 각 플레이어에게 개별적으로 데미지 적용 및 혈흔 이펙트 처리
 		for (const auto& DamagedSeeker : CachedDamagedCharacters)
 		{
@@ -973,9 +981,9 @@ void AGS_Drakhar::FeverComoLastAttack()
 					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedSeeker);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
-					
+
 					float ActualDamage = DamagedSeeker->TakeDamage(Damage + 20.f, DamageEvent, GetController(), this);
-					
+
 					// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생
 					if (ActualDamage > 0.0f)
 					{
@@ -983,7 +991,7 @@ void AGS_Drakhar::FeverComoLastAttack()
 						FVector HitNormal = FVector::UpVector; // 피버 콤보는 위에서 아래로
 						Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.4f);
 					}
-					
+
 					MulticastRPC_PlayAttackHitVFX(DamagedSeeker->GetActorLocation());
 					DamagedSeeker->LaunchCharacter(FVector(0.f, 0.f, 500.f), true, true);
 				}
@@ -994,12 +1002,11 @@ void AGS_Drakhar::FeverComoLastAttack()
 		// RPC 호출 제한을 피하기 위해 약간 지연 후 사운드 재생
 		FTimerHandle ComboFinisherSoundTimer;
 		GetWorld()->GetTimerManager().SetTimer(
-			ComboFinisherSoundTimer,
-			this,
-			&AGS_Drakhar::PlayDelayedComboFinisherSounds,
-			0.125f, // 0.15초 지연 (RPC 제한 0.1초보다 길게)
-			false
-		);
+		    ComboFinisherSoundTimer,
+		    this,
+		    &AGS_Drakhar::PlayDelayedComboFinisherSounds,
+		    0.125f, // 0.15초 지연 (RPC 제한 0.1초보다 길게)
+		    false);
 	}
 }
 
@@ -1020,7 +1027,7 @@ void AGS_Drakhar::StartFeverMode()
 
 	GetStatComp()->ChangeStat(Stat);
 	MulticastRPCFeverMontagePlay();
-	
+
 	// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 	if (GetNetMode() != NM_DedicatedServer)
 	{
@@ -1056,7 +1063,7 @@ void AGS_Drakhar::MinusFeverGaugeValue()
 void AGS_Drakhar::BeginHealRegeneration()
 {
 	bIsDamaged = false;
-	
+
 	//health regeneration start
 	UWorld* RegenWorld = GetWorld();
 	if (RegenWorld && RegenWorld->IsValidLowLevel() && !RegenWorld->bIsTearingDown)
@@ -1093,13 +1100,13 @@ void AGS_Drakhar::SetStaminaGaugeWidget(UGS_DrakharStaminaGauge* InDrakharStamin
 void AGS_Drakhar::StartFlyingStaminaTimer()
 {
 	SafeClearTimer(FlyingEndStaminaCoolTimeHandler);
-	
+
 	FlyingStaminaCoolTime -= 1.f;
-	
+
 	if (FlyingStaminaCoolTime <= 0.f)
 	{
 		FlyingStaminaCoolTime = 0.f;
-		
+
 		// 스테미나가 0이 되면 떨어지는 소리 재생
 		if (HasAuthority() && AudioComponent)
 		{
@@ -1113,7 +1120,7 @@ void AGS_Drakhar::StartFlyingStaminaTimer()
 void AGS_Drakhar::EndFlyingStaminaTimer()
 {
 	SafeClearTimer(FlyingStartStaminaCoolTimeHandler);
-	
+
 	FlyingStaminaCoolTime += 1.f;
 
 	if (FlyingStaminaCoolTime >= MaxFlyingStaminaCoolTime)
@@ -1211,7 +1218,7 @@ void AGS_Drakhar::MulticastPlayFeverModeEndEffects_Implementation()
 				FeverModeStateSoundPlayingID = AK_INVALID_PLAYING_ID;
 			}
 		}
-		
+
 		// 피버 모드 종료 사운드 재생
 		if (FeverModeEndSoundEvent)
 		{
@@ -1283,39 +1290,46 @@ void AGS_Drakhar::ServerRPCShootEnergy_Implementation()
 // === 나이아가라 VFX 함수 구현 ===
 void AGS_Drakhar::MulticastStartWingRushVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StartWingRushVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StartWingRushVFX();
 }
 
 void AGS_Drakhar::MulticastStopWingRushVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StopWingRushVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StopWingRushVFX();
 }
 
 void AGS_Drakhar::MulticastStartDustVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StartDustVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StartDustVFX();
 }
 
 void AGS_Drakhar::MulticastStopDustVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StopDustVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StopDustVFX();
 }
 
 // === 어스퀘이크 지면 균열 VFX 제어 함수 ===
 void AGS_Drakhar::MulticastStartGroundCrackVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StartGroundCrackVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StartGroundCrackVFX();
 }
 
 void AGS_Drakhar::MulticastStopGroundCrackVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StopGroundCrackVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StopGroundCrackVFX();
 }
 
 // === 어스퀘이크 먼지 구름 VFX 제어 함수 ===
 void AGS_Drakhar::MulticastStartDustCloudVFX_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->StartDustCloudVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StartDustCloudVFX();
 }
 
 // === DraconicFury 투사체 충돌 처리 함수 구현 ===
@@ -1329,69 +1343,78 @@ void AGS_Drakhar::HandleDraconicProjectileImpact(const FVector& ImpactLocation, 
 	}
 
 	// 로컬 재생 (모든 클라이언트에서 OnHit이 호출되므로 RPC 불필요)
-	if (DrakharVFXComponent) DrakharVFXComponent->HandleDraconicProjectileImpact(ImpactLocation, ImpactNormal, bHitCharacter);
-	if (AudioComponent) AudioComponent->PlayDraconicProjectileImpactSoundLocal(ImpactLocation, bHitCharacter);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->HandleDraconicProjectileImpact(ImpactLocation, ImpactNormal, bHitCharacter);
+	if (AudioComponent)
+		AudioComponent->PlayDraconicProjectileImpactSoundLocal(ImpactLocation, bHitCharacter);
 }
 
 void AGS_Drakhar::MulticastPlayFeverEarthquakeImpactVFX_Implementation(const FVector& ImpactLocation)
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->PlayFeverEarthquakeImpactVFX(ImpactLocation);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->PlayFeverEarthquakeImpactVFX(ImpactLocation);
 }
 
 void AGS_Drakhar::MulticastRPC_OnFlyStart_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnFlyStart();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnFlyStart();
 }
 
 void AGS_Drakhar::MulticastRPC_OnFlyEnd_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnFlyEnd();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnFlyEnd();
 }
 
 void AGS_Drakhar::MulticastRPC_OnUltimateStart_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnUltimateStart();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnUltimateStart();
 }
 
 void AGS_Drakhar::MulticastRPC_OnEarthquakeStart_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnEarthquakeStart();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnEarthquakeStart();
 }
 
 void AGS_Drakhar::MulticastRPC_OnFeverModeStart_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnFeverModeChanged(true);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnFeverModeChanged(true);
 	BP_OnFeverModeStart();
 }
 
 void AGS_Drakhar::MulticastRPC_OnFeverModeEnd_Implementation()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnFeverModeChanged(false);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnFeverModeChanged(false);
 	BP_OnFeverModeEnd();
 }
 
 void AGS_Drakhar::OnRep_IsFeverMode()
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->OnFeverModeChanged(IsFeverMode);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->OnFeverModeChanged(IsFeverMode);
 
 	if (AudioComponent)
 	{
 		if (IsFeverMode)
 		{
 			AudioComponent->PlayFeverModeStartSoundLocal();
-			
+
 			// State Sound는 약간의 딜레이 후 재생 (시각 효과와 맞추기 위함)
 			UWorld* World = GetWorld();
 			if (World)
 			{
 				SafeClearTimer(FeverStateSoundDelayTimer);
 				World->GetTimerManager().SetTimer(
-					FeverStateSoundDelayTimer,
-					this,
-					&AGS_Drakhar::PlayFeverModeStateSoundDelayed,
-					0.2f,
-					false
-				);
+				    FeverStateSoundDelayTimer,
+				    this,
+				    &AGS_Drakhar::PlayFeverModeStateSoundDelayed,
+				    0.2f,
+				    false);
 			}
 		}
 		else
@@ -1408,7 +1431,7 @@ void AGS_Drakhar::OnRep_IsFeverMode()
 					EndFeverShake.Intensity *= 0.5f;
 					Client_PlayAttackSuccessShakeWithInfo(PC, EndFeverShake);
 				}
-				
+
 				ApplyFeverModeEndCameraEffect();
 			}
 		}
@@ -1442,17 +1465,20 @@ void AGS_Drakhar::OnRep_FlyingStaminaCoolTime()
 
 void AGS_Drakhar::MulticastRPC_PlayAttackHitVFX_Implementation(FVector ImpactPoint)
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->PlayAttackHitVFX(ImpactPoint);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->PlayAttackHitVFX(ImpactPoint);
 }
 
 void AGS_Drakhar::MulticastPlayEarthquakeImpactVFX_Implementation(const FVector& ImpactLocation)
 {
-	if (DrakharVFXComponent) DrakharVFXComponent->PlayEarthquakeImpactVFX(ImpactLocation);
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->PlayEarthquakeImpactVFX(ImpactLocation);
 }
 
 void AGS_Drakhar::MulticastStopDustCloudVFX_Implementation()
 {
-	if(DrakharVFXComponent) DrakharVFXComponent->StopDustCloudVFX();
+	if (DrakharVFXComponent)
+		DrakharVFXComponent->StopDustCloudVFX();
 }
 
 void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, FVector HitNormal, float Scale)
@@ -1468,10 +1494,10 @@ bool AGS_Drakhar::IsWorldContextValid() const
 {
 	UWorld* World = GetWorld();
 	return World &&
-		   World->IsValidLowLevel() &&
-		   !World->bIsTearingDown &&
-		   IsValid(World) &&
-		   IsValid(this);
+	       World->IsValidLowLevel() &&
+	       !World->bIsTearingDown &&
+	       IsValid(World) &&
+	       IsValid(this);
 }
 
 // === 타이머 정리 함수 ===
@@ -1491,7 +1517,8 @@ void AGS_Drakhar::SafeClearTimer(FTimerHandle& TimerHandle)
 // === FeverModeStateSound 딜레이 재생 콜백 ===
 void AGS_Drakhar::PlayFeverModeStateSoundDelayed()
 {
-	if (!IsValid(this)) return;
+	if (!IsValid(this))
+		return;
 
 	if (AudioComponent && IsFeverMode)
 	{
@@ -1549,12 +1576,11 @@ void AGS_Drakhar::ApplyFeverModeEndCameraEffect()
 	if (World && World->IsValidLowLevel() && !World->bIsTearingDown)
 	{
 		World->GetTimerManager().SetTimer(
-			CameraZoomTimer,
-			this,
-			&AGS_Drakhar::UpdateCameraEffect,
-			CAMERA_UPDATE_INTERVAL,
-			true
-		);
+		    CameraZoomTimer,
+		    this,
+		    &AGS_Drakhar::UpdateCameraEffect,
+		    CAMERA_UPDATE_INTERVAL,
+		    true);
 	}
 }
 
@@ -1595,7 +1621,8 @@ void AGS_Drakhar::UpdateCameraEffect()
 void AGS_Drakhar::UpdateCameraZoomIn()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC || !PC->PlayerCameraManager) return;
+	if (!PC || !PC->PlayerCameraManager)
+		return;
 
 	// FOV 줌인
 	float CurrentFOV = PC->PlayerCameraManager->GetFOVAngle();
@@ -1611,7 +1638,7 @@ void AGS_Drakhar::UpdateCameraZoomIn()
 
 		// 둘 다 타겟에 도달하면 다음 단계로
 		if (FMath::IsNearlyEqual(NewFOV, TargetFOV, FOV_TOLERANCE) &&
-			FMath::IsNearlyEqual(NewArmLength, TargetArmLength, ARM_LENGTH_TOLERANCE))
+		    FMath::IsNearlyEqual(NewArmLength, TargetArmLength, ARM_LENGTH_TOLERANCE))
 		{
 			TransitionToNextCameraPhase();
 		}
@@ -1622,7 +1649,8 @@ void AGS_Drakhar::UpdateCameraZoomIn()
 void AGS_Drakhar::UpdateCameraZoomOut()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC || !PC->PlayerCameraManager) return;
+	if (!PC || !PC->PlayerCameraManager)
+		return;
 
 	// FOV 줌아웃
 	float CurrentFOV = PC->PlayerCameraManager->GetFOVAngle();
@@ -1638,7 +1666,7 @@ void AGS_Drakhar::UpdateCameraZoomOut()
 
 		// 둘 다 타겟에 도달하면 다음 단계로
 		if (FMath::IsNearlyEqual(NewFOV, TargetFOV, FOV_TOLERANCE) &&
-			FMath::IsNearlyEqual(NewArmLength, TargetArmLength, ARM_LENGTH_TOLERANCE))
+		    FMath::IsNearlyEqual(NewArmLength, TargetArmLength, ARM_LENGTH_TOLERANCE))
 		{
 			TransitionToNextCameraPhase();
 		}
@@ -1649,7 +1677,8 @@ void AGS_Drakhar::UpdateCameraZoomOut()
 void AGS_Drakhar::UpdateCameraRestore()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC || !PC->PlayerCameraManager) return;
+	if (!PC || !PC->PlayerCameraManager)
+		return;
 
 	// FOV 복귀
 	float CurrentFOV = PC->PlayerCameraManager->GetFOVAngle();
