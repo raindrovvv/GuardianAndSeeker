@@ -265,12 +265,13 @@ void AGS_AIController::SetNewTarget(AActor* NewTarget)
 
 void AGS_AIController::OnTargetDied()
 {
-	if (Blackboard)
+	if (!IsValid(Blackboard))
 	{
-		Blackboard->ClearValue(TargetActorKey);
-		Blackboard->SetValueAsEnum(CommandKey, 0);
+		return;
 	}
 
+	Blackboard->ClearValue(TargetActorKey);
+	Blackboard->SetValueAsEnum(CommandKey, 0);
 	TargetCharacter = nullptr;
 }
 
