@@ -860,6 +860,8 @@ float AGS_Character::CalculateSignificance(const FTransform& Viewpoint)
 
 void AGS_Character::OnSignificanceChanged(float NewSignificance)
 {
+	CurrentSignificance = NewSignificance;
+
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	if (!MeshComp)
 		return;

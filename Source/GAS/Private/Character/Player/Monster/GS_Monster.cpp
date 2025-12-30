@@ -110,29 +110,26 @@ void AGS_Monster::BeginPlay()
 	// 클라이언트: 그림자 컬링 및 HP 위젯 가시성을 타이머로 처리 (0.1초 간격)
 	if (!IsRunningDedicatedServer())
 	{
-		GetWorld()->GetTimerManager().SetTimer(
-			ShadowCullingTimerHandle,
-			this,
-			&AGS_Monster::UpdateShadowCulling,
-			0.1f,
-			true);
+		// 타이머 로드 밸런싱 (Load Balancing)
+		// 모든 몬스터가 동일한 프레임에 연산을 수행하지 않도록, 시작 시간을 0.0 ~ 0.1초 사이로 랜덤 분산.
+		float RandomVariance = FMath::RandRange(0.0f, 0.1f);
 
 		GetWorld()->GetTimerManager().SetTimer(
-			HPWidgetVisibilityTimerHandle,
-			this,
-			&AGS_Monster::UpdateHPWidgetVisibility,
-			0.1f,
-			true);
+		    ShadowCullingTimerHandle,
+		    this,
+		    &AGS_Monster::UpdateShadowCulling,
+		    0.1f,
+		    true,
+		    RandomVariance); // 초기 딜레이 적용
+
+		GetWorld()->GetTimerManager().SetTimer(
+		    HPWidgetVisibilityTimerHandle,
+		    this,
+		    &AGS_Monster::UpdateHPWidgetVisibility,
+		    0.1f,
+		    true,
+		    RandomVariance + 0.05f); // 위젯은 섀도우 타이머와도 겹치지 않게 추가 오프셋
 	}
-
-	/*	if (UWorld* World = GetWorld())
-	{
-		if (UGS_ActorRegistrySubsystem* Registry =
-		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
-		{
-			Registry->RegisterMonster(this);
-		}
-	}*/
 
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
@@ -387,6 +384,16 @@ void AGS_Monster::Tick(float DeltaSeconds)
 
 void AGS_Monster::UpdateHPWidgetVisibility()
 {
+	// Significance 체크: 중요도가 너무 낮으면(멀리 있으면) UI 가시성 연산 스킵
+	if (GetSignificance() < 0.1f)
+	{
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible())
+		{
+			HPTextWidgetComp->SetVisibility(false);
+		}
+		return;
+	}
+
 	// Monster HP Bar visibility (Client only)
 	if (!IsValid(HPTextWidgetComp))
 	{
