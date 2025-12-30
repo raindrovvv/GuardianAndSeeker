@@ -230,6 +230,9 @@ protected:
 	double LastBloodVFXTime = 0.0;
 	const float BloodVFXCooldown = 0.3f;
 
+	/** TrapData 로드 여부 (중복 로드 방지) */
+	bool bTrapDataLoaded = false;
+
 	AGS_TrapManager* GetTrapManager() const;
 	void LoadTrapData();
 	bool IsBlockedInDirection(const FVector& Start, const FVector& Direction, float Distance, AGS_Character* CharacterToIgnore);

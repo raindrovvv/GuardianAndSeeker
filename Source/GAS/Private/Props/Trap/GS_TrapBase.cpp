@@ -403,14 +403,18 @@ void AGS_TrapBase::Multicast_DisableOptimizedCollision_Implementation()
 	}
 }
 
-//함정 데미지 
+//함정 데미지
 void AGS_TrapBase::LoadTrapData()
 {
+	// 중복 로드 방지 (OnConstruction + BeginPlay 모두에서 호출됨)
+	if (bTrapDataLoaded) return;
+
 	if (!TrapDataTable) return;
 	FTrapData* FoundTrapData = TrapDataTable->FindRow<FTrapData>(TrapID, TEXT("LoadTrapData"));
 	if (FoundTrapData)
 	{
 		TrapData = *FoundTrapData;
+		bTrapDataLoaded = true;
 	}
 	else
 	{
