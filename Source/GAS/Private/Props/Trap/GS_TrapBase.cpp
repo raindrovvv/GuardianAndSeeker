@@ -166,6 +166,9 @@ void AGS_TrapBase::OnConstruction(const FTransform& Transform)
         return;
     }
 
+    // 에디터에서 TrapID 변경 시 재로딩을 위해 플래그 초기화
+    // (OnConstruction은 프로퍼티 변경 시마다 호출되므로 항상 재로드 필요)
+    bTrapDataLoaded = false;
     LoadTrapData();
 
     // TrapData가 로드된 후 AudioAnchor 위치 조정
@@ -184,6 +187,7 @@ void AGS_TrapBase::RefreshTrapAudioSetup(bool bForceFindComponent)
 
     // === 데디케이티드 서버 크래시 방지 ===
     // BP에서 추가된 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+    // DestroyComponent 대신 비활성화로 안전하게 처리
     if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
     {
         TrapAkComponent = FindComponentByClass<UAkComponent>();
@@ -191,8 +195,8 @@ void AGS_TrapBase::RefreshTrapAudioSetup(bool bForceFindComponent)
         {
             TrapAkComponent->Stop();
             TrapAkComponent->SetComponentTickEnabled(false);
+            TrapAkComponent->Deactivate();
             TrapAkComponent->UnregisterComponent();
-            TrapAkComponent->DestroyComponent();
             TrapAkComponent = nullptr;
         }
         return; // 서버에서는 오디오 설정 중단
@@ -320,11 +324,11 @@ void AGS_TrapBase::OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp,
 			if (!bIsActivated)
 			{
 				bIsActivated = true;
-				// 재발동 시에도 사운드가 들리도록 함정 활성화 사운드 재생
-				PlayActivationSound();
-				
+
+				// 클라이언트에서만 로컬 사운드 재생 (서버는 ActivateTrap_Implementation에서 Multicast로 처리)
 				if (!HasAuthority())
 				{
+					PlayActivationSound();
 					Server_ActivateTrap(OtherActor);
 				}
 				else

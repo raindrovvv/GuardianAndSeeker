@@ -133,15 +133,16 @@ void AGS_Monster::BeginPlay()
 
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
+	// DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
 	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
 	{
 		if (IsValid(AkComponent))
 		{
 			AkComponent->Stop();
 			AkComponent->SetComponentTickEnabled(false);
+			AkComponent->Deactivate();
+			// DestroyComponent 대신 UnregisterComponent만 호출 (DefaultSubobject 안전)
 			AkComponent->UnregisterComponent();
-			AkComponent->DestroyComponent();
-			AkComponent = nullptr;
 		}
 		// 주의: MonsterAudioComponent는 GS_AudioComponentBase를 상속하므로
 		// 해당 클래스의 BeginPlay에서 이미 처리됨
@@ -350,19 +351,20 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		// Significance Manager 해제는 부모 클래스(GS_Character::EndPlay)에서 수행됨
 	}
 
-	// Stability: Ensure widget components are properly cleaned up
+	// Stability: DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
+	// (DestroyComponent 호출 시 ensure(!IsDefaultSubobject()) 실패 위험)
 	if (IsValid(SkillCooldownWidgetComp))
 	{
 		SkillCooldownWidgetComp->SetWidget(nullptr);
 		SkillCooldownWidgetComp->SetVisibility(false);
-		SkillCooldownWidgetComp->DestroyComponent();
+		SkillCooldownWidgetComp->SetComponentTickEnabled(false);
 	}
 
 	if (IsValid(TargetedUIComponent))
 	{
 		TargetedUIComponent->SetWidget(nullptr);
 		TargetedUIComponent->SetVisibility(false);
-		TargetedUIComponent->DestroyComponent();
+		TargetedUIComponent->SetComponentTickEnabled(false);
 	}
 
 	// 타이머 정리
@@ -931,17 +933,7 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 	UpdateWidgetOptimization(TargetedUIComponent);
 	UpdateWidgetOptimization(SkillCooldownWidgetComp);
 
-	// 5. 틱 활성화 가시성 임계값 결정 (중요도에 따라 틱 간격도 조절하여 성능 최적화)
-	if (PrimaryActorTick.bCanEverTick)
-	{
-		bool bShouldTick = (NewSignificance > 0.05f);
-		SetActorTickEnabled(bShouldTick);
-
-		if (bShouldTick)
-		{
-			// 중요도가 낮을수록(멀수록) 틱 간격을 늘려 레이트레이싱 빈도 감소
-			float NewTickInterval = (NewSignificance > 0.8f) ? 0.0f : (NewSignificance > 0.4f ? 0.1f : 0.3f);
-			SetActorTickInterval(NewTickInterval);
-		}
-	}
+	// 참고: 몬스터는 BeginPlay에서 bCanEverTick = false로 설정됨
+	// 모든 주기적 로직은 타이머로 이동되어 Tick을 사용하지 않음
+	// (UpdateShadowCulling, UpdateHPWidgetVisibility 등)
 }

@@ -184,21 +184,19 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		StatComp->OnCurrentHPChanged.Clear();
 	}
 
-	HPTextWidgetComp->SetVisibility(false);
-	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (HPTextWidgetComp->GetBodySetup())
-	{
-		HPTextWidgetComp->DestroyPhysicsState();
-	}
-
+	// Stability: DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
+	// (DestroyComponent 호출 시 ensure(!IsDefaultSubobject()) 실패 위험)
 	if (IsValid(HPTextWidgetComp))
 	{
-		// if (UUserWidget* Widget = HPTextWidgetComp->GetWidget())
-		// {
-		// 	Widget->RemoveFromParent();
-		// }
-		// HPTextWidgetComp->SetWidget(nullptr);
-		HPTextWidgetComp->DestroyComponent();
+		HPTextWidgetComp->SetWidget(nullptr);
+		HPTextWidgetComp->SetVisibility(false);
+		HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HPTextWidgetComp->SetComponentTickEnabled(false);
+
+		if (HPTextWidgetComp->GetBodySetup())
+		{
+			HPTextWidgetComp->DestroyPhysicsState();
+		}
 	}
 
 	// Significance Manager 해제
