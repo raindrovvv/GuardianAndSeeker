@@ -147,9 +147,9 @@ protected:
 	void UpdateShadowCulling();
 
 	/** Significance Manager: 중요도 계산 콜백 */
-	float CalculateSignificance(const FTransform& Viewpoint);
+	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
 
-	virtual void OnSignificanceChanged(float NewSignificance);
+	virtual void OnSignificanceChanged(float NewSignificance) override;
 
 protected:
 	virtual void RegisterSignificanceManager() override;

@@ -373,6 +373,7 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		TimerWorld->GetTimerManager().ClearTimer(ShadowCullingTimerHandle);
 		TimerWorld->GetTimerManager().ClearTimer(HPWidgetVisibilityTimerHandle);
+		TimerWorld->GetTimerManager().ClearTimer(NetworkOptimizationTimerHandle);
 	}
 
 	Super::EndPlay(EndPlayReason);
