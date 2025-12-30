@@ -242,6 +242,9 @@ private:
 	void RefreshTrapAudioSetup(bool bForceFindComponent = false);
 	void AttachTrapAkComponentToAnchor();
 
+	/** 환경 오브젝트(바닥, 벽 등) 충돌 여부 체크 */
+	bool IsEnvironmentHit(AActor* HitActor, UPrimitiveComponent* HitComp) const;
+
 	/** Distance Culling 적용 */
 	void ApplyDistanceCulling();
 

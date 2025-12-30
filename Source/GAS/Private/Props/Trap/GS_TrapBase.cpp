@@ -448,41 +448,10 @@ void AGS_TrapBase::OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActo
         return;
     }
 
-    if (bPlayHitSoundOnEnvironmentImpact)
+    if (bPlayHitSoundOnEnvironmentImpact && IsEnvironmentHit(OtherActor, OtherComp))
     {
-        // 환경 충돌 체크 람다 (안정성 강화)
-        auto IsEnvironmentHit = [](AActor* HitActor, UPrimitiveComponent* HitComp) -> bool
-        {
-            // nullptr 체크 강화
-            if (!IsValid(HitActor))
-            {
-                return false;
-            }
-
-            if (HitComp && IsValid(HitComp))
-            {
-                const ECollisionChannel Channel = HitComp->GetCollisionObjectType();
-                return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
-            }
-
-            // RootComponent 체크
-            if (const UPrimitiveComponent* RootPrim = Cast<UPrimitiveComponent>(HitActor->GetRootComponent()))
-            {
-                if (IsValid(RootPrim))
-                {
-                    const ECollisionChannel Channel = RootPrim->GetCollisionObjectType();
-                    return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
-                }
-            }
-
-            return false;
-        };
-
-        if (IsEnvironmentHit(OtherActor, OtherComp))
-        {
-            UE_LOG(LogTemp, Verbose, TEXT("[TrapBase] Environment impact detected (%s)"), *GetNameSafe(OtherActor));
-            PlayHitSound();
-        }
+        UE_LOG(LogTemp, Verbose, TEXT("[TrapBase] Environment impact detected (%s)"), *GetNameSafe(OtherActor));
+        PlayHitSound();
     }
 }
 
@@ -507,41 +476,8 @@ void AGS_TrapBase::OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 		return;
 	}
 
-	// 환경 충돌 사운드 재생 여부 체크
-	if (!bPlayHitSoundOnEnvironmentImpact)
-	{
-		return;
-	}
-
-	// 환경 오브젝트 체크 (바닥, 천장, 벽 등)
-	auto IsEnvironmentHit = [](AActor* HitActor, UPrimitiveComponent* HitComponent) -> bool
-	{
-		if (!IsValid(HitActor))
-		{
-			return false;
-		}
-
-		if (HitComponent && IsValid(HitComponent))
-		{
-			const ECollisionChannel Channel = HitComponent->GetCollisionObjectType();
-			return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
-		}
-
-		// RootComponent 체크
-		if (const UPrimitiveComponent* RootPrim = Cast<UPrimitiveComponent>(HitActor->GetRootComponent()))
-		{
-			if (IsValid(RootPrim))
-			{
-				const ECollisionChannel Channel = RootPrim->GetCollisionObjectType();
-				return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
-			}
-		}
-
-		return false;
-	};
-
 	// 환경에 부딪힌 경우 충돌 사운드 재생
-	if (IsEnvironmentHit(OtherActor, OtherComp))
+	if (bPlayHitSoundOnEnvironmentImpact && IsEnvironmentHit(OtherActor, OtherComp))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Environment Hit detected - Trap: %s, Hit: %s"), *GetName(), *GetNameSafe(OtherActor));
 		PlayHitSound();
@@ -1177,4 +1113,30 @@ float AGS_TrapBase::GetTrapCullDistance() const
 
 	// PlaceInfo가 없으면 기본값 (중간 크기)
 	return GS_Rendering::TRAP_MEDIUM_CULL_DISTANCE;
+}
+
+bool AGS_TrapBase::IsEnvironmentHit(AActor* HitActor, UPrimitiveComponent* HitComp) const
+{
+	if (!IsValid(HitActor))
+	{
+		return false;
+	}
+
+	if (HitComp && IsValid(HitComp))
+	{
+		const ECollisionChannel Channel = HitComp->GetCollisionObjectType();
+		return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
+	}
+
+	// RootComponent 체크
+	if (const UPrimitiveComponent* RootPrim = Cast<UPrimitiveComponent>(HitActor->GetRootComponent()))
+	{
+		if (IsValid(RootPrim))
+		{
+			const ECollisionChannel Channel = RootPrim->GetCollisionObjectType();
+			return Channel == ECC_WorldStatic || Channel == ECC_WorldDynamic;
+		}
+	}
+
+	return false;
 }
