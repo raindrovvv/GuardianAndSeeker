@@ -166,6 +166,15 @@ private:
 	/** 네트워크 최적화 업데이트 타이머 (1초마다 체크) */
 	FTimerHandle NetworkOptimizationTimerHandle;
 
+	/** 그림자 컬링 업데이트 타이머 (0.1초마다 체크) */
+	FTimerHandle ShadowCullingTimerHandle;
+
+	/** HP 위젯 가시성 업데이트 타이머 (0.1초마다 체크) */
+	FTimerHandle HPWidgetVisibilityTimerHandle;
+
+	/** HP 위젯 가시성 업데이트 (타이머에서 호출) */
+	void UpdateHPWidgetVisibility();
+
 	/** 마지막으로 설정한 NetUpdateFrequency (변경 감지용) */
 	float LastNetUpdateFrequency;
 

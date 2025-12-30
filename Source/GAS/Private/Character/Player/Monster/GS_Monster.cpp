@@ -103,15 +103,26 @@ void AGS_Monster::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (IsRunningDedicatedServer())
+	// 서버/클라이언트 모두 Tick 비활성화 (타이머 기반 최적화)
+	PrimaryActorTick.bCanEverTick = false;
+	SetActorTickEnabled(false);
+
+	// 클라이언트: 그림자 컬링 및 HP 위젯 가시성을 타이머로 처리 (0.1초 간격)
+	if (!IsRunningDedicatedServer())
 	{
-		PrimaryActorTick.bCanEverTick = false;
-		SetActorTickEnabled(false);
-	}
-	else
-	{
-		// 클라이언트에서는 거리 기반 UI 컬링 등을 위해 틱 활성화
-		SetActorTickEnabled(true);
+		GetWorld()->GetTimerManager().SetTimer(
+			ShadowCullingTimerHandle,
+			this,
+			&AGS_Monster::UpdateShadowCulling,
+			0.1f,
+			true);
+
+		GetWorld()->GetTimerManager().SetTimer(
+			HPWidgetVisibilityTimerHandle,
+			this,
+			&AGS_Monster::UpdateHPWidgetVisibility,
+			0.1f,
+			true);
 	}
 
 	/*	if (UWorld* World = GetWorld())
@@ -145,7 +156,7 @@ void AGS_Monster::BeginPlay()
 		    this, &AGS_Monster::HandleSkillCooldownChanged);
 	}
 
-	// HP 위젯 틱 간격 최적화 (매 프레임 대신 0.1초마다 체크)
+	// HP 위젯 컴포넌트 틱 간격 최적화 (틱은 유지해야 렌더링됨)
 	if (IsValid(HPTextWidgetComp))
 	{
 		HPTextWidgetComp->SetComponentTickInterval(0.1f);
@@ -338,16 +349,26 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		TargetedUIComponent->DestroyComponent();
 	}
 
+	// 타이머 정리
+	if (UWorld* TimerWorld = GetWorld())
+	{
+		TimerWorld->GetTimerManager().ClearTimer(ShadowCullingTimerHandle);
+		TimerWorld->GetTimerManager().ClearTimer(HPWidgetVisibilityTimerHandle);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
 void AGS_Monster::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateShadowCulling();
+	// 모든 로직이 타이머로 이동됨 (UpdateShadowCulling, UpdateHPWidgetVisibility)
+}
 
+void AGS_Monster::UpdateHPWidgetVisibility()
+{
 	// Monster HP Bar visibility (Client only)
-	if (GetNetMode() == NM_DedicatedServer || !IsValid(HPTextWidgetComp))
+	if (!IsValid(HPTextWidgetComp))
 	{
 		return;
 	}
@@ -429,13 +450,10 @@ void AGS_Monster::Tick(float DeltaSeconds)
 		}
 	}
 
-	// 가시성 업데이트 (위젯이 꺼져있더라도 Tick은 돌아서 다시 켜질지 판단해야 함)
+	// 가시성 업데이트
 	if (HPTextWidgetComp->IsVisible() != bIsVisible)
 	{
 		HPTextWidgetComp->SetVisibility(bIsVisible);
-
-		// 최적화: 보일 때는 0.1초(기본값), 안 보일 때는 0.3초마다 체크하여 CPU 부하 감소
-		HPTextWidgetComp->SetComponentTickInterval(bIsVisible ? 0.1f : 0.3f);
 	}
 }
 
