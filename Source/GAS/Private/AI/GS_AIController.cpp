@@ -75,28 +75,38 @@ void AGS_AIController::OnPossess(APawn* InPawn)
 
 		if (AssetsToLoad.Num() > 0)
 		{
+			// TWeakObjectPtr로 캡처하여 비동기 콜백 안전성 확보
+			TWeakObjectPtr<AGS_AIController> WeakThis(this);
+			TWeakObjectPtr<AGS_Monster> WeakMonster(Monster);
+			TWeakObjectPtr<APawn> WeakPawn(InPawn);
+
 			// 비동기 로드 시작
-			UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [this, Monster, InPawn]()
-			                                         {
-				// 로드 완료 후 컨트롤러가 여전히 이 폰을 소유하고 있는지 확인
-				if (!IsValid(this) || !IsValid(Monster) || GetPawn() != InPawn)
+			UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis, WeakMonster, WeakPawn]()
+			{
+				// 로드 완료 후 모든 객체가 유효하고 컨트롤러가 여전히 이 폰을 소유하는지 확인
+				AGS_AIController* StrongThis = WeakThis.Get();
+				AGS_Monster* StrongMonster = WeakMonster.Get();
+				APawn* StrongPawn = WeakPawn.Get();
+
+				if (!StrongThis || !StrongMonster || StrongThis->GetPawn() != StrongPawn)
 				{
 					return;
 				}
 
-				UBehaviorTree* LoadedBT = Monster->BTAsset.Get();
-				UBlackboardData* LoadedBB = Monster->BBAsset.Get();
+				UBehaviorTree* LoadedBT = StrongMonster->BTAsset.Get();
+				UBlackboardData* LoadedBB = StrongMonster->BBAsset.Get();
 
-				UBlackboardComponent* BlackboardComponent = Blackboard;
-				if (LoadedBB && UseBlackboard(LoadedBB, BlackboardComponent))
+				UBlackboardComponent* BlackboardComponent = StrongThis->Blackboard;
+				if (LoadedBB && StrongThis->UseBlackboard(LoadedBB, BlackboardComponent))
 				{
-					BlackboardComponent->SetValueAsVector(HomePosKey, InPawn->GetActorLocation());
+					BlackboardComponent->SetValueAsVector(StrongThis->HomePosKey, StrongPawn->GetActorLocation());
 
 					if (LoadedBT)
 					{
-						RunBehaviorTree(LoadedBT);
+						StrongThis->RunBehaviorTree(LoadedBT);
 					}
-				} });
+				}
+			});
 		}
 	}
 
