@@ -18,10 +18,10 @@ class UGS_MonsterAnimInstance;
 class UGS_VFXComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterDead, AGS_Monster*,
-											DeadUnit);
+                                            DeadUnit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMonsterAttacked, AGS_Monster*,
-											 AttackedUnit, FVector,
-											 AttackLocation);
+                                             AttackedUnit, FVector,
+                                             AttackLocation);
 
 UCLASS()
 class GAS_API AGS_Monster : public AGS_Character
@@ -108,7 +108,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(
-		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	    TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Skill")
@@ -146,6 +146,14 @@ protected:
 	/** 그림자 컬링 최적화 (거리 기반) */
 	void UpdateShadowCulling();
 
+	/** Significance Manager: 중요도 계산 콜백 */
+	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
+
+	virtual void OnSignificanceChanged(float NewSignificance) override;
+
+protected:
+	virtual void RegisterSignificanceManager() override;
+
 private:
 	bool bIsSelected;
 
@@ -158,6 +166,23 @@ private:
 	/** 네트워크 최적화 업데이트 타이머 (1초마다 체크) */
 	FTimerHandle NetworkOptimizationTimerHandle;
 
+	/** 그림자 컬링 업데이트 타이머 (0.1초마다 체크) */
+	FTimerHandle ShadowCullingTimerHandle;
+
+	/** HP 위젯 가시성 업데이트 타이머 (0.1초마다 체크) */
+	FTimerHandle HPWidgetVisibilityTimerHandle;
+
+	/** HP 위젯 가시성 업데이트 (타이머에서 호출) */
+	void UpdateHPWidgetVisibility();
+
 	/** 마지막으로 설정한 NetUpdateFrequency (변경 감지용) */
 	float LastNetUpdateFrequency;
+
+	/** 로컬 시커의 CombatTrigger 내부에 있는지 여부 (클라이언트 로컬) */
+	bool bIsInSeekerCombatTrigger = false;
+
+public:
+	/** 시커의 CombatTrigger 내부 여부 설정 (시커에서 호출) */
+	void SetInSeekerCombatTrigger(bool bInTrigger) { bIsInSeekerCombatTrigger = bInTrigger; }
+	bool IsInSeekerCombatTrigger() const { return bIsInSeekerCombatTrigger; }
 };

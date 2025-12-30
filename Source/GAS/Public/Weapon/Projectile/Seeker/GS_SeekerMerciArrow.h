@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Weapon/Projectile/GS_WeaponProjectile.h"
-#include "Engine/Engine.h" 
+#include "Engine/Engine.h"
 #include "Components/PrimitiveComponent.h"
 #include "Engine/HitResult.h"
 #include "AkAudioEvent.h"
@@ -60,20 +60,25 @@ protected:
 
 	UFUNCTION()
 	virtual void OnBeginOverlap(
-		UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	    UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	    bool bFromSweep, const FHitResult& SweepResult);
+
+	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
+	                   UPrimitiveComponent* OtherComp, FVector NormalImpulse,
+	                   const FHitResult& Hit) override;
 	virtual ETargetType DetermineTargetType(AActor* OtherActor) const;
 	virtual bool HandleTargetTypeGeneric(ETargetType TargetType, const FHitResult& SweepResult);
 
 	virtual void ProcessHitEffects(ETargetType TargetType, const FHitResult& SweepResult);
 	virtual void ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor);
 	void ProcessStickLogic(AActor* HitActor, ETargetType TargetType, const FHitResult& SweepResult);
+
 private:
 	bool bAlreadyStuck = false;
 	FHitResult CreateFallbackHitResult(USkeletalMeshComponent* TargetMesh, AActor* HitActor,
-		const FVector& ArrowLocation, const FVector& ArrowDirection,
-		const FHitResult& OriginalSweepResult);
+	                                   const FVector& ArrowLocation, const FVector& ArrowDirection,
+	                                   const FHitResult& OriginalSweepResult);
 
 	UPROPERTY()
 	bool bAlreadyHit = false;

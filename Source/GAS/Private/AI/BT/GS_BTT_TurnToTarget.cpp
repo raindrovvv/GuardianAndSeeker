@@ -24,12 +24,17 @@ EBTNodeResult::Type UGS_BTT_TurnToTarget::ExecuteTask(UBehaviorTreeComponent& Ow
 	}
 
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	if (!IsValid(Blackboard))
+	{
+		return EBTNodeResult::Failed;
+	}
+
 	AGS_Character* TargetActor = Cast<AGS_Character>(Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey));
 	if (!TargetActor)
 	{
 		return EBTNodeResult::Failed;
 	}
-	
+
 	return EBTNodeResult::InProgress;
 }
 
@@ -46,6 +51,12 @@ void UGS_BTT_TurnToTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* No
 	}
 
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	if (!IsValid(Blackboard))
+	{
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+
 	AGS_Character* TargetActor = Cast<AGS_Character>(Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey));
 	if (!TargetActor)
 	{

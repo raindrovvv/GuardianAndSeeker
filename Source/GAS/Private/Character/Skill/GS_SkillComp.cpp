@@ -697,13 +697,7 @@ void UGS_SkillComp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	OnSkillCooldownChanged.Clear();
-	OnHealCountChanged.Clear();
-	OnSkillActivated.Clear();
-	OnSkillCooldownBlocked.Clear();
-
-	Super::EndPlay(EndPlayReason);
-
+	// 1. 타이머 먼저 정리 (Super 호출 전에 World 접근)
 	if (GetWorld())
 	{
 		for (auto& Pair : CooldownStates)
@@ -713,4 +707,13 @@ void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			GetWorld()->GetTimerManager().ClearTimer(State.UIUpdateTimer);
 		}
 	}
+
+	// 2. 델리게이트 정리
+	OnSkillCooldownChanged.Clear();
+	OnHealCountChanged.Clear();
+	OnSkillActivated.Clear();
+	OnSkillCooldownBlocked.Clear();
+
+	// 3. 마지막에 Super 호출
+	Super::EndPlay(EndPlayReason);
 }

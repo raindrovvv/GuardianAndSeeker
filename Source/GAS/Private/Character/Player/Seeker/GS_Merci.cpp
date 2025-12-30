@@ -24,6 +24,9 @@
 #include "Character/GS_Character.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
+#include "Component/GS_VisualPoolComp.h"
+#include "Weapon/Projectile/Seeker/GS_ArrowVisualActor.h"
 #include "Character/Skill/GS_SkillComp.h"
 //#include "Weapon/Equipable/"
 
@@ -43,6 +46,16 @@ AGS_Merci::AGS_Merci()
 
 	CharacterType = ECharacterType::Merci;
 	SkillInputHandlerComponent = CreateDefaultSubobject<UGS_MerciSkillInputHandlerComp>(TEXT("SkillInputHandlerComp"));
+
+	VisualPool = CreateDefaultSubobject<UGS_VisualPoolComp>(TEXT("VisualPool"));
+
+	// [최적화 설정]
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		// AlwaysTickPose: 시야에서 사라져도 노티파이(화살 장전 등)는 작동하게 함 (뼈 연산만 생략)
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+		MeshComp->SetBoundsScale(1.1f);
+	}
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Merci");
@@ -82,6 +95,14 @@ void AGS_Merci::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		// 로컬 플레이어는 부드러운 애니메이션을 위해 URO를 끄고, 나머지는 켭니다.
+		MeshComp->bEnableUpdateRateOptimizations = !IsLocallyControlled();
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+		MeshComp->SetBoundsScale(1.1f);
+	}
+
 	SetActorTickEnabled(true);
 
 	CurrentArrowType = EArrowType::Normal;
@@ -96,14 +117,18 @@ void AGS_Merci::BeginPlay()
 		GetWorld()->GetTimerManager().SetTimer(ChildArrowRegenTimer, this, &AGS_Merci::RegenChildArrow, RegenInterval, true);
 	}
 
-	Mesh = this->GetMesh();
-	UE_LOG(LogTemp, Warning, TEXT("AnimInstance: %s"), *GetNameSafe(GetMesh()->GetAnimInstance()));
 	if (ZoomCurve)
 	{
 		FOnTimelineFloat TimelineCallback;
 		TimelineCallback.BindUFunction(this, FName("UpdateZoom"));
 
 		ZoomTimeline.AddInterpFloat(ZoomCurve, TimelineCallback);
+	}
+
+	// === Visual Pool 초기화 (서버에서만 실행, 클라이언트는 복제본을 받음) ===
+	if (HasAuthority() && VisualPool && VisualArrowClass)
+	{
+		VisualPool->Initialize(VisualArrowClass, 20); // 20발 선스폰
 	}
 }
 
@@ -242,9 +267,9 @@ void AGS_Merci::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 
 void AGS_Merci::PlayDrawMontage(UAnimMontage* DrawMontage)
 {
-	if (Mesh && DrawMontage)
+	if (GetMesh() && DrawMontage)
 	{
-		float Duration = Mesh->GetAnimInstance()->Montage_Play(DrawMontage);
+		float Duration = GetMesh()->GetAnimInstance()->Montage_Play(DrawMontage);
 		if (Duration > 0.0f)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Montage_Play called, duration: %f"), Duration);
@@ -262,10 +287,10 @@ void AGS_Merci::PlayDrawMontage(UAnimMontage* DrawMontage)
 
 void AGS_Merci::Multicast_StopDrawMontage_Implementation()
 {
-	if (Mesh && Mesh->GetAnimInstance())
+	if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Multicast_StopDrawMontage"));
-		Mesh->GetAnimInstance()->Montage_Stop(0.2f); // BlendOut 0.2초
+		GetMesh()->GetAnimInstance()->Montage_Stop(0.2f); // BlendOut 0.2초
 	}
 }
 
@@ -615,8 +640,11 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		return 0.0f;
 	}
 
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
 	// 활을 들고 있는 경우 (궁극기 상태가 아닐 때만 피격 시 해제)
-	if ((GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+	// 가벼운 데미지(10 미만)에는 취소되지 않도록 임계값 추가
+	if (ActualDamage >= 20.0f && (GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 	{
 		// 활 쏘기 애니메이션 재생 정지
 		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
@@ -642,8 +670,6 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		// 달리기 상태 설정
 		SetSeekerGait(EGait::Run);
 	}
-
-	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	// 데미지를 받은 후 적절한 사운드 재생
 	if (SeekerAudioComponent && ActualDamage > 0.0f)

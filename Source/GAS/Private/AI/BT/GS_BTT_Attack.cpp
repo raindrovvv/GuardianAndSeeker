@@ -19,6 +19,11 @@ EBTNodeResult::Type UGS_BTT_Attack::ExecuteTask(UBehaviorTreeComponent& OwnerCom
 	}
 
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	if (!IsValid(Blackboard))
+	{
+		return EBTNodeResult::Failed;
+	}
+
 	if (!Blackboard->GetValueAsBool(AGS_AIController::CanAttackKey))
 	{
 		return EBTNodeResult::Failed;

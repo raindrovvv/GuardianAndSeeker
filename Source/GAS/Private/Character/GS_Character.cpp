@@ -1,4 +1,5 @@
 #include "Character/GS_Character.h"
+#include "SignificanceManager.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "AkGameplayStatics.h"
 #include "Character/Component/GS_CameraShakeComponent.h"
@@ -38,10 +39,6 @@ AGS_Character::AGS_Character()
 	HitReactComp = CreateDefaultSubobject<UGS_HitReactComp>(TEXT("HitReactComp"));
 	CameraShakeComp =
 	    CreateDefaultSubobject<UGS_CameraShakeComponent>(TEXT("CameraShakeComp"));
-
-	// 틱 최적화 컴포넌트 생성
-	TickOptimizationComp = CreateDefaultSubobject<UGS_TickOptimizationComponent>(
-	    TEXT("TickOptimizationComp"));
 
 	HPTextWidgetComp =
 	    CreateDefaultSubobject<UGS_HPTextWidgetComp>(TEXT("TextWidgetComp"));
@@ -127,23 +124,42 @@ void AGS_Character::BeginPlay()
 	{
 		SpawnAndAttachWeapons();
 	}
+
+	// === Significance Manager 등록 (클라이언트만) ===
+	RegisterSignificanceManager();
+}
+
+void AGS_Character::RegisterSignificanceManager()
+{
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
+		{
+			// TWeakObjectPtr로 캡처하여 액터 파괴 후 람다 호출 시 안전성 확보
+			TWeakObjectPtr<AGS_Character> WeakThis(this);
+
+			SM->RegisterObject(
+			    this, "Character",
+			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+			               const FTransform& Viewpoint) -> float
+			    {
+				    if (AGS_Character* StrongThis = WeakThis.Get())
+					    return StrongThis->CalculateSignificance(Viewpoint);
+				    return 0.0f;
+			    },
+			    USignificanceManager::EPostSignificanceType::Sequential,
+			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+			               float OldValue, float NewValue, bool bExternal)
+			    {
+				    if (AGS_Character* StrongThis = WeakThis.Get())
+					    StrongThis->OnSignificanceChanged(NewValue);
+			    });
+		}
+	}
 }
 
 void AGS_Character::Tick(float DeltaTime)
 {
-	// Tick Optimization 적용
-	if (TickOptimizationComp)
-	{
-		// 쓰로틀링된 틱 실행 여부 확인
-		if (!TickOptimizationComp->ShouldExecuteThrottledTick(
-		        GetWorld()->GetTimeSeconds()))
-		{
-			return;
-		}
-		TickOptimizationComp->MarkThrottledTickExecuted(
-		    GetWorld()->GetTimeSeconds());
-	}
-
 	Super::Tick(DeltaTime);
 }
 
@@ -183,6 +199,15 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		// }
 		// HPTextWidgetComp->SetWidget(nullptr);
 		HPTextWidgetComp->DestroyComponent();
+	}
+
+	// Significance Manager 해제
+	if (UWorld* World = GetWorld())
+	{
+		if (USignificanceManager* SM = USignificanceManager::Get(World))
+		{
+			SM->UnregisterObject(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -338,34 +363,11 @@ void AGS_Character::OnDeath()
 
 	OnDeathDelegate.Broadcast();
 
-	// 서버/리슨 서버에서 로컬 Death 사운드 재생 (RPC 제거)
+	// 서버/리슨 서버에서 로컬 Death 사운드 재생
 	// 클라이언트는 OnRep_IsDead()에서 재생됨
 	if (HasAuthority())
 	{
-		// Seeker Death 사운드 (로컬 재생)
-		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
-		{
-			if (Seeker->SeekerAudioComponent)
-			{
-				Seeker->SeekerAudioComponent->PlayDeathSoundLocal();
-			}
-		}
-		// Monster Death 사운드 (로컬 재생)
-		else if (AGS_Monster* Monster = Cast<AGS_Monster>(this))
-		{
-			if (Monster->MonsterAudioComponent)
-			{
-				Monster->MonsterAudioComponent->PlayDeathSoundLocal();
-			}
-		}
-		// Drakhar Death 사운드 (로컬 재생)
-		else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(this))
-		{
-			if (Drakhar->GetAudioComponent())
-			{
-				Drakhar->GetAudioComponent()->PlayDeathSoundLocal();
-			}
-		}
+		PlayDeathSoundLocal();
 	}
 
 	// 모든 디버프 제거 (VFX 포함)
@@ -679,15 +681,8 @@ void AGS_Character::OnRep_CharacterSpeed()
 	GetCharacterMovement()->MaxWalkSpeed = CharacterSpeed;
 }
 
-void AGS_Character::OnRep_IsDead()
+void AGS_Character::PlayDeathSoundLocal()
 {
-	// 클라이언트에서 Death 사운드 재생 (RPC 없음!)
-	if (!bIsDead)
-	{
-		return; // 죽지 않은 상태면 무시
-	}
-
-	// Seeker Death 사운드 (로컬 재생)
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
 	{
 		if (Seeker->SeekerAudioComponent)
@@ -695,7 +690,6 @@ void AGS_Character::OnRep_IsDead()
 			Seeker->SeekerAudioComponent->PlayDeathSoundLocal();
 		}
 	}
-	// Monster Death 사운드 (로컬 재생)
 	else if (AGS_Monster* Monster = Cast<AGS_Monster>(this))
 	{
 		if (Monster->MonsterAudioComponent)
@@ -703,13 +697,21 @@ void AGS_Character::OnRep_IsDead()
 			Monster->MonsterAudioComponent->PlayDeathSoundLocal();
 		}
 	}
-	// Drakhar Death 사운드 (로컬 재생)
 	else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(this))
 	{
 		if (Drakhar->GetAudioComponent())
 		{
 			Drakhar->GetAudioComponent()->PlayDeathSoundLocal();
 		}
+	}
+}
+
+void AGS_Character::OnRep_IsDead()
+{
+	// 클라이언트에서 Death 사운드 재생
+	if (bIsDead)
+	{
+		PlayDeathSoundLocal();
 	}
 }
 
@@ -833,4 +835,89 @@ UTexture2D* AGS_Character::GetPortrait() const
 
 	// Soft Reference를 동기 로드 (UI는 즉시 표시되어야 하므로)
 	return UGS_AssetLoader::SyncLoadAsset(CharacterData->Portrait);
+}
+
+float AGS_Character::CalculateSignificance(const FTransform& Viewpoint)
+{
+	if (IsDead())
+		return 0.0f;
+
+	// 로컬 플레이어는 무조건 최상위 중요도 (1.0)
+	if (IsLocallyControlled())
+		return 1.0f;
+
+	float Score = 0.1f;
+	FVector ActorLoc = GetActorLocation();
+	FVector ViewLoc = Viewpoint.GetLocation();
+	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
+
+	// 기본 거리 기반 점수 (플레이어는 50m 기준)
+	float MaxRangeSq = FMath::Square(5000.0f);
+	Score = FMath::Clamp(1.2f - (DistSq / MaxRangeSq), 0.1f, 1.0f);
+
+	return Score;
+}
+
+void AGS_Character::OnSignificanceChanged(float NewSignificance)
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+		return;
+
+	// 1. 애니메이션 URO (Update Rate Optimization) 제어
+	// 중요도가 0.7 미만이면 프레임 스킵 허용
+	MeshComp->bEnableUpdateRateOptimizations = (NewSignificance < 0.7f);
+
+	// 2. 중요도에 따른 애니메이션 틱 옵션 조정
+	if (NewSignificance > 0.5f)
+	{
+		// 중요할 때: 시각적 품질 유지
+		MeshComp->VisibilityBasedAnimTickOption =
+		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	}
+	else
+	{
+		// 보통이거나 낮을 때: 화면에 보일 때만 갱신
+		MeshComp->VisibilityBasedAnimTickOption =
+		    EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	}
+
+	// 3. 중요도가 매우 낮으면 Tick 비활성화
+	if (PrimaryActorTick.bCanEverTick)
+	{
+		SetActorTickEnabled(NewSignificance > 0.1f);
+	}
+
+	// 4. 이동 및 물리 연산 최적화
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		if (NewSignificance > 0.8f)
+		{
+			// 매우 중요한 경우: 최고 부드러움 유지
+			MoveComp->NetworkSmoothingMode = ENetworkSmoothingMode::Exponential;
+			MoveComp->bComponentShouldUpdatePhysicsVolume = true;
+		}
+		else if (NewSignificance > 0.3f)
+		{
+			// 중간 중요도: 선형 보간으로 전환
+			MoveComp->NetworkSmoothingMode = ENetworkSmoothingMode::Linear;
+		}
+		else
+		{
+			// 낮거나 거의 안 보일 때: 보간 비활성화 및 물리 체크 최소화
+			MoveComp->NetworkSmoothingMode = ENetworkSmoothingMode::Disabled;
+			MoveComp->bComponentShouldUpdatePhysicsVolume = false;
+		}
+	}
+
+	// 5. 네트워크 업데이트 빈도 최적화 (서버 전용)
+	if (HasAuthority())
+	{
+		if (NewSignificance > 0.8f)
+			NetUpdateFrequency = 60.0f;
+		else if (NewSignificance > 0.4f)
+			NetUpdateFrequency = 30.0f;
+		else
+			NetUpdateFrequency = 5.0f;
+	}
 }

@@ -54,19 +54,19 @@ AGS_Seeker::AGS_Seeker()
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	GetMesh()->bOnlyAllowAutonomousTickPose = false;
 
-    // Post Process Component 생성 (Low Health)
-    LowHealthPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("LowHealthPostProcessComp"));
-    LowHealthPostProcessComp->SetupAttachment(CameraComp);
-    LowHealthPostProcessComp->bEnabled = false;
-    LowHealthPostProcessComp->Priority = 10;
-    LowHealthEffectComp = CreateDefaultSubobject<UGS_LowHealthEffectComponent>(TEXT("LowHealthEffectComp"));
+	// Post Process Component 생성 (Low Health)
+	LowHealthPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("LowHealthPostProcessComp"));
+	LowHealthPostProcessComp->SetupAttachment(CameraComp);
+	LowHealthPostProcessComp->bEnabled = false;
+	LowHealthPostProcessComp->Priority = 10;
+	LowHealthEffectComp = CreateDefaultSubobject<UGS_LowHealthEffectComponent>(TEXT("LowHealthEffectComp"));
 
-    // Post Process Component 생성 (가디언 감지 - MPP_Detect)
-    DetectionPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("DetectionPostProcessComp"));
-    DetectionPostProcessComp->SetupAttachment(CameraComp);
-    DetectionPostProcessComp->bEnabled = false;
-    DetectionPostProcessComp->Priority = 11; // Low Health보다 높은 우선순위
-    DetectionEffectComp = CreateDefaultSubobject<UGS_DetectionEffectComponent>(TEXT("DetectionEffectComp"));
+	// Post Process Component 생성 (가디언 감지 - MPP_Detect)
+	DetectionPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("DetectionPostProcessComp"));
+	DetectionPostProcessComp->SetupAttachment(CameraComp);
+	DetectionPostProcessComp->bEnabled = false;
+	DetectionPostProcessComp->Priority = 11; // Low Health보다 높은 우선순위
+	DetectionEffectComp = CreateDefaultSubobject<UGS_DetectionEffectComponent>(TEXT("DetectionEffectComp"));
 
 	// =======================
 	// Post Process Component 생성 (빈사 상태 - Dying)
@@ -124,8 +124,8 @@ AGS_Seeker::AGS_Seeker()
 
 	// 전투 BGM 트리거 생성 (시커가 몬스터를 감지)
 	CombatTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CombatTrigger"));
-    CombatTrigger->SetupAttachment(RootComponent);
-    CombatTrigger->SetSphereRadius(CombatTriggerRadius);
+	CombatTrigger->SetupAttachment(RootComponent);
+	CombatTrigger->SetSphereRadius(CombatTriggerRadius);
 	CombatTrigger->SetCollisionProfileName(TEXT("SoundTrigger"));
 
 	//함정 - 화살발사기의 화살 채널 설정(Projectile)
@@ -149,7 +149,7 @@ AGS_Seeker::AGS_Seeker()
 	ItemData->CurCount = 5;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FullPotionMesh(TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Full.HP_Potion_Full"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> EmptyPotionMesh(TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Empty.HP_Potion_Empty"));
-	
+
 	ItemData->ItemMeshs.Add(FName(TEXT("HP_Potion_Full")), FullPotionMesh.Object);
 	ItemData->ItemMeshs.Add(FName(TEXT("HP_Potion_Empty")), EmptyPotionMesh.Object);
 
@@ -176,12 +176,12 @@ void AGS_Seeker::BeginPlay()
 		}
 	}
 
-    if (IsLocallyControlled())
+	if (IsLocallyControlled())
 	{
 		InitializeCameraManager();
 
 		// 스탯 컴포넌트 가져와서 델리게이트 바인딩
-        if (UGS_StatComp* FoundStatComp = FindComponentByClass<UGS_StatComp>())
+		if (UGS_StatComp* FoundStatComp = FindComponentByClass<UGS_StatComp>())
 		{
 			FoundStatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Seeker::HandleLowHealthEffect);
 		}
@@ -233,7 +233,7 @@ void AGS_Seeker::Tick(float DeltaTime)
 
 // Called to bind functionality to input
 void AGS_Seeker::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
+{
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	if (SkillInputHandlerComponent)
@@ -245,11 +245,11 @@ void AGS_Seeker::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
 	// 소유 클라이언트는 어차피 로컬에서 효과를 계산하므로 복제 제외 가능
 	DOREPLIFETIME_CONDITION(AGS_Seeker, bIsLowHealthEffectActive, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AGS_Seeker, CurrentEffectStrength, COND_SkipOwner);
-	
+
 	DOREPLIFETIME(AGS_Seeker, LastSeekerGait);
 	DOREPLIFETIME(AGS_Seeker, SeekerGait);
 	DOREPLIFETIME(AGS_Seeker, CanChangeSeekerGait);
@@ -259,7 +259,7 @@ void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 
 	DOREPLIFETIME(AGS_Seeker, bIsDetectedByGuardian);
 	DOREPLIFETIME(AGS_Seeker, DetectionIntensity);
-	
+
 	// 빈사 상태 변수들
 	DOREPLIFETIME(AGS_Seeker, bIsInDyingState);
 	DOREPLIFETIME(AGS_Seeker, DyingTimeRemaining);
@@ -274,7 +274,7 @@ AGS_Item* AGS_Seeker::GetItem(EItemType ItemType)
 	{
 		return Item;
 	}
-	
+
 	return nullptr;
 }
 
@@ -298,8 +298,8 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		GetWorldTimerManager().ClearTimer(LowHealthEffectTimer);
 	}
-	
-    if (IsLocallyControlled() && LowHealthPostProcessComp)
+
+	if (IsLocallyControlled() && LowHealthPostProcessComp)
 	{
 		LowHealthPostProcessComp->bEnabled = false;
 		LowHealthPostProcessComp->Settings.WeightedBlendables.Array.Empty();
@@ -337,7 +337,7 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AGS_Seeker::SetAimState(bool IsAim)
 {
 	SeekerState.IsAim = IsAim;
-	
+
 	// 시커 오디오 컴포넌트에 조준 상태 변경 알림
 	if (SeekerAudioComponent)
 	{
@@ -385,20 +385,20 @@ void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
 	{
 		SeekerAnim->ChooserInputObj->Gait = SeekerGait;
 	}
-	
+
 	switch (Gait)
 	{
-	case EGait::Walk :
-		SetCharacterSpeed(0.45f);	
+	case EGait::Walk:
+		SetCharacterSpeed(0.45f);
 		break;
-	case EGait::Run :
+	case EGait::Run:
 		SetCharacterSpeed(0.8f);
 		break;
-	case EGait::Sprint :
+	case EGait::Sprint:
 		SetCharacterSpeed(1.0f);
 		break;
-	case EGait::Crawl :
-		SetCharacterSpeed(0.15f);  // 빈사 상태 기어다니기 - 매우 느린 속도
+	case EGait::Crawl:
+		SetCharacterSpeed(0.15f); // 빈사 상태 기어다니기 - 매우 느린 속도
 		break;
 	}
 }
@@ -417,20 +417,20 @@ void AGS_Seeker::SetSeekerGait(EGait Gait)
 	{
 		SeekerAnim->ChooserInputObj->Gait = SeekerGait;
 	}
-	
+
 	switch (Gait)
 	{
-	case EGait::Walk :
-		SetCharacterSpeed(0.45f);	
+	case EGait::Walk:
+		SetCharacterSpeed(0.45f);
 		break;
-	case EGait::Run :
+	case EGait::Run:
 		SetCharacterSpeed(0.8f);
 		break;
-	case EGait::Sprint :
+	case EGait::Sprint:
 		SetCharacterSpeed(1.0f);
 		break;
-	case EGait::Crawl :
-		SetCharacterSpeed(0.15f);  // 빈사 상태 기어다니기 - 매우 느린 속도
+	case EGait::Crawl:
+		SetCharacterSpeed(0.15f); // 빈사 상태 기어다니기 - 매우 느린 속도
 		break;
 	}
 }
@@ -449,7 +449,7 @@ void AGS_Seeker::StateReset()
 {
 	this->SetAimState(false);
 	this->SetDrawState(false);
-	
+
 	if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
 		if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
@@ -465,7 +465,7 @@ void AGS_Seeker::StateReset()
 			TPSController->SetIsAutoMoving(false);
 		}
 	}
-	
+
 	this->CanChangeSeekerGait = true;
 	this->CanAcceptComboInput = true;
 	this->SetMoveControlValue(true, true);
@@ -484,41 +484,41 @@ const FName AGS_Seeker::EffectIntensityParamName = TEXT("EffectIntensity");
 
 void AGS_Seeker::InitializeCameraManager()
 {
-    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		LocalCameraManager = PC->PlayerCameraManager;
 
-        // Low Health: 컴포넌트 초기화 (Soft Reference 로드)
-        if (LowHealthEffectComp && !LowHealthEffectMaterial.IsNull())
-        {
-            UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.LoadSynchronous();
-            if (LoadedMaterial)
-            {
-                LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LoadedMaterial);
-            }
-        }
+		// Low Health: 컴포넌트 초기화 (Soft Reference 로드)
+		if (LowHealthEffectComp && !LowHealthEffectMaterial.IsNull())
+		{
+			UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.LoadSynchronous();
+			if (LoadedMaterial)
+			{
+				LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LoadedMaterial);
+			}
+		}
 
-        // Detection: 컴포넌트 초기화 (Soft Reference 로드)
-        if (DetectionEffectComp && !DetectionEffectMaterial.IsNull())
-        {
-            UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.LoadSynchronous();
-            if (LoadedMaterial)
-            {
-                DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, LoadedMaterial);
-            }
-        }
+		// Detection: 컴포넌트 초기화 (Soft Reference 로드)
+		if (DetectionEffectComp && !DetectionEffectMaterial.IsNull())
+		{
+			UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.LoadSynchronous();
+			if (LoadedMaterial)
+			{
+				DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, LoadedMaterial);
+			}
+		}
 
 		// Dying: PostProcess 초기화 (Soft Reference 로드)
 		if (DyingPostProcessComp && !DyingEffectMaterial.IsNull())
 		{
-            UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
-            if (LoadedMaterial)
-            {
-			    DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
-			    DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
-			    DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
-			    DyingPostProcessComp->bEnabled = false;
-            }
+			UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
+			if (LoadedMaterial)
+			{
+				DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
+				DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
+				DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
+				DyingPostProcessComp->bEnabled = false;
+			}
 		}
 	}
 }
@@ -581,7 +581,7 @@ void AGS_Seeker::Server_OnComboAttack_Implementation()
 		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, IsSkillAllowed == false"));
 		return;
 	}
-		
+
 	if (CurrentComboIndex == 0)
 	{
 		GetWorldTimerManager().ClearTimer(AttackSoundResetTimerHandle);
@@ -617,10 +617,10 @@ FName AGS_Seeker::GetManualRowName_Implementation() const
 
 void AGS_Seeker::UpdatePostProcessEffect(float EffectStrength)
 {
-    if (LowHealthEffectComp)
-    {
-        LowHealthEffectComp->ApplyStrength(EffectStrength);
-    }
+	if (LowHealthEffectComp)
+	{
+		LowHealthEffectComp->ApplyStrength(EffectStrength);
+	}
 }
 
 void AGS_Seeker::ServerAttackMontage_Implementation()
@@ -649,17 +649,17 @@ void AGS_Seeker::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 
 void AGS_Seeker::HandleLowHealthEffect(UGS_StatComp* InStatComp)
 {
-    if (!IsLocallyControlled() || !InStatComp)
+	if (!IsLocallyControlled() || !InStatComp)
 	{
 		return;
 	}
-    if (LowHealthEffectComp)
-    {
-        LowHealthEffectComp->OnHealthChanged(InStatComp->GetCurrentHealth(), InStatComp->GetMaxHealth());
-    }
+	if (LowHealthEffectComp)
+	{
+		LowHealthEffectComp->OnHealthChanged(InStatComp->GetCurrentHealth(), InStatComp->GetMaxHealth());
+	}
 }
 
-void AGS_Seeker::UpdateLowHealthEffect(){}
+void AGS_Seeker::UpdateLowHealthEffect() {}
 
 void AGS_Seeker::OnRep_SeekerGait()
 {
@@ -716,15 +716,15 @@ void AGS_Seeker::Multicast_SetMustTurnInPlace_Implementation(bool MustTurn)
 
 void AGS_Seeker::OnRep_IsLowHealthEffectActive()
 {
-    if (LowHealthPostProcessComp)
-    {
-        LowHealthPostProcessComp->bEnabled = bIsLowHealthEffectActive;
-    }
+	if (LowHealthPostProcessComp)
+	{
+		LowHealthPostProcessComp->bEnabled = bIsLowHealthEffectActive;
+	}
 }
 
 void AGS_Seeker::OnRep_CurrentEffectStrength()
 {
-    UpdatePostProcessEffect(CurrentEffectStrength);
+	UpdatePostProcessEffect(CurrentEffectStrength);
 }
 
 // ============================
@@ -739,10 +739,11 @@ void AGS_Seeker::OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp
 		if (AGS_Monster* Monster = Cast<AGS_Monster>(OtherActor))
 		{
 			AddCombatMonster(Monster);
-			
-			if (UGS_HPTextWidgetComp* HPWidgetComp = Monster->FindComponentByClass<UGS_HPTextWidgetComp>())
+
+			// 로컬 클라이언트에서만 CombatTrigger 상태 설정 (HP 위젯 가시성 제어용)
+			if (IsLocallyControlled())
 			{
-				HPWidgetComp->SetVisibility(true);
+				Monster->SetInSeekerCombatTrigger(true);
 			}
 		}
 	}
@@ -756,9 +757,16 @@ void AGS_Seeker::OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedCompon
 		{
 			RemoveCombatMonster(Monster);
 
-			if (UGS_HPTextWidgetComp* HPWidgetComp = Monster->FindComponentByClass<UGS_HPTextWidgetComp>())
+			// 로컬 클라이언트에서만 CombatTrigger 상태 설정 및 HP 위젯 숨김
+			if (IsLocallyControlled())
 			{
-				HPWidgetComp->SetVisibility(false);
+				Monster->SetInSeekerCombatTrigger(false);
+
+				// CombatTrigger를 벗어나면 즉시 HP 위젯 숨김
+				if (UGS_HPTextWidgetComp* HPWidgetComp = Monster->FindComponentByClass<UGS_HPTextWidgetComp>())
+				{
+					HPWidgetComp->SetVisibility(false);
+				}
 			}
 		}
 	}
@@ -793,7 +801,7 @@ void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
 	if (!bAlreadyContains)
 	{
 		NearbyMonsters.Add(TWeakObjectPtr<AGS_Monster>(Monster));
-		
+
 		// 몬스터 사망 시 호출될 델리게이트 바인딩
 		Monster->OnMonsterDead.AddUniqueDynamic(this, &AGS_Seeker::HandleMonsterDeath);
 
@@ -819,11 +827,11 @@ void AGS_Seeker::ClearNearbyMonsters()
 
 void AGS_Seeker::RemoveCombatMonster(AGS_Monster* Monster)
 {
-	if (!Monster) return;
+	if (!Monster)
+		return;
 
-	NearbyMonsters.RemoveAll([Monster](const TWeakObjectPtr<AGS_Monster>& Ptr) {
-		return Ptr.Get() == Monster;
-	});
+	NearbyMonsters.RemoveAll([Monster](const TWeakObjectPtr<AGS_Monster>& Ptr)
+	                         { return Ptr.Get() == Monster; });
 	Monster->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
 
 	// 모든 몬스터가 제거되면 음악 중지
@@ -847,7 +855,8 @@ void AGS_Seeker::StartCombatMusic()
 	}
 
 	// 무효한 몬스터 제거 (TWeakObjectPtr이므로 유효성 체크만 수행)
-	NearbyMonsters.RemoveAll([](const TWeakObjectPtr<AGS_Monster>& M) { return !M.IsValid(); });
+	NearbyMonsters.RemoveAll([](const TWeakObjectPtr<AGS_Monster>& M)
+	                         { return !M.IsValid(); });
 
 	if (NearbyMonsters.Num() == 0)
 	{
@@ -859,34 +868,34 @@ void AGS_Seeker::StartCombatMusic()
 	{
 		if (UGS_AudioManager* AudioManager = GameInstance->GetSubsystem<UGS_AudioManager>())
 		{
-            UAkAudioEvent* CombatStartEvent = nullptr;
-            UAkAudioEvent* CombatStopEvent = nullptr;
+			UAkAudioEvent* CombatStartEvent = nullptr;
+			UAkAudioEvent* CombatStopEvent = nullptr;
 
-            // 유효한 이벤트를 가진 몬스터를 우선 탐색
-            for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
-            {
-                AGS_Monster* Monster = MonsterPtr.Get();
-                if (!IsValid(Monster))
-                {
-                    continue;
-                }
-                // Soft Reference 로드
-                if (!Monster->CombatMusicEvent.IsNull())
-                {
-                    CombatStartEvent = Monster->CombatMusicEvent.LoadSynchronous();
-                    CombatStopEvent = Monster->CombatMusicStopEvent.IsNull() ? nullptr : Monster->CombatMusicStopEvent.LoadSynchronous();
-                    break;
-                }
-            }
+			// 유효한 이벤트를 가진 몬스터를 우선 탐색
+			for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
+			{
+				AGS_Monster* Monster = MonsterPtr.Get();
+				if (!IsValid(Monster))
+				{
+					continue;
+				}
+				// Soft Reference 로드
+				if (!Monster->CombatMusicEvent.IsNull())
+				{
+					CombatStartEvent = Monster->CombatMusicEvent.LoadSynchronous();
+					CombatStopEvent = Monster->CombatMusicStopEvent.IsNull() ? nullptr : Monster->CombatMusicStopEvent.LoadSynchronous();
+					break;
+				}
+			}
 
-            if (CombatStartEvent)
-            {
-                AudioManager->StartCombatSequence(this, CombatStartEvent, CombatStopEvent);
-            }
-            else
-            {
-                UE_LOG(LogTemp, Warning, TEXT("[Seeker] StartCombatMusic - 유효한 CombatMusicEvent가 없습니다. (NearbyMonsters: %d)"), NearbyMonsters.Num());
-            }
+			if (CombatStartEvent)
+			{
+				AudioManager->StartCombatSequence(this, CombatStartEvent, CombatStopEvent);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Seeker] StartCombatMusic - 유효한 CombatMusicEvent가 없습니다. (NearbyMonsters: %d)"), NearbyMonsters.Num());
+			}
 		}
 		else
 		{
@@ -957,14 +966,14 @@ void AGS_Seeker::OnDeath()
 
 void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, bool bIsNowAlive)
 {
-	if (!IsLocallyControlled()) 
+	if (!IsLocallyControlled())
 	{
 		return;
 	}
 
 	// 자신의 PlayerState인지 확인
 	AGS_PlayerState* MyPlayerState = GetPlayerState<AGS_PlayerState>();
-	if (ChangedPlayerState != MyPlayerState) 
+	if (ChangedPlayerState != MyPlayerState)
 	{
 		return;
 	}
@@ -977,7 +986,7 @@ void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, b
 }
 
 void AGS_Seeker::TransWeaponHandingState(EWeaponHandlingState RequiredCurState, EWeaponHandlingState NextState,
-	UAnimMontage* TargetAM, ESeekerMontageSlot TargetMontageSlot)
+                                         UAnimMontage* TargetAM, ESeekerMontageSlot TargetMontageSlot)
 {
 	if (WeaponHandlingState == RequiredCurState)
 	{
@@ -999,7 +1008,6 @@ void AGS_Seeker::Multicast_PlaySound_Implementation(UAkAudioEvent* SoundToPlay)
 	{
 		SeekerAudioComponent->PlayGenericSound(SoundToPlay);
 	}
-
 }
 
 void AGS_Seeker::OnHoverBegin()
@@ -1068,8 +1076,8 @@ void AGS_Seeker::OnRep_IsDetectedByGuardian()
 		return;
 	}
 
-    // 시각적 효과 업데이트 (항상 실행)
-    UpdateDetectionEffects();
+	// 시각적 효과 업데이트 (항상 실행)
+	UpdateDetectionEffects();
 
 	// 델리게이트 알림 (블루프린트 UI용)
 	OnDetectedByGuardianChanged.Broadcast(bIsDetectedByGuardian);
@@ -1088,14 +1096,14 @@ void AGS_Seeker::OnRep_IsDetectedByGuardian()
 
 	float CurrentTime = World->GetTimeSeconds();
 
-    if (bIsDetectedByGuardian)
+	if (bIsDetectedByGuardian)
 	{
 		// 입장 감지 사운드 제한 적용
 		float TimeSinceLastSound = CurrentTime - LastDetectionSoundTime;
 		if (TimeSinceLastSound >= DetectionSoundCooldown)
 		{
 			SeekerAudioComponent->PlayDetectionWarningSound();
-            LastDetectionSoundTime = CurrentTime;
+			LastDetectionSoundTime = CurrentTime;
 		}
 	}
 	else
@@ -1119,7 +1127,7 @@ void AGS_Seeker::OnRep_DetectionIntensity()
 	}
 
 	// 포스트 프로세스 효과 강도 업데이트
-    UpdateDetectionPostProcessEffect(DetectionIntensity);
+	UpdateDetectionPostProcessEffect(DetectionIntensity);
 }
 
 void AGS_Seeker::UpdateDetectionEffects()
@@ -1127,38 +1135,38 @@ void AGS_Seeker::UpdateDetectionEffects()
 	if (bIsDetectedByGuardian)
 	{
 		// 감지되었을 때 - 블루프린트에서 HUD 위젯 표시
-        UpdateDetectionHUD(true);
+		UpdateDetectionHUD(true);
 
 		// 감지 전용 포스트 프로세스 활성화
-        if (DetectionEffectComp)
-        {
-            DetectionEffectComp->OnDetectedChanged(true);
-        }
+		if (DetectionEffectComp)
+		{
+			DetectionEffectComp->OnDetectedChanged(true);
+		}
 	}
 	else
 	{
 		// 감지 해제 시 - 블루프린트에서 HUD 위젯 숨김
-        UpdateDetectionHUD(false);
+		UpdateDetectionHUD(false);
 
 		// 감지 전용 포스트 프로세스 비활성화
-        if (DetectionEffectComp)
-        {
-            DetectionEffectComp->OnDetectedChanged(false);
-        }
+		if (DetectionEffectComp)
+		{
+			DetectionEffectComp->OnDetectedChanged(false);
+		}
 	}
 }
 
 void AGS_Seeker::UpdateDetectionPostProcessEffect(float Intensity)
 {
-    if (!IsLocallyControlled())
+	if (!IsLocallyControlled())
 	{
 		return;
 	}
 
-    if (DetectionEffectComp)
-    {
-        DetectionEffectComp->SetIntensity(Intensity);
-    }
+	if (DetectionEffectComp)
+	{
+		DetectionEffectComp->SetIntensity(Intensity);
+	}
 }
 
 void AGS_Seeker::UpdateDetectionHUD_Implementation(bool bIsDetected)
@@ -1174,15 +1182,15 @@ void AGS_Seeker::UpdateDetectionHUD_Implementation(bool bIsDetected)
 		// 감지되었을 때 UI 표시 (Soft Reference 로드)
 		if (!DetectionHUDWidget && !DetectionHUDWidgetClass.IsNull())
 		{
-            TSubclassOf<UUserWidget> LoadedClass = DetectionHUDWidgetClass.LoadSynchronous();
-            if (LoadedClass)
-            {
-			    DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), LoadedClass);
-			    if (DetectionHUDWidget)
-			    {
-				    DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
-			    }
-            }
+			TSubclassOf<UUserWidget> LoadedClass = DetectionHUDWidgetClass.LoadSynchronous();
+			if (LoadedClass)
+			{
+				DetectionHUDWidget = CreateWidget<UUserWidget>(GetWorld(), LoadedClass);
+				if (DetectionHUDWidget)
+				{
+					DetectionHUDWidget->AddToViewport(100); // UI가 다른 요소에 가려지지 않도록 ZOrder 설정
+				}
+			}
 		}
 		else if (DetectionHUDWidget)
 		{
@@ -1323,7 +1331,7 @@ void AGS_Seeker::ExitDyingState(bool bWasRevived)
 	{
 		// 구조된 경우 - 이전 Gait로 복구
 		Server_SetSeekerGait(GaitBeforeDying);
-		
+
 		// 스킬 사용 가능
 		SetCanUseSkill(true);
 	}
@@ -1343,7 +1351,7 @@ void AGS_Seeker::OnRevived()
 	{
 		float MaxHP = Stat->GetMaxHealth();
 		float ReviveHP = MaxHP * ReviveHealthPercent;
-		Stat->SetCurrentHealth(ReviveHP, true);  // true = healing
+		Stat->SetCurrentHealth(ReviveHP, true); // true = healing
 	}
 
 	// 빈사 상태 해제
@@ -1517,7 +1525,7 @@ void AGS_Seeker::UpdateDyingPostProcessEffect()
 
 		// 남은 시간에 따라 효과 강도 조절 (시간이 적을수록 강해짐)
 		float TimeRatio = DyingTimeRemaining / MaxDyingTime;
-		float EffectStrength = 1.0f - TimeRatio;  // 0~1 범위
+		float EffectStrength = 1.0f - TimeRatio; // 0~1 범위
 
 		if (DyingDynamicMaterial)
 		{
@@ -1655,11 +1663,11 @@ void AGS_Seeker::StartReviveDecay()
 	if (World)
 	{
 		World->GetTimerManager().SetTimer(
-			ReviveDecayTimerHandle,
-			this,
-			&AGS_Seeker::OnReviveDecayTick,
-			REVIVE_DECAY_TICK_INTERVAL,  // 100ms마다 업데이트
-			true   // 반복
+		    ReviveDecayTimerHandle,
+		    this,
+		    &AGS_Seeker::OnReviveDecayTick,
+		    REVIVE_DECAY_TICK_INTERVAL, // 100ms마다 업데이트
+		    true // 반복
 		);
 	}
 }
@@ -1771,7 +1779,7 @@ void AGS_Seeker::OnRep_IsInDyingState()
 	if (IsLocallyControlled())
 	{
 		UpdateDetectionEffects();
-		
+
 		if (bIsInDyingState)
 		{
 			// 빈사 상태 화면 효과 활성화
@@ -1782,13 +1790,13 @@ void AGS_Seeker::OnRep_IsInDyingState()
 				// 동적 머티리얼 생성 (첫 진입 시, Soft Reference 로드)
 				if (!DyingDynamicMaterial && !DyingEffectMaterial.IsNull())
 				{
-                    UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
-                    if (LoadedMaterial)
-                    {
-					    DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
-					    DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
-					    DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
-                    }
+					UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
+					if (LoadedMaterial)
+					{
+						DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
+						DyingPostProcessComp->Settings.WeightedBlendables.Array.Empty();
+						DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
+					}
 				}
 			}
 		}
@@ -1841,7 +1849,9 @@ void AGS_Seeker::OnRep_ReviveProgress()
 {
 	// 구조 진행도 UI 업데이트
 	OnReviveProgressChanged.Broadcast(ReviveProgress);
-}// ========================================
+}
+
+// ========================================
 // 빈사 상태 불꽃 효과 구현
 // ========================================
 
@@ -1923,7 +1933,7 @@ void AGS_Seeker::UpdateDyingFlameVisuals(float TimeRemaining)
 				SeekerAudioComponent->PlayDyingTimerWarningSound();
 			}
 			// 재생 완료 표시
-			LastDyingWarningSecond = 1; 
+			LastDyingWarningSecond = 1;
 		}
 	}
 	else if (TimeRemaining > 10.0f)

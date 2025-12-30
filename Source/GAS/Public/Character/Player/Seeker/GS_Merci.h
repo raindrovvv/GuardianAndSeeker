@@ -15,6 +15,7 @@ class UAkComponent;
 class UGS_ArrowTypeWidget;
 class UNiagaraSystem;
 class UGS_CrossHairImage;
+class UGS_VisualPoolComp;
 
 UCLASS()
 class GAS_API AGS_Merci : public AGS_Seeker, public IGS_AttackInterface
@@ -24,7 +25,7 @@ class GAS_API AGS_Merci : public AGS_Seeker, public IGS_AttackInterface
 public:
 	// Sets default values for this character's properties
 	AGS_Merci();
-	
+
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -38,10 +39,10 @@ public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
 	// 화살 발사 VFX
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayArrowShotVFX(FVector Location, FRotator Rotation, int32 NumArrows);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayArrowShotSound();
 
 	// getter
@@ -58,7 +59,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Aim")
 	UGS_CrossHairImage* WidgetCrosshair;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* Quiver;
 
 	// Attack
@@ -76,7 +77,7 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_FireArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg = 0.0f, int32 NumArrows = 1);
-	
+
 	// Arrow
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TSubclassOf<AGS_SeekerMerciArrow> NormalArrowClass;
@@ -92,9 +93,9 @@ public:
 	void Server_NotifyDrawMontageEnded();
 
 	void OnDrawMontageEnded();
-	
+
 	bool GetIsFullyDrawn() { return bIsFullyDrawn; }
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_DrawDebugLine(FVector Start, FVector End, FColor Color = FColor::Green);
 
@@ -107,30 +108,33 @@ public:
 	void SetAutoAimTarget(AActor* Target);
 
 	// Camera Control
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_StartZoom();
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_StopZoom(float Duration);
 
 	//Crosshair
 	UFUNCTION(BlueprintCallable, Category = "Crosshair")
 	void SetCrosshairWidget(UGS_CrossHairImage* InCrosshairWidget);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_UpdateCrosshairAim(bool bAiming);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_ShowCrosshairHitFeedback();
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayHitFeedbackSound();
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayArrowEmptySound();
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_UpdateTargetUI(AActor* NewTarget, AActor* OldTarget);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Optimization")
+	UGS_VisualPoolComp* VisualPool;
 
 protected:
 	// Called when the game starts or when spawned
@@ -149,7 +153,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX|Attack", meta = (AllowPrivateAccess = "true"))
 	FVector MultiShotVFXOffset = FVector::ZeroVector;
-	
+
 	// 타임라인 관련
 	FTimeline ZoomTimeline;
 
@@ -161,33 +165,35 @@ protected:
 	UFUNCTION()
 	void UpdateZoom(float Alpha);
 
-	virtual void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
-	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 private:
 	FTimerHandle ReverseTimerHandle;
 	FTimerHandle DamageRecoveryTimerHandle;
-	
+
+	UPROPERTY(EditDefaultsOnly, Category = "Optimization")
+	TSubclassOf<AGS_ArrowVisualActor> VisualArrowClass;
+
 	UGS_ArrowTypeWidget* ArrowTypeWidget;
 
 	bool bWidgetVisibility = false;
-	USkeletalMeshComponent* Mesh;
 
 	void PlayDrawMontage(UAnimMontage* DrawMontage);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StopDrawMontage();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDrawMontage(UAnimMontage* Montage);
 
-	UFUNCTION(Client, Reliable)
-	void Client_SetWidgetVisibility(bool bVisible);	
+	UFUNCTION(Client, Unreliable)
+	void Client_SetWidgetVisibility(bool bVisible);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlaySound(UAkComponent* SoundComp);
 
 	bool bIsFullyDrawn = false;
-	
+
 	// [화살 관리]
 	int32 MaxAxeArrows = 5;
 	int32 MaxChildArrows = 3;

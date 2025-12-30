@@ -230,6 +230,9 @@ protected:
 	double LastBloodVFXTime = 0.0;
 	const float BloodVFXCooldown = 0.3f;
 
+	/** TrapData 로드 여부 (중복 로드 방지) */
+	bool bTrapDataLoaded = false;
+
 	AGS_TrapManager* GetTrapManager() const;
 	void LoadTrapData();
 	bool IsBlockedInDirection(const FVector& Start, const FVector& Direction, float Distance, AGS_Character* CharacterToIgnore);
@@ -241,6 +244,9 @@ protected:
 private:
 	void RefreshTrapAudioSetup(bool bForceFindComponent = false);
 	void AttachTrapAkComponentToAnchor();
+
+	/** 환경 오브젝트(바닥, 벽 등) 충돌 여부 체크 */
+	bool IsEnvironmentHit(AActor* HitActor, UPrimitiveComponent* HitComp) const;
 
 	/** Distance Culling 적용 */
 	void ApplyDistanceCulling();
