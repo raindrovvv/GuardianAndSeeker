@@ -267,9 +267,25 @@ void AGS_Monster::RegisterSignificanceManager()
 	{
 		if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
 		{
-			SM->RegisterObject(this, "Monster", [this](USignificanceManager::FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint) -> float
-			                   { return this->CalculateSignificance(Viewpoint); }, USignificanceManager::EPostSignificanceType::Sequential, [this](USignificanceManager::FManagedObjectInfo* ObjectInfo, float OldValue, float NewValue, bool bExternal)
-			                   { this->OnSignificanceChanged(NewValue); });
+			// TWeakObjectPtr로 캡처하여 액터 파괴 후 람다 호출 시 안전성 확보
+			TWeakObjectPtr<AGS_Monster> WeakThis(this);
+
+			SM->RegisterObject(
+			    this, "Monster",
+			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+			               const FTransform& Viewpoint) -> float
+			    {
+				    if (AGS_Monster* StrongThis = WeakThis.Get())
+					    return StrongThis->CalculateSignificance(Viewpoint);
+				    return 0.0f;
+			    },
+			    USignificanceManager::EPostSignificanceType::Sequential,
+			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+			               float OldValue, float NewValue, bool bExternal)
+			    {
+				    if (AGS_Monster* StrongThis = WeakThis.Get())
+					    StrongThis->OnSignificanceChanged(NewValue);
+			    });
 		}
 	}
 }
