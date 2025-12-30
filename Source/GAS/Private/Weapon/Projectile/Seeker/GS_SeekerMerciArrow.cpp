@@ -4,6 +4,7 @@
 #include "Weapon/Projectile/Seeker/GS_SeekerMerciArrow.h"
 #include "Weapon/Projectile/Seeker/GS_ArrowVisualActor.h"
 #include "Weapon/Projectile/Component/GS_ArrowFXComponent.h"
+#include "Component/GS_VisualPoolComp.h"
 #include "Components/SphereComponent.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
@@ -55,86 +56,79 @@ void AGS_SeekerMerciArrow::BeginPlay()
 
 void AGS_SeekerMerciArrow::StickWithVisualOnly(const FHitResult& Hit)
 {
-	if (!ProjectileMesh)
-	{
-		return;
-	}
-
-	if (bAlreadyStuck)
+	if (!ProjectileMesh || bAlreadyStuck)
 	{
 		return;
 	}
 	bAlreadyStuck = true;
 
-	UE_LOG(LogTemp, Error, TEXT("=== StickWithVisualOnly Called ==="));
-	UE_LOG(LogTemp, Error, TEXT("Hit Component: %s"), Hit.Component.IsValid() ? *Hit.Component->GetName() : TEXT("NULL"));
-	UE_LOG(LogTemp, Error, TEXT("Hit BoneName: %s"), *Hit.BoneName.ToString());
+	// 화살이 박힐 정확한 지점 계산
+	FVector StickLocation = Hit.ImpactPoint;
+	FVector StickNormal = Hit.ImpactNormal;
 
-	// 화살이 박힌 위치 (Hit 결과 사용)
-	FVector SpawnLocation = Hit.ImpactPoint;
-
-	// 화살의 실제 속도 방향 사용
-	FVector ArrowDirection = GetVelocity().GetSafeNormal();
-	if (ArrowDirection.IsNearlyZero())
+	// Overlap 시 ImpactPoint가 0인 경우가 많으므로 보정
+	if (StickLocation.IsZero())
 	{
-		// 속도가 0에 가까우면 Forward Vector 사용
-		ArrowDirection = GetActorForwardVector();
+		FVector ArrowLoc = GetActorLocation();
+		FVector PrevLoc = ArrowLoc - (GetVelocity() * GetWorld()->GetDeltaSeconds() * 2.0f);
+
+		FHitResult SurfaceHit;
+		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(ArrowStickTrace), true, this);
+
+		// [최적화] ECC_Visibility 대신 WorldStatic 채널 사용 (벽 감지 정확도 향상)
+		if (GetWorld()->LineTraceSingleByChannel(SurfaceHit, PrevLoc, ArrowLoc + (GetActorForwardVector() * 100.f), ECC_WorldStatic, TraceParams))
+		{
+			StickLocation = SurfaceHit.ImpactPoint;
+			StickNormal = SurfaceHit.ImpactNormal;
+		}
+		else
+		{
+			StickLocation = ArrowLoc;
+			StickNormal = -GetActorForwardVector();
+		}
 	}
 
-	FRotator SpawnRotation = FRotationMatrix::MakeFromX(ArrowDirection).Rotator();
+	// 화살의 회전값 결정
+	FRotator StickRotation = GetActorRotation();
 
-	// 화살이 표면에서 약간 파고들도록 위치 조정
-	SpawnLocation += Hit.ImpactNormal * 20.0f; // ImpactNormal 방향으로 파고들기
+	// [수정] StickNormal 방향으로 '빼야' 벽 안쪽으로 파고듭니다.
+	// 너무 많이 파고들면 사라지므로 10~15유닛이 적당합니다.
+	StickLocation -= (StickNormal * 12.0f);
 
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGS_Merci* Merci = Cast<AGS_Merci>(GetOwner());
+	if (!Merci)
+		Merci = Cast<AGS_Merci>(GetInstigator());
 
-	if (VisualArrowClass && GetWorld())
+	if (Merci && Merci->VisualPool)
 	{
-		AGS_ArrowVisualActor* VisualArrow = GetWorld()->SpawnActor<AGS_ArrowVisualActor>(
-		    VisualArrowClass,
-		    SpawnLocation,
-		    SpawnRotation,
-		    Params);
-
-		if (VisualArrow)
+		if (AGS_ArrowVisualActor* VisualArrow = Merci->VisualPool->GetActorFromPool(StickLocation, StickRotation))
 		{
-			VisualArrow->SetArrowMesh(ProjectileMesh->GetSkeletalMeshAsset());
+			if (USkeletalMesh* MeshAsset = ProjectileMesh->GetSkeletalMeshAsset())
+			{
+				VisualArrow->SetArrowMesh(MeshAsset);
+			}
 			VisualArrow->SetAttachedTargetActor(Hit.GetActor());
-			// Bone 이름이 있으면 해당 Bone에 Attach
-			if (Hit.BoneName != NAME_None && Hit.Component.IsValid())
+
+			if (Hit.Component.IsValid())
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Attaching arrow to bone: %s"), *Hit.BoneName.ToString());
-				VisualArrow->AttachToComponent(
-				    Hit.Component.Get(),
-				    FAttachmentTransformRules::KeepWorldTransform,
-				    Hit.BoneName);
-			}
-			else if (Hit.Component.IsValid())
-			{
-				// Bone은 없지만 Component는 있는 경우
-				UE_LOG(LogTemp, Warning, TEXT("Attaching arrow to component (no bone)"));
-				VisualArrow->AttachToComponent(
-				    Hit.Component.Get(),
-				    FAttachmentTransformRules::KeepWorldTransform);
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("No valid component to attach arrow to!"));
+				VisualArrow->AttachToComponent(Hit.Component.Get(), FAttachmentTransformRules::KeepWorldTransform, Hit.BoneName);
 			}
 		}
 	}
 
-	// 이동 멈춤
 	if (ProjectileMovementComponent)
 	{
 		ProjectileMovementComponent->StopMovementImmediately();
 		ProjectileMovementComponent->Deactivate();
 	}
 	SetActorEnableCollision(false);
-
-	// 원래 화살 제거
 	Destroy();
+}
+
+void AGS_SeekerMerciArrow::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	// Overlap과 통합 처리
+	OnBeginOverlap(HitComp, OtherActor, OtherComp, 0, true, Hit);
 }
 
 void AGS_SeekerMerciArrow::Multicast_InitHomingTarget_Implementation(AActor* Target)
@@ -265,7 +259,7 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 	}
 
 	HitActors.Add(OtherActor);
-	UE_LOG(LogTemp, Error, TEXT("Arrow hit actor: %s"), *OtherActor->GetName());
+	UE_LOG(LogTemp, Log, TEXT("Arrow hit actor: %s"), *OtherActor->GetName());
 
 	// 맞은 대상 구분
 	ETargetType TargetType = DetermineTargetType(OtherActor);
