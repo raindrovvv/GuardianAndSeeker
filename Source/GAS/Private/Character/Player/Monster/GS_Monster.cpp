@@ -11,6 +11,7 @@
 #include "Sound/GS_AudioManager.h"
 
 // #include "Character/GS_Character.h"
+#include "SignificanceManager.h"
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -88,6 +89,14 @@ AGS_Monster::AGS_Monster()
 	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
 	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
 	LastNetUpdateFrequency = NetUpdateFrequency;
+	HitReactComp = CreateDefaultSubobject<UGS_HitReactComp>(TEXT("HitReactComp_Monster"));
+
+	// === Shadow Proxy (Capsule Shadows) 활성화 ===
+	if (GetMesh())
+	{
+		GetMesh()->SetCastCapsuleDirectShadow(true);
+		GetMesh()->SetCastCapsuleIndirectShadow(true);
+	}
 }
 
 void AGS_Monster::BeginPlay()
@@ -105,14 +114,14 @@ void AGS_Monster::BeginPlay()
 		SetActorTickEnabled(true);
 	}
 
-	if (UWorld* World = GetWorld())
+	/*	if (UWorld* World = GetWorld())
 	{
 		if (UGS_ActorRegistrySubsystem* Registry =
 		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->RegisterMonster(this);
 		}
-	}
+	}*/
 
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
@@ -134,6 +143,12 @@ void AGS_Monster::BeginPlay()
 	{
 		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(
 		    this, &AGS_Monster::HandleSkillCooldownChanged);
+	}
+
+	// HP 위젯 틱 간격 최적화 (매 프레임 대신 0.1초마다 체크)
+	if (IsValid(HPTextWidgetComp))
+	{
+		HPTextWidgetComp->SetComponentTickInterval(0.1f);
 	}
 
 	// Bind to HP change for attack detection
@@ -234,6 +249,20 @@ void AGS_Monster::BeginPlay()
 	}
 }
 
+void AGS_Monster::RegisterSignificanceManager()
+{
+	// === Significance Manager 등록 (클라이언트만) ===
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
+		{
+			SM->RegisterObject(this, "Monster", [this](USignificanceManager::FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint) -> float
+			                   { return this->CalculateSignificance(Viewpoint); }, USignificanceManager::EPostSignificanceType::Sequential, [this](USignificanceManager::FManagedObjectInfo* ObjectInfo, float OldValue, float NewValue, bool bExternal)
+			                   { this->OnSignificanceChanged(NewValue); });
+		}
+	}
+}
+
 void AGS_Monster::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -290,6 +319,8 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		{
 			Registry->UnregisterMonster(this);
 		}
+
+		// Significance Manager 해제는 부모 클래스(GS_Character::EndPlay)에서 수행됨
 	}
 
 	// Stability: Ensure widget components are properly cleaned up
@@ -312,76 +343,99 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AGS_Monster::Tick(float DeltaSeconds)
 {
-	// Tick Optimization 적용
-	if (TickOptimizationComp)
-	{
-		// 쓰로틀링된 틱 실행 여부 확인
-		if (!TickOptimizationComp->ShouldExecuteThrottledTick(
-		        GetWorld()->GetTimeSeconds()))
-		{
-			return;
-		}
-		TickOptimizationComp->MarkThrottledTickExecuted(
-		    GetWorld()->GetTimeSeconds());
-	}
-
-	// 최적화 체크를 통과한 경우에만 부모 틱 및 하위 로직 실행
 	Super::Tick(DeltaSeconds);
-
-	// 주기적(틱 간격에 맞게)으로 그림자 컬링 상태 업데이트
 	UpdateShadowCulling();
 
-	// Monster HP Bar distance & LoS culling (Client only)
-	if (GetNetMode() != NM_DedicatedServer && IsValid(HPTextWidgetComp))
+	// Monster HP Bar visibility (Client only)
+	if (GetNetMode() == NM_DedicatedServer || !IsValid(HPTextWidgetComp))
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		return;
+	}
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+		return;
+
+	APlayerCameraManager* CameraManager = PC->PlayerCameraManager;
+	if (!CameraManager)
+		return;
+
+	bool bIsVisible = false;
+	bool bIsRTSMode = GS_Rendering::IsRTSMode(this);
+	FVector CameraLocation = CameraManager->GetCameraLocation();
+
+	if (bIsRTSMode)
+	{
+		// RTS 모드: 거리 기반 컬링
+		float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
+		float MaxCullDist = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+		bIsVisible = (DistSq < FMath::Square(MaxCullDist));
+	}
+	else
+	{
+		// TPS 모드 (시커 시점): 근접 전투 중이거나 일정 거리(30m) 내에 있으면 표시
+		bool bIsInRange = false;
+		if (APawn* LocalPawn = PC->GetPawn())
 		{
-			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			float DistSqToSeeker = FVector::DistSquared(GetActorLocation(), LocalPawn->GetActorLocation());
+			// 30m 내에 있으면 보이도록 설정 (시커 거리 안전망)
+			bIsInRange = (DistSqToSeeker < FMath::Square(3000.0f));
+
+			const float CombatTriggerRadiusSq = FMath::Square(800.0f * 1.1f);
+			if (DistSqToSeeker > CombatTriggerRadiusSq)
 			{
-				FVector CameraLocation = CameraManager->GetCameraLocation();
-				FVector WidgetLocation =
-				    GetActorLocation() +
-				    FVector(0.f, 0.f, 200.f); // HP 위젯 위치로 상향 조정
-
-				float DistSq = FVector::DistSquared(CameraLocation, GetActorLocation());
-
-				// 시점에 따른 동적 컬링 거리 계산 (RTS 모드 대응)
-				float MaxCullDist = GS_Rendering::CalculateCullDistance(
-				    this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
-				float MaxCullDistSq = MaxCullDist * MaxCullDist;
-
-				bool bInRange = (DistSq < MaxCullDistSq);
-				bool bIsVisible = bInRange;
-
-				// 거리 내에 있다면 차폐 여부 체크 (TPS 모드에서만 적용, RTS 모드에서는
-				// 항상 노출)
-				if (bInRange && !GS_Rendering::IsRTSMode(this))
-				{
-					FHitResult HitResult;
-					FCollisionQueryParams Params(NAME_None, false, this);
-					Params.AddIgnoredActor(PC->GetPawn()); // 로컬 플레이어 무시
-
-					// Visibility 채널을 사용하여 차폐 여부 확인
-					if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation,
-					                                         WidgetLocation,
-					                                         ECC_Visibility, Params))
-					{
-						// 환경(지형, 벽)에 맞았을 때만 가림 처리. 다른 캐릭터에 의한 가림은
-						// 무시
-						if (HitResult.GetActor() != this &&
-						    !HitResult.GetActor()->IsA<ACharacter>())
-						{
-							bIsVisible = false;
-						}
-					}
-				}
-
-				if (HPTextWidgetComp->IsVisible() != bIsVisible)
-				{
-					HPTextWidgetComp->SetVisibility(bIsVisible);
-				}
+				bIsInSeekerCombatTrigger = false;
 			}
 		}
+
+		if (bIsInSeekerCombatTrigger || bIsInRange)
+		{
+			bIsVisible = true;
+			FVector MonsterLocation = GetActorLocation();
+			FVector WidgetLocation = HPTextWidgetComp->GetComponentLocation();
+
+			FHitResult HitResult;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(HPWidgetVisibility), true, this);
+			Params.AddIgnoredActor(PC->GetPawn());
+
+			// 1. 머리 및 허리 위치 체크 (둘 다 가려져야만 숨김 처리하여 깜빡임 방지)
+			bool bHeadBlocked = false;
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, WidgetLocation, ECC_Visibility, Params))
+			{
+				bool bIsPawn = (HitResult.GetActor() && HitResult.GetActor()->IsA<APawn>());
+				bool bIsFloor = (HitResult.ImpactNormal.Z >= 0.7f);
+				if (!bIsPawn && !bIsFloor)
+				{
+					bHeadBlocked = true;
+				}
+			}
+
+			bool bWaistBlocked = false;
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, 50.f), ECC_Visibility, Params))
+			{
+				bool bIsPawn = (HitResult.GetActor() && HitResult.GetActor()->IsA<APawn>());
+				bool bIsFloor = (HitResult.ImpactNormal.Z >= 0.7f);
+				if (!bIsPawn && !bIsFloor)
+				{
+					bWaistBlocked = true;
+				}
+			}
+
+			// 머리와 허리 둘 다 가려진 경우에만 비활성화
+			if (bHeadBlocked && bWaistBlocked)
+			{
+				bIsVisible = false;
+			}
+		}
+	}
+
+	// 가시성 업데이트 (위젯이 꺼져있더라도 Tick은 돌아서 다시 켜질지 판단해야 함)
+	if (HPTextWidgetComp->IsVisible() != bIsVisible)
+	{
+		HPTextWidgetComp->SetVisibility(bIsVisible);
+
+		// 최적화: 보일 때는 0.1초(기본값), 안 보일 때는 0.3초마다 체크하여 CPU 부하 감소
+		HPTextWidgetComp->SetComponentTickInterval(bIsVisible ? 0.1f : 0.3f);
 	}
 }
 
@@ -704,22 +758,139 @@ void AGS_Monster::UpdateShadowCulling()
 				// 거리 기반 그림자 설정
 				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
 				{
-					// 80m 이상: 그림자 완전 비활성화
+					// 80m 이상: 동적/정적 그림자 모두 끄되, 캡슐 그림자는 유지 (Grounded 느낌)
 					MeshComp->SetCastShadow(false);
+					MeshComp->bCastDynamicShadow = false;
 				}
 				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
 				{
-					// 40-80m: 정적 그림자만 유지 (동적 그림자 비활성화)
+					// 40-80m: 정적 그림자 및 캡슐 그림자 유지
 					MeshComp->SetCastShadow(true);
 					MeshComp->bCastDynamicShadow = false;
 				}
 				else
 				{
-					// 40m 이내: 모든 그림자 활성화
+					// 40m 이내: 고품질 동적 그림자 활성화
 					MeshComp->SetCastShadow(true);
 					MeshComp->bCastDynamicShadow = true;
 				}
 			}
+		}
+	}
+}
+
+float AGS_Monster::CalculateSignificance(const FTransform& Viewpoint)
+{
+	if (IsDead())
+		return 0.0f;
+
+	float Score = 0.1f;
+	FVector ActorLoc = GetActorLocation();
+	FVector ViewLoc = Viewpoint.GetLocation();
+	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
+
+	// 가디언(RTS) 시점
+	if (GS_Rendering::IsRTSMode(this))
+	{
+		// 선택된 유닛은 최상위 중요도
+		if (bIsSelected)
+			return 1.0f;
+
+		// 화면 컬링 거리 (RTS 배율 적용) 내에 있는지 확인
+		float MaxCullDist = GS_Rendering::CalculateCullDistance(
+		    this, GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE);
+		float MaxCullDistSq = FMath::Square(MaxCullDist);
+
+		if (DistSq < MaxCullDistSq)
+		{
+			Score = 0.8f; // 화면 근처 유닛
+		}
+		else
+		{
+			Score = 0.2f; // 먼 유닛
+		}
+	}
+	// 시커(TPS) 시점
+	else
+	{
+		// 30m 거리 기준으로 점수 선형 감쇠
+		float CombatRangeSq = FMath::Square(3000.0f);
+		Score = FMath::Clamp(1.0f - (DistSq / CombatRangeSq), 0.1f, 1.0f);
+	}
+
+	return Score;
+}
+
+void AGS_Monster::OnSignificanceChanged(float NewSignificance)
+{
+	// 1. 부모 클래스의 최적화 로직 수행 (이동, 네트워크 등)
+	Super::OnSignificanceChanged(NewSignificance);
+
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+		return;
+
+	// 2. 중요도에 따라 애니메이션 품질 조절
+	MeshComp->bEnableUpdateRateOptimizations = (NewSignificance < 0.8f);
+
+	// 2. 중요도에 따른 애니메이션 틱 옵션 조정
+	if (NewSignificance > 0.6f)
+	{
+		// 중요할 때: 항상 재생 및 본 갱신
+		MeshComp->VisibilityBasedAnimTickOption =
+		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	}
+	else if (NewSignificance > 0.2f)
+	{
+		// 보통일 때: 화면에 보일 때만 갱신
+		MeshComp->VisibilityBasedAnimTickOption =
+		    EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	}
+	else
+	{
+		// 거의 보이지 않거나 멀 때: 몽타주만 재생 (성능 위주)
+		MeshComp->VisibilityBasedAnimTickOption =
+		    EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+	}
+
+	// 4. UI 및 틱 최적화
+	// 중요도가 작으면 UI 틱 및 가시성 강제 비활성화 (성능 최적화)
+	// 가시성 임계값(0.5)은 Tick()의 거리 기반 가시성 로직과 협력함
+	bool bUIEnabled = (NewSignificance > 0.4f);
+
+	auto UpdateWidgetOptimization = [&](UWidgetComponent* Widget)
+	{
+		if (Widget)
+		{
+			if (!bUIEnabled)
+			{
+				Widget->SetVisibility(false);
+				Widget->SetComponentTickEnabled(false);
+			}
+			else
+			{
+				Widget->SetComponentTickEnabled(true);
+				// 주의: 여기서 직접 SetVisibility(true)를 하지 않음.
+				// 실제 가시성은 Tick()에서 거리 및 장애물 체크를 거쳐 최종 결정됨.
+			}
+		}
+	};
+
+	UpdateWidgetOptimization(HPTextWidgetComp);
+	UpdateWidgetOptimization(TargetedUIComponent);
+	UpdateWidgetOptimization(SkillCooldownWidgetComp);
+
+	// 5. 틱 활성화 가시성 임계값 결정 (중요도에 따라 틱 간격도 조절하여 성능 최적화)
+	if (PrimaryActorTick.bCanEverTick)
+	{
+		bool bShouldTick = (NewSignificance > 0.05f);
+		SetActorTickEnabled(bShouldTick);
+
+		if (bShouldTick)
+		{
+			// 중요도가 낮을수록(멀수록) 틱 간격을 늘려 레이트레이싱 빈도 감소
+			float NewTickInterval = (NewSignificance > 0.8f) ? 0.0f : (NewSignificance > 0.4f ? 0.1f : 0.3f);
+			SetActorTickInterval(NewTickInterval);
 		}
 	}
 }

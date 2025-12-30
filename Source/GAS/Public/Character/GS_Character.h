@@ -7,7 +7,6 @@
 #include "Component/GS_HitReactComp.h"
 #include "CharacterDataAsset.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
-#include "Component/GS_TickOptimizationComponent.h"
 #include "GS_Character.generated.h"
 
 class UGS_StatComp;
@@ -99,10 +98,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComp;
 
-	// 틱 최적화 컴포넌트 (거리 기반 틱 쓰로틀링)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Optimization")
-	TObjectPtr<UGS_TickOptimizationComponent> TickOptimizationComp;
-
 	// EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake"
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
 	FGS_CameraShakeInfo TakeDamageShake;
@@ -156,7 +151,7 @@ public:
 	void ServerRPCMeleeAttack(AGS_Character* InDamagedCharacter);
 
 	//clientRPC for camera shake
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Client_PlayTakeDamageShake(APlayerController* TargetPC);
 
 	UFUNCTION(Client, Unreliable)
@@ -186,13 +181,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Team")
 	bool IsEnemy(const AGS_Character* Other) const;
 
-	//play skill montage
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCPlaySkillMontage(UAnimMontage* SkillMontage);
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void MulicastRPCStopCurrentSkillMontage(UAnimMontage* CurrentSkillMontage);
-
 	// Impact VFX 재생 (내부적으로 OnRep을 통해 동기화)
 	UFUNCTION(BlueprintCallable, Category = "Effects")
 	void PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale = FVector(1.0f, 1.0f, 1.0f));
@@ -231,6 +224,16 @@ public:
 	// @param MaxDistance 최대 재생 거리 (cm, 기본값 4000cm)
 	// @return VFX를 재생해야 하면 true, 아니면 false
 	bool ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance = 4000.0f) const;
+
+	/** Significance Manager: 중요도 계산 (거리, 시점, 로컬 여부 등 고려) */
+	virtual float CalculateSignificance(const FTransform& Viewpoint);
+
+	/** Significance Manager: 중요도 변경에 따른 자원(애니메이션, 틱 등) 조절 */
+	virtual void OnSignificanceChanged(float NewSignificance);
+
+protected:
+	/** Significance Manager 등록 로직 (가상 함수로 분리하여 중복 등록 방지) */
+	virtual void RegisterSignificanceManager();
 
 protected:
 	virtual void NotifyActorBeginCursorOver() override;

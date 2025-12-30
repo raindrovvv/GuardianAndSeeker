@@ -18,10 +18,10 @@ class UGS_MonsterAnimInstance;
 class UGS_VFXComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterDead, AGS_Monster*,
-											DeadUnit);
+                                            DeadUnit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMonsterAttacked, AGS_Monster*,
-											 AttackedUnit, FVector,
-											 AttackLocation);
+                                             AttackedUnit, FVector,
+                                             AttackLocation);
 
 UCLASS()
 class GAS_API AGS_Monster : public AGS_Character
@@ -108,7 +108,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(
-		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	    TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Skill")
@@ -146,6 +146,14 @@ protected:
 	/** 그림자 컬링 최적화 (거리 기반) */
 	void UpdateShadowCulling();
 
+	/** Significance Manager: 중요도 계산 콜백 */
+	float CalculateSignificance(const FTransform& Viewpoint);
+
+	virtual void OnSignificanceChanged(float NewSignificance);
+
+protected:
+	virtual void RegisterSignificanceManager() override;
+
 private:
 	bool bIsSelected;
 
@@ -160,4 +168,12 @@ private:
 
 	/** 마지막으로 설정한 NetUpdateFrequency (변경 감지용) */
 	float LastNetUpdateFrequency;
+
+	/** 로컬 시커의 CombatTrigger 내부에 있는지 여부 (클라이언트 로컬) */
+	bool bIsInSeekerCombatTrigger = false;
+
+public:
+	/** 시커의 CombatTrigger 내부 여부 설정 (시커에서 호출) */
+	void SetInSeekerCombatTrigger(bool bInTrigger) { bIsInSeekerCombatTrigger = bInTrigger; }
+	bool IsInSeekerCombatTrigger() const { return bIsInSeekerCombatTrigger; }
 };
