@@ -294,7 +294,10 @@ void AGS_Monster::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	MonsterAnim = Cast<UGS_MonsterAnimInstance>(GetMesh()->GetAnimInstance());
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MonsterAnim = Cast<UGS_MonsterAnimInstance>(MeshComp->GetAnimInstance());
+	}
 }
 
 void AGS_Monster::GetLifetimeReplicatedProps(
@@ -389,7 +392,13 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 		return;
 	}
 
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	APlayerController* PC = World->GetFirstPlayerController();
 	if (!PC)
 		return;
 
