@@ -92,6 +92,12 @@ void UGS_AresUltimateSkill::OnSkillAnimationEnd()
 	}
 }
 
+void UGS_AresUltimateSkill::InterruptSkill()
+{
+	// 궁극기는 10초 지속 버프 스킬이므로, 다른 스킬 사용으로 interrupt되지 않음
+	// bIsActive를 유지하여 검기 스킬에서 궁극기 VFX를 사용할 수 있도록 함
+}
+
 void UGS_AresUltimateSkill::BecomeBerserker()
 {
 	if (!OwnerCharacter)

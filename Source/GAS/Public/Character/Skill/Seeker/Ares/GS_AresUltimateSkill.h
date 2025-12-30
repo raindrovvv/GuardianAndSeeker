@@ -20,6 +20,7 @@ public:
 	virtual void ActiveSkill() override;
 	virtual void OnSkillCanceledByDebuff() override;
 	virtual void OnSkillAnimationEnd() override;
+	virtual void InterruptSkill() override;
 
 private:
 	virtual void DeactiveSkill() override;

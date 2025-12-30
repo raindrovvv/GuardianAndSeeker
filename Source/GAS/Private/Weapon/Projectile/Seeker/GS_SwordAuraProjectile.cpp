@@ -113,16 +113,19 @@ void AGS_SwordAuraProjectile::StopSwordSlashVFX()
 }
 
 
-void AGS_SwordAuraProjectile::Multicast_StartSwordSlashVFX_Implementation()
+void AGS_SwordAuraProjectile::Multicast_StartSwordSlashVFX_Implementation(ESwordAuraEffectType InEffectType)
 {
 	if (!SlashBox)
 	{
 		return;
 	}
 
+	// RPC 파라미터로 전달받은 값으로 EffectType 동기화 (Hit VFX에서도 사용)
+	EffectType = InEffectType;
+
 	// VFX 타입 선택
 	UNiagaraSystem* SelectedVFX = nullptr;
-	switch (EffectType)
+	switch (InEffectType)
 	{
 	case ESwordAuraEffectType::LeftNormal:
 		SelectedVFX = LeftNormalSlashVFX;
