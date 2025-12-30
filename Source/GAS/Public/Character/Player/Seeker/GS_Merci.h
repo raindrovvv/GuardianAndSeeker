@@ -92,6 +92,7 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_NotifyDrawMontageEnded();
 
+	virtual void StateReset() override;
 	void OnDrawMontageEnded();
 
 	bool GetIsFullyDrawn() { return bIsFullyDrawn; }

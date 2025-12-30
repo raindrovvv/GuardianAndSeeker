@@ -532,6 +532,18 @@ void AGS_Merci::Server_NotifyDrawMontageEnded_Implementation()
 	SetDrawState(false);
 }
 
+void AGS_Merci::StateReset()
+{
+	Super::StateReset();
+
+	// 새로운 액션(구르기 등)으로 인해 상태가 리셋될 때, 피격 복구용 타이머도 함께 제거하여
+	// 0.5초 뒤에 갑자기 상태가 다시 풀리는(가령 구르기 중 제어권 복구 등) 현상을 방지함.
+	if (GetWorldTimerManager().IsTimerActive(DamageRecoveryTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(DamageRecoveryTimerHandle);
+	}
+}
+
 void AGS_Merci::Client_SetWidgetVisibility_Implementation(bool bVisible)
 {
 	if (!IsLocallyControlled())
@@ -667,8 +679,11 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		SetAimState(false);
 		bIsFullyDrawn = false;
 
-		// 키 제한
-		GetSkillComp()->SetCurAllowedSkillsMask(0);
+		// 키 제한 (구르기는 허용)
+		if (GetSkillComp())
+		{
+			GetSkillComp()->SetCurAllowedSkillsMask(1 << static_cast<int32>(ESkillSlot::Rolling));
+		}
 
 		// 0.5초 뒤 상태 리셋 (피격 후 복구 보장)
 		GetWorldTimerManager().ClearTimer(DamageRecoveryTimerHandle);
