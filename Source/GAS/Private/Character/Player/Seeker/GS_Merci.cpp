@@ -97,9 +97,16 @@ void AGS_Merci::BeginPlay()
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		// 로컬 플레이어는 부드러운 애니메이션을 위해 URO를 끄고, 나머지는 켭니다.
 		MeshComp->bEnableUpdateRateOptimizations = !IsLocallyControlled();
-		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+		// 서버에서는 공격 로직(화살 발사 위치 계산, 노티파이 등)을 위해 항상 뼈를 갱신
+		if (HasAuthority())
+		{
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		}
+		else
+		{
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		}
 		MeshComp->SetBoundsScale(1.1f);
 	}
 
