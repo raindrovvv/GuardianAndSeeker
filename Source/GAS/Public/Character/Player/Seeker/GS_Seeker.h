@@ -10,6 +10,7 @@
 #include "Props/Item/E_ItemType.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "AkAudioEvent.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 #include "GS_Seeker.generated.h"
 
@@ -307,7 +308,7 @@ public:
 
 	// 전투 탐지 반경
 	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta=(ClampMin="0"))
-	float CombatTriggerRadius = 800.0f;
+	float CombatTriggerRadius = GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS;
 
 	// 몬스터가 전투 음악 시작/중지를 요청할 때 호출
 	UFUNCTION(BlueprintCallable)

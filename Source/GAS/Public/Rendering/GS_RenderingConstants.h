@@ -136,6 +136,13 @@ constexpr float SHADOW_DISABLE_DISTANCE = 8000.0f;
 constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 4000.0f;
 
 // ========================================
+// Combat Detection Settings
+// ========================================
+
+/** Seeker 전투 트리거 반경 기본값 (8m) - Monster HP 위젯 가시성 등에서 공유 */
+constexpr float DEFAULT_COMBAT_TRIGGER_RADIUS = 800.0f;
+
+// ========================================
 // AI Perception Distance Optimization
 // ========================================
 

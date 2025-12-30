@@ -402,7 +402,7 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 			// 30m 내에 있으면 보이도록 설정 (시커 거리 안전망)
 			bIsInRange = (DistSqToSeeker < FMath::Square(3000.0f));
 
-			const float CombatTriggerRadiusSq = FMath::Square(800.0f * 1.1f);
+			const float CombatTriggerRadiusSq = FMath::Square(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS * 1.1f);
 			if (DistSqToSeeker > CombatTriggerRadiusSq)
 			{
 				bIsInSeekerCombatTrigger = false;
