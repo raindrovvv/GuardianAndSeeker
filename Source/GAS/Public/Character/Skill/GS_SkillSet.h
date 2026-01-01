@@ -32,14 +32,14 @@ struct GAS_API FSkillInfo
 	FSkillInfo()
 	{
 		AllowSkillList.Empty();
-		for (int32 i =0; i < static_cast<int32>(ESkillSlot::End); i++)
+		for (int32 i = 0; i < static_cast<int32>(ESkillSlot::End); i++)
 		{
 			FSkillAllow AllowSkill;
 			AllowSkill.Slot = static_cast<ESkillSlot>(i);
 			AllowSkillList.Add(AllowSkill);
 		}
 	}
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<UGS_SkillBase> SkillClass = nullptr;
 
@@ -122,6 +122,9 @@ struct GAS_API FSkillInfo
 	TObjectPtr<UNiagaraSystem> SkillImpactVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+	TObjectPtr<UNiagaraSystem> SkillEnvImpactVFX; // 환경(벽, 바닥) 충돌용 VFX
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
 	TObjectPtr<UNiagaraSystem> SkillEndVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
@@ -145,7 +148,13 @@ struct GAS_API FSkillInfo
 	FVector ImpactVFXOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Offset")
+	FVector EnvImpactVFXOffset = FVector::ZeroVector; // 환경 충돌용 VFX 오프셋
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Offset")
 	FVector EndVFXOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Offset")
+	FVector LoopVFXOffset = FVector::ZeroVector;
 };
 
 USTRUCT(BlueprintType)
@@ -158,7 +167,7 @@ struct GAS_API FGS_SkillSet : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSkillInfo ReadySkill;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSkillInfo AimingSkill;
 

@@ -26,7 +26,7 @@ void UGS_ChanAimingSkill::ActiveSkill()
 {
 	// 스킬 상태 업데이트
 	Super::ActiveSkill();
-	
+
 	// 쿨타임 측정 시작
 	StartCoolDown();
 
@@ -59,6 +59,11 @@ void UGS_ChanAimingSkill::ActiveSkill()
 		// Set HitReact
 		CachedChanOwner->SetCanHitReact(false);
 
+		// =======================
+		// 스킬 시전 VFX 재생
+		// =======================
+		OwningComp->Multicast_PlayCastVFX(CurrentSkillType, CachedChanOwner->GetActorLocation(), CachedChanOwner->GetActorRotation());
+
 		// Forward Jump
 		const FVector Forward = CachedChanOwner->GetActorForwardVector();
 		const FVector JumpVelocity = Forward * 600.0f + FVector(0.f, 0.f, 420.0f);
@@ -77,15 +82,14 @@ void UGS_ChanAimingSkill::ActiveSkill()
 		// 스킬 범위 VFX 재생
 		// =======================
 		OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(
-			RangeVFXSpawnHandle,
-			FTimerDelegate::CreateUObject(this, &UGS_ChanAimingSkill::SpawnAimingSkillVFX),
-			0.93f,
-			false);
+		    RangeVFXSpawnHandle,
+		    FTimerDelegate::CreateUObject(this, &UGS_ChanAimingSkill::SpawnAimingSkillVFX),
+		    0.93f,
+		    false);
 
 		// 내려치기
 		OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(KnockbackHandle, this, &UGS_ChanAimingSkill::OnShieldSlam, 0.8f, false);
 	}
-
 }
 
 void UGS_ChanAimingSkill::OnSkillCanceledByDebuff()
@@ -112,7 +116,7 @@ void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 
 		CachedChanOwner->CanChangeSeekerGait = true;
-		
+
 		CachedChanOwner->SetMoveControlValue(true, true);
 		CachedChanOwner->SetLookControlValue(true, true);
 
@@ -124,7 +128,7 @@ void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 		// =======================
 		// 스킬 종료 VFX 재생
 		// =======================
-		
+
 		if (OwningComp)
 		{
 			FVector SkillLocation = OwnerCharacter->GetActorLocation();
@@ -140,7 +144,7 @@ void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 
 void UGS_ChanAimingSkill::SpawnAimingSkillVFX()
 {
-	if (OwningComp&& OwnerCharacter)
+	if (OwningComp && OwnerCharacter)
 	{
 		const FVector Start = OwnerCharacter->GetActorLocation();
 		const FVector Forward = OwnerCharacter->GetActorForwardVector();
@@ -162,7 +166,7 @@ void UGS_ChanAimingSkill::InterruptSkill()
 		// 방어 상태 비활성화 (스킬이 중단될 때)
 		CachedChanOwner->SetDefending(false);
 	}
-	
+
 	SetIsActive(false);
 
 	//OwnerPlayer->SetCurrentStamina(0.f);
@@ -221,27 +225,18 @@ void UGS_ChanAimingSkill::OnShieldSlam()
 			// 충돌 액터 저장
 			HitActors.Add(HitActor);
 
-			// Soft Reference 로드
-			UNiagaraSystem* LoadedImpactVFX = SkillImpactVFX.IsNull() ? nullptr : SkillImpactVFX.LoadSynchronous();
-
-			// 충돌 효과 활성화
-			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor)) // 몬스터일 경우
+			// 몬스터일 경우
+			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor))
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
-				// Impact VFX 재생
-				if (LoadedImpactVFX)
-				{
-					TargetMonster->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
-				}
+				// Impact VFX 재생 (Multicast 사용)
+				OwningComp->Multicast_PlayImpactVFXOnTarget(CurrentSkillType, TargetMonster);
 			}
 			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
 			{
 				ApplyEffectToGuardian(TargetGuardian);
-				// Impact VFX 재생
-				if (LoadedImpactVFX)
-				{
-					TargetGuardian->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
-				}
+				// Impact VFX 재생 (Multicast 사용)
+				OwningComp->Multicast_PlayImpactVFXOnTarget(CurrentSkillType, TargetGuardian);
 			}
 			else if (AGS_Character* Target = Cast<AGS_Character>(HitActor)) // 시커일 경우
 			{
@@ -280,7 +275,7 @@ void UGS_ChanAimingSkill::StartHoldUp()
 
 void UGS_ChanAimingSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 {
-	if (!Target) 
+	if (!Target)
 	{
 		return;
 	}

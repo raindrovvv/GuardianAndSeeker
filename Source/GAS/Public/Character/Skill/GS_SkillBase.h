@@ -16,10 +16,10 @@ class GAS_API UGS_SkillBase : public UObject
 
 public:
 	ESkillSlot CurrentSkillType;
-	
+
 	float Cooltime;
 	float Damage;
-	
+
 	UPROPERTY(EditDefaultsOnly)
 	TArray<TSoftObjectPtr<UAnimMontage>> SkillAnimMontages;
 
@@ -43,8 +43,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
 	TSoftObjectPtr<UNiagaraSystem> SkillImpactVFX;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
+	TSoftObjectPtr<UNiagaraSystem> SkillEnvImpactVFX;
+
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
 	TSoftObjectPtr<UNiagaraSystem> SkillEndVFX;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VFX")
+	TSoftObjectPtr<UNiagaraSystem> SkillLoopVFX;
 
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
 	FVector SkillVFXScale = FVector(1.0f, 1.0f, 1.0f);
@@ -59,14 +65,20 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "VFX")
 	FVector RangeVFXOffset = FVector::ZeroVector;
 
-	UPROPERTY(BlueprintReadOnly, Category = "VFX")
-	FVector ImpactVFXOffset = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
+	FVector ImpactVFXOffset;
 
-	UPROPERTY(BlueprintReadOnly, Category = "VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
+	FVector EnvImpactVFXOffset;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	FVector EndVFXOffset = FVector::ZeroVector;
 
+	UPROPERTY(BlueprintReadOnly, Category = "VFX")
+	FVector LoopVFXOffset = FVector::ZeroVector;
+
 	UTexture2D* GetSkillImage();
-	
+
 	// 쿨타임 관리
 	float GetCoolTime();
 
@@ -78,10 +90,13 @@ public:
 	void PlayRangeVFX(FVector Location, float Radius);
 	void PlayImpactVFX(FVector Location); // 월드 위치에 생성
 	void PlayImpactVFXOnTarget(AActor* Target); // 타겟에 부착
+	// 환경(벽, 바닥) 충돌 VFX 재생
+	void PlayEnvImpactVFX(FVector Location, FRotator Rotation);
 	void PlayEndVFX(FVector Location, FRotator Rotation);
-	
+
 	// Cast VFX 정리 함수
 	void StopCastVFX();
+	void Internal_StopCastVFX();
 
 	// VFX + 몽타주 에셋 프리로드 (InitSkill에서 호출)
 	void PreloadSkillAssets();
@@ -101,9 +116,9 @@ public:
 	virtual void InterruptSkill(); // 다른 스킬 사용으로 인한 스킬 중단
 	virtual void SetIsActive(bool bInIsActive);
 
-	// 쿨타임 
+	// 쿨타임
 	void SetCoolingDown(bool bInCoolingDown) { bIsCoolingDown = bInCoolingDown; }
-	
+
 	// Delegate Binding 함수
 	virtual void InitializeDelegate();
 
@@ -120,8 +135,7 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UGS_SkillComp> OwningComp;
-	
-	// Cast VFX 컴포넌트 추적 (스킬 종료 시 정리를 위해)
+
 	UPROPERTY()
 	TObjectPtr<UNiagaraComponent> ActiveCastVFXComponent;
 
@@ -136,7 +150,13 @@ protected:
 	TObjectPtr<UNiagaraSystem> CachedImpactVFX;
 
 	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedEnvImpactVFX;
+
+	UPROPERTY()
 	TObjectPtr<UNiagaraSystem> CachedEndVFX;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedLoopVFX;
 
 	// 프리로드된 애니메이션 몽타주 캐시 (메모리 최적화를 위한 로드된 에셋 저장)
 	UPROPERTY()
