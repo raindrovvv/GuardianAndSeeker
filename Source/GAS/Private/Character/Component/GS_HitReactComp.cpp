@@ -39,13 +39,13 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 			ReactType = EHitReactType::DamageOnly;
 		}
 
-		// 메르시 궁극기 상태인지 확인
-		bool bIsMerciUltimate = false;
-		if (OwnerSeeker && OwnerSeeker->IsMerci())
+		// 궁극기 상태인지 확인 (슈퍼아머 효과: 모든 시커 공통)
+		bool bIsSuperArmorActive = false;
+		if (OwnerSeeker)
 		{
-			if (OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+			if (OwnerSeeker->GetSkillComp() && OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 			{
-				bIsMerciUltimate = true;
+				bIsSuperArmorActive = true;
 			}
 		}
 
@@ -53,8 +53,8 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		{
 			if (OwnerSeeker)
 			{
-				// 메르시 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
-				if (!bIsMerciUltimate)
+				// 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
+				if (!bIsSuperArmorActive)
 				{
 					OwnerSeeker->GetSkillComp()->SkillsInterrupt();
 
@@ -81,7 +81,7 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		}
 		else if (ReactType == EHitReactType::Additive)
 		{
-			if (OwnerSeeker && !bIsMerciUltimate)
+			if (OwnerSeeker && !bIsSuperArmorActive)
 			{
 				OwnerSeeker->StateReset();
 				OwnerSeeker->SetSeekerGait(EGait::Run);
@@ -96,8 +96,8 @@ void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirectio
 		}
 
 
-		// 메르시 궁극기 중이 아니며, 단순 데미지 피격이 아닐 때만 활 조준 상태를 해제함
-		if (OwnerSeeker && !bIsMerciUltimate && ReactType != EHitReactType::DamageOnly)
+		// 궁극기 중이 아니며, 단순 데미지 피격이 아닐 때만 활 조준 상태를 해제함
+		if (OwnerSeeker && !bIsSuperArmorActive && ReactType != EHitReactType::DamageOnly)
 		{
 			OwnerSeeker->SetAimState(false);
 			OwnerSeeker->SetDrawState(false);
