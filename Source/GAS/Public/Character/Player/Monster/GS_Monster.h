@@ -185,4 +185,11 @@ public:
 	/** 시커의 CombatTrigger 내부 여부 설정 (시커에서 호출) */
 	void SetInSeekerCombatTrigger(bool bInTrigger) { bIsInSeekerCombatTrigger = bInTrigger; }
 	bool IsInSeekerCombatTrigger() const { return bIsInSeekerCombatTrigger; }
+
+protected:
+	/** 상수 정의 (Magic Numbers 제거) */
+	static constexpr float DELAYED_DESTROY_TIME = 2.0f;
+	static constexpr float AGGRESSIVE_HP_RATIO_THRESHOLD = 0.99f;
+	static constexpr float MOVEMENT_VELOCITY_THRESHOLD_SQ = 100.0f;
+	static constexpr float TPS_SEEKER_PROXIMITY_RADIUS_SQ = 9000000.0f; // 30m^2
 };

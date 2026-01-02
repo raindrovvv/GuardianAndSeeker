@@ -8,9 +8,6 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "Sound/GS_AudioManager.h"
-
-// #include "Character/GS_Character.h"
 #include "SignificanceManager.h"
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "AI/RTS/GS_RTSController.h"
@@ -20,10 +17,7 @@
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "Components/DecalComponent.h"
 #include "Components/WidgetComponent.h"
-#include "DrawDebugHelpers.h"
-#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "System/GameState/GS_InGameGS.h"
@@ -53,6 +47,8 @@ AGS_Monster::AGS_Monster()
 	// 몬스터 오디오 컴포넌트 생성
 	MonsterAudioComponent = CreateDefaultSubobject<UGS_MonsterAudioComponent>(
 	    "MonsterAudioComponent");
+	BaseAudioComponent = MonsterAudioComponent;
+	BaseAudioComponent = MonsterAudioComponent;
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
@@ -182,8 +178,6 @@ void AGS_Monster::BeginPlay()
 				OnMonsterAttacked.AddUniqueDynamic(
 				    RTSController->AttackNotificationManager,
 				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
-				// UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Attack notification delegate
-				// bound to local RTSController"), *GetName());
 			}
 		}
 	}
@@ -386,8 +380,8 @@ void AGS_Monster::Tick(float DeltaSeconds)
 
 void AGS_Monster::UpdateHPWidgetVisibility()
 {
-	// Significance 체크: 중요도가 너무 낮으면(멀리 있으면) UI 가시성 연산 스킵
-	if (GetSignificance() < 0.1f)
+	// Significance 체크: 중요도가 너무 낮으면 UI 가시성 연산 스킵 (성능 최적화)
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI_SKIP)
 	{
 		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible())
 		{
@@ -434,8 +428,8 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 		if (APawn* LocalPawn = PC->GetPawn())
 		{
 			float DistSqToSeeker = FVector::DistSquared(GetActorLocation(), LocalPawn->GetActorLocation());
-			// 30m 내에 있으면 보이도록 설정 (시커 거리 안전망)
-			bIsInRange = (DistSqToSeeker < FMath::Square(3000.0f));
+			// 일정 거리 내에 있으면 보이도록 설정 (시커 거리 안전망)
+			bIsInRange = (DistSqToSeeker < TPS_SEEKER_PROXIMITY_RADIUS_SQ);
 
 			const float CombatTriggerRadiusSq = FMath::Square(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS * 1.1f);
 			if (DistSqToSeeker > CombatTriggerRadiusSq)
@@ -467,7 +461,7 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 			}
 
 			bool bWaistBlocked = false;
-			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, 50.f), ECC_Visibility, Params))
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, GS_Rendering::HP_WIDGET_VISIBILITY_TRACE_OFFSET), ECC_Visibility, Params))
 			{
 				bool bIsPawn = (HitResult.GetActor() && HitResult.GetActor()->IsA<APawn>());
 				bool bIsFloor = (HitResult.ImpactNormal.Z >= 0.7f);
@@ -548,8 +542,9 @@ void AGS_Monster::OnDeath()
 
 	FTimerHandle DestroyTimerHandle;
 	GetWorldTimerManager().SetTimer(
-	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, 2.f, false);
+	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, DELAYED_DESTROY_TIME, false);
 }
+
 
 void AGS_Monster::HandleDelayedDestroy()
 {
@@ -730,8 +725,8 @@ void AGS_Monster::UpdateNetworkOptimization()
 	{
 		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
 
-		// HP가 조금이라도 깎였다면 (99% 이하) 전투 상태로 간주
-		if (HealthRatio < 0.99f)
+		// HP가 임계값 이하라면 전투 상태로 간주
+		if (HealthRatio < AGGRESSIVE_HP_RATIO_THRESHOLD)
 		{
 			bIsAggressiveState = true;
 		}
@@ -761,8 +756,7 @@ void AGS_Monster::UpdateNetworkOptimization()
 	// === 이동 상태 체크: 이동 중이면 최소 중거리 빈도 보장 ===
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		if (MoveComp->Velocity.SizeSquared() >
-		    100.0f) // 움직이고 있다면 (약 10cm/s 이상)
+		if (MoveComp->Velocity.SizeSquared() > MOVEMENT_VELOCITY_THRESHOLD_SQ)
 		{
 			NewFrequency =
 			    FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_MEDIUM);
@@ -908,8 +902,7 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 
 	// 4. UI 및 틱 최적화
 	// 중요도가 작으면 UI 틱 및 가시성 강제 비활성화 (성능 최적화)
-	// 가시성 임계값(0.5)은 Tick()의 거리 기반 가시성 로직과 협력함
-	bool bUIEnabled = (NewSignificance > 0.4f);
+	bool bUIEnabled = (NewSignificance > GS_Rendering::SIGNIFICANCE_THRESHOLD_UI);
 
 	auto UpdateWidgetOptimization = [&](UWidgetComponent* Widget)
 	{
