@@ -55,6 +55,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDyingStateChanged, bool, bIsDyin
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReviveProgressChanged, float, Progress);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, bIsDetected);
 
+// Seeker Gait Speeds (Ratios)
+static constexpr float GAIT_SPEED_WALK = 0.45f;
+static constexpr float GAIT_SPEED_RUN = 0.75f;
+static constexpr float GAIT_SPEED_SPRINT = 1.0f;
+static constexpr float GAIT_SPEED_CRAWL = 0.2f;
+
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
 enum class ECollisionSoundType : uint8
@@ -347,6 +353,9 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input")
 	UGS_SkillInputHandlerComp* SkillInputHandlerComponent;
+
+	UFUNCTION()
+	void HandleHitReactEnd(UAnimMontage* Montage, bool bInterrupted);
 
 	// 동적 머티리얼 파라미터 사용
 	UPROPERTY()

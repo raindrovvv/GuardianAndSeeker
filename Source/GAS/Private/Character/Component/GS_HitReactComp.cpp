@@ -162,20 +162,8 @@ void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 		Seeker->StateReset();
 		Seeker->SetSeekerGait(EGait::Run);
 
-		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(Seeker->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
-		if (HealSkill)
-		{
-			UAnimMontage* AM_Wielding = HealSkill->GetCachedMontage(2);
-
-			if (AM_Wielding)
-			{
-				Seeker->TransWeaponHandingState(
-				    EWeaponHandlingState::Sheathing,
-				    EWeaponHandlingState::Wielding,
-				    AM_Wielding,
-				    ESeekerMontageSlot::UpperBody);
-			}
-		}
+		// 외부(Seeker 등)에서 추가 처리를 할 수 있도록 델리게이트 호출
+		OnHitReactEnd.Broadcast(Montage, bInterrupted);
 	}
 }
 
@@ -183,6 +171,11 @@ void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 void UGS_HitReactComp::BeginPlay()
 {
 	Super::BeginPlay();
+}
 
-	// ...
+void UGS_HitReactComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	HitReactEndDelegate.Unbind();
+
+	Super::EndPlay(EndPlayReason);
 }
