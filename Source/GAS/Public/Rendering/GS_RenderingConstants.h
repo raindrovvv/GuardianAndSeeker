@@ -142,6 +142,18 @@ constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 4000.0f;
 /** Seeker 전투 트리거 반경 기본값 (8m) - Monster HP 위젯 가시성 등에서 공유 */
 constexpr float DEFAULT_COMBAT_TRIGGER_RADIUS = 800.0f;
 
+/** TPS 모드에서 HP 위젯이 보이기 시작하는 최대 거리 (30m) */
+constexpr float TPS_HP_WIDGET_VISIBLE_DISTANCE = 3000.0f;
+
+/** HP 위젯 가시성 트레이스를 위한 허리 높이 오프셋 */
+constexpr float HP_WIDGET_VISIBILITY_TRACE_OFFSET = 50.0f;
+
+/** Significance Manager: UI 활성화 임계값 */
+constexpr float SIGNIFICANCE_THRESHOLD_UI = 0.4f;
+
+/** Significance Manager: UI 가시성 연산 스킵 임계값 */
+constexpr float SIGNIFICANCE_THRESHOLD_UI_SKIP = 0.1f;
+
 // ========================================
 // AI Perception Distance Optimization
 // ========================================
