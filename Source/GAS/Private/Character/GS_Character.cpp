@@ -67,8 +67,7 @@ void AGS_Character::BeginPlay()
 	bIsInvincible = false;
 
 	// Set Default Stats to Character
-	const UEnum* CharacterEnum =
-	    FindObject<UEnum>(ANY_PACKAGE, TEXT("ECharacterType"), true);
+	const UEnum* CharacterEnum = StaticEnum<ECharacterType>();
 	bool bStatInitialized = false;
 
 	if (CharacterEnum)
@@ -681,26 +680,9 @@ void AGS_Character::OnRep_CharacterSpeed()
 
 void AGS_Character::PlayDeathSoundLocal()
 {
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
+	if (BaseAudioComponent)
 	{
-		if (Seeker->SeekerAudioComponent)
-		{
-			Seeker->SeekerAudioComponent->PlayDeathSoundLocal();
-		}
-	}
-	else if (AGS_Monster* Monster = Cast<AGS_Monster>(this))
-	{
-		if (Monster->MonsterAudioComponent)
-		{
-			Monster->MonsterAudioComponent->PlayDeathSoundLocal();
-		}
-	}
-	else if (AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(this))
-	{
-		if (Drakhar->GetAudioComponent())
-		{
-			Drakhar->GetAudioComponent()->PlayDeathSoundLocal();
-		}
+		BaseAudioComponent->PlayDeathSoundLocal();
 	}
 }
 
