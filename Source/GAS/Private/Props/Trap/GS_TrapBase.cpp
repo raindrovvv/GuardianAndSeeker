@@ -17,6 +17,7 @@
 #include "Rendering/GS_RenderingConstants.h"
 #include "Components/StaticMeshComponent.h"
 #include "DungeonEditor/Component/PlaceInfoComponent.h"
+#include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -105,10 +106,10 @@ void AGS_TrapBase::BeginPlay()
 		}
 	}
 
-	/*if (HasAuthority())
+	if (HasAuthority())
 	{
 		AGS_TrapManager* TrapManager = GetTrapManager();
-		if(TrapManager)
+		if (TrapManager)
 		{
 			TrapManager->RegisterTrap(this);
 			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager in BeginPlay"));
@@ -117,8 +118,7 @@ void AGS_TrapBase::BeginPlay()
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager is not in BeginPlay"));
 		}
-
-	}*/
+	}
 
 	DamageBoxComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnDamageBoxOverlap);
 	DamageBoxComp->OnComponentHit.AddDynamic(this, &AGS_TrapBase::OnDamageBoxHit);
@@ -707,10 +707,16 @@ AGS_TrapManager* AGS_TrapBase::GetTrapManager() const
 		return CachedTrapManager.Get();
 	}
 
-	for (TActorIterator<AGS_TrapManager> It(GetWorld()); It; ++It)
+	if (UWorld* World = GetWorld())
 	{
-		CachedTrapManager = *It;
-		return *It;
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			if (AGS_TrapManager* TrapManager = Registry->GetTrapManager())
+			{
+				CachedTrapManager = TrapManager;
+				return TrapManager;
+			}
+		}
 	}
 
 	return nullptr;
