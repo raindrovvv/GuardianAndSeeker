@@ -182,7 +182,7 @@ public:
 	void SetStaminaGaugeWidget(UGS_DrakharStaminaGauge* InDrakharStaminaGaugeWidget);
 	void StartFlyingStaminaTimer();
 	FORCEINLINE float GetCurrentStaminaGauge() const { return FlyingStaminaCoolTime; }
-	FORCEINLINE float GetMaxStaminaGauge() const { return MaxFlyingStaminaCoolTime; }
+	FORCEINLINE float GetMaxStaminaGauge() const { return MAX_FLYING_STAMINA_COOLTIME; }
 	void EndFlyingStaminaTimer();
 	FOnCurrentStaminaGaugeChangedDelegate OnCurrentStaminaGaugeChanged;
 

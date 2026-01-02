@@ -390,11 +390,11 @@ void AGS_Drakhar::MeleeAttackCheck()
 					}
 
 					// 서버에서 피버 게이지 증가
-					if (!GetbIsFeverMode())
+					if (!GetIsFeverMode())
 					{
 						SetFeverGauge(10.f);
 					}
-					else if (GetbIsFeverMode())
+					else if (GetIsFeverMode())
 					{
 						bIsAttackingDuringFever = true;
 						ResetIsAttackingDuringFeverMode();
@@ -897,7 +897,7 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 				// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 				if (GetNetMode() != NM_DedicatedServer)
 				{
-					OnRep_bIsFeverMode();
+					OnRep_IsFeverMode();
 				}
 			}
 			else
@@ -1035,7 +1035,7 @@ void AGS_Drakhar::StartFeverMode()
 	// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		OnRep_bIsFeverMode();
+		OnRep_IsFeverMode();
 	}
 }
 
@@ -1189,11 +1189,11 @@ void AGS_Drakhar::OnAttackHit(AGS_Character* HitCharacter)
 void AGS_Drakhar::OnFeverGaugeUpdate(float DeltaGauge)
 {
 	// 피버 게이지 업데이트 로직
-	if (!GetbIsFeverMode())
+	if (!GetIsFeverMode())
 	{
 		SetFeverGauge(DeltaGauge);
 	}
-	else if (GetbIsFeverMode())
+	else if (GetIsFeverMode())
 	{
 		bIsAttackingDuringFever = true;
 		ResetIsAttackingDuringFeverMode();
@@ -1397,7 +1397,7 @@ void AGS_Drakhar::MulticastRPC_OnFeverModeEnd_Implementation()
 	BP_OnFeverModeEnd();
 }
 
-void AGS_Drakhar::OnRep_bIsFeverMode()
+void AGS_Drakhar::OnRep_IsFeverMode()
 {
 	if (DrakharVFXComponent)
 		DrakharVFXComponent->OnFeverModeChanged(bIsFeverMode);
