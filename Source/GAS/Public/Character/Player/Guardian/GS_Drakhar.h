@@ -49,8 +49,8 @@ public:
 
 	UFUNCTION()
 	void OnRep_ComboAttackCount();
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool IsAttacking;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (DisplayName = "IsAttacking"))
+	bool bIsAttacking;
 
 	//[Draconic Fury Variables]
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
@@ -65,7 +65,7 @@ public:
 	//[fever mode]
 	FOnCurrentFeverGaugeChangedDelegate OnCurrentFeverGaugeChanged;
 	UPROPERTY()
-	bool bIsAttckingDuringFever;
+	bool bIsAttackingDuringFever;
 	FTimerHandle ResetAttackTimer;
 
 	//[health regeneration]
@@ -146,7 +146,7 @@ public:
 	//[Fever Mode]
 	FORCEINLINE float GetCurrentFeverGauge() const { return CurrentFeverGauge; }
 	FORCEINLINE float GetMaxFeverGauge() const { return MaxFeverGauge; }
-	FORCEINLINE bool GetIsFeverMode() const { return IsFeverMode; }
+	FORCEINLINE bool GetIsFeverMode() const { return bIsFeverMode; }
 
 	void SetFeverGaugeWidget(UGS_DrakharFeverGauge* InDrakharFeverGaugeWidget);
 	void SetFeverGauge(float InValue);
@@ -426,8 +426,8 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_FeverGauge)
 	float CurrentFeverGauge;
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsFeverMode)
-	bool IsFeverMode;
+	UPROPERTY(ReplicatedUsing = OnRep_IsFeverMode, meta = (DisplayName = "IsFeverMode"))
+	bool bIsFeverMode;
 
 	FTimerHandle FeverTimer;
 	FTimerHandle FeverStateSoundDelayTimer;
@@ -435,9 +435,9 @@ private:
 	//[Flying CoolTime]
 	UPROPERTY(ReplicatedUsing = OnRep_FlyingStaminaCoolTime)
 	float FlyingStaminaCoolTime;
-	const float MaxFlyingStaminaCoolTime = 7.f; // 최대 스테미나
-	const float ValidFlyingStaminaCoolTime = 2.f; // 날기 시작 가능한 정도
-	bool isStartCoolTime = true;
+	static constexpr float MAX_FLYING_STAMINA_COOLTIME = 7.0f; // 최대 스테미나
+	static constexpr float VALID_FLYING_STAMINA_COOLTIME = 2.0f; // 날기 시작 가능한 정도
+	bool bIsStartCoolTime = true;
 
 	FTimerHandle FlyingStartStaminaCoolTimeHandler;
 	FTimerHandle FlyingEndStaminaCoolTimeHandler;

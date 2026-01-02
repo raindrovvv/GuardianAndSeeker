@@ -142,7 +142,7 @@ AGS_Drakhar::AGS_Drakhar()
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Drakhar");
-	FlyingStaminaCoolTime = MaxFlyingStaminaCoolTime;
+	FlyingStaminaCoolTime = MAX_FLYING_STAMINA_COOLTIME;
 
 	ComboAttackCount = 0;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -189,7 +189,7 @@ void AGS_Drakhar::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& Ou
 	DOREPLIFETIME(ThisClass, bCanCombo);
 	DOREPLIFETIME(ThisClass, ComboAttackCount);
 	DOREPLIFETIME(ThisClass, CurrentFeverGauge);
-	DOREPLIFETIME(ThisClass, IsFeverMode);
+	DOREPLIFETIME(ThisClass, bIsFeverMode);
 	DOREPLIFETIME(ThisClass, FlyingStaminaCoolTime);
 }
 
@@ -237,7 +237,7 @@ void AGS_Drakhar::Ctrl()
 		}
 
 		//not flying
-		if (GuardianState == EGuardianCtrlState::CtrlEnd && FlyingStaminaCoolTime >= ValidFlyingStaminaCoolTime)
+		if (GuardianState == EGuardianCtrlState::CtrlEnd && FlyingStaminaCoolTime >= VALID_FLYING_STAMINA_COOLTIME)
 		{
 			//if execute flying skill, prevent change state
 			if (GuardianDoSkillState != EGuardianDoSkill::None)
@@ -390,13 +390,13 @@ void AGS_Drakhar::MeleeAttackCheck()
 					}
 
 					// 서버에서 피버 게이지 증가
-					if (!GetIsFeverMode())
+					if (!GetbIsFeverMode())
 					{
 						SetFeverGauge(10.f);
 					}
-					else if (GetIsFeverMode())
+					else if (GetbIsFeverMode())
 					{
-						bIsAttckingDuringFever = true;
+						bIsAttackingDuringFever = true;
 						ResetIsAttackingDuringFeverMode();
 					}
 
@@ -456,7 +456,7 @@ void AGS_Drakhar::ComboLastAttack()
 			}
 		}
 
-		if (IsFeverMode)
+		if (bIsFeverMode)
 		{
 			FeverComoLastAttack();
 		}
@@ -540,7 +540,7 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 			Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.2f); // 대시 공격
 		}
 
-		if (IsFeverMode)
+		if (bIsFeverMode)
 		{
 			DamagedCharacter->GetDebuffComp()->ApplyDebuff(EDebuffType::Bleed, this);
 		}
@@ -638,7 +638,7 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 				Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.3f);
 			}
 
-			if (IsFeverMode)
+			if (bIsFeverMode)
 			{
 				DamagedCharacter->GetDebuffComp()->ApplyDebuff(EDebuffType::Bleed, this);
 				MulticastPlayFeverEarthquakeImpactVFX(DamagedCharacter->GetActorLocation());
@@ -667,7 +667,7 @@ void AGS_Drakhar::ServerRPCStartCtrl_Implementation()
 	GuardianState = EGuardianCtrlState::CtrlUp;
 	MoveSpeed = SpeedUpMoveSpeed;
 
-	if (isStartCoolTime)
+	if (bIsStartCoolTime)
 	{
 		SafeClearTimer(FlyingEndStaminaCoolTimeHandler);
 		UWorld* World = GetWorld();
@@ -675,7 +675,7 @@ void AGS_Drakhar::ServerRPCStartCtrl_Implementation()
 		{
 			World->GetTimerManager().SetTimer(FlyingStartStaminaCoolTimeHandler, this, &AGS_Drakhar::StartFlyingStaminaTimer, 1.f, true);
 		}
-		isStartCoolTime = false;
+		bIsStartCoolTime = false;
 	}
 
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
@@ -688,7 +688,7 @@ void AGS_Drakhar::ServerRPCStopCtrl_Implementation()
 
 	MoveSpeed = NormalMoveSpeed;
 
-	isStartCoolTime = true;
+	bIsStartCoolTime = true;
 	SafeClearTimer(FlyingStartStaminaCoolTimeHandler);
 
 	UWorld* World = GetWorld();
@@ -753,7 +753,7 @@ void AGS_Drakhar::ServerRPCSpawnDraconicFury_Implementation()
 	Params.Owner = this;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	if (IsFeverMode)
+	if (bIsFeverMode)
 	{
 		// 피버 모드: 드라카의 현재 위치 기준으로 앞쪽에 투사체 소환
 		FVector SpawnLocation = GetActorLocation() + GetActorForwardVector() * 200.f + FVector(0.f, 0.f, 600.f);
@@ -886,23 +886,23 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 			CurrentFeverGauge = 0.f;
 
 			SafeClearTimer(FeverTimer);
-			if (IsFeverMode)
+			if (bIsFeverMode)
 			{
 				FGS_StatRow Stat;
 				Stat.ATK = 50.f;
 				GetStatComp()->ResetStat(Stat);
 
-				IsFeverMode = false;
+				bIsFeverMode = false;
 
 				// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 				if (GetNetMode() != NM_DedicatedServer)
 				{
-					OnRep_IsFeverMode();
+					OnRep_bIsFeverMode();
 				}
 			}
 			else
 			{
-				IsFeverMode = false;
+				bIsFeverMode = false;
 			}
 		}
 
@@ -910,7 +910,7 @@ void AGS_Drakhar::SetFeverGauge(float InValue)
 		if (CurrentFeverGauge >= MaxFeverGauge)
 		{
 			CurrentFeverGauge = MaxFeverGauge;
-			IsFeverMode = true;
+			bIsFeverMode = true;
 			StartFeverMode();
 		}
 
@@ -935,7 +935,7 @@ void AGS_Drakhar::ResetIsAttackingDuringFeverMode()
 
 void AGS_Drakhar::StartIsAttackingTimer()
 {
-	bIsAttckingDuringFever = false;
+	bIsAttackingDuringFever = false;
 }
 
 void AGS_Drakhar::MulticastRPCFeverMontagePlay_Implementation()
@@ -1035,7 +1035,7 @@ void AGS_Drakhar::StartFeverMode()
 	// Server(Listen Server) 및 클라이언트 연출을 위해 OnRep 호출
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		OnRep_IsFeverMode();
+		OnRep_bIsFeverMode();
 	}
 }
 
@@ -1050,10 +1050,10 @@ void AGS_Drakhar::DecreaseFeverGauge()
 
 void AGS_Drakhar::MinusFeverGaugeValue()
 {
-	if (IsFeverMode)
+	if (bIsFeverMode)
 	{
 		//공격 유지 안된 경우
-		if (!bIsAttckingDuringFever)
+		if (!bIsAttackingDuringFever)
 		{
 			SetFeverGauge(-5.f);
 		}
@@ -1127,9 +1127,9 @@ void AGS_Drakhar::EndFlyingStaminaTimer()
 
 	FlyingStaminaCoolTime += 1.f;
 
-	if (FlyingStaminaCoolTime >= MaxFlyingStaminaCoolTime)
+	if (FlyingStaminaCoolTime >= MAX_FLYING_STAMINA_COOLTIME)
 	{
-		FlyingStaminaCoolTime = MaxFlyingStaminaCoolTime;
+		FlyingStaminaCoolTime = MAX_FLYING_STAMINA_COOLTIME;
 	}
 	//OnCurrentStaminaGaugeChanged.Broadcast(FlyingStaminaCoolTime);
 
@@ -1139,7 +1139,7 @@ void AGS_Drakhar::EndFlyingStaminaTimer()
 void AGS_Drakhar::GenerateDraconicFuryTargets()
 {
 	// 피버 모드일 경우 피버 모드 위치 생성
-	if (IsFeverMode)
+	if (bIsFeverMode)
 	{
 		FeverModeDraconicFurySpawnLocation = GetActorLocation() + GetActorForwardVector() * 200.f + FVector(0.f, 0.f, 600.f);
 	}
@@ -1189,13 +1189,13 @@ void AGS_Drakhar::OnAttackHit(AGS_Character* HitCharacter)
 void AGS_Drakhar::OnFeverGaugeUpdate(float DeltaGauge)
 {
 	// 피버 게이지 업데이트 로직
-	if (!GetIsFeverMode())
+	if (!GetbIsFeverMode())
 	{
 		SetFeverGauge(DeltaGauge);
 	}
-	else if (GetIsFeverMode())
+	else if (GetbIsFeverMode())
 	{
-		bIsAttckingDuringFever = true;
+		bIsAttackingDuringFever = true;
 		ResetIsAttackingDuringFeverMode();
 	}
 }
@@ -1397,14 +1397,14 @@ void AGS_Drakhar::MulticastRPC_OnFeverModeEnd_Implementation()
 	BP_OnFeverModeEnd();
 }
 
-void AGS_Drakhar::OnRep_IsFeverMode()
+void AGS_Drakhar::OnRep_bIsFeverMode()
 {
 	if (DrakharVFXComponent)
-		DrakharVFXComponent->OnFeverModeChanged(IsFeverMode);
+		DrakharVFXComponent->OnFeverModeChanged(bIsFeverMode);
 
 	if (AudioComponent)
 	{
-		if (IsFeverMode)
+		if (bIsFeverMode)
 		{
 			AudioComponent->PlayFeverModeStartSoundLocal();
 
@@ -1442,7 +1442,7 @@ void AGS_Drakhar::OnRep_IsFeverMode()
 	}
 
 	// 블루프린트 이벤트 호출
-	if (IsFeverMode)
+	if (bIsFeverMode)
 	{
 		BP_OnFeverModeStart();
 	}
@@ -1458,7 +1458,7 @@ void AGS_Drakhar::OnRep_FlyingStaminaCoolTime()
 	{
 		StopCtrl();
 	}
-	if (FlyingStaminaCoolTime == MaxFlyingStaminaCoolTime)
+	if (FlyingStaminaCoolTime == MAX_FLYING_STAMINA_COOLTIME)
 	{
 		SafeClearTimer(FlyingStartStaminaCoolTimeHandler);
 		SafeClearTimer(FlyingEndStaminaCoolTimeHandler);
@@ -1524,7 +1524,7 @@ void AGS_Drakhar::PlayFeverModeStateSoundDelayed()
 	if (!IsValid(this))
 		return;
 
-	if (AudioComponent && IsFeverMode)
+	if (AudioComponent && bIsFeverMode)
 	{
 		// OnRep에서 타이머로 호출되거나 서버에서 직접 호출됨
 		AudioComponent->PlayFeverModeStateSoundLocal();
