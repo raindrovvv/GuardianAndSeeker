@@ -19,6 +19,11 @@ void UGS_DrakharAudioComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	OwnerDrakhar = Cast<AGS_Drakhar>(GetOwner());
+	if (OwnerDrakhar)
+	{
+		// 베이스 클래스의 공통 죽음 사운드 포인터 설정
+		DeathSound = OwnerDrakhar->DeathSoundEvent;
+	}
 }
 
 void UGS_DrakharAudioComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -90,17 +95,16 @@ void UGS_DrakharAudioComponent::PlayDashSkillSound()
 
 	// 서버에서도 쿨다운 플래그를 즉시 설정하여 중복 RPC 송신 방지
 	bDashSkillSoundPlayed = true;
-	
+
 	UWorld* World = GetWorld();
 	if (World)
 	{
 		World->GetTimerManager().SetTimer(
-			DashSkillSoundCooldownTimer,
-			this,
-			&UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
-			DashSkillSoundCooldown,
-			false
-		);
+		    DashSkillSoundCooldownTimer,
+		    this,
+		    &UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
+		    DashSkillSoundCooldown,
+		    false);
 	}
 
 	LastMulticastTime = GetWorld()->GetTimeSeconds();
@@ -133,12 +137,11 @@ void UGS_DrakharAudioComponent::Multicast_PlayDashSkillSound_Implementation()
 	if (World)
 	{
 		World->GetTimerManager().SetTimer(
-			DashSkillSoundCooldownTimer,
-			this,
-			&UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
-			DashSkillSoundCooldown,
-			false
-		);
+		    DashSkillSoundCooldownTimer,
+		    this,
+		    &UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
+		    DashSkillSoundCooldown,
+		    false);
 	}
 }
 
@@ -204,12 +207,11 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicFurySkillSound_Implementat
 	// 타이머 설정 (PrepareMulticastSound가 World 검증을 완료했으므로 안전)
 	UWorld* World = GetWorld();
 	World->GetTimerManager().SetTimer(
-		DraconicFurySoundCooldownTimer,
-		this,
-		&UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown,
-		DraconicFurySoundCooldown,
-		false
-	);
+	    DraconicFurySoundCooldownTimer,
+	    this,
+	    &UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown,
+	    DraconicFurySoundCooldown,
+	    false);
 }
 
 void UGS_DrakharAudioComponent::PlayDraconicProjectileSound(const FVector& Location)
@@ -332,7 +334,8 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStartSound_Implementation
 
 void UGS_DrakharAudioComponent::PlayFeverModeStartSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStartSoundEvent) return;
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStartSoundEvent)
+		return;
 
 	PlaySoundEvent(OwnerDrakhar->FeverModeStartSoundEvent, OwnerDrakhar->GetActorLocation());
 }
@@ -366,7 +369,8 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeEndSound_Implementation()
 
 void UGS_DrakharAudioComponent::PlayFeverModeEndSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeEndSoundEvent) return;
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeEndSoundEvent)
+		return;
 
 	PlaySoundEvent(OwnerDrakhar->FeverModeEndSoundEvent, OwnerDrakhar->GetActorLocation());
 }
@@ -432,15 +436,15 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStateSound_Implementation
 
 void UGS_DrakharAudioComponent::PlayFeverModeStateSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStateSoundEvent || !IsAudioSystemValid()) return;
+	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStateSoundEvent || !IsAudioSystemValid())
+		return;
 
 	// 피버모드 스테이트 사운드 재생 및 Playing ID 저장
 	FeverModeStateSoundPlayingID = UAkGameplayStatics::PostEvent(
-		OwnerDrakhar->FeverModeStateSoundEvent,
-		OwnerDrakhar,
-		0,
-		FOnAkPostEventCallback()
-	);
+	    OwnerDrakhar->FeverModeStateSoundEvent,
+	    OwnerDrakhar,
+	    0,
+	    FOnAkPostEventCallback());
 }
 
 void UGS_DrakharAudioComponent::StopFeverModeStateSound()
@@ -506,29 +510,13 @@ void UGS_DrakharAudioComponent::PlayHurtSoundLocal()
 	// 타이머 설정 (PrepareMulticastSound가 World 검증을 완료했으므로 안전)
 	UWorld* World = GetWorld();
 	World->GetTimerManager().SetTimer(
-		HurtSoundCooldownTimer,
-		this,
-		&UGS_DrakharAudioComponent::ResetHurtSoundCooldown,
-		HurtSoundCooldown,
-		false
-	);
+	    HurtSoundCooldownTimer,
+	    this,
+	    &UGS_DrakharAudioComponent::ResetHurtSoundCooldown,
+	    HurtSoundCooldown,
+	    false);
 }
 
-// 로컬 전용 Death 사운드 재생 (RPC 없음 - RepNotify에서 호출)
-void UGS_DrakharAudioComponent::PlayDeathSoundLocal()
-{
-	// 통합 체크 및 Distance Scaling 설정
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
-	{
-		return;
-	}
-
-	// Death Sound 재생
-	if (IsValid(OwnerDrakhar->DeathSoundEvent))
-	{
-		PlaySoundEvent(OwnerDrakhar->DeathSoundEvent, OwnerDrakhar->GetActorLocation());
-	}
-}
 
 void UGS_DrakharAudioComponent::PlayDraconicProjectileImpactSoundLocal(const FVector& ImpactLocation, bool bHitCharacter)
 {
@@ -588,24 +576,25 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboFinisherSound_Implementation(
 	}
 
 	UAkGameplayStatics::PostEvent(
-		OwnerDrakhar->ComboFinisherSoundEvent,
-		OwnerDrakhar,
-		0,
-		FOnAkPostEventCallback()
-	);
+	    OwnerDrakhar->ComboFinisherSoundEvent,
+	    OwnerDrakhar,
+	    0,
+	    FOnAkPostEventCallback());
 }
 
 // === 타이머 콜백 함수 구현 ===
 void UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown()
 {
-	if (!IsValid(this)) return;
+	if (!IsValid(this))
+		return;
 
 	bDraconicFurySoundPlayed = false;
 }
 
 void UGS_DrakharAudioComponent::ResetHurtSoundCooldown()
 {
-	if (!IsValid(this)) return;
+	if (!IsValid(this))
+		return;
 
 	bHurtSoundPlayed = false;
 }
@@ -623,7 +612,8 @@ void UGS_DrakharAudioComponent::PlayLandingSound()
 
 void UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown()
 {
-	if (!IsValid(this)) return;
+	if (!IsValid(this))
+		return;
 
 	bDashSkillSoundPlayed = false;
 }
@@ -674,4 +664,4 @@ void UGS_DrakharAudioComponent::PlaySoundEvent(UAkAudioEvent* SoundEvent, const 
 			AkComp->PostAkEvent(SoundEvent);
 		}
 	}
-} 
+}

@@ -31,7 +31,7 @@
 #include "Rendering/GS_RenderingConstants.h"
 #include "AkAudioEvent.h"
 /*#include "AkComponent.h"
-#include "AkAudioDevice.h"*/
+#include "AkAudioDevice.h*/
 #include "UI/Character/GS_HPTextWidgetComp.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 #include "Character/Component/GS_LowHealthEffectComponent.h"
@@ -42,6 +42,7 @@
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "UI/Character/GS_SteamNameWidgetComp.h"
 #include "Props/Item/EmberChest/GS_EmberChest.h"
+#include "Character/Skill/Seeker/GS_HealSkill.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker()
@@ -85,6 +86,7 @@ AGS_Seeker::AGS_Seeker()
 	// 시커 오디오 컴포넌트 생성 (RTS/TPS 지원)
 	// =======================
 	SeekerAudioComponent = CreateDefaultSubobject<UGS_SeekerAudioComponent>("SeekerAudioComponent");
+	BaseAudioComponent = SeekerAudioComponent;
 
 	// =======================
 	// 마커 배치 컴포넌트 생성
@@ -203,6 +205,12 @@ void AGS_Seeker::BeginPlay()
 		}
 	}
 
+	// HitReact 종료 델리게이트 바인딩
+	if (HitReactComp)
+	{
+		HitReactComp->OnHitReactEnd.AddDynamic(this, &AGS_Seeker::HandleHitReactEnd);
+	}
+
 	// === 최적화: Tick 비활성화 및 타이머 시스템 가동 ===
 	// 기본 Tick을 비활성화하여 CPU 사용량을 줄입니다.
 	SetActorTickEnabled(false);
@@ -319,6 +327,7 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SafeClearTimer(ReviveDecayTimerHandle);
 	SafeClearTimer(DyingUpdateTimerHandle);
 	SafeClearTimer(PeripheralSensorTimerHandle);
+	SafeClearTimer(AttackSoundResetTimerHandle);
 
 	// 포스트 프로세스 비활성화
 	// Unregister from Subsystem
@@ -389,16 +398,16 @@ void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
 	switch (Gait)
 	{
 	case EGait::Walk:
-		SetCharacterSpeed(0.45f);
+		SetCharacterSpeed(GAIT_SPEED_WALK);
 		break;
 	case EGait::Run:
-		SetCharacterSpeed(0.8f);
+		SetCharacterSpeed(GAIT_SPEED_RUN);
 		break;
 	case EGait::Sprint:
-		SetCharacterSpeed(1.0f);
+		SetCharacterSpeed(GAIT_SPEED_SPRINT);
 		break;
 	case EGait::Crawl:
-		SetCharacterSpeed(0.15f); // 빈사 상태 기어다니기 - 매우 느린 속도
+		SetCharacterSpeed(GAIT_SPEED_CRAWL); // 빈사 상태 기어다니기 - 매우 느린 속도
 		break;
 	}
 }
@@ -963,6 +972,7 @@ void AGS_Seeker::OnDeath()
 	ClientRPCStopCombatMusic();
 	ClearNearbyMonsters();
 }
+
 
 void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, bool bIsNowAlive)
 {
@@ -1957,4 +1967,30 @@ float AGS_Seeker::GetOptimalCullDistance() const
 {
 	// Seeker는 중간 크기 컬링 거리 (45m)
 	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+}
+void AGS_Seeker::HandleHitReactEnd(UAnimMontage* Montage, bool bInterrupted)
+{
+	// 피격 애니메이션이 정상 종료된 경우에만 추가 로직 수행
+	if (bInterrupted)
+	{
+		return;
+	}
+
+	// 회복 포션 사용 중 피격당했다면 무기 상태 복구
+	if (GetSkillComp())
+	{
+		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
+		if (HealSkill)
+		{
+			UAnimMontage* AM_Wielding = HealSkill->GetCachedMontage(2);
+			if (AM_Wielding)
+			{
+				TransWeaponHandingState(
+				    EWeaponHandlingState::Sheathing,
+				    EWeaponHandlingState::Wielding,
+				    AM_Wielding,
+				    ESeekerMontageSlot::UpperBody);
+			}
+		}
+	}
 }

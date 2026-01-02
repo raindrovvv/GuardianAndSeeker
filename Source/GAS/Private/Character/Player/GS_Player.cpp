@@ -20,6 +20,7 @@
 #include "Sound/GS_AudioComponentBase.h"
 #include "Components/CapsuleComponent.h"
 #include "Rendering/GS_RenderingConstants.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
 
 AGS_Player::AGS_Player()
 {
@@ -78,7 +79,6 @@ AGS_Player::AGS_Player()
 	// 네트워크 최적화 초기화
 	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
 	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
-	LastNetUpdateFrequency = NetUpdateFrequency;
 }
 
 void AGS_Player::BeginPlay()
@@ -159,18 +159,6 @@ void AGS_Player::BeginPlay()
 		MeshComp->MinLodModel = MinLOD;
 
 		UE_LOG(LogTemp, Log, TEXT("[Player:%s] Rendering Optimization - Cull Distance: %.1f (Local Player excluded)"), *GetName(), CullDistance);
-	}
-
-	// === 네트워크 & 그림자 최적화 타이머 설정 (서버만) ===
-	if (HasAuthority() && !IsLocalPlayer())
-	{
-		GetWorld()->GetTimerManager().SetTimer(
-			NetworkOptimizationTimerHandle,
-			this,
-			&AGS_Player::UpdateNetworkOptimization,
-			1.0f, // 1초마다 체크
-			true
-		);
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만, Local Player 제외) ===
@@ -604,79 +592,54 @@ float AGS_Player::GetOptimalCullDistance() const
 	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }
 
-void AGS_Player::UpdateNetworkOptimization()
+float AGS_Player::CalculateSignificance(const FTransform& Viewpoint)
 {
-	// 서버에서만 실행
-	if (!HasAuthority()) return;
+	// 로컬 플레이어는 항상 최상위 중요도 (죽어도, 빈사 상태여도 카메라 중심)
+	if (IsLocalPlayer())
+		return 1.0f;
 
-	// 로컬 플레이어는 최적화 제외
-	if (IsLocalPlayer()) return;
+	// Dying State는 죽음보다 중요! (구조 가능, 파티원이 달려옴, 빈사 애니메이션 중요)
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
+	{
+		if (Seeker->IsInDyingState())
+			return 0.6f;  // 중간~높은 중요도 → 30Hz 네트워크, 중간 애니메이션 품질
+	}
 
-	// 거리 기반 네트워크 업데이트 빈도 계산
-	float NewFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
+	// 죽은 Player는 중간 중요도 유지 (TPS 시점에서 파티원 시체가 보임)
+	// Monster와 달리 Player는 죽어도 화면에 보이므로 애니메이션/네트워크 유지 필요
+	if (IsDead())
+		return 0.5f;  // 중간 중요도 → 30Hz 네트워크 업데이트, 중간 애니메이션 품질
 
-	// === 전투 상태 체크: HP가 낮거나 최근 피격 시 최소 빈도 보장 ===
+	float Score = 0.1f;
+	FVector ActorLoc = GetActorLocation();
+	FVector ViewLoc = Viewpoint.GetLocation();
+	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
+
+	// === 전투 상태 체크: HP가 낮으면 중요도 강제 상승 ===
+	bool bIsInCombat = false;
+
 	if (StatComp)
 	{
 		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
-
-		// HP가 90% 이하이면 전투 중으로 간주 (최소 10Hz 보장)
+		// HP가 90% 이하이면 전투 중으로 간주
 		if (HealthRatio < 0.9f)
 		{
-			NewFrequency = FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
+			bIsInCombat = true;
 		}
 	}
 
-	// 변경이 있을 때만 업데이트 (불필요한 연산 방지)
-	if (FMath::Abs(NewFrequency - LastNetUpdateFrequency) > 0.1f)
+	// === 이동 상태 체크: 이동 중이면 중요도 상승 ===
+	bool bIsMoving = GetVelocity().SizeSquared() > 100.0f; // 10cm/s 이상
+
+	// 거리 기반 점수 (50m 기준)
+	float MaxRangeSq = FMath::Square(5000.0f);
+	Score = FMath::Clamp(1.2f - (DistSq / MaxRangeSq), 0.1f, 1.0f);
+
+	// === 전투 중이거나 이동 중이면 중요도 보장 (부모의 NetUpdateFrequency 60Hz 유도) ===
+	if (bIsInCombat || bIsMoving)
 	{
-		NetUpdateFrequency = NewFrequency;
-		LastNetUpdateFrequency = NewFrequency;
-
-		UE_LOG(LogTemp, Verbose, TEXT("[Player:%s] Network Optimization - NetUpdateFrequency: %.1fHz"), *GetName(), NewFrequency);
+		Score = FMath::Max(Score, 0.85f); // 0.8 초과 → 부모의 OnSignificanceChanged에서 60Hz 설정
 	}
-}
 
-void AGS_Player::UpdateShadowCulling()
-{
-	// 클라이언트에서만 실행
-	if (IsRunningDedicatedServer()) return;
-
-	// 로컬 플레이어는 최적화 제외
-	if (IsLocalPlayer()) return;
-
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	if (!MeshComp) return;
-
-	// 카메라 위치 가져오기
-	if (UWorld* World = GetWorld())
-	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
-		{
-			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
-			{
-				FVector CameraLocation = CameraManager->GetCameraLocation();
-				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
-
-				// 거리 기반 그림자 설정
-				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
-				{
-					// 80m 이상: 그림자 완전 비활성화
-					MeshComp->SetCastShadow(false);
-				}
-				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
-				{
-					// 40-80m: 정적 그림자만 유지 (동적 그림자 비활성화)
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = false;
-				}
-				else
-				{
-					// 40m 이내: 모든 그림자 활성화
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = true;
-				}
-			}
-		}
-	}
+	return Score;
 }

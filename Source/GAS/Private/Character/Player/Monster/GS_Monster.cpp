@@ -8,9 +8,6 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "Sound/GS_AudioManager.h"
-
-// #include "Character/GS_Character.h"
 #include "SignificanceManager.h"
 #include "AI/RTS/GS_RTSAttackNotificationManager.h"
 #include "AI/RTS/GS_RTSController.h"
@@ -20,10 +17,7 @@
 #include "Character/Skill/Monster/GS_MonsterSkillComp.h"
 #include "Components/DecalComponent.h"
 #include "Components/WidgetComponent.h"
-#include "DrawDebugHelpers.h"
-#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "System/GameState/GS_InGameGS.h"
@@ -53,6 +47,8 @@ AGS_Monster::AGS_Monster()
 	// 몬스터 오디오 컴포넌트 생성
 	MonsterAudioComponent = CreateDefaultSubobject<UGS_MonsterAudioComponent>(
 	    "MonsterAudioComponent");
+	BaseAudioComponent = MonsterAudioComponent;
+	BaseAudioComponent = MonsterAudioComponent;
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
@@ -88,7 +84,6 @@ AGS_Monster::AGS_Monster()
 	// 네트워크 최적화 초기화
 	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
 	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
-	LastNetUpdateFrequency = NetUpdateFrequency;
 	HitReactComp = CreateDefaultSubobject<UGS_HitReactComp>(TEXT("HitReactComp_Monster"));
 
 	// === Shadow Proxy (Capsule Shadows) 활성화 ===
@@ -182,8 +177,6 @@ void AGS_Monster::BeginPlay()
 				OnMonsterAttacked.AddUniqueDynamic(
 				    RTSController->AttackNotificationManager,
 				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
-				// UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Attack notification delegate
-				// bound to local RTSController"), *GetName());
 			}
 		}
 	}
@@ -240,15 +233,6 @@ void AGS_Monster::BeginPlay()
 		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
 		GetMesh()->VisibilityBasedAnimTickOption =
 		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
-	}
-
-	// === 네트워크 최적화 타이머 설정 (서버만) ===
-	if (HasAuthority())
-	{
-		GetWorld()->GetTimerManager().SetTimer(
-		    NetworkOptimizationTimerHandle, this,
-		    &AGS_Monster::UpdateNetworkOptimization, 0.2f, // 0.2초마다 체크
-		    true);
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만) ===
@@ -372,7 +356,6 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		TimerWorld->GetTimerManager().ClearTimer(ShadowCullingTimerHandle);
 		TimerWorld->GetTimerManager().ClearTimer(HPWidgetVisibilityTimerHandle);
-		TimerWorld->GetTimerManager().ClearTimer(NetworkOptimizationTimerHandle);
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -386,8 +369,8 @@ void AGS_Monster::Tick(float DeltaSeconds)
 
 void AGS_Monster::UpdateHPWidgetVisibility()
 {
-	// Significance 체크: 중요도가 너무 낮으면(멀리 있으면) UI 가시성 연산 스킵
-	if (GetSignificance() < 0.1f)
+	// Significance 체크: 중요도가 너무 낮으면 UI 가시성 연산 스킵 (성능 최적화)
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI_SKIP)
 	{
 		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible())
 		{
@@ -434,8 +417,8 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 		if (APawn* LocalPawn = PC->GetPawn())
 		{
 			float DistSqToSeeker = FVector::DistSquared(GetActorLocation(), LocalPawn->GetActorLocation());
-			// 30m 내에 있으면 보이도록 설정 (시커 거리 안전망)
-			bIsInRange = (DistSqToSeeker < FMath::Square(3000.0f));
+			// 일정 거리 내에 있으면 보이도록 설정 (시커 거리 안전망)
+			bIsInRange = (DistSqToSeeker < TPS_SEEKER_PROXIMITY_RADIUS_SQ);
 
 			const float CombatTriggerRadiusSq = FMath::Square(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS * 1.1f);
 			if (DistSqToSeeker > CombatTriggerRadiusSq)
@@ -467,7 +450,7 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 			}
 
 			bool bWaistBlocked = false;
-			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, 50.f), ECC_Visibility, Params))
+			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, GS_Rendering::HP_WIDGET_VISIBILITY_TRACE_OFFSET), ECC_Visibility, Params))
 			{
 				bool bIsPawn = (HitResult.GetActor() && HitResult.GetActor()->IsA<APawn>());
 				bool bIsFloor = (HitResult.ImpactNormal.Z >= 0.7f);
@@ -548,8 +531,9 @@ void AGS_Monster::OnDeath()
 
 	FTimerHandle DestroyTimerHandle;
 	GetWorldTimerManager().SetTimer(
-	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, 2.f, false);
+	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, DELAYED_DESTROY_TIME, false);
 }
+
 
 void AGS_Monster::HandleDelayedDestroy()
 {
@@ -714,124 +698,6 @@ float AGS_Monster::GetOptimalCullDistance() const
 	return GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
 }
 
-void AGS_Monster::UpdateNetworkOptimization()
-{
-	// 서버에서만 실행
-	if (!HasAuthority())
-		return;
-
-	// 거리 기반 네트워크 업데이트 빈도 계산
-	float NewFrequency =
-	    GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
-
-	// === 전투 상태 체크: HP가 낮거나 AI 타겟이 있으면 최상위 빈도 보장 ===
-	bool bIsAggressiveState = false;
-	if (StatComp)
-	{
-		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
-
-		// HP가 조금이라도 깎였다면 (99% 이하) 전투 상태로 간주
-		if (HealthRatio < 0.99f)
-		{
-			bIsAggressiveState = true;
-		}
-	}
-
-	// AI가 타겟을 추적 중이면 전투 중으로 간주
-	if (AGS_AIController* AIController =
-	        Cast<AGS_AIController>(GetController()))
-	{
-		if (UBlackboardComponent* Blackboard =
-		        AIController->GetBlackboardComponent())
-		{
-			if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) !=
-			    nullptr)
-			{
-				bIsAggressiveState = true;
-			}
-		}
-	}
-
-	if (bIsAggressiveState)
-	{
-		NewFrequency =
-		    FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_COMBAT);
-	}
-
-	// === 이동 상태 체크: 이동 중이면 최소 중거리 빈도 보장 ===
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		if (MoveComp->Velocity.SizeSquared() >
-		    100.0f) // 움직이고 있다면 (약 10cm/s 이상)
-		{
-			NewFrequency =
-			    FMath::Max(NewFrequency, GS_Rendering::NET_UPDATE_FREQ_MEDIUM);
-
-			// 이동 중에는 스무딩 방식을 지수적으로 강제하여 더 부드럽게 보이도록 설정
-			if (MoveComp->NetworkSmoothingMode != ENetworkSmoothingMode::Exponential)
-			{
-				MoveComp->NetworkSmoothingMode = ENetworkSmoothingMode::Exponential;
-			}
-		}
-	}
-
-	// 변경이 있을 때만 업데이트 (불필요한 연산 방지)
-	if (FMath::Abs(NewFrequency - LastNetUpdateFrequency) > 0.1f)
-	{
-		NetUpdateFrequency = NewFrequency;
-		LastNetUpdateFrequency = NewFrequency;
-
-		UE_LOG(
-		    LogTemp, Verbose,
-		    TEXT("[Monster:%s] Network Optimization - NetUpdateFrequency: %.1fHz"),
-		    *GetName(), NewFrequency);
-	}
-}
-
-void AGS_Monster::UpdateShadowCulling()
-{
-	// 클라이언트에서만 실행
-	if (IsRunningDedicatedServer())
-		return;
-
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	if (!MeshComp)
-		return;
-
-	// 카메라 위치 가져오기
-	if (UWorld* World = GetWorld())
-	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
-		{
-			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
-			{
-				FVector CameraLocation = CameraManager->GetCameraLocation();
-				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
-
-				// 거리 기반 그림자 설정
-				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
-				{
-					// 80m 이상: 동적/정적 그림자 모두 끄되, 캡슐 그림자는 유지 (Grounded 느낌)
-					MeshComp->SetCastShadow(false);
-					MeshComp->bCastDynamicShadow = false;
-				}
-				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
-				{
-					// 40-80m: 정적 그림자 및 캡슐 그림자 유지
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = false;
-				}
-				else
-				{
-					// 40m 이내: 고품질 동적 그림자 활성화
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = true;
-				}
-			}
-		}
-	}
-}
-
 float AGS_Monster::CalculateSignificance(const FTransform& Viewpoint)
 {
 	if (IsDead())
@@ -841,6 +707,34 @@ float AGS_Monster::CalculateSignificance(const FTransform& Viewpoint)
 	FVector ActorLoc = GetActorLocation();
 	FVector ViewLoc = Viewpoint.GetLocation();
 	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
+
+	// === 전투 상태 체크: HP가 낮거나 AI 타겟이 있으면 중요도 강제 상승 ===
+	bool bIsInCombat = false;
+
+	// HP가 감소했으면 전투 중으로 간주 (99% 임계값)
+	if (StatComp)
+	{
+		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
+		if (HealthRatio < 0.99f)
+		{
+			bIsInCombat = true;
+		}
+	}
+
+	// AI가 타겟을 추적 중이면 전투 중으로 간주
+	if (AGS_AIController* AIController = Cast<AGS_AIController>(GetController()))
+	{
+		if (UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent())
+		{
+			if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) != nullptr)
+			{
+				bIsInCombat = true;
+			}
+		}
+	}
+
+	// === 이동 상태 체크: 이동 중이면 중요도 상승 ===
+	bool bIsMoving = GetVelocity().SizeSquared() > 100.0f; // 10cm/s 이상
 
 	// 가디언(RTS) 시점
 	if (GS_Rendering::IsRTSMode(this))
@@ -869,6 +763,12 @@ float AGS_Monster::CalculateSignificance(const FTransform& Viewpoint)
 		// 30m 거리 기준으로 점수 선형 감쇠
 		float CombatRangeSq = FMath::Square(3000.0f);
 		Score = FMath::Clamp(1.0f - (DistSq / CombatRangeSq), 0.1f, 1.0f);
+	}
+
+	// === 전투 중이거나 이동 중이면 중요도 보장 (부모의 NetUpdateFrequency 60Hz 유도) ===
+	if (bIsInCombat || bIsMoving)
+	{
+		Score = FMath::Max(Score, 0.85f); // 0.8 초과 → 부모의 OnSignificanceChanged에서 60Hz 설정
 	}
 
 	return Score;
@@ -908,8 +808,7 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 
 	// 4. UI 및 틱 최적화
 	// 중요도가 작으면 UI 틱 및 가시성 강제 비활성화 (성능 최적화)
-	// 가시성 임계값(0.5)은 Tick()의 거리 기반 가시성 로직과 협력함
-	bool bUIEnabled = (NewSignificance > 0.4f);
+	bool bUIEnabled = (NewSignificance > GS_Rendering::SIGNIFICANCE_THRESHOLD_UI);
 
 	auto UpdateWidgetOptimization = [&](UWidgetComponent* Widget)
 	{

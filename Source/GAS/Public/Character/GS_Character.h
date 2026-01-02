@@ -245,6 +245,9 @@ protected:
 	/** Significance Manager 등록 로직 (가상 함수로 분리하여 중복 등록 방지) */
 	virtual void RegisterSignificanceManager();
 
+	/** 그림자 컬링 최적화 (거리 기반) - 모든 캐릭터 공통 */
+	void UpdateShadowCulling();
+
 protected:
 	virtual void NotifyActorBeginCursorOver() override;
 	virtual void NotifyActorEndCursorOver() override;
@@ -256,6 +259,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_StatComp> StatComp;
+
+	/** 공통 오디오 컴포넌트 변수 (Seeker/Monster/Drakhar 오디오 컴포넌트가 여기 할당됨) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<class UGS_AudioComponentBase> BaseAudioComponent;
 
 	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TArray<FWeaponSlot> WeaponSlots;
@@ -300,7 +307,7 @@ protected:
 	virtual void OnRep_IsDead();
 
 	/** Death 사운드 로컬 재생 (OnDeath, OnRep_IsDead에서 공통 사용) */
-	void PlayDeathSoundLocal();
+	virtual void PlayDeathSoundLocal();
 
 	UFUNCTION()
 	void OnRep_ImpactVFX();

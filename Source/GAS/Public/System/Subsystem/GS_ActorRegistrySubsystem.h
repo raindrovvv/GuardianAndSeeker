@@ -11,6 +11,7 @@ class AGS_Seeker;
 class AGS_Guardian;
 class AGS_RTSController;
 class AGS_LavaTrap;
+class AGS_TrapManager;
 class UGS_CompassIndicatorComponent;
 
 /**
@@ -47,6 +48,9 @@ public:
 	void RegisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator);
 	void UnregisterCompassIndicator(UGS_CompassIndicatorComponent* CompassIndicator);
 
+	void RegisterTrapManager(AGS_TrapManager* TrapManager);
+	void UnregisterTrapManager(AGS_TrapManager* TrapManager);
+
 	// --- Accessors ---
 	const TArray<TWeakObjectPtr<AGS_Monster>>& GetMonsters() const { return RegisteredMonsters; }
 	const TArray<TWeakObjectPtr<AGS_Seeker>>& GetSeekers() const { return RegisteredSeekers; }
@@ -54,6 +58,7 @@ public:
 	AGS_RTSController* GetRTSController() const { return RegisteredRTSController.Get(); }
 	const TArray<TWeakObjectPtr<AGS_LavaTrap>>& GetLavaTraps() const { return RegisteredLavaTraps; }
 	const TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>>& GetCompassIndicators() const { return RegisteredCompassIndicators; }
+	AGS_TrapManager* GetTrapManager() const { return RegisteredTrapManager.Get(); }
 
 	/** Combines Monsters and Guardians for Merci's ultimate or similar logic */
 	void GetAllHostileActors(TArray<AActor*>& OutActors) const;
@@ -76,6 +81,9 @@ private:
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>> RegisteredCompassIndicators;
+
+	UPROPERTY()
+	TWeakObjectPtr<AGS_TrapManager> RegisteredTrapManager;
 
 	FTimerHandle CleanupTimerHandle;
 };
