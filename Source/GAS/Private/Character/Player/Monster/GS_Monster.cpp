@@ -25,37 +25,37 @@
 #include "TimerManager.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 
-AGS_Monster::AGS_Monster()
+AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	AIControllerClass = AGS_AIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	MonsterSkillComp =
-	    CreateDefaultSubobject<UGS_MonsterSkillComp>(TEXT("MonsterSkillComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UGS_MonsterSkillComp>(this, TEXT("MonsterSkillComp"));
 
 	SkillCooldownWidgetComp =
-	    CreateDefaultSubobject<UWidgetComponent>(TEXT("SkillCooldownWidgetComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("SkillCooldownWidgetComp"));
 	SkillCooldownWidgetComp->SetupAttachment(RootComponent);
 	SkillCooldownWidgetComp->SetVisibility(false);
 	SkillCooldownWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
 	SkillCooldownWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SkillCooldownWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 
-	AkComponent = CreateDefaultSubobject<UAkComponent>("AkComponent");
+	AkComponent = ObjectInitializer.CreateDefaultSubobject<UAkComponent>(this, TEXT("AkComponent"));
 	AkComponent->SetupAttachment(RootComponent);
 
 	// 몬스터 오디오 컴포넌트 생성
-	MonsterAudioComponent = CreateDefaultSubobject<UGS_MonsterAudioComponent>(
-	    "MonsterAudioComponent");
-	BaseAudioComponent = MonsterAudioComponent;
+	MonsterAudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_MonsterAudioComponent>(this,
+	                                                                                            TEXT("MonsterAudioComponent"));
 	BaseAudioComponent = MonsterAudioComponent;
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
-	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
+	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
 
 	// UI 컴포넌트 생성 및 초기화
 	TargetedUIComponent =
-	    CreateDefaultSubobject<UWidgetComponent>(TEXT("TargetedUI"));
+	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));
 	TargetedUIComponent->SetupAttachment(RootComponent);
 	TargetedUIComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	TargetedUIComponent->SetWidgetSpace(EWidgetSpace::Screen);

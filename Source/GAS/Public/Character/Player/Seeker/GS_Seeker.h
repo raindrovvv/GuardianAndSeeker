@@ -76,7 +76,7 @@ class GAS_API AGS_Seeker : public AGS_Player, public IGS_ManualDataInterface
 	GENERATED_BODY()
 
 public:
-	AGS_Seeker();
+	AGS_Seeker(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

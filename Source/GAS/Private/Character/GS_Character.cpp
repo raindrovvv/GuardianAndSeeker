@@ -30,18 +30,19 @@
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Weapon/GS_Weapon.h"
 
-AGS_Character::AGS_Character()
+AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	StatComp = CreateDefaultSubobject<UGS_StatComp>(TEXT("StatComp"));
-	DebuffComp = CreateDefaultSubobject<UGS_DebuffComp>(TEXT("DebuffComp"));
-	HitReactComp = CreateDefaultSubobject<UGS_HitReactComp>(TEXT("HitReactComp"));
+	StatComp = ObjectInitializer.CreateDefaultSubobject<UGS_StatComp>(this, TEXT("StatComp"));
+	DebuffComp = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffComp>(this, TEXT("DebuffComp"));
+	HitReactComp = ObjectInitializer.CreateDefaultSubobject<UGS_HitReactComp>(this, TEXT("HitReactComp"));
 	CameraShakeComp =
-	    CreateDefaultSubobject<UGS_CameraShakeComponent>(TEXT("CameraShakeComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UGS_CameraShakeComponent>(this, TEXT("CameraShakeComp"));
 
 	HPTextWidgetComp =
-	    CreateDefaultSubobject<UGS_HPTextWidgetComp>(TEXT("TextWidgetComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UGS_HPTextWidgetComp>(this, TEXT("TextWidgetComp"));
 	HPTextWidgetComp->SetupAttachment(RootComponent);
 	HPTextWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -51,7 +52,7 @@ AGS_Character::AGS_Character()
 	HPTextWidgetComp->SetCullDistance(2000.0f);
 
 	SelectionDecal =
-	    CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
+	    ObjectInitializer.CreateDefaultSubobject<UDecalComponent>(this, TEXT("SelectionDecal"));
 	SelectionDecal->SetupAttachment(RootComponent);
 	SelectionDecal->SetVisibility(false);
 
@@ -616,7 +617,12 @@ void AGS_Character::OnRep_ImpactVFX()
 		    UNiagaraFunctionLibrary::SpawnSystemAttached(
 		        LoadedVFX, GetRootComponent(), NAME_None,
 		        FVector::ZeroVector, FRotator::ZeroRotator,
-		        EAttachLocation::SnapToTarget, true);
+		        EAttachLocation::SnapToTarget,
+		        true, // bAutoDestroy
+		        true, // bAutoActivate (위치 수정)
+		        ENCPoolMethod::AutoRelease, // Pooling 활성화 (위치 수정)
+		        true // bPreCullCheck
+		    );
 
 		if (SpawnedVFX)
 		{

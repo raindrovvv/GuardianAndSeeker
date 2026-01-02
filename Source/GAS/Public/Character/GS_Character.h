@@ -61,7 +61,7 @@ class GAS_API AGS_Character : public ACharacter, public IGenericTeamAgentInterfa
 	GENERATED_BODY()
 
 public:
-	AGS_Character();
+	AGS_Character(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;

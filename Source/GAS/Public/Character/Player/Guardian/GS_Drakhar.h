@@ -29,7 +29,7 @@ class GAS_API AGS_Drakhar : public AGS_Guardian
 	GENERATED_BODY()
 
 public:
-	AGS_Drakhar();
+	AGS_Drakhar(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;

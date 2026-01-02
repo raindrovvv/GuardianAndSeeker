@@ -36,15 +36,15 @@ UCLASS()
 class GAS_API AGS_Guardian : public AGS_Player, public IGS_ManualDataInterface
 {
 	GENERATED_BODY()
-	
+
 public:
-	AGS_Guardian();
+	AGS_Guardian(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
-	
+
 	UPROPERTY()
 	TObjectPtr<UGS_DrakharAnimInstance> GuardianAnim;
 
@@ -53,17 +53,17 @@ public:
 
 	UPROPERTY(Replicated)
 	EGuardianDoSkill GuardianDoSkillState;
-	
-	UPROPERTY(ReplicatedUsing=OnRep_MoveSpeed)
+
+	UPROPERTY(ReplicatedUsing = OnRep_MoveSpeed)
 	float MoveSpeed;
-	
+
 	// VFX 컴포넌트 (디버프 등 모든 VFX) - Drakhar는 자체 VFX 컴포넌트 사용
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UGS_VFXComponent* VFXComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComponent;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "HitStop Camera Shake Info"))
 	FGS_CameraShakeInfo HitStopShakeInfo;
 
@@ -74,17 +74,17 @@ public:
 
 	virtual void StartCtrl();
 	virtual void StopCtrl();
-	
+
 	UFUNCTION()
 	void OnRep_MoveSpeed();
-	
+
 	//[attck check function]
 	UFUNCTION()
 	virtual void MeleeAttackCheck();
-	
+
 	//check player in attack range
 	void DetectPlayerInRange(TSet<AGS_Character*>& OutDamagedCharacters, const FVector& Start, float SkillRange, float Radius);
-	
+
 	//damage player in TSet
 	void ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& DamagedCharacters, float PlusDamge);
 
@@ -127,13 +127,13 @@ protected:
 	// KeyManual을 위한 캐릭터 타입 저장
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Manual")
 	FName ManualRowName;
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCApplyHitStop(AGS_Character* InDamagedCharacter);
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCEndHitStop(AGS_Character* InDamagedCharacter);
-	
+
 private:
 	//hit stop duration
 	UPROPERTY()

@@ -29,7 +29,7 @@ class GAS_API AGS_Monster : public AGS_Character
 	GENERATED_BODY()
 
 public:
-	AGS_Monster();
+	AGS_Monster(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "RTS")
 	bool bCommandLocked;

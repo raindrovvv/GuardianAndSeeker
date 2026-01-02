@@ -29,21 +29,18 @@
 #include "UI/Character/GS_DrakharStaminaGauge.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 
-AGS_Drakhar::AGS_Drakhar()
+AGS_Drakhar::AGS_Drakhar(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UGS_DrakharVFXComponent>(TEXT("VFXComponent")))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Guardian의 VFXComponent를 제거하고 Drakhar 전용 컴포넌트로 교체
-	if (VFXComponent)
-	{
-		VFXComponent->DestroyComponent();
-		VFXComponent = nullptr;
-	}
+	// Super(AGS_Guardian)에서 생성한 "VFXComponent"가 UGS_DrakharVFXComponent 클래스로 생성.
+	DrakharVFXComponent = Cast<UGS_DrakharVFXComponent>(VFXComponent);
 
-	DrakharVFXComponent = CreateDefaultSubobject<UGS_DrakharVFXComponent>(TEXT("DrakharVFXComponent"));
-	AudioComponent = CreateDefaultSubobject<UGS_DrakharAudioComponent>(TEXT("AudioComponent"));
+	AudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DrakharAudioComponent>(this, TEXT("AudioComponent"));
 	BaseAudioComponent = AudioComponent;
-	FootManagerComponent = CreateDefaultSubobject<UGS_FootManagerComponent>(TEXT("FootManagerComponent"));
+
+	FootManagerComponent = ObjectInitializer.CreateDefaultSubobject<UGS_FootManagerComponent>(this, TEXT("FootManagerComponent"));
 
 	// === 어스퀘이크 카메라 쉐이크 기본값 설정 ===
 	EarthquakeShakeInfo.Intensity = 8.0f;

@@ -43,9 +43,11 @@
 #include "UI/Character/GS_SteamNameWidgetComp.h"
 #include "Props/Item/EmberChest/GS_EmberChest.h"
 #include "Character/Skill/Seeker/GS_HealSkill.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 // Sets default values
-AGS_Seeker::AGS_Seeker()
+AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -56,44 +58,44 @@ AGS_Seeker::AGS_Seeker()
 	GetMesh()->bOnlyAllowAutonomousTickPose = false;
 
 	// Post Process Component 생성 (Low Health)
-	LowHealthPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("LowHealthPostProcessComp"));
-	LowHealthPostProcessComp->SetupAttachment(CameraComp);
-	LowHealthPostProcessComp->bEnabled = false;
+	LowHealthPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("LowHealthPostProcessComp"));
+	LowHealthPostProcessComp->SetupAttachment(RootComponent);
+	LowHealthPostProcessComp->bUnbound = true;
 	LowHealthPostProcessComp->Priority = 10;
-	LowHealthEffectComp = CreateDefaultSubobject<UGS_LowHealthEffectComponent>(TEXT("LowHealthEffectComp"));
+	LowHealthPostProcessComp->BlendWeight = 0.0f;
 
 	// Post Process Component 생성 (가디언 감지 - MPP_Detect)
-	DetectionPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("DetectionPostProcessComp"));
-	DetectionPostProcessComp->SetupAttachment(CameraComp);
-	DetectionPostProcessComp->bEnabled = false;
-	DetectionPostProcessComp->Priority = 11; // Low Health보다 높은 우선순위
-	DetectionEffectComp = CreateDefaultSubobject<UGS_DetectionEffectComponent>(TEXT("DetectionEffectComp"));
+	DetectionPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("DetectionPostProcessComp"));
+	DetectionPostProcessComp->SetupAttachment(RootComponent);
+	DetectionPostProcessComp->bUnbound = true;
+	DetectionPostProcessComp->Priority = 11;
+	DetectionPostProcessComp->BlendWeight = 0.0f;
 
-	// =======================
 	// Post Process Component 생성 (빈사 상태 - Dying)
-	// =======================
-	DyingPostProcessComp = CreateDefaultSubobject<UPostProcessComponent>(TEXT("DyingPostProcessComp"));
-	DyingPostProcessComp->SetupAttachment(CameraComp);
-	DyingPostProcessComp->bEnabled = false;
-	DyingPostProcessComp->Priority = 12; // 다른 효과보다 높은 우선순위
+	DyingPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("DyingPostProcessComp"));
+	DyingPostProcessComp->SetupAttachment(RootComponent);
+	DyingPostProcessComp->bUnbound = true;
+	DyingPostProcessComp->Priority = 12;
 
-	// =======================
+	// Low Health Effect (Niagara 기반 커스텀 컴포넌트)
+	LowHealthEffectComp = ObjectInitializer.CreateDefaultSubobject<UGS_LowHealthEffectComponent>(this, TEXT("LowHealthEffectComp"));
+	LowHealthEffectComp->SetAutoActivate(false);
+
+	// Detection Effect (Niagara 기반 커스텀 컴포넌트)
+	DetectionEffectComp = ObjectInitializer.CreateDefaultSubobject<UGS_DetectionEffectComponent>(this, TEXT("DetectionEffectComp"));
+	DetectionEffectComp->SetAutoActivate(false);
+
 	// VFX 컴포넌트 생성 (디버프, 힐링 등 모든 VFX)
-	// =======================
-	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
+	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
 
-	// =======================
 	// 시커 오디오 컴포넌트 생성 (RTS/TPS 지원)
-	// =======================
-	SeekerAudioComponent = CreateDefaultSubobject<UGS_SeekerAudioComponent>("SeekerAudioComponent");
+	SeekerAudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_SeekerAudioComponent>(this, TEXT("SeekerAudioComponent"));
 	BaseAudioComponent = SeekerAudioComponent;
 
-	// =======================
 	// 마커 배치 컴포넌트 생성
-	// =======================
-	MarkerPlacementComponent = CreateDefaultSubobject<UGS_MarkerPlacementComponent>("MarkerPlacementComponent");
+	MarkerPlacementComponent = ObjectInitializer.CreateDefaultSubobject<UGS_MarkerPlacementComponent>(this, TEXT("MarkerPlacementComponent"));
 
-	// Fire Effect 생성 및 설정
+	// 발 밑 용암 VFX
 	FeetLavaVFX_L = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FeetLavaVFX_L"));
 	FeetLavaVFX_L->SetupAttachment(GetMesh(), FName("foot_l_Socket"));
 	FeetLavaVFX_L->bAutoActivate = false;
@@ -104,15 +106,14 @@ AGS_Seeker::AGS_Seeker()
 	FeetLavaVFX_R->bAutoActivate = false;
 	FeetLavaVFX_R->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
 
+	// 몸통 용암 VFX
 	BodyLavaVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("BodyLavaVFX"));
 	BodyLavaVFX->SetupAttachment(GetMesh(), FName("spine_03"));
 	BodyLavaVFX->bAutoActivate = false;
 	BodyLavaVFX->SetRelativeLocation(FVector(-60.f, 0.f, 0.f));
 	BodyLavaVFX->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
 
-	// =======================
 	// 빈사 상태 불꽃 VFX 컴포넌트 초기화
-	// =======================
 	DyingFlameEffectComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("DyingFlameEffectComp"));
 	DyingFlameEffectComp->SetupAttachment(RootComponent);
 	DyingFlameEffectComp->bAutoActivate = false;
@@ -125,10 +126,15 @@ AGS_Seeker::AGS_Seeker()
 	DyingMagicCircleComp->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f)); // 바닥에 평행하게
 
 	// 전투 BGM 트리거 생성 (시커가 몬스터를 감지)
-	CombatTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CombatTrigger"));
+	CombatTrigger = ObjectInitializer.CreateDefaultSubobject<USphereComponent>(this, TEXT("CombatTrigger"));
 	CombatTrigger->SetupAttachment(RootComponent);
-	CombatTrigger->SetSphereRadius(CombatTriggerRadius);
-	CombatTrigger->SetCollisionProfileName(TEXT("SoundTrigger"));
+	CombatTrigger->SetSphereRadius(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS);
+	CombatTrigger->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+	CombatTrigger->SetGenerateOverlapEvents(true);
+
+	// 델리게이트 바인딩 (생성자에서 수행)
+	CombatTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerBeginOverlap);
+	CombatTrigger->OnComponentEndOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerEndOverlap);
 
 	//함정 - 화살발사기의 화살 채널 설정(Projectile)
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
@@ -144,7 +150,7 @@ AGS_Seeker::AGS_Seeker()
 	GaitBeforeDying = EGait::Run;
 
 	// Item (hard coding) -> 나중에 SkillSet DataTable 과 같이 ItemSet DataTable 를 가지고 초기화 할 수 있도록 한다. // SJE
-	UGS_ItemData* ItemData = CreateDefaultSubobject<UGS_ItemData>(TEXT("HP_Potion_Data"));
+	UGS_ItemData* ItemData = ObjectInitializer.CreateDefaultSubobject<UGS_ItemData>(this, TEXT("HP_Potion_Data"));
 	ItemData->ItemName = TEXT("HP_Potion");
 	ItemData->ItemType = EItemType::HP_Potion;
 	ItemData->MaxCount = 5;
@@ -180,7 +186,24 @@ void AGS_Seeker::BeginPlay()
 
 	if (IsLocallyControlled())
 	{
-		InitializeCameraManager();
+		// 카메라 및 효과 관련 에셋들을 비동기로 로드
+		TArray<FSoftObjectPath> AssetsToLoad;
+		if (!LowHealthEffectMaterial.IsNull())
+			AssetsToLoad.Add(LowHealthEffectMaterial.ToSoftObjectPath());
+		if (!DetectionEffectMaterial.IsNull())
+			AssetsToLoad.Add(DetectionEffectMaterial.ToSoftObjectPath());
+		if (!DyingEffectMaterial.IsNull())
+			AssetsToLoad.Add(DyingEffectMaterial.ToSoftObjectPath());
+		if (!DetectionHUDWidgetClass.IsNull())
+			AssetsToLoad.Add(DetectionHUDWidgetClass.ToSoftObjectPath());
+
+		TWeakObjectPtr<AGS_Seeker> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
+		                                         {
+			if (WeakThis.IsValid())
+			{
+				WeakThis->InitializeCameraManager();
+			} });
 
 		// 스탯 컴포넌트 가져와서 델리게이트 바인딩
 		if (UGS_StatComp* FoundStatComp = FindComponentByClass<UGS_StatComp>())
@@ -430,16 +453,16 @@ void AGS_Seeker::SetSeekerGait(EGait Gait)
 	switch (Gait)
 	{
 	case EGait::Walk:
-		SetCharacterSpeed(0.45f);
+		SetCharacterSpeed(GAIT_SPEED_WALK);
 		break;
 	case EGait::Run:
-		SetCharacterSpeed(0.8f);
+		SetCharacterSpeed(GAIT_SPEED_RUN);
 		break;
 	case EGait::Sprint:
-		SetCharacterSpeed(1.0f);
+		SetCharacterSpeed(GAIT_SPEED_SPRINT);
 		break;
 	case EGait::Crawl:
-		SetCharacterSpeed(0.15f); // 빈사 상태 기어다니기 - 매우 느린 속도
+		SetCharacterSpeed(GAIT_SPEED_CRAWL); // 빈사 상태 기어다니기 - 매우 느린 속도
 		break;
 	}
 }
@@ -480,8 +503,6 @@ void AGS_Seeker::StateReset()
 	this->SetMoveControlValue(true, true);
 	this->SetLookControlValue(true, true);
 
-	this->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-
 	if (this->GetSkillComp())
 	{
 		this->GetSkillComp()->ResetAllowedSkillsMask();
@@ -497,30 +518,30 @@ void AGS_Seeker::InitializeCameraManager()
 	{
 		LocalCameraManager = PC->PlayerCameraManager;
 
-		// Low Health: 컴포넌트 초기화 (Soft Reference 로드)
+		// Low Health: 컴포넌트 초기화 (Get() 사용 - BeginPlay에서 비동기 로드됨)
 		if (LowHealthEffectComp && !LowHealthEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.LoadSynchronous();
+			UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.Get();
 			if (LoadedMaterial)
 			{
 				LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LoadedMaterial);
 			}
 		}
 
-		// Detection: 컴포넌트 초기화 (Soft Reference 로드)
+		// Detection: 컴포넌트 초기화 (Get() 사용)
 		if (DetectionEffectComp && !DetectionEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.LoadSynchronous();
+			UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.Get();
 			if (LoadedMaterial)
 			{
 				DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, LoadedMaterial);
 			}
 		}
 
-		// Dying: PostProcess 초기화 (Soft Reference 로드)
+		// Dying: PostProcess 초기화 (Get() 사용)
 		if (DyingPostProcessComp && !DyingEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = DyingEffectMaterial.LoadSynchronous();
+			UMaterialInterface* LoadedMaterial = DyingEffectMaterial.Get();
 			if (LoadedMaterial)
 			{
 				DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
