@@ -43,18 +43,18 @@ void UGS_SkillComp::ApplyCooldownModifier(ESkillSlot Slot, float Ratio)
 			if (NewRemaining > 0.0f)
 			{
 				GetWorld()->GetTimerManager().SetTimer(
-					State->CooldownTimer,
-					[this, Slot]() { HandleCooldownComplete(Slot); },
-					NewRemaining,
-					false
-				);
+				    State->CooldownTimer,
+				    [this, Slot]()
+				    { HandleCooldownComplete(Slot); },
+				    NewRemaining,
+				    false);
 
 				GetWorld()->GetTimerManager().SetTimer(
-					State->UIUpdateTimer,
-					[this, Slot]() { HandleCooldownProgress(Slot); },
-					0.1f,
-					true
-				);
+				    State->UIUpdateTimer,
+				    [this, Slot]()
+				    { HandleCooldownProgress(Slot); },
+				    0.1f,
+				    true);
 			}
 
 			UpdateReplicatedCooldownStates(); // UI에도 반영
@@ -64,21 +64,24 @@ void UGS_SkillComp::ApplyCooldownModifier(ESkillSlot Slot, float Ratio)
 
 void UGS_SkillComp::ResetCooldownModifier(ESkillSlot Slot)
 {
-	if (!SkillDataTable || !GetOwner()) return;
+	if (!SkillDataTable || !GetOwner())
+		return;
 
 	UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot);
-	if (!Skill) return;
+	if (!Skill)
+		return;
 
 	// 캐릭터 타입을 기반으로 RowName 구하기
 	AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner());
-	if (!OwnerCharacter) return;
+	if (!OwnerCharacter)
+		return;
 
-	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(
-		UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
+	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
 
 	FString Context;
 	const FGS_SkillSet* SkillSet = SkillDataTable->FindRow<FGS_SkillSet>(RowName, Context);
-	if (!SkillSet) return;
+	if (!SkillSet)
+		return;
 
 	float OriginalCooltime = 0.f;
 
@@ -112,7 +115,7 @@ void UGS_SkillComp::ResetCooldownModifier(ESkillSlot Slot)
 void UGS_SkillComp::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	SetIsReplicated(true);
 	InitSkills();
 }
@@ -149,8 +152,7 @@ void UGS_SkillComp::InitSkills()
 		return;
 	}
 
-	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(
-		UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
+	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
 	FString Context;
 
 	FGS_SkillSet* SkillSet = SkillDataTable->FindRow<FGS_SkillSet>(RowName, Context);
@@ -164,7 +166,7 @@ void UGS_SkillComp::InitSkills()
 		SetSkill(ESkillSlot::Rolling, SkillSet->RollingSkill);
 		SetSkill(ESkillSlot::Combo, SkillSet->ComboSkill);
 		SetSkill(ESkillSlot::HealPotion, SkillSet->HealPotionSkill);
-		
+
 		// 스킬 초기화 후 마스크 리셋 (초기 상태에서 스킬 사용 가능하도록)
 		ResetAllowedSkillsMask();
 	}
@@ -235,23 +237,26 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 			}
 		}
 	}
-	
-	Skill-> AllowControlValue = Info.AllowControlValue;
-	
+
+	Skill->AllowControlValue = Info.AllowControlValue;
+
 	// VFX 정보 설정
 	Skill->SkillCastVFX = Info.SkillCastVFX;
 	Skill->SkillRangeVFX = Info.SkillRangeVFX;
 	Skill->SkillImpactVFX = Info.SkillImpactVFX;
+	Skill->SkillEnvImpactVFX = Info.SkillEnvImpactVFX;
 	Skill->SkillEndVFX = Info.SkillEndVFX;
+	Skill->SkillLoopVFX = Info.SkillLoopVFX;
 	Skill->SkillVFXScale = Info.SkillVFXScale;
 	Skill->SkillVFXDuration = Info.SkillVFXDuration;
-	
+
 	// VFX 오프셋 정보 설정
 	Skill->CastVFXOffset = Info.CastVFXOffset;
 	Skill->RangeVFXOffset = Info.RangeVFXOffset;
 	Skill->ImpactVFXOffset = Info.ImpactVFXOffset;
 	Skill->EndVFXOffset = Info.EndVFXOffset;
-	
+	Skill->LoopVFXOffset = Info.LoopVFXOffset;
+
 	SkillMap.Add(Slot, Skill);
 
 	// Init Delegate
@@ -270,7 +275,7 @@ void UGS_SkillComp::Server_TryActivateSkill_Implementation(ESkillSlot Slot)
 		if (SkillMap[Slot]->CanActive())
 		{
 			AGS_Player* OwnerPlayer = Cast<AGS_Player>(GetOwner());
-			if(OwnerPlayer)
+			if (OwnerPlayer)
 			{
 				if (IsSkillAllowed(Slot))
 				{
@@ -329,7 +334,7 @@ void UGS_SkillComp::Server_TryDeactiveSkill_Implementation(ESkillSlot Slot)
 }
 
 void UGS_SkillComp::Server_TrySkillCanceledByDebuff_Implementation(ESkillSlot Slot)
-{	
+{
 	if (SkillMap.Contains(Slot))
 	{
 		SkillMap[Slot]->OnSkillCanceledByDebuff();
@@ -368,7 +373,7 @@ void UGS_SkillComp::SetSkillActiveState(ESkillSlot Slot, bool InIsActive)
 	}
 	if (!bFound)
 	{
-		ReplicatedSkillStates.Add({ Slot, InIsActive });
+		ReplicatedSkillStates.Add({Slot, InIsActive});
 	}
 
 	// SkillStates는 항상 갱신 (Standalone 대응)
@@ -382,7 +387,7 @@ bool UGS_SkillComp::IsSkillActive(ESkillSlot Slot) const
 	{
 		return State->bIsActive;
 	}
-	
+
 	return false;
 }
 
@@ -420,7 +425,7 @@ void UGS_SkillComp::StartCooldownForSkill(ESkillSlot Slot)
 	{
 		return;
 	}
-	
+
 	FSkillCooldownState& State = CooldownStates.FindOrAdd(Slot);
 	State.Slot = Slot;
 	State.CooldownRemaining = CooldownTime;
@@ -429,32 +434,30 @@ void UGS_SkillComp::StartCooldownForSkill(ESkillSlot Slot)
 	// 쿨다운 타이머
 	TWeakObjectPtr<UGS_SkillComp> WeakThis = this;
 	GetWorld()->GetTimerManager().SetTimer(
-		State.CooldownTimer,
-		[WeakThis, Slot]() 
-		{ 
-			if (WeakThis.IsValid())
-			{
-				WeakThis->HandleCooldownComplete(Slot); 
-			}
-		},
-		CooldownTime,
-		false
-	);
+	    State.CooldownTimer,
+	    [WeakThis, Slot]()
+	    {
+		    if (WeakThis.IsValid())
+		    {
+			    WeakThis->HandleCooldownComplete(Slot);
+		    }
+	    },
+	    CooldownTime,
+	    false);
 
 	// UI 업데이트 타이머
 	GetWorld()->GetTimerManager().SetTimer(
-		State.UIUpdateTimer,
-		[WeakThis, Slot]() 
-		{ 
-			if (WeakThis.IsValid())
-			{
-				WeakThis->HandleCooldownProgress(Slot); 
-			}
-		},
-		0.1f,
-		true
-	);
-	
+	    State.UIUpdateTimer,
+	    [WeakThis, Slot]()
+	    {
+		    if (WeakThis.IsValid())
+		    {
+			    WeakThis->HandleCooldownProgress(Slot);
+		    }
+	    },
+	    0.1f,
+	    true);
+
 	Skill->SetCoolingDown(true);
 	UpdateReplicatedCooldownStates();
 }
@@ -463,15 +466,17 @@ void UGS_SkillComp::SkillsInterrupt()
 {
 	AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner());
 	if (Seeker == nullptr)
-	{return;}
-	
+	{
+		return;
+	}
+
 	if (Seeker->CurrentComboIndex > 0)
 	{
 		Seeker->CurrentComboIndex = 0;
 		Seeker->CanAcceptComboInput = true;
 		Seeker->bNextCombo = false;
 	}
-	
+
 	for (TPair<ESkillSlot, UGS_SkillBase*> slot : SkillMap)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("%s"), *slot.Value->GetName());
@@ -490,15 +495,15 @@ void UGS_SkillComp::HandleCooldownComplete(ESkillSlot Slot)
 	{
 		return;
 	}
-	
+
 	GetWorld()->GetTimerManager().ClearTimer(State->CooldownTimer);
 	GetWorld()->GetTimerManager().ClearTimer(State->UIUpdateTimer);
-	
+
 	State->CooldownRemaining = 0.0f;
 	State->bIsOnCooldown = false;
 
 	UpdateReplicatedCooldownStates();
-	
+
 	if (UGS_SkillBase* Skill = SkillMap.FindRef(Slot))
 	{
 		Skill->SetCoolingDown(false);
@@ -512,7 +517,7 @@ void UGS_SkillComp::HandleCooldownProgress(ESkillSlot Slot)
 	{
 		return;
 	}
-	
+
 	float RemainingTime = GetWorld()->GetTimerManager().GetTimerRemaining(State->CooldownTimer);
 	RemainingTime = FMath::Max(0.0f, RemainingTime);
 
@@ -543,9 +548,9 @@ void UGS_SkillComp::OnRep_CooldownStates()
 	for (const FSkillCooldownState& State : ReplicatedCooldownStates)
 	{
 		ESkillSlot Slot = State.Slot;
-		
+
 		OnSkillCooldownChanged.Broadcast(Slot, State.CooldownRemaining);
-		
+
 		if (UGS_SkillBase* Skill = SkillMap.FindRef(Slot))
 		{
 			Skill->SetCoolingDown(State.bIsOnCooldown);
@@ -559,13 +564,13 @@ void UGS_SkillComp::InitializeSkillWidget(UGS_SkillWidget* InSkillWidget)
 	{
 		//client
 		ESkillSlot Slot = InSkillWidget->GetSkillSlot();
-		
+
 		InitSkills();
-		
+
 		if (SkillMap.Contains(Slot))
 		{
 			InSkillWidget->InitSkill(SkillMap[Slot]);
-			
+
 			OnSkillCooldownChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnSkillCoolTimeChanged);
 			OnHealCountChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnHealCountChanged);
 			OnSkillActivated.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillActivated);
@@ -608,6 +613,22 @@ void UGS_SkillComp::Multicast_PlayImpactVFX_Implementation(ESkillSlot Slot, FVec
 	}
 }
 
+void UGS_SkillComp::Multicast_PlayImpactVFXOnTarget_Implementation(ESkillSlot Slot, AActor* Target)
+{
+	if (UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot))
+	{
+		Skill->PlayImpactVFXOnTarget(Target);
+	}
+}
+
+void UGS_SkillComp::Multicast_PlayEnvImpactVFX_Implementation(ESkillSlot Slot, FVector Location, FRotator Rotation)
+{
+	if (UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot))
+	{
+		Skill->PlayEnvImpactVFX(Location, Rotation);
+	}
+}
+
 void UGS_SkillComp::Multicast_PlayEndVFX_Implementation(ESkillSlot Slot, FVector Location, FRotator Rotation)
 {
 	if (UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot))
@@ -631,7 +652,7 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 		return;
 	}
 
-	// SkillInfo에서 LoopVFX 가져오기
+	// Skill 객체에서 프리로드된 Loop VFX 가져오기
 	UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot);
 	if (!Skill)
 	{
@@ -639,10 +660,16 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 		return;
 	}
 
-	const FSkillInfo* SkillInfo = Skill->GetCurrentSkillInfo();
-	if (!SkillInfo || !SkillInfo->SkillLoopVFX)
+	UNiagaraSystem* LoopVFX = Skill->SkillLoopVFX.Get();
+	if (!LoopVFX)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[SkillComp] Multicast_PlayLoopVFX: SkillLoopVFX가 DT_SkillSet에 할당되지 않았습니다!"));
+		// 프리로드되지 않은 경우 동기 로드 시도
+		LoopVFX = Skill->SkillLoopVFX.LoadSynchronous();
+	}
+
+	if (!LoopVFX)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[SkillComp] Multicast_PlayLoopVFX: SkillLoopVFX가 유효하지 않습니다!"));
 		return;
 	}
 
@@ -651,13 +678,13 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 
 	// 새로운 Loop VFX 생성 (AttachTarget에 부착)
 	UNiagaraComponent* LoopVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-		SkillInfo->SkillLoopVFX,
-		AttachTarget->GetRootComponent(),
-		NAME_None,
-		FVector::ZeroVector,
-		FRotator::ZeroRotator,
-		EAttachLocation::KeepRelativeOffset,
-		true  // bAutoDestroy
+	    LoopVFX,
+	    AttachTarget->GetRootComponent(),
+	    NAME_None,
+	    Skill->LoopVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
+	    FRotator::ZeroRotator,
+	    EAttachLocation::KeepRelativeOffset,
+	    true // bAutoDestroy
 	);
 
 	if (LoopVFXComponent)
@@ -686,10 +713,18 @@ void UGS_SkillComp::Multicast_StopLoopVFX_Implementation(ESkillSlot Slot)
 	}
 }
 
+void UGS_SkillComp::Multicast_StopCastVFX_Implementation(ESkillSlot Slot)
+{
+	if (UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot))
+	{
+		Skill->Internal_StopCastVFX();
+	}
+}
+
 void UGS_SkillComp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
 	DOREPLIFETIME(UGS_SkillComp, ReplicatedSkillStates);
 	DOREPLIFETIME(UGS_SkillComp, bCanUseSkill);
 	DOREPLIFETIME(UGS_SkillComp, ReplicatedCooldownStates);

@@ -10,6 +10,8 @@
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Component/GS_VFXComponent.h"
 #include "Character/Component/GS_DrakharVFXComponent.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/Skill/GS_SkillComp.h"
 
 
 UGS_DebuffComp::UGS_DebuffComp()
@@ -39,9 +41,29 @@ void UGS_DebuffComp::ApplyDebuff(EDebuffType Type, AActor* Attacker)
 		return;
 	}
 
+	// 궁극기 사용 중이거나 무적 상태일 때는 디버프 무시 (슈퍼아머 효과)
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner()))
+	{
+		// 1. 무적 상태 확인
+		if (OwnerChar->IsInvincible())
+		{
+			return;
+		}
+
+		// 2. 시커의 경우 궁극기 사용 중인지 확인
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerChar))
+		{
+			if (Seeker->GetSkillComp() && Seeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+			{
+				return;
+			}
+		}
+	}
+
 	// 해당 디버프 타입의 데이터 가져오기
 	const FDebuffData* Row = GetDebuffData(Type);
-	if (!Row || !Row->DebuffClass) return;
+	if (!Row || !Row->DebuffClass)
+		return;
 
 	// 이미 적용중인 디버프라면
 	UGS_DebuffBase* Existing = GetActiveDebuff(Type);
@@ -52,18 +74,19 @@ void UGS_DebuffComp::ApplyDebuff(EDebuffType Type, AActor* Attacker)
 		RefreshDebuffTimer(Existing, Row->Duration);
 		UpdateReplicatedDebuffList(); // 복제 정보 갱신
 
-		
+
 		// ===============================
 		// VFX 트리거 (기존 디버프 갱신 시에도)
 		// ===============================
 		TriggerDebuffVFX(Type);
-		
+
 		return;
 	}
 
 	// 적용중이 아닌 디버프라면 풀에서 꺼내거나 생성
 	UGS_DebuffBase* NewDebuff = GetOrCreateDebuffObject(Type, Row->DebuffClass);
-	if (!NewDebuff) return;
+	if (!NewDebuff)
+		return;
 
 	NewDebuff->Initialize(Cast<AGS_Character>(GetOwner()), Attacker, Row->Duration, Row->Priority, Row->Damage, Row->DamageInterval, Type);
 	NewDebuff->StartTime = GetWorld()->GetTimeSeconds();
@@ -78,7 +101,7 @@ void UGS_DebuffComp::ApplyDebuff(EDebuffType Type, AActor* Attacker)
 		AddDebuffToQueue(NewDebuff);
 	}
 	UpdateReplicatedDebuffList(); // 복제 정보 갱신
-	
+
 	// ===============================
 	// VFX 트리거 (새로운 디버프 적용 시)
 	// ===============================
@@ -111,7 +134,6 @@ void UGS_DebuffComp::RemoveDebuff(EDebuffType Type)
 	if (ConcurrentDebuffs.Contains(Debuff))
 	{
 		ConcurrentDebuffs.Remove(Debuff);
-		
 	}
 	else if (DebuffQueue.Contains(Debuff))
 	{
@@ -188,7 +210,8 @@ void UGS_DebuffComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 const FDebuffData* UGS_DebuffComp::GetDebuffData(EDebuffType Type) const
 {
-	if (!DebuffDataTable) return nullptr;
+	if (!DebuffDataTable)
+		return nullptr;
 
 	// 디버프 데이터 Row 반환
 	FName RowName = *UEnum::GetValueAsString(Type).RightChop(13);
@@ -200,7 +223,8 @@ UGS_DebuffBase* UGS_DebuffComp::GetActiveDebuff(EDebuffType Type) const
 	// ConcurrentDebuffs 내에 존재하는지 확인
 	for (UGS_DebuffBase* Debuff : ConcurrentDebuffs)
 	{
-		if (Debuff && Debuff->GetDebuffType() == Type) return Debuff;
+		if (Debuff && Debuff->GetDebuffType() == Type)
+			return Debuff;
 	}
 
 	// CurrentDebuff로 존재하는지 확인
@@ -212,7 +236,8 @@ UGS_DebuffBase* UGS_DebuffComp::GetActiveDebuff(EDebuffType Type) const
 	// DebuffQueue 내에 존재하는지 확인
 	for (UGS_DebuffBase* Debuff : DebuffQueue)
 	{
-		if (Debuff && Debuff->GetDebuffType() == Type) return Debuff;
+		if (Debuff && Debuff->GetDebuffType() == Type)
+			return Debuff;
 	}
 
 	// 존재하지 않음
@@ -228,36 +253,38 @@ void UGS_DebuffComp::RefreshDebuffTimer(UGS_DebuffBase* Debuff, float Duration)
 		TWeakObjectPtr<UGS_DebuffBase> WeakDebuff(Debuff);
 
 		GetWorld()->GetTimerManager().SetTimer(*FoundHandle, [this, WeakDebuff]()
-			{
-				if (!IsValid(WeakDebuff.Get())) return;
-				UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
-				
-				// 디버프 만료 VFX 재생
-				TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
+		                                       {
+			                                       if (!IsValid(WeakDebuff.Get()))
+				                                       return;
+			                                       UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
 
-				// 디버프 VFX 제거
-				RemoveDebuffVFX(ValidDebuff->GetDebuffType());
-				
-				
-				DebuffTimers.Remove(ValidDebuff);
-				if (ConcurrentDebuffs.Contains(ValidDebuff))
-				{
-					ConcurrentDebuffs.Remove(ValidDebuff);
-				}
-				else if (DebuffQueue.Contains(ValidDebuff))
-				{
-					DebuffQueue.Remove(ValidDebuff);
-				}
-				else if (ValidDebuff == CurrentDebuff)
-				{
-					CurrentDebuff = nullptr;
-					ApplyNextDebuff();
-				}
-				UpdateReplicatedDebuffList();
+			                                       // 디버프 만료 VFX 재생
+			                                       TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
 
-				ValidDebuff->OnExpire();
-				ReturnDebuffToPool(ValidDebuff); // 풀에 반환
-			}, Duration, false);
+			                                       // 디버프 VFX 제거
+			                                       RemoveDebuffVFX(ValidDebuff->GetDebuffType());
+
+
+			                                       DebuffTimers.Remove(ValidDebuff);
+			                                       if (ConcurrentDebuffs.Contains(ValidDebuff))
+			                                       {
+				                                       ConcurrentDebuffs.Remove(ValidDebuff);
+			                                       }
+			                                       else if (DebuffQueue.Contains(ValidDebuff))
+			                                       {
+				                                       DebuffQueue.Remove(ValidDebuff);
+			                                       }
+			                                       else if (ValidDebuff == CurrentDebuff)
+			                                       {
+				                                       CurrentDebuff = nullptr;
+				                                       ApplyNextDebuff();
+			                                       }
+			                                       UpdateReplicatedDebuffList();
+
+			                                       ValidDebuff->OnExpire();
+			                                       ReturnDebuffToPool(ValidDebuff); // 풀에 반환
+		                                       },
+		                                       Duration, false);
 	}
 }
 
@@ -270,25 +297,26 @@ void UGS_DebuffComp::CreateAndApplyConcurrentDebuff(UGS_DebuffBase* Debuff)
 	TWeakObjectPtr<UGS_DebuffBase> WeakDebuff(Debuff);
 
 	GetWorld()->GetTimerManager().SetTimer(Handle, [this, WeakDebuff]()
-		{
-			if (!IsValid(WeakDebuff.Get()))
-			{
-				return;
-			}
-			UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
-			
-			// 디버프 만료 VFX 재생 (Concurrent 디버프용)
-			TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
+	                                       {
+		                                       if (!IsValid(WeakDebuff.Get()))
+		                                       {
+			                                       return;
+		                                       }
+		                                       UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
 
-			// 디버프 VFX 제거
-			RemoveDebuffVFX(ValidDebuff->GetDebuffType());
-			
-			ConcurrentDebuffs.Remove(ValidDebuff);
-			DebuffTimers.Remove(ValidDebuff);
-			UpdateReplicatedDebuffList();
-			ValidDebuff->OnExpire();
-			ReturnDebuffToPool(ValidDebuff); // 풀에 반환
-		}, Debuff->GetDuration(), false);
+		                                       // 디버프 만료 VFX 재생 (Concurrent 디버프용)
+		                                       TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
+
+		                                       // 디버프 VFX 제거
+		                                       RemoveDebuffVFX(ValidDebuff->GetDebuffType());
+
+		                                       ConcurrentDebuffs.Remove(ValidDebuff);
+		                                       DebuffTimers.Remove(ValidDebuff);
+		                                       UpdateReplicatedDebuffList();
+		                                       ValidDebuff->OnExpire();
+		                                       ReturnDebuffToPool(ValidDebuff); // 풀에 반환
+	                                       },
+	                                       Debuff->GetDuration(), false);
 
 	DebuffTimers.Add(Debuff, Handle);
 }
@@ -300,7 +328,7 @@ void UGS_DebuffComp::AddDebuffToQueue(UGS_DebuffBase* Debuff)
 	{
 		if (Debuff->GetPriority() > CurrentDebuff->GetPriority())
 		{
-	
+
 			// 현재 디버프의 타이머 제거
 			if (FTimerHandle* FoundHandle = DebuffTimers.Find(CurrentDebuff))
 			{
@@ -320,14 +348,16 @@ void UGS_DebuffComp::AddDebuffToQueue(UGS_DebuffBase* Debuff)
 			FTimerHandle NewHandle;
 			TWeakObjectPtr<UGS_DebuffBase> WeakDebuff(CurrentDebuff);
 			GetWorld()->GetTimerManager().SetTimer(NewHandle, [this, WeakDebuff]()
-				{
-					if (!IsValid(WeakDebuff.Get())) return;
-					UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
-					DebuffQueue.Remove(ValidDebuff);
-					DebuffTimers.Remove(ValidDebuff);
-					UpdateReplicatedDebuffList();
-					ReturnDebuffToPool(ValidDebuff); // 풀에 반환
-				}, RemainingTime, false);
+			                                       {
+				                                       if (!IsValid(WeakDebuff.Get()))
+					                                       return;
+				                                       UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
+				                                       DebuffQueue.Remove(ValidDebuff);
+				                                       DebuffTimers.Remove(ValidDebuff);
+				                                       UpdateReplicatedDebuffList();
+				                                       ReturnDebuffToPool(ValidDebuff); // 풀에 반환
+			                                       },
+			                                       RemainingTime, false);
 
 			DebuffTimers.Add(CurrentDebuff, NewHandle);
 			CurrentDebuff = nullptr;
@@ -339,29 +369,29 @@ void UGS_DebuffComp::AddDebuffToQueue(UGS_DebuffBase* Debuff)
 
 	// 우선순위 정렬
 	DebuffQueue.Sort([](const UGS_DebuffBase& A, const UGS_DebuffBase& B)
-		{
-			return A.GetPriority() > B.GetPriority();
-		});
+	                 { return A.GetPriority() > B.GetPriority(); });
 
 	// 디버프 만료 타이머 설정
 	FTimerHandle Handle;
 	TWeakObjectPtr<UGS_DebuffBase> WeakDebuff(Debuff);
 	GetWorld()->GetTimerManager().SetTimer(Handle, [this, WeakDebuff]()
-		{
-			if (!IsValid(WeakDebuff.Get())) return;
-			UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
-			
-			// 디버프 만료 VFX 재생 (Queue 디버프용)
-			TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
+	                                       {
+		                                       if (!IsValid(WeakDebuff.Get()))
+			                                       return;
+		                                       UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
 
-			// 디버프 VFX 제거
-			RemoveDebuffVFX(ValidDebuff->GetDebuffType());
-			
-			DebuffQueue.Remove(ValidDebuff);
-			DebuffTimers.Remove(ValidDebuff);
-			UpdateReplicatedDebuffList();
-			ReturnDebuffToPool(ValidDebuff); // 풀에 반환
-		}, Debuff->GetDuration(), false);
+		                                       // 디버프 만료 VFX 재생 (Queue 디버프용)
+		                                       TriggerDebuffExpireVFX(ValidDebuff->GetDebuffType());
+
+		                                       // 디버프 VFX 제거
+		                                       RemoveDebuffVFX(ValidDebuff->GetDebuffType());
+
+		                                       DebuffQueue.Remove(ValidDebuff);
+		                                       DebuffTimers.Remove(ValidDebuff);
+		                                       UpdateReplicatedDebuffList();
+		                                       ReturnDebuffToPool(ValidDebuff); // 풀에 반환
+	                                       },
+	                                       Debuff->GetDuration(), false);
 
 	DebuffTimers.Add(Debuff, Handle);
 
@@ -375,7 +405,8 @@ void UGS_DebuffComp::AddDebuffToQueue(UGS_DebuffBase* Debuff)
 void UGS_DebuffComp::ApplyNextDebuff()
 {
 	// 디버프 큐에 없으면 리턴
-	if (DebuffQueue.Num() == 0) return;
+	if (DebuffQueue.Num() == 0)
+		return;
 
 	// 현재 디버프 업데이트
 	CurrentDebuff = DebuffQueue[0];
@@ -398,7 +429,7 @@ void UGS_DebuffComp::ApplyNextDebuff()
 
 	// 남은 시간으로 다시 타이머 세팅
 	GetWorld()->GetTimerManager().SetTimer(NewHandle, [this, WeakDebuff]()
-		{
+	                                       {
 			if (!IsValid(WeakDebuff.Get())) return;
 			UGS_DebuffBase* ValidDebuff = WeakDebuff.Get();
 			
@@ -416,8 +447,7 @@ void UGS_DebuffComp::ApplyNextDebuff()
 			UpdateReplicatedDebuffList();
 			ValidDebuff->OnExpire();
 			ReturnDebuffToPool(ValidDebuff); // 풀에 반환
-			ApplyNextDebuff();
-		}, Remaining, false);
+			ApplyNextDebuff(); }, Remaining, false);
 
 	DebuffTimers.Add(CurrentDebuff, NewHandle);
 }
@@ -430,7 +460,8 @@ void UGS_DebuffComp::UpdateReplicatedDebuffList()
 	// Concurrent 디버프 추가
 	for (UGS_DebuffBase* Debuff : ConcurrentDebuffs)
 	{
-		if (!Debuff) continue;
+		if (!Debuff)
+			continue;
 		FDebuffRepInfo Info;
 		Info.Type = Debuff->GetDebuffType();
 		Info.RemainingTime = Debuff->GetRemainingTime(Now);
@@ -449,7 +480,8 @@ void UGS_DebuffComp::UpdateReplicatedDebuffList()
 	// DebuffQueue의 디버프 추가
 	for (UGS_DebuffBase* Debuff : DebuffQueue)
 	{
-		if (!Debuff) continue;
+		if (!Debuff)
+			continue;
 		FDebuffRepInfo Info;
 		Info.Type = Debuff->GetDebuffType();
 		Info.RemainingTime = Debuff->GetRemainingTime(Now);
@@ -500,7 +532,8 @@ void UGS_DebuffComp::TriggerDebuffVFX(EDebuffType Type)
 
 void UGS_DebuffComp::RemoveDebuffVFX(EDebuffType Type)
 {
-	if (!GetOwner()->HasAuthority()) return;
+	if (!GetOwner()->HasAuthority())
+		return;
 
 	if (CachedDrakharVFXComp)
 	{
@@ -532,7 +565,8 @@ void UGS_DebuffComp::TriggerDebuffExpireVFX(EDebuffType Type)
 
 UGS_DebuffBase* UGS_DebuffComp::GetOrCreateDebuffObject(EDebuffType Type, TSubclassOf<UGS_DebuffBase> DebuffClass)
 {
-	if (!DebuffClass) return nullptr;
+	if (!DebuffClass)
+		return nullptr;
 
 	// 풀에서 해당 타입의 객체가 있는지 확인
 	if (UGS_DebuffBase** PooledObject = DebuffPool.Find(Type))
@@ -551,7 +585,8 @@ UGS_DebuffBase* UGS_DebuffComp::GetOrCreateDebuffObject(EDebuffType Type, TSubcl
 
 void UGS_DebuffComp::ReturnDebuffToPool(UGS_DebuffBase* Debuff)
 {
-	if (!Debuff || !IsValid(Debuff)) return;
+	if (!Debuff || !IsValid(Debuff))
+		return;
 
 	// 이미 동일한 타입의 객체가 풀에 있으면 무시하거나 교체 (시스템상 한 타입당 하나가 보통)
 	DebuffPool.Add(Debuff->GetDebuffType(), Debuff);

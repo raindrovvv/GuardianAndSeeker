@@ -92,7 +92,7 @@ void UGS_AresMovingSkill::HandleSkillActivated(ESkillSlot ActivatedSkillSlot)
 			{
 				CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 			}
-			
+
 			StartCameraZoomOut();
 		}
 	}
@@ -213,7 +213,7 @@ void UGS_AresMovingSkill::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 
 	// 데미지 적용
 	UGameplayStatics::ApplyDamage(Target, 50.0f, OwnerCharacter->GetController(), OwnerCharacter, nullptr);
-	
+
 	// 타격 사운드 재생 (멀티캐스트) - HasAuthority 체크 불필요 (UpdateDash가 서버에서만 호출됨)
 	FVector HitLocation = Target->GetActorLocation();
 	Multicast_PlayDashHitSound(EAresDashHitTargetType::Monster, HitLocation);
@@ -233,7 +233,7 @@ void UGS_AresMovingSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
 
 	// 데미지 적용
 	UGameplayStatics::ApplyDamage(Target, 50.0f, OwnerCharacter->GetController(), OwnerCharacter, nullptr);
-	
+
 	// 타격 사운드 재생 (멀티캐스트) - HasAuthority 체크 불필요 (UpdateDash가 서버에서만 호출됨)
 	FVector HitLocation = Target->GetActorLocation();
 	Multicast_PlayDashHitSound(EAresDashHitTargetType::Guardian, HitLocation);
@@ -264,7 +264,7 @@ void UGS_AresMovingSkill::StartDash()
 	OwnerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	OwnerCharacter->GetMesh()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(DashTimerHandle, this, &UGS_AresMovingSkill::UpdateDash, 0.01f, true);
-	
+
 	// =======================
 	// VFX 재생 - 컴포넌트 RPC 사용
 	// =======================
@@ -288,24 +288,23 @@ void UGS_AresMovingSkill::StartDash()
 		{
 			// 기본값 캐시 (아직 캐시되지 않았다면)
 			CacheCameraMotionBlurDefaults(OwnerPlayer);
-			
+
 			// 대시 모션블러 시작
 			DashMotionBlurStartTime = OwnerCharacter->GetWorld()->GetTimeSeconds();
 			bDashMotionBlurActive = true;
 			bMotionBlurActive = true;
-			
+
 			// 초기 모션블러 값 설정 (최대값으로 시작)
 			OwnerPlayer->CameraComp->PostProcessSettings.bOverride_MotionBlurAmount = true;
 			OwnerPlayer->CameraComp->PostProcessSettings.MotionBlurAmount = MotionBlurPeakAmount;
-			
+
 			// 대시 진행률에 따라 모션블러 업데이트 (클라이언트에서 독립적으로 추적)
 			OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(
-				DashMotionBlurTimerHandle,
-				this,
-				&UGS_AresMovingSkill::UpdateDashMotionBlur,
-				0.016f, // ~60fps
-				true
-			);
+			    DashMotionBlurTimerHandle,
+			    this,
+			    &UGS_AresMovingSkill::UpdateDashMotionBlur,
+			    0.016f, // ~60fps
+			    true);
 		}
 	}
 }
@@ -338,24 +337,24 @@ void UGS_AresMovingSkill::UpdateDash()
 	TArray<FHitResult> HitResults;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(OwnerCharacter);
-	
+
 	// 이전 프레임 위치에서 현재 프레임 위치까지만 스윕 (Pawn 채널만 감지)
 	FCollisionObjectQueryParams ObjectParams;
 	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
-	
+
 	if (OwnerCharacter->GetWorld()->SweepMultiByObjectType(
-		HitResults, 
-		PreviousLocation,  // 이전 위치
-		NewLocation,       // 현재 위치
-		FQuat::Identity, 
-		ObjectParams,      // Pawn 오브젝트만 감지
-		FCollisionShape::MakeCapsule(100.0f, 100.0f), 
-		Params))
+	        HitResults,
+	        PreviousLocation, // 이전 위치
+	        NewLocation, // 현재 위치
+	        FQuat::Identity,
+	        ObjectParams, // Pawn 오브젝트만 감지
+	        FCollisionShape::MakeCapsule(100.0f, 100.0f),
+	        Params))
 	{
 		for (const FHitResult& Hit : HitResults)
 		{
 			AActor* HitActor = Hit.GetActor();
-			
+
 			// 중복 체크 (GetActor()는 이미 유효성 보장)
 			if (!HitActor || DamagedActors.Contains(HitActor))
 			{
@@ -399,7 +398,7 @@ void UGS_AresMovingSkill::DeactiveSkill()
 		{
 			OwnerCharacter->GetWorld()->GetTimerManager().ClearTimer(DashMotionBlurTimerHandle);
 		}
-		
+
 		// 모션블러 비활성화 (부드럽게 페이드아웃)
 		bDashMotionBlurActive = false;
 		ResetCameraMotionBlur();
@@ -436,6 +435,18 @@ void UGS_AresMovingSkill::DeactiveSkill()
 			{
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
+		}
+
+		// =======================
+		// VFX 종료 - 컴포넌트 RPC 사용
+		// =======================
+		if (OwningComp)
+		{
+			FVector SkillLocation = OwnerCharacter->GetActorLocation();
+			FRotator SkillRotation = OwnerCharacter->GetActorRotation();
+
+			// 스킬 종료 VFX 재생
+			OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
 		}
 	}
 
@@ -483,12 +494,11 @@ void UGS_AresMovingSkill::StartCameraZoomOut()
 	// 기존 타이머 정리 후 새 타이머 시작
 	SafeClearTimer(CameraUpdateTimerHandle);
 	OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(
-		CameraUpdateTimerHandle,
-		this,
-		&UGS_AresMovingSkill::UpdateCameraZoom,
-		0.016f, // ~60fps
-		true
-	);
+	    CameraUpdateTimerHandle,
+	    this,
+	    &UGS_AresMovingSkill::UpdateCameraZoom,
+	    0.016f, // ~60fps
+	    true);
 }
 
 void UGS_AresMovingSkill::RestoreCameraZoom(bool bForceRestore)
@@ -541,19 +551,18 @@ void UGS_AresMovingSkill::RestoreCameraZoom(bool bForceRestore)
 	// 기존 타이머 정리 후 줌인 타이머 시작
 	SafeClearTimer(CameraUpdateTimerHandle);
 	OwnerCharacter->GetWorld()->GetTimerManager().SetTimer(
-		CameraUpdateTimerHandle,
-		this,
-		&UGS_AresMovingSkill::UpdateCameraZoom,
-		0.016f, // ~60fps
-		true
-	);
+	    CameraUpdateTimerHandle,
+	    this,
+	    &UGS_AresMovingSkill::UpdateCameraZoom,
+	    0.016f, // ~60fps
+	    true);
 }
 
 void UGS_AresMovingSkill::SetCameraSettings(float InZoomOutDistance, UCurveFloat* InCameraZoomCurve,
-	bool bInEnableMotionBlur,
-	float InMotionBlurPeakAmount,
-	UCurveFloat* InMotionBlurCurve,
-	float InMotionBlurExponent)
+                                            bool bInEnableMotionBlur,
+                                            float InMotionBlurPeakAmount,
+                                            UCurveFloat* InMotionBlurCurve,
+                                            float InMotionBlurExponent)
 {
 	ZoomOutDistance = InZoomOutDistance;
 	CameraZoomCurve = InCameraZoomCurve;
@@ -844,11 +853,10 @@ void UGS_AresMovingSkill::Multicast_PlayDashHitSound_Implementation(EAresDashHit
 	if (SoundEventToPlay)
 	{
 		UAkGameplayStatics::PostEventAtLocation(
-			SoundEventToPlay,
-			HitLocation,
-			FRotator::ZeroRotator,
-			OwnerCharacter->GetWorld()
-		);
+		    SoundEventToPlay,
+		    HitLocation,
+		    FRotator::ZeroRotator,
+		    OwnerCharacter->GetWorld());
 	}
 }
 
@@ -877,7 +885,7 @@ void UGS_AresMovingSkill::Multicast_PlayDashEndVFX_Implementation(const FVector&
 
 	// SkillImpactVFX 사용 (데이터 테이블에서 설정됨)
 	UNiagaraSystem* FireSlashVFX = SkillInfo->SkillImpactVFX;
-	
+
 	if (!FireSlashVFX)
 	{
 		UE_LOG(LogTemp, Error, TEXT("[Ares Dash VFX] SkillImpactVFX is null in data table - Please assign NS_Ares_MovingSkill_FireSlash to SkillImpactVFX in DT_SkillSet"));
@@ -889,15 +897,15 @@ void UGS_AresMovingSkill::Multicast_PlayDashEndVFX_Implementation(const FVector&
 
 	// FireSlash 이펙트 재생
 	UNiagaraComponent* SpawnedVFX = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		OwnerCharacter->GetWorld(),
-		FireSlashVFX,
-		Location,
-		VFXRotation,
-		SkillInfo->SkillVFXScale, // 데이터 테이블에서 설정된 스케일 사용
-		true,              // bAutoDestroy
-		true,              // bAutoActivate
-		ENCPoolMethod::AutoRelease, // Pooling 활성화
-		true               // bPreCullCheck
+	    OwnerCharacter->GetWorld(),
+	    FireSlashVFX,
+	    Location,
+	    VFXRotation,
+	    SkillInfo->SkillVFXScale, // 데이터 테이블에서 설정된 스케일 사용
+	    true, // bAutoDestroy
+	    true, // bAutoActivate
+	    ENCPoolMethod::AutoRelease, // Pooling 활성화
+	    true // bPreCullCheck
 	);
 
 	if (!SpawnedVFX)

@@ -217,6 +217,9 @@ public:
 	UFUNCTION()
 	void SetCanHitReact(bool bCanReact);
 
+	UFUNCTION(BlueprintCallable, Category = "State")
+	bool IsInvincible() const { return bIsInvincible; }
+
 	void SetInvincible(bool bEnable);
 
 	// VFX 거리 기반 컬링 (성능 최적화)

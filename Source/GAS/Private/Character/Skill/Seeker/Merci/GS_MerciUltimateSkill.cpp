@@ -55,6 +55,18 @@ void UGS_MerciUltimateSkill::ActiveSkill()
 
 	// 자동 조준 시작
 	AutoAimingStart();
+
+	// =======================
+	// VFX 재생 - 컴포넌트 RPC 사용
+	// =======================
+	if (OwningComp)
+	{
+		FVector SkillLocation = OwnerCharacter->GetActorLocation();
+		FRotator SkillRotation = OwnerCharacter->GetActorRotation();
+
+		// 스킬 시전 VFX 재생
+		OwningComp->Multicast_PlayCastVFX(CurrentSkillType, SkillLocation, SkillRotation);
+	}
 }
 
 void UGS_MerciUltimateSkill::OnSkillAnimationEnd()
@@ -226,6 +238,18 @@ void UGS_MerciUltimateSkill::DeactiveSkill()
 				AudioComp->RequestSkillAudio(CurrentSkillType, 1);
 			}
 		}
+	}
+
+	// =======================
+	// VFX 종료 - 컴포넌트 RPC 사용
+	// =======================
+	if (OwningComp)
+	{
+		FVector SkillLocation = OwnerCharacter->GetActorLocation();
+		FRotator SkillRotation = OwnerCharacter->GetActorRotation();
+
+		// 스킬 종료 VFX 재생
+		OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
 	}
 
 	// 스킬 상태 업데이트
