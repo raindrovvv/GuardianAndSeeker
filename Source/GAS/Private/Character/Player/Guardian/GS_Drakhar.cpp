@@ -42,6 +42,7 @@ AGS_Drakhar::AGS_Drakhar()
 
 	DrakharVFXComponent = CreateDefaultSubobject<UGS_DrakharVFXComponent>(TEXT("DrakharVFXComponent"));
 	AudioComponent = CreateDefaultSubobject<UGS_DrakharAudioComponent>(TEXT("AudioComponent"));
+	BaseAudioComponent = AudioComponent;
 	FootManagerComponent = CreateDefaultSubobject<UGS_FootManagerComponent>(TEXT("FootManagerComponent"));
 
 	// === 어스퀘이크 카메라 쉐이크 기본값 설정 ===
@@ -204,6 +205,9 @@ void AGS_Drakhar::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SafeClearTimer(HealthDelayTimer);
 	SafeClearTimer(DraconicAttackTimer); // 궁극기 타이머
 	SafeClearTimer(CameraZoomTimer); // 카메라 효과 타이머 (통합됨)
+	SafeClearTimer(FlyingTimerHandle);
+	SafeClearTimer(FlyingStartStaminaCoolTimeHandler);
+	SafeClearTimer(FlyingEndStaminaCoolTimeHandler);
 }
 
 void AGS_Drakhar::OnDamageStart()
