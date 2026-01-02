@@ -903,3 +903,54 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 			NetUpdateFrequency = 5.0f;
 	}
 }
+
+void AGS_Character::UpdateShadowCulling()
+{
+	// 클라이언트에서만 실행
+	if (IsRunningDedicatedServer())
+		return;
+
+	// 로컬 플레이어는 최적화 제외 (Player 타입만 해당)
+	if (AGS_Player* Player = Cast<AGS_Player>(this))
+	{
+		if (Player->IsLocalPlayer())
+			return;
+	}
+
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+		return;
+
+	// 카메라 위치 가져오기
+	if (UWorld* World = GetWorld())
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
+			{
+				FVector CameraLocation = CameraManager->GetCameraLocation();
+				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
+
+				// 거리 기반 그림자 설정
+				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
+				{
+					// 80m 이상: 동적/정적 그림자 모두 끄되, 캡슐 그림자는 유지 (Monster)
+					MeshComp->SetCastShadow(false);
+					MeshComp->bCastDynamicShadow = false;
+				}
+				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
+				{
+					// 40-80m: 정적 그림자 유지, 동적 그림자 비활성화
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = false;
+				}
+				else
+				{
+					// 40m 이내: 고품질 동적 그림자 활성화
+					MeshComp->SetCastShadow(true);
+					MeshComp->bCastDynamicShadow = true;
+				}
+			}
+		}
+	}
+}

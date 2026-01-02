@@ -245,6 +245,9 @@ protected:
 	/** Significance Manager 등록 로직 (가상 함수로 분리하여 중복 등록 방지) */
 	virtual void RegisterSignificanceManager();
 
+	/** 그림자 컬링 최적화 (거리 기반) - 모든 캐릭터 공통 */
+	void UpdateShadowCulling();
+
 protected:
 	virtual void NotifyActorBeginCursorOver() override;
 	virtual void NotifyActorEndCursorOver() override;

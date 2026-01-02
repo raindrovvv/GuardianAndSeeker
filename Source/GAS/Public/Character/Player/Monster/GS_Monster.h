@@ -140,12 +140,6 @@ protected:
 	/** 몬스터 크기에 따른 최적 컬링 거리 반환 (자식 클래스에서 오버라이드) */
 	virtual float GetOptimalCullDistance() const;
 
-	/** 네트워크 업데이트 빈도 최적화 (거리 기반) */
-	void UpdateNetworkOptimization();
-
-	/** 그림자 컬링 최적화 (거리 기반) */
-	void UpdateShadowCulling();
-
 	/** Significance Manager: 중요도 계산 콜백 */
 	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
 
@@ -163,9 +157,6 @@ private:
 	/** Tracks previous HP for damage detection (not healing) */
 	float LastKnownHP;
 
-	/** 네트워크 최적화 업데이트 타이머 (1초마다 체크) */
-	FTimerHandle NetworkOptimizationTimerHandle;
-
 	/** 그림자 컬링 업데이트 타이머 (0.1초마다 체크) */
 	FTimerHandle ShadowCullingTimerHandle;
 
@@ -174,9 +165,6 @@ private:
 
 	/** HP 위젯 가시성 업데이트 (타이머에서 호출) */
 	void UpdateHPWidgetVisibility();
-
-	/** 마지막으로 설정한 NetUpdateFrequency (변경 감지용) */
-	float LastNetUpdateFrequency;
 
 	/** 로컬 시커의 CombatTrigger 내부에 있는지 여부 (클라이언트 로컬) */
 	bool bIsInSeekerCombatTrigger = false;
@@ -189,7 +177,5 @@ public:
 protected:
 	/** 상수 정의 (Magic Numbers 제거) */
 	static constexpr float DELAYED_DESTROY_TIME = 2.0f;
-	static constexpr float AGGRESSIVE_HP_RATIO_THRESHOLD = 0.99f;
-	static constexpr float MOVEMENT_VELOCITY_THRESHOLD_SQ = 100.0f;
 	static constexpr float TPS_SEEKER_PROXIMITY_RADIUS_SQ = 9000000.0f; // 30m^2
 };
