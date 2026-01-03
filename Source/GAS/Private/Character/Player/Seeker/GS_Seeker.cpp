@@ -582,9 +582,10 @@ void AGS_Seeker::ComboInputOpen()
 
 void AGS_Seeker::ComboInputClose()
 {
+	CanAcceptComboInput = false;
+
 	if (HasAuthority())
 	{
-		CanAcceptComboInput = false;
 		if (bNextCombo)
 		{
 			ServerAttackMontage();
