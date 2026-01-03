@@ -23,6 +23,7 @@
 #include "UI/Character/GS_DrakharFeverGauge.h"
 #include "Character/Component/GS_DrakharVFXComponent.h"
 #include "Character/Component/GS_DrakharAudioComponent.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
@@ -219,6 +220,43 @@ void AGS_Drakhar::OnDamageStart()
 	{
 		World->GetTimerManager().SetTimer(HealthDelayTimer, this, &AGS_Drakhar::BeginHealRegeneration, 5.f, false);
 	}
+}
+
+void AGS_Drakhar::OnSignificanceChanged(float NewSignificance)
+{
+	Super::OnSignificanceChanged(NewSignificance);
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		if (NewSignificance < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI_SKIP)
+		{
+			// 매우 멀리 있음: 틱 최소화 및 정적 LOD 강제
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+			MeshComp->bEnableUpdateRateOptimizations = true;
+		}
+		else if (NewSignificance < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI)
+		{
+			// 중간 거리: URO 활성화
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+			MeshComp->bEnableUpdateRateOptimizations = true;
+		}
+		else
+		{
+			// 가까움: 최고 품질
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+			MeshComp->bEnableUpdateRateOptimizations = false;
+		}
+	}
+}
+
+float AGS_Drakhar::CalculateSignificance(const FTransform& Viewpoint)
+{
+	// 가디언은 매우 중요하므로 기본 중요도를 높게 설정하되,
+	// 화면 밖이거나 너무 멀면 낮춤 (AGS_Character의 기본 구현 활용)
+	float Sig = Super::CalculateSignificance(Viewpoint);
+
+	// Drakhar(보스) 전용 보정: 보스는 화면에 조금이라도 걸치면 최소 중요도를 높게 유지
+	return FMath::Max(Sig, 0.2f);
 }
 
 void AGS_Drakhar::Ctrl()

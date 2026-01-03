@@ -228,15 +228,21 @@ UAnimMontage* UGS_SkillBase::GetCachedMontage(int32 Index)
 void UGS_SkillBase::PlayCastVFX(FVector Location, FRotator Rotation)
 {
 	// 캐싱된 VFX 사용 (프리로드되지 않은 경우 즉시 로드)
-	UNiagaraSystem* VFXToUse = CachedCastVFX;
+	UNiagaraSystem* VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillCastVFX);
 	if (!VFXToUse)
 	{
-		VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillCastVFX);
-		CachedCastVFX = VFXToUse; // 캐싱
+		return;
 	}
 
-	if (VFXToUse && OwnerCharacter)
+	if (OwnerCharacter)
 	{
+		// === 깜빡임(Flickering) 방지 로직 ===
+		// 이미 해당 에셋이 재생 중이라면 중복 실행하지 않음
+		if (ActiveCastVFXComponent && IsValid(ActiveCastVFXComponent) && ActiveCastVFXComponent->GetAsset() == VFXToUse)
+		{
+			return;
+		}
+
 		// 기존 Cast VFX가 있으면 먼저 로컬에서 정리 (이미 멀티캐스트 내부이므로 추가 RPC 불필요)
 		Internal_StopCastVFX();
 
@@ -322,23 +328,55 @@ void UGS_SkillBase::PlayImpactVFX(FVector Location)
 // 타겟에 직접 Impact VFX를 부착하는 새 함수
 void UGS_SkillBase::PlayImpactVFXOnTarget(AActor* Target)
 {
-	if (!Target)
+	if (!Target || SkillImpactVFX.IsNull())
 		return;
 
-	UNiagaraSystem* VFX = CachedImpactVFX ? (UNiagaraSystem*)CachedImpactVFX : SkillImpactVFX.LoadSynchronous();
-	if (VFX)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAttached(VFX, Target->GetRootComponent(), NAME_None, ImpactVFXOffset, FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
-	}
+	TWeakObjectPtr<AActor> WeakTarget(Target);
+	TWeakObjectPtr<UGS_SkillBase> WeakThis(this);
+
+	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    SkillImpactVFX,
+	    [WeakThis, WeakTarget](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (WeakThis.IsValid() && WeakTarget.IsValid() && LoadedVFX)
+		    {
+			    // 캐싱
+			    WeakThis->CachedImpactVFX = LoadedVFX;
+
+			    UNiagaraFunctionLibrary::SpawnSystemAttached(
+			        LoadedVFX,
+			        WeakTarget->GetRootComponent(),
+			        NAME_None,
+			        WeakThis->ImpactVFXOffset,
+			        FRotator::ZeroRotator,
+			        EAttachLocation::KeepRelativeOffset,
+			        true);
+		    }
+	    });
 }
 
 void UGS_SkillBase::PlayEnvImpactVFX(FVector Location, FRotator Rotation)
 {
-	UNiagaraSystem* VFX = CachedEnvImpactVFX ? (UNiagaraSystem*)CachedEnvImpactVFX : SkillEnvImpactVFX.LoadSynchronous();
-	if (VFX)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), VFX, Location + Rotation.RotateVector(EnvImpactVFXOffset), Rotation);
-	}
+	if (SkillEnvImpactVFX.IsNull() || !GetWorld())
+		return;
+
+	TWeakObjectPtr<UGS_SkillBase> WeakThis(this);
+	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    SkillEnvImpactVFX,
+	    [WeakThis, Location, Rotation](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (WeakThis.IsValid() && LoadedVFX)
+		    {
+			    // 캐싱
+			    WeakThis->CachedEnvImpactVFX = LoadedVFX;
+
+			    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			        WeakThis->GetWorld(),
+			        LoadedVFX,
+			        Location + Rotation.RotateVector(WeakThis->EnvImpactVFXOffset),
+			        Rotation);
+		    }
+	    });
 }
 
 void UGS_SkillBase::PlayEndVFX(FVector Location, FRotator Rotation)

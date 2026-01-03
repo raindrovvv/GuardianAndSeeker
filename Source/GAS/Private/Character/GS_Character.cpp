@@ -601,34 +601,42 @@ void AGS_Character::PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale)
 
 void AGS_Character::OnRep_ImpactVFX()
 {
-	// Soft Reference 로드 (Get()은 로컬 캐시 확인용)
-	UNiagaraSystem* LoadedVFX = RepImpactVFX.VFXAsset.Get();
-
-	if (!LoadedVFX && !RepImpactVFX.VFXAsset.IsNull())
+	if (RepImpactVFX.VFXAsset.IsNull())
 	{
-		// 이 시점에서 동기 로드를 수행하거나 (안전장치),
-		// 시스템적으로 미리 로드되어 있을 것으로 기대.
-		LoadedVFX = RepImpactVFX.VFXAsset.LoadSynchronous();
+		return;
 	}
 
-	if (LoadedVFX)
-	{
-		UNiagaraComponent* SpawnedVFX =
-		    UNiagaraFunctionLibrary::SpawnSystemAttached(
-		        LoadedVFX, GetRootComponent(), NAME_None,
-		        FVector::ZeroVector, FRotator::ZeroRotator,
-		        EAttachLocation::SnapToTarget,
-		        true, // bAutoDestroy
-		        true, // bAutoActivate (위치 수정)
-		        ENCPoolMethod::AutoRelease, // Pooling 활성화 (위치 수정)
-		        true // bPreCullCheck
-		    );
+	// 보관을 위해 캡처
+	FImpactVFXInfo CurrentVFXInfo = RepImpactVFX;
+	TWeakObjectPtr<AGS_Character> WeakThis(this);
 
-		if (SpawnedVFX)
-		{
-			SpawnedVFX->SetWorldScale3D(RepImpactVFX.Scale);
-		}
-	}
+	// 비동기 로드 시작
+	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    CurrentVFXInfo.VFXAsset,
+	    [WeakThis, CurrentVFXInfo](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (WeakThis.IsValid() && LoadedVFX)
+		    {
+			    UNiagaraComponent* SpawnedVFX =
+			        UNiagaraFunctionLibrary::SpawnSystemAttached(
+			            LoadedVFX,
+			            WeakThis->GetRootComponent(),
+			            NAME_None,
+			            FVector::ZeroVector,
+			            FRotator::ZeroRotator,
+			            EAttachLocation::SnapToTarget,
+			            true, // bAutoDestroy
+			            true, // bAutoActivate
+			            ENCPoolMethod::AutoRelease, // Pooling 활성화
+			            true // bPreCullCheck
+			        );
+
+			    if (SpawnedVFX)
+			    {
+				    SpawnedVFX->SetWorldScale3D(CurrentVFXInfo.Scale);
+			    }
+		    }
+	    });
 }
 
 void AGS_Character::SpawnAndAttachWeapons()

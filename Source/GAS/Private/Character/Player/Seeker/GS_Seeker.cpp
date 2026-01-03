@@ -168,11 +168,17 @@ void AGS_Seeker::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// CombatTrigger 오버랩 이벤트 바인딩
+	// CombatTrigger 오버랩 이벤트 바인딩 (중복 바인딩 방지)
 	if (CombatTrigger)
 	{
-		CombatTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerBeginOverlap);
-		CombatTrigger->OnComponentEndOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerEndOverlap);
+		if (!CombatTrigger->OnComponentBeginOverlap.IsAlreadyBound(this, &AGS_Seeker::OnCombatTriggerBeginOverlap))
+		{
+			CombatTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerBeginOverlap);
+		}
+		if (!CombatTrigger->OnComponentEndOverlap.IsAlreadyBound(this, &AGS_Seeker::OnCombatTriggerEndOverlap))
+		{
+			CombatTrigger->OnComponentEndOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerEndOverlap);
+		}
 	}
 
 	// Generate Overlap Events 활성화 (화살 함정 충돌 처리를 위해 필요)
@@ -205,17 +211,23 @@ void AGS_Seeker::BeginPlay()
 				WeakThis->InitializeCameraManager();
 			} });
 
-		// 스탯 컴포넌트 가져와서 델리게이트 바인딩
+		// 스탯 컴포넌트 가져와서 델리게이트 바인딩 (중복 바인딩 방지)
 		if (UGS_StatComp* FoundStatComp = FindComponentByClass<UGS_StatComp>())
 		{
-			FoundStatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Seeker::HandleLowHealthEffect);
+			if (!FoundStatComp->OnCurrentHPChanged.IsBoundToObject(this))
+			{
+				FoundStatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Seeker::HandleLowHealthEffect);
+			}
 		}
 
-		// PlayerState 생존 상태 변경 델리게이트 바인딩
+		// PlayerState 생존 상태 변경 델리게이트 바인딩 (중복 바인딩 방지)
 		AGS_PlayerState* PS = GetPlayerState<AGS_PlayerState>();
 		if (PS)
 		{
-			PS->OnPlayerAliveStatusChangedDelegate.AddUObject(this, &AGS_Seeker::HandleAliveStatusChanged);
+			if (!PS->OnPlayerAliveStatusChangedDelegate.IsBoundToObject(this))
+			{
+				PS->OnPlayerAliveStatusChangedDelegate.AddUObject(this, &AGS_Seeker::HandleAliveStatusChanged);
+			}
 		}
 	}
 
@@ -619,8 +631,8 @@ void AGS_Seeker::Server_OnComboAttack_Implementation()
 	}
 	else
 	{
-		Server_SetNextComboFlag(true);
-		Server_SetComboInputFlag(false); // server 함수의 호출을 막기 위해서 합친 함수를 만들어야 하나?
+		bNextCombo = true;
+		CanAcceptComboInput = false;
 	}
 }
 

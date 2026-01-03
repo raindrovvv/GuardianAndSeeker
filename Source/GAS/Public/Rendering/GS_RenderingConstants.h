@@ -165,9 +165,16 @@ constexpr float AI_PERCEPTION_DISTANCE_TPS = 5000.0f;
 constexpr float AI_PERCEPTION_DISTANCE_RTS = 15000.0f;
 
 /**
- * 현재 시점에 맞는 AI 인지 거리를 계산합니다.
+ * 현재 시점에 맞는 AI 인지 거리를 계산(최적화)
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
  * @return 시점 기반 AI 인지 거리
  */
 float CalculateAIPerceptionDistance(const UObject* WorldContext);
+
+/**
+ * 거리에 따라 그림자 캐스팅 여부를 업데이트(최적화)
+ * @param Actor 대상 액터
+ * @param MeshComp 대상 메시 컴포넌트
+ */
+void UpdateShadowCulling(const AActor* Actor, USceneComponent* MeshComp);
 } // namespace GS_Rendering

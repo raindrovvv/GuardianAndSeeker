@@ -19,6 +19,7 @@
 #include "Components/WidgetComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Rendering/GS_RenderingConstants.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "System/GameState/GS_InGameGS.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
@@ -155,12 +156,14 @@ void AGS_Monster::BeginPlay()
 		HPTextWidgetComp->SetComponentTickInterval(0.1f);
 	}
 
-	// Bind to HP change for attack detection
+	// Bind to HP change for attack detection (중복 바인딩 방지)
 	if (StatComp)
 	{
 		LastKnownHP = StatComp->GetCurrentHealth();
-		StatComp->OnCurrentHPChanged.AddUObject(this,
-		                                        &AGS_Monster::HandleHPChanged);
+		if (!StatComp->OnCurrentHPChanged.IsBoundToObject(this))
+		{
+			StatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Monster::HandleHPChanged);
+		}
 	}
 
 	// Bind to owner's RTSController for attack notifications
@@ -610,14 +613,21 @@ void AGS_Monster::Attack()
 
 void AGS_Monster::Multicast_PlayAttackMontage_Implementation()
 {
-	// Soft Reference 로드
-	if (!AttackMontage.IsNull())
+	if (AttackMontage.IsNull())
 	{
-		if (UAnimMontage* LoadedMontage = AttackMontage.LoadSynchronous())
-		{
-			MonsterAnim->Montage_Play(LoadedMontage);
-		}
+		return;
 	}
+
+	TWeakObjectPtr<AGS_Monster> WeakThis(this);
+	UGS_AssetLoader::AsyncLoadAsset<UAnimMontage>(
+	    AttackMontage,
+	    [WeakThis](UAnimMontage* LoadedMontage)
+	    {
+		    if (WeakThis.IsValid() && LoadedMontage && WeakThis->MonsterAnim)
+		    {
+			    WeakThis->MonsterAnim->Montage_Play(LoadedMontage);
+		    }
+	    });
 }
 
 void AGS_Monster::SetSelected(bool bSelected, bool bPlaySound)
@@ -835,4 +845,12 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 	// 참고: 몬스터는 BeginPlay에서 bCanEverTick = false로 설정됨
 	// 모든 주기적 로직은 타이머로 이동되어 Tick을 사용하지 않음
 	// (UpdateShadowCulling, UpdateHPWidgetVisibility 등)
+}
+
+void AGS_Monster::UpdateShadowCulling()
+{
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		GS_Rendering::UpdateShadowCulling(this, MeshComp);
+	}
 }

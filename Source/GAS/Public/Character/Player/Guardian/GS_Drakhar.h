@@ -36,6 +36,10 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	void OnDamageStart() override;
 
+	/** Significance Manager: 거대 캐릭터 전용 최적화 */
+	virtual void OnSignificanceChanged(float NewSignificance) override;
+	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AGS_EarthquakeEffect> GC_EarthquakeEffect;
 

@@ -4,6 +4,8 @@
 #include "Character/Component/Seeker/GS_ChanSkillInputHandlerComp.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Player/Seeker/GS_Chan.h"
+#include "EnhancedInputComponent.h"
+#include "InputActionValue.h"
 
 void UGS_ChanSkillInputHandlerComp::OnRightClick(const FInputActionInstance& Instance)
 {
@@ -13,7 +15,7 @@ void UGS_ChanSkillInputHandlerComp::OnRightClick(const FInputActionInstance& Ins
 	{
 		return;
 	}
-	
+
 	Super::OnRightClick(Instance);
 
 	if (!bCtrlHeld)
@@ -21,13 +23,11 @@ void UGS_ChanSkillInputHandlerComp::OnRightClick(const FInputActionInstance& Ins
 		if (ChanCharacter->GetSkillComp()->IsSkillActive(ESkillSlot::Ready))
 		{
 			ChanCharacter->GetSkillComp()->Server_TryDeactiveSkill(ESkillSlot::Ready);
-			
 		}
 		else
 		{
 			ChanCharacter->GetSkillComp()->Server_TryActivateSkill(ESkillSlot::Ready);
 		}
-		
 	}
 	else
 	{
@@ -42,9 +42,9 @@ void UGS_ChanSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 	{
 		return;
 	}
-	
+
 	Super::OnLeftClick(Instance);
-	
+
 	if (!bCtrlHeld)
 	{
 		if (ChanCharacter)
@@ -55,7 +55,10 @@ void UGS_ChanSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 			}
 			else
 			{
-				ChanCharacter->Server_OnComboAttack();
+				if (ChanCharacter->CanAcceptComboInput)
+				{
+					ChanCharacter->Server_OnComboAttack();
+				}
 			}
 		}
 	}
@@ -71,9 +74,9 @@ void UGS_ChanSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 void UGS_ChanSkillInputHandlerComp::OnRoll(const struct FInputActionInstance& Instance)
 {
 	AGS_Chan* ChanCharacter = Cast<AGS_Chan>(OwnerCharacter);
-	
+
 	Super::OnRoll(Instance);
-	
+
 	if (ChanCharacter)
 	{
 		ChanCharacter->GetSkillComp()->Server_TryActivateSkill(ESkillSlot::Rolling);
@@ -86,4 +89,3 @@ void UGS_ChanSkillInputHandlerComp::OnKeyReset(const struct FInputActionInstance
 {
 	Super::OnKeyReset(Instance);
 }
-

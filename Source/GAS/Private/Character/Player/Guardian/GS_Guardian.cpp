@@ -69,12 +69,30 @@ void AGS_Guardian::BeginPlay()
 
 			// 추가 최적화: URO(Update Rate Optimization) 활성화
 			MeshComp->bEnableUpdateRateOptimizations = true;
+
+			// === 거리 기반 컬링 및 LOD 설정 ===
+			float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+			MeshComp->SetCullDistance(CullDistance);
+			MeshComp->SetCachedMaxDrawDistance(CullDistance);
+			MeshComp->MinLodModel = GS_Rendering::CalculateMinLOD(this);
+			MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+
+			// === 그림자 컬링 타이머 시작 ===
+			GetWorldTimerManager().SetTimer(
+			    ShadowCullingTimerHandle,
+			    this,
+			    &AGS_Guardian::UpdateShadowCulling,
+			    0.1f,
+			    true,
+			    FMath::RandRange(0.0f, 0.1f));
 		}
 	}
 }
 
 void AGS_Guardian::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorldTimerManager().ClearTimer(ShadowCullingTimerHandle);
+
 	// Unregister from Subsystem
 	if (UWorld* World = GetWorld())
 	{
@@ -85,6 +103,14 @@ void AGS_Guardian::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void AGS_Guardian::UpdateShadowCulling()
+{
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		GS_Rendering::UpdateShadowCulling(this, MeshComp);
+	}
 }
 
 void AGS_Guardian::PostInitializeComponents()

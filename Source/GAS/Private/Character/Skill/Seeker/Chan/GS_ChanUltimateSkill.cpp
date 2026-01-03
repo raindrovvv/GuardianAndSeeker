@@ -134,8 +134,10 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 		}
 	}
 
-	// 벽 충돌 체크
-	if (HitComp && HitComp->ComponentHasTag("Wall"))
+	// 벽 충돌 체크 ("Wall" 태그 확인)
+	bool bIsWall = (HitComp && HitComp->ComponentHasTag("Wall")) || (HitActor && HitActor->ActorHasTag("Wall"));
+
+	if (bIsWall)
 	{
 		// ---------------------------------------------------------------------------
 		// [강화된 방향 판정 로직]
@@ -174,7 +176,7 @@ void UGS_ChanUltimateSkill::HandleUltimateCollision(AActor* HitActor, UPrimitive
 		if (bValidNormal)
 		{
 			float NormalDot = FVector::DotProduct(OwnerForward, -HitResult.ImpactNormal.GetSafeNormal2D());
-			if (NormalDot > 0.1f && ForwardDot > 0.4f) // 임계값 소폭 완화
+			if (NormalDot > 0.05f && ForwardDot > 0.3f) // 임계값 더 완화 (스치듯 지나가는 경우 외에는 충돌 인정)
 			{
 				bIsFrontalCrash = true;
 			}
@@ -332,6 +334,9 @@ void UGS_ChanUltimateSkill::DeactiveSkill()
 	// =======================
 	if (OwningComp)
 	{
+		// CastVFX 중지 (돌진 VFX)
+		OwningComp->Multicast_StopCastVFX(CurrentSkillType);
+
 		FVector SkillLocation = OwnerCharacter->GetActorLocation();
 		FRotator SkillRotation = OwnerCharacter->GetActorRotation();
 		OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
@@ -386,15 +391,14 @@ void UGS_ChanUltimateSkill::StartCharge()
 		}
 
 		// =======================
-		// VFX 재생 - 컴포넌트 RPC 사용
+		// VFX 재생 - CastVFX 사용
 		// =======================
 		if (OwningComp)
 		{
 			FVector SkillLocation = OwnerCharacter->GetActorLocation();
-			//FRotator SkillRotation = OwnerCharacter->GetActorRotation();
 			FRotator SkillRotation = FRotator(0.f, 0.f, 0.f);
 
-			// 스킬 시전 VFX 재생
+			// 스킬 시전 VFX 재생 (캐릭터에 부착됨)
 			OwningComp->Multicast_PlayCastVFX(CurrentSkillType, SkillLocation, SkillRotation);
 		}
 	}
@@ -529,8 +533,10 @@ void UGS_ChanUltimateSkill::CheckForwardObstacle()
 
 	if (bHit && HitResult.GetComponent())
 	{
-		// 명확하게 "Wall" 태그가 있는 경우에만 장애물로 인지
-		if (HitResult.GetComponent()->ComponentHasTag("Wall"))
+		// "Wall" 태그 체크 전용 (열린 문 등 일반 StaticMesh 충돌 방지)
+		bool bIsStaticObstacle = HitResult.GetComponent()->ComponentHasTag("Wall") || (HitResult.GetActor() && HitResult.GetActor()->ActorHasTag("Wall"));
+
+		if (bIsStaticObstacle)
 		{
 			// 돌진 방향과 충돌 법선 비교
 			FVector ImpactNormal2D = HitResult.ImpactNormal.GetSafeNormal2D();
