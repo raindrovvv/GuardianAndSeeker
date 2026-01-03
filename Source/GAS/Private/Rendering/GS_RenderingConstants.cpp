@@ -129,12 +129,21 @@ void UpdateShadowCulling(const AActor* Actor, USceneComponent* MeshComp)
 	{
 		float DistSq = FVector::DistSquared(Actor->GetActorLocation(), PC->PlayerCameraManager->GetCameraLocation());
 
-		// SHADOW_DISABLE_DISTANCE (80m)를 기준으로 그림자 활성화 여부 결정
-		bool bNear = DistSq < (SHADOW_DISABLE_DISTANCE * SHADOW_DISABLE_DISTANCE);
+		// 1. 전체 그림자 활성화 여부 (SHADOW_DISABLE_DISTANCE - 80m)
+		bool bCastAnyShadow = DistSq < (SHADOW_DISABLE_DISTANCE * SHADOW_DISABLE_DISTANCE);
 
-		if (PrimitiveMesh->CastShadow != bNear)
+		// 2. 동적 그림자 활성화 여부 (DYNAMIC_SHADOW_DISABLE_DISTANCE - 40m)
+		// 40~80m 사이는 정적 그림자만 출력하여 비용 절감 및 시각적 안정성 확보
+		bool bCastDynamicShadow = DistSq < (DYNAMIC_SHADOW_DISABLE_DISTANCE * DYNAMIC_SHADOW_DISABLE_DISTANCE);
+
+		if (PrimitiveMesh->CastShadow != bCastAnyShadow)
 		{
-			PrimitiveMesh->SetCastShadow(bNear);
+			PrimitiveMesh->SetCastShadow(bCastAnyShadow);
+		}
+
+		if (PrimitiveMesh->bCastDynamicShadow != bCastDynamicShadow)
+		{
+			PrimitiveMesh->bCastDynamicShadow = bCastDynamicShadow;
 		}
 	}
 }

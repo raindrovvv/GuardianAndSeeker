@@ -116,6 +116,19 @@ constexpr float NET_DISTANCE_CLOSE = 8000.0f;
 /** 중거리 임계값 (150m - RTS 시야 고려) */
 constexpr float NET_DISTANCE_MEDIUM = 15000.0f;
 
+// ========================================
+// Timer Optimization Settings (Adaptive)
+// ========================================
+
+/** 중요도가 높을 때 업데이트 간격 (0.1s) */
+constexpr float TIMER_INTERVAL_HIGH = 0.1f;
+
+/** 중요도가 낮을 때 업데이트 간격 (0.5s) */
+constexpr float TIMER_INTERVAL_LOW = 0.5f;
+
+/** 중요도가 매우 낮을 때 업데이트 간격 (1.0s) */
+constexpr float TIMER_INTERVAL_MIN = 1.0f;
+
 /**
  * 로컬 플레이어와의 거리에 따라 최적의 네트워크 업데이트 빈도를 계산합니다.
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
@@ -153,6 +166,19 @@ constexpr float SIGNIFICANCE_THRESHOLD_UI = 0.4f;
 
 /** Significance Manager: UI 가시성 연산 스킵 임계값 */
 constexpr float SIGNIFICANCE_THRESHOLD_UI_SKIP = 0.1f;
+
+/** Significance Manager: 에셋 로딩 최소 임계값 (0.2 이하면 로드 스킵) */
+constexpr float SIGNIFICANCE_THRESHOLD_ASYNC_LOAD = 0.2f;
+
+/** Significance Manager: 중요도에 따른 타이머 주기 계산 */
+inline float GetAdaptiveTimerInterval(float Significance)
+{
+	if (Significance > 0.5f)
+		return TIMER_INTERVAL_HIGH;
+	if (Significance > 0.1f)
+		return TIMER_INTERVAL_LOW;
+	return TIMER_INTERVAL_MIN;
+}
 
 // ========================================
 // AI Perception Distance Optimization
