@@ -618,6 +618,12 @@ void AGS_Monster::Multicast_PlayAttackMontage_Implementation()
 		return;
 	}
 
+	// 최적화: 중요도가 너무 낮으면 (멀리 있으면) 애니메이션/에셋 로딩 스킵
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_ASYNC_LOAD)
+	{
+		return;
+	}
+
 	TWeakObjectPtr<AGS_Monster> WeakThis(this);
 	UGS_AssetLoader::AsyncLoadAsset<UAnimMontage>(
 	    AttackMontage,
@@ -841,6 +847,26 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 	UpdateWidgetOptimization(HPTextWidgetComp);
 	UpdateWidgetOptimization(TargetedUIComponent);
 	UpdateWidgetOptimization(SkillCooldownWidgetComp);
+
+	// 5. 가변 타이머 주기 조정 (Adaptive Timer)
+	// 중요도에 따라 타이머 주기를 동적으로 변경하여 CPU 부하 분산
+	if (!IsRunningDedicatedServer())
+	{
+		float NewInterval = GS_Rendering::GetAdaptiveTimerInterval(NewSignificance);
+
+		auto UpdateTimerInterval = [&](FTimerHandle& Handle, void (AGS_Monster::*Func)())
+		{
+			if (Handle.IsValid())
+			{
+				float Remaining = GetWorldTimerManager().GetTimerRemaining(Handle);
+				GetWorldTimerManager().ClearTimer(Handle);
+				GetWorldTimerManager().SetTimer(Handle, this, Func, NewInterval, true, FMath::Min(Remaining, NewInterval));
+			}
+		};
+
+		UpdateTimerInterval(ShadowCullingTimerHandle, &AGS_Monster::UpdateShadowCulling);
+		UpdateTimerInterval(HPWidgetVisibilityTimerHandle, &AGS_Monster::UpdateHPWidgetVisibility);
+	}
 
 	// 참고: 몬스터는 BeginPlay에서 bCanEverTick = false로 설정됨
 	// 모든 주기적 로직은 타이머로 이동되어 Tick을 사용하지 않음

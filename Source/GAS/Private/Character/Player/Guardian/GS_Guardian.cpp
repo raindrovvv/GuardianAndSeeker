@@ -113,6 +113,25 @@ void AGS_Guardian::UpdateShadowCulling()
 	}
 }
 
+void AGS_Guardian::OnSignificanceChanged(float NewSignificance)
+{
+	Super::OnSignificanceChanged(NewSignificance);
+
+	// 가변 타이머 주기 조정 (Adaptive Timer)
+	// 중요도에 따라 타이머 주기를 동적으로 변경하여 CPU 부하 분산
+	if (!IsRunningDedicatedServer())
+	{
+		float NewInterval = GS_Rendering::GetAdaptiveTimerInterval(NewSignificance);
+
+		if (ShadowCullingTimerHandle.IsValid())
+		{
+			float Remaining = GetWorldTimerManager().GetTimerRemaining(ShadowCullingTimerHandle);
+			GetWorldTimerManager().ClearTimer(ShadowCullingTimerHandle);
+			GetWorldTimerManager().SetTimer(ShadowCullingTimerHandle, this, &AGS_Guardian::UpdateShadowCulling, NewInterval, true, FMath::Min(Remaining, NewInterval));
+		}
+	}
+}
+
 void AGS_Guardian::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();

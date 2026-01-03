@@ -44,6 +44,7 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnSignificanceChanged(float NewSignificance) override;
 
 	UPROPERTY()
 	TObjectPtr<UGS_DrakharAnimInstance> GuardianAnim;
