@@ -601,13 +601,15 @@ void AGS_Character::PlayImpactVFX(UNiagaraSystem* VFXAsset, FVector Scale)
 
 void AGS_Character::OnRep_ImpactVFX()
 {
-	if (RepImpactVFX.VFXAsset.IsNull())
+	// 보관을 위해 캡처
+	FImpactVFXInfo CurrentVFXInfo = RepImpactVFX;
+
+	// 최적화: 중요도가 너무 낮으면 (멀리 있으면) 이펙트 로딩/생성 스킵
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_ASYNC_LOAD)
 	{
 		return;
 	}
 
-	// 보관을 위해 캡처
-	FImpactVFXInfo CurrentVFXInfo = RepImpactVFX;
 	TWeakObjectPtr<AGS_Character> WeakThis(this);
 
 	// 비동기 로드 시작
@@ -909,62 +911,14 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 	// 5. 네트워크 업데이트 빈도 최적화 (서버 전용)
 	if (HasAuthority())
 	{
-		if (NewSignificance > 0.8f)
-			NetUpdateFrequency = 60.0f;
-		else if (NewSignificance > 0.4f)
-			NetUpdateFrequency = 30.0f;
-		else
-			NetUpdateFrequency = 5.0f;
+		NetUpdateFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
 	}
 }
 
 void AGS_Character::UpdateShadowCulling()
 {
-	// 클라이언트에서만 실행
-	if (IsRunningDedicatedServer())
-		return;
-
-	// 로컬 플레이어는 최적화 제외 (Player 타입만 해당)
-	if (AGS_Player* Player = Cast<AGS_Player>(this))
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		if (Player->IsLocalPlayer())
-			return;
-	}
-
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	if (!MeshComp)
-		return;
-
-	// 카메라 위치 가져오기
-	if (UWorld* World = GetWorld())
-	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
-		{
-			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
-			{
-				FVector CameraLocation = CameraManager->GetCameraLocation();
-				float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
-
-				// 거리 기반 그림자 설정
-				if (Distance > GS_Rendering::SHADOW_DISABLE_DISTANCE)
-				{
-					// 80m 이상: 동적/정적 그림자 모두 끄되, 캡슐 그림자는 유지 (Monster)
-					MeshComp->SetCastShadow(false);
-					MeshComp->bCastDynamicShadow = false;
-				}
-				else if (Distance > GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE)
-				{
-					// 40-80m: 정적 그림자 유지, 동적 그림자 비활성화
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = false;
-				}
-				else
-				{
-					// 40m 이내: 고품질 동적 그림자 활성화
-					MeshComp->SetCastShadow(true);
-					MeshComp->bCastDynamicShadow = true;
-				}
-			}
-		}
+		GS_Rendering::UpdateShadowCulling(this, MeshComp);
 	}
 }
