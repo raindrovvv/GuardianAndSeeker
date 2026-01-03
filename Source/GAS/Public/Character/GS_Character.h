@@ -147,6 +147,9 @@ public:
 	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
 
 	//serverRPC
+	/** 타격 정격(Hit-stop) 효과 적용 (멀티캐스트) */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_ApplyHitStop(float Duration, float TimeDilation, bool bPlayShake = false);
 	UFUNCTION(Server, Reliable)
 	void ServerRPCMeleeAttack(AGS_Character* InDamagedCharacter);
 

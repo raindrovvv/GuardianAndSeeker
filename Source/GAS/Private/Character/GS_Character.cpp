@@ -922,3 +922,52 @@ void AGS_Character::UpdateShadowCulling()
 		GS_Rendering::UpdateShadowCulling(this, MeshComp);
 	}
 }
+void AGS_Character::Multicast_ApplyHitStop_Implementation(float Duration, float TimeDilation, bool bPlayShake)
+{
+	if (IsRunningDedicatedServer())
+		return;
+
+	// 멀티플레이 최적화: 내가 컨트롤하는 캐릭터거나 내가 타겟일 때만 연출 적용
+	// 제3자 시점에서는 타격 시마다 멈추면 렉처럼 보일 수 있으므로 제외
+	if (!IsLocallyControlled() && !IsPlayerControlled())
+		return;
+
+	// Tactile Camera: 본인일 때만 카메라 쉐이크
+	if (bPlayShake && CameraShakeComp && IsLocallyControlled())
+	{
+		CameraShakeComp->PlayCameraShake(AttackSuccessShake);
+	}
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (!AnimInstance)
+		return;
+
+	UAnimMontage* CurrentMontage = AnimInstance->GetCurrentActiveMontage();
+	if (!CurrentMontage)
+		return;
+
+	float OriginalPlayRate = AnimInstance->Montage_GetPlayRate(CurrentMontage);
+
+	// 멀티플레이 유의: 완전 정지(0.0)는 렉처럼 보일 수 있으므로 아주 미세한 움직임(0.1) 유지
+	float HitStopPlayRate = 0.1f;
+	if (OriginalPlayRate <= HitStopPlayRate)
+		return;
+
+	AnimInstance->Montage_SetPlayRate(CurrentMontage, HitStopPlayRate);
+
+	FTimerHandle HitStopTimer;
+	TWeakObjectPtr<AGS_Character> WeakThis(this);
+	TWeakObjectPtr<UAnimInstance> WeakAnimInstance(AnimInstance);
+	TWeakObjectPtr<UAnimMontage> WeakMontage(CurrentMontage);
+
+	GetWorldTimerManager().SetTimer(HitStopTimer, [WeakThis, WeakAnimInstance, WeakMontage, OriginalPlayRate]()
+	                                {
+		if (WeakThis.IsValid() && WeakAnimInstance.IsValid())
+		{
+			// 아직 같은 몽타주를 재생 중이라면 PlayRate 복구
+			if (WeakAnimInstance->GetCurrentActiveMontage() == WeakMontage.Get())
+			{
+				WeakAnimInstance->Montage_SetPlayRate(WeakMontage.Get(), OriginalPlayRate);
+			}
+		} }, Duration, false);
+}

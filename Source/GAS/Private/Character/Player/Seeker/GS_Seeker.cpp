@@ -578,11 +578,36 @@ void AGS_Seeker::Server_SetComboInputFlag_Implementation(bool InputCombo)
 void AGS_Seeker::ComboInputOpen()
 {
 	CanAcceptComboInput = true;
+
+	// 입력 버퍼링 처리: 최근에 입력된 기록이 있다면 즉시 다음 공격 실행
+	if (IsLocallyControlled())
+	{
+		float CurrentTime = GetWorld()->GetTimeSeconds();
+		if (LastInputTime > 0.0f && (CurrentTime - LastInputTime) <= InputBufferWindow)
+		{
+			// 버퍼 소진: 다음 공격 요청
+			Server_OnComboAttack();
+			LastInputTime = -1.0f; // 버퍼 초기화
+		}
+	}
+
+	// 조작감 개선: 콤보 가능 시점부터는 회피(Rolling)로의 캔슬도 항상 허용
+	if (GetSkillComp())
+	{
+		GetSkillComp()->AddAllowedSkill(ESkillSlot::Rolling);
+	}
 }
 
 void AGS_Seeker::ComboInputClose()
 {
 	CanAcceptComboInput = false;
+	// 입력 버퍼는 초기화하지 않음 - ComboInputOpen에서 시간 기반 검증으로 처리
+
+	// 회피 캔슬 권한 제거 (콤보 창이 닫힐 때)
+	if (GetSkillComp())
+	{
+		GetSkillComp()->RemoveAllowedSkill(ESkillSlot::Rolling);
+	}
 
 	if (HasAuthority())
 	{
@@ -666,8 +691,82 @@ void AGS_Seeker::UpdatePostProcessEffect(float EffectStrength)
 	}
 }
 
+AActor* AGS_Seeker::GetBestMagnetismTarget() const
+{
+	AActor* BestTarget = nullptr;
+	float MinScore = TNumericLimits<float>::Max();
+
+	FVector Forward = GetActorForwardVector();
+	FVector Location = GetActorLocation();
+
+	for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
+	{
+		AGS_Monster* Monster = MonsterPtr.Get();
+		if (!IsValid(Monster) || Monster->IsDead())
+			continue;
+
+		FVector ToMonster = Monster->GetActorLocation() - Location;
+		float Distance = ToMonster.Size();
+
+		if (Distance <= MagnetismDistance)
+		{
+			ToMonster.Normalize();
+			float Dot = FVector::DotProduct(Forward, ToMonster);
+			float Angle = FMath::RadiansToDegrees(FMath::Acos(Dot));
+
+			if (Angle <= MagnetismAngle)
+			{
+				// 거리와 각도를 조합한 점수 (낮을수록 좋음)
+				float Score = (Distance / MagnetismDistance) + (Angle / MagnetismAngle);
+				if (Score < MinScore)
+				{
+					MinScore = Score;
+					BestTarget = Monster;
+				}
+			}
+		}
+	}
+
+	return BestTarget;
+}
+
 void AGS_Seeker::ServerAttackMontage_Implementation()
 {
+	// 타격 보정 (Target Magnetism) 로직 적용
+	if (AActor* Target = GetBestMagnetismTarget())
+	{
+		// 1. 타겟 방향으로 부드럽게 회전 보정
+		FVector Direction = Target->GetActorLocation() - GetActorLocation();
+		Direction.Z = 0.0f;
+		if (!Direction.IsNearlyZero())
+		{
+			SetActorRotation(Direction.Rotation());
+		}
+
+		// 2. 타겟 방향으로 약간의 전진 보정 (Lunge)
+		// 너무 가까우면 보정하지 않음
+		float Dist = Direction.Size();
+		if (Dist > 100.0f)
+		{
+			FVector LungeImpulse = Direction.GetSafeNormal() * 300.0f; // 기본 추진력
+			LaunchCharacter(LungeImpulse, true, false);
+		}
+	}
+	else
+	{
+		// 3. 전 방향 공격 보정 (Input-Driven Lunge)
+		// 적이 없을 때 플레이어가 입력한 이동 방향으로 살짝 전진
+		FVector InputDir = GetLastMovementInputVector();
+		if (!InputDir.IsNearlyZero())
+		{
+			InputDir.Normalize();
+			// 입력 방향으로 즉시 회전 (조작감 향상)
+			SetActorRotation(InputDir.Rotation());
+			// 살짝 전진 추진력 부여
+			LaunchCharacter(InputDir * 200.0f, true, false);
+		}
+	}
+
 	Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 	MulticastPlayComboSection(CurrentComboIndex);
 }

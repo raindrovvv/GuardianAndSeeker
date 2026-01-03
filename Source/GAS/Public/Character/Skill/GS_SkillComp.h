@@ -196,6 +196,14 @@ public:
 	UFUNCTION()
 	int16 GetCurAllowedSkillsMask();
 
+	/** 특정 스킬 슬롯을 허용 목록에 추가 (액션 캔슬용) */
+	UFUNCTION()
+	void AddAllowedSkill(ESkillSlot Slot);
+
+	/** 특정 스킬 슬롯을 허용 목록에서 제거 */
+	UFUNCTION()
+	void RemoveAllowedSkill(ESkillSlot Slot);
+
 private:
 	UFUNCTION()
 	void OnRep_SkillStates();

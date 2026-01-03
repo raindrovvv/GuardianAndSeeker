@@ -138,6 +138,24 @@ int16 UGS_SkillComp::GetCurAllowedSkillsMask()
 	return CurAllowedSkillsMask;
 }
 
+void UGS_SkillComp::AddAllowedSkill(ESkillSlot Slot)
+{
+	if (Slot == ESkillSlot::End)
+		return;
+
+	int16 BitFlag = (1 << static_cast<int32>(Slot));
+	CurAllowedSkillsMask |= BitFlag;
+}
+
+void UGS_SkillComp::RemoveAllowedSkill(ESkillSlot Slot)
+{
+	if (Slot == ESkillSlot::End)
+		return;
+
+	int16 BitFlag = (1 << static_cast<int32>(Slot));
+	CurAllowedSkillsMask &= ~BitFlag;
+}
+
 void UGS_SkillComp::InitSkills()
 {
 	AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner());

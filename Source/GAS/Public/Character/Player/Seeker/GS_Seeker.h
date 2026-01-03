@@ -143,6 +143,7 @@ public:
 	UFUNCTION(Server, Reliable)
 	virtual void Server_OnComboAttack();
 
+
 	// Damage Handler
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
@@ -213,11 +214,29 @@ public:
 	UPROPERTY(Replicated)
 	bool bNextCombo = false;
 
+	/** 마지막 입력 시간 (입력 버퍼링용) */
+	float LastInputTime = -1.0f;
+
+	/** 입력 버퍼링 허용 시간 (0.2초) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float InputBufferWindow = 0.25f;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SeekerGait)
 	EGait SeekerGait;
 
 	UPROPERTY(Replicated)
 	EGait LastSeekerGait;
+
+	/** 타격 보정(Target Magnetism) 거리 */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float MagnetismDistance = 400.0f;
+
+	/** 타격 보정 허용 각도 (도) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float MagnetismAngle = 60.0f;
+
+	/** 최적의 타겟 찾기 (보정용) */
+	AActor* GetBestMagnetismTarget() const;
 
 	UPROPERTY(BlueprintAssignable, Category = "RTS")
 	FOnSeekerHover OnSeekerHover;

@@ -17,7 +17,7 @@ class GAS_API AGS_WeaponEquipable : public AGS_Weapon
 	GENERATED_BODY()
 public:
 	AGS_WeaponEquipable();
-	
+
 	AGS_Character* GetOwnerChar() { return OwnerChar; };
 
 protected:
@@ -44,6 +44,9 @@ protected:
 
 	UPROPERTY()
 	TSet<AActor*> HitActors;
+
+	// 현재 활성화된 타격 노티파이 개수 (중첩된 노티파이 타이밍 이슈 해결용)
+	int32 ActiveNotifyCount = 0;
 
 	FTimerHandle SafetyTimerHandle;
 

@@ -112,11 +112,6 @@ void AGS_TrapBase::BeginPlay()
 		if (TrapManager)
 		{
 			TrapManager->RegisterTrap(this);
-			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager in BeginPlay"));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager is not in BeginPlay"));
 		}
 	}
 
@@ -490,7 +485,6 @@ void AGS_TrapBase::OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 	// 환경에 부딪힌 경우 충돌 사운드 재생
 	if (bPlayHitSoundOnEnvironmentImpact && IsEnvironmentHit(OtherActor, OtherComp))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Environment Hit detected - Trap: %s, Hit: %s"), *GetName(), *GetNameSafe(OtherActor));
 		PlayHitSound();
 	}
 }
@@ -580,7 +574,6 @@ void AGS_TrapBase::Server_DamageBoxEffect_Implementation(AActor* OtherActor)
 
 void AGS_TrapBase::Multicast_DamageBoxEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Multicast_DamageBoxEffect_Implementation called"));
 	DamageBoxEffect(TargetActor);
 }
 

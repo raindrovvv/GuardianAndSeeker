@@ -41,6 +41,10 @@ AGS_Chan::AGS_Chan()
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Chan");
+
+	// 타격 보정 설정 (찬: 짧은 사거리, 넓은 유도각)
+	MagnetismDistance = 350.0f;
+	MagnetismAngle = 75.0f;
 }
 
 void AGS_Chan::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -148,6 +152,24 @@ void AGS_Chan::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
 	{
 		SeekerAudioComponent->PlayChanFinalAttackSound();
 	}
+
+	// 조작감 개선: 콤보 인덱스별 차별화된 타격 정지(Hit-stop) 적용
+	// 멀티플레이 유의: 공격 흐름을 방해하지 않도록 시간을 이전보다 대폭 단축 (0.12 -> 0.05)
+	float BaseDuration = 0.05f;
+	float FinalDuration = BaseDuration;
+
+	if (ComboIndex == 4)
+	{
+		FinalDuration = 0.09f; // 피니셔: 짧고 강렬하게 강조
+	}
+	else
+	{
+		// 콤보 진행에 따른 점진적 강화 (최대 1.2배)
+		float Scale = 1.0f + (FMath::Min(2, FMath::Max(0, ComboIndex - 1)) * 0.1f);
+		FinalDuration = BaseDuration * Scale;
+	}
+
+	Multicast_ApplyHitStop(FinalDuration, 0.0f, true);
 
 	// 공격 성공 시 공격자에게 카메라 쉐이크 적용 (Chan 전용)
 	if (HasAuthority())
