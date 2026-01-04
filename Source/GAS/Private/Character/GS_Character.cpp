@@ -15,6 +15,7 @@
 #include "Components/DecalComponent.h"
 #include "Engine/DamageEvents.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
@@ -161,6 +162,48 @@ void AGS_Character::RegisterSignificanceManager()
 void AGS_Character::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 카메라 낙아웃 효과 복구
+	if (CurrentCameraKnockback > 0.0f)
+	{
+		float PreviousKnockback = CurrentCameraKnockback;
+		CurrentCameraKnockback = FMath::FInterpTo(CurrentCameraKnockback, 0.0f, DeltaTime, CameraKnockbackRecoverySpeed);
+
+		AGS_Player* Player = Cast<AGS_Player>(this);
+		if (IsValid(Player) && IsValid(Player->SpringArmComp))
+		{
+			float Delta = PreviousKnockback - CurrentCameraKnockback;
+			Player->SpringArmComp->TargetArmLength -= Delta;
+		}
+
+		// 완전히 복구되면 Tick 비활성화 고려 (원래 비활성 상태였다면)
+		if (CurrentCameraKnockback <= KINDA_SMALL_NUMBER)
+		{
+			CurrentCameraKnockback = 0.0f;
+			// Player는 bCanEverTick가 true이므로 계속 켜둬도 됨
+			// Boss 등은 OnSignificanceChanged에서 제어함
+		}
+	}
+}
+
+void AGS_Character::ApplyCameraKnockback(float IntensityMultiplier)
+{
+	if (!IsLocallyControlled())
+		return;
+
+	AGS_Player* Player = Cast<AGS_Player>(this);
+	if (IsValid(Player) && IsValid(Player->SpringArmComp))
+	{
+		// 데미지 강도에 따라 밀림 거리 가변 적용
+		float DynamicKnockbackDistance = CameraKnockbackDistance * IntensityMultiplier;
+		float NewKnockback = FMath::Min(CurrentCameraKnockback + DynamicKnockbackDistance, 20.0f);
+		float Delta = NewKnockback - CurrentCameraKnockback;
+
+		CurrentCameraKnockback = NewKnockback;
+		Player->SpringArmComp->TargetArmLength += Delta;
+
+		SetActorTickEnabled(true);
+	}
 }
 
 void AGS_Character::GetLifetimeReplicatedProps(
@@ -256,7 +299,33 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	{
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
 		{
-			Client_PlayTakeDamageShake(PC);
+			// 데미지 강도에 따른 카메라 쉐이크 선택
+			FGS_CameraShakeInfo SelectedShake;
+			float IntensityMultiplier = 1.0f;
+
+			if (ActualDamage < LightDamageThreshold)
+			{
+				SelectedShake = LightDamageShake;
+				IntensityMultiplier = 0.5f;
+			}
+			else if (ActualDamage < NormalDamageThreshold)
+			{
+				SelectedShake = NormalDamageShake;
+				IntensityMultiplier = 1.0f;
+			}
+			else if (ActualDamage < HeavyDamageThreshold)
+			{
+				SelectedShake = HeavyDamageShake;
+				IntensityMultiplier = 1.5f;
+			}
+			else
+			{
+				SelectedShake = HeavyDamageShake;
+				IntensityMultiplier = 2.0f;
+			}
+
+			SelectedShake.Intensity *= IntensityMultiplier;
+			Client_PlayTakeDamageShake(PC, SelectedShake, IntensityMultiplier);
 		}
 	}
 
@@ -440,12 +509,12 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 }
 
 void AGS_Character::Client_PlayTakeDamageShake_Implementation(
-    APlayerController* TargetPC)
+    APlayerController* TargetPC, const FGS_CameraShakeInfo& ShakeInfo, float KnockbackMultiplier)
 {
-	if (TargetPC && TargetPC->IsLocalController() && TakeDamageShake.ShakeClass)
+	if (TargetPC && TargetPC->IsLocalController() && ShakeInfo.ShakeClass)
 	{
-		TargetPC->ClientStartCameraShake(TakeDamageShake.ShakeClass,
-		                                 TakeDamageShake.Intensity);
+		TargetPC->ClientStartCameraShake(ShakeInfo.ShakeClass, ShakeInfo.Intensity);
+		ApplyCameraKnockback(KnockbackMultiplier);
 	}
 }
 

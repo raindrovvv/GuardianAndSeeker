@@ -105,6 +105,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
 	FGS_CameraShakeInfo AttackSuccessShake;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo LightDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo NormalDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo HeavyDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float LightDamageThreshold = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float NormalDamageThreshold = 25.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float HeavyDamageThreshold = 45.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Effects|CameraShake")
+	float CameraKnockbackDistance = 5.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Effects|CameraShake")
+	float CameraKnockbackRecoverySpeed = 10.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stat", meta = (AllowPrivateAccess))
 	TObjectPtr<UGS_HPTextWidgetComp> HPTextWidgetComp;
 
@@ -155,7 +179,7 @@ public:
 
 	//clientRPC for camera shake
 	UFUNCTION(Client, Unreliable)
-	void Client_PlayTakeDamageShake(APlayerController* TargetPC);
+	void Client_PlayTakeDamageShake(APlayerController* TargetPC, const FGS_CameraShakeInfo& ShakeInfo, float KnockbackMultiplier = 1.0f);
 
 	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShake(APlayerController* TargetPC);
@@ -239,6 +263,12 @@ public:
 
 	/** 현재 중요도 값 반환 */
 	FORCEINLINE float GetSignificance() const { return CurrentSignificance; }
+
+	/** 현재 누적된 카메라 낙아웃 거리 */
+	float CurrentCameraKnockback = 0.0f;
+
+	/** 카메라 낙아웃 효과 적용 */
+	void ApplyCameraKnockback(float IntensityMultiplier = 1.0f);
 
 protected:
 	/** 현재 중요도 상태 저장 (0.0 ~ 1.0) */

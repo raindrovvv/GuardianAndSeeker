@@ -248,7 +248,7 @@ void AGS_Guardian::ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& Damag
 			DamagedCharacter->TakeDamage(Damage + PlusDamge, DamageEvent, GetController(), this);
 
 			//hit stop
-			MulticastRPCApplyHitStop(DamagedCharacter);
+			MulticastRPCApplyHitStop(DamagedCharacter, HitStopDurtaion);
 
 			// 피버 게이지 업데이트 (각 가디언이 자신의 방식으로 처리)
 			OnFeverGaugeUpdate(10.f);
@@ -328,7 +328,7 @@ float AGS_Guardian::GetOptimalCullDistance() const
 	return GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
 }
 
-void AGS_Guardian::MulticastRPCApplyHitStop_Implementation(AGS_Character* InDamagedCharacter)
+void AGS_Guardian::MulticastRPCApplyHitStop_Implementation(AGS_Character* InDamagedCharacter, float Duration)
 {
 	if (HasAuthority())
 	{
@@ -343,13 +343,17 @@ void AGS_Guardian::MulticastRPCApplyHitStop_Implementation(AGS_Character* InDama
 		{
 			return;
 		}
+
+		// 멀티플레이어 환경에서 아주 미세한 움직임은 유지 (0.1)
 		CustomTimeDilation = 0.1f;
 		InDamagedCharacter->CustomTimeDilation = 0.1f;
 
 		FTimerDelegate HitStopTimerDelegate;
 		FTimerHandle HitStopTimerHandle;
 		HitStopTimerDelegate.BindUFunction(this, FName("MulticastRPCEndHitStop"), InDamagedCharacter);
-		GetWorld()->GetTimerManager().SetTimer(HitStopTimerHandle, HitStopTimerDelegate, HitStopDurtaion, false);
+
+		float FinalDuration = (Duration > 0.0f) ? Duration : HitStopDurtaion;
+		GetWorld()->GetTimerManager().SetTimer(HitStopTimerHandle, HitStopTimerDelegate, FinalDuration, false);
 	}
 }
 

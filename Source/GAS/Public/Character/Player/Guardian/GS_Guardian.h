@@ -132,7 +132,7 @@ protected:
 	FName ManualRowName;
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastRPCApplyHitStop(AGS_Character* InDamagedCharacter);
+	void MulticastRPCApplyHitStop(AGS_Character* InDamagedCharacter, float Duration);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCEndHitStop(AGS_Character* InDamagedCharacter);

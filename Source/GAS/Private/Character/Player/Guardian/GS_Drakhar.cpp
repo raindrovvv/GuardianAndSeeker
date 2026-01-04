@@ -415,8 +415,8 @@ void AGS_Drakhar::MeleeAttackCheck()
 						Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.0f);
 					}
 
-					// 히트 스톱 효과
-					MulticastRPCApplyHitStop(DamagedCharacter);
+					// 히트 스톱 효과 (일반 콤보)
+					MulticastRPCApplyHitStop(DamagedCharacter, ComboHitStopDuration);
 
 					// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
@@ -479,6 +479,9 @@ void AGS_Drakhar::ComboLastAttack()
 					MulticastRPC_PlayAttackHitVFX(DamagedPlayer->GetActorLocation());
 					if (AudioComponent)
 						AudioComponent->PlayAttackHitSound();
+
+					// 히트 스톱 효과 (피니셔)
+					MulticastRPCApplyHitStop(DamagedPlayer, FinisherHitStopDuration);
 
 					// 공격 성공 시 공격자에게 강한 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
@@ -584,6 +587,9 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 		if (AudioComponent)
 			AudioComponent->PlayAttackHitSound();
 
+		// 히트 스톱 효과 (스킬)
+		MulticastRPCApplyHitStop(DamagedCharacter, SkillHitStopDuration);
+
 		// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 		if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 		{
@@ -687,6 +693,9 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 			MulticastRPC_PlayAttackHitVFX(DamagedCharacter->GetActorLocation());
 			if (AudioComponent)
 				AudioComponent->PlayAttackHitSound();
+
+			// 히트 스톱 효과 (스킬)
+			MulticastRPCApplyHitStop(DamagedCharacter, SkillHitStopDuration);
 
 			FVector DrakharLocation = GetActorLocation();
 			FVector DamagedLocation = DamagedCharacter->GetActorLocation();

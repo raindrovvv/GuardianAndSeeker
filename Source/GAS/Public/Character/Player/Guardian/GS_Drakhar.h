@@ -398,6 +398,16 @@ private:
 	float TargetSpringArmLength;
 	bool bIsFlying;
 
+	//[HitStop]
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float ComboHitStopDuration = 0.08f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float FinisherHitStopDuration = 0.15f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float SkillHitStopDuration = 0.1f;
+
 	//[NEW COMBO ATTACK]
 	FName ComboAttackSectionName;
 	FName DefaultComboAttackSectionName;
