@@ -14,7 +14,6 @@
 AGS_PlacerBase::AGS_PlacerBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	SetActorTickEnabled(false);
 
 	StaticMeshCompo = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
 	StaticMeshCompo->SetupAttachment(RootComponent);
@@ -88,7 +87,8 @@ AGS_PlacerBase::AGS_PlacerBase()
 void AGS_PlacerBase::BeginPlay()
 {
 	Super::BeginPlay();
-
+	SetActorTickEnabled(false);
+	
 	SetupObjectPlacer();
 }
 
@@ -166,7 +166,6 @@ void AGS_PlacerBase::BuildObject()
 		FVector2d CenterLocation = BuildManagerRef->GetCenterOfRectArea(CursorPoint, ObjectSize, RotateYaw);
 		FVector SpawnLocation = FVector(CenterLocation.X, CenterLocation.Y, ObjectData.OffSet.Z);
 		FVector2D SpawnOffset = FVector2D(ObjectData.OffSet.X, ObjectData.OffSet.Y);
-		FRotator SpawnRotator = GetActorRotation();
 		AActor* NewActor = GetWorld()->SpawnActor<AActor>(ObjectData.PlaceableObjectClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
 	
 		if (!NewActor)
