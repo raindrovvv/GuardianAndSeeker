@@ -14,11 +14,14 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "System/GS_PlayerState.h"
+#include "System/GS_PlayerRole.h"
+#include "UObject/UnrealType.h"
 
 // Sets default values
 AGS_RTSCamera::AGS_RTSCamera()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 }
 
@@ -26,6 +29,23 @@ AGS_RTSCamera::AGS_RTSCamera()
 void AGS_RTSCamera::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 멀티플레이어 환경에서 시커 플레이어에게는 구름 효과가 보이지 않도록 처리
+	if (UWorld* World = GetWorld())
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (AGS_PlayerState* PS = PC->GetPlayerState<AGS_PlayerState>())
+			{
+				if (PS->CurrentPlayerRole != EPlayerRole::PR_Guardian)
+				{
+					// 시커 플레이어인 경우 구름 효과 로직을 실행하지 않고 틱을 비활성화함
+					SetActorTickEnabled(false);
+					return;
+				}
+			}
+		}
+	}
 
 	// Post Process Setup
 	if (CloudMaterialBase)
@@ -46,33 +66,31 @@ void AGS_RTSCamera::BeginPlay()
 	if (CloudNiagaraSystem)
 	{
 		CloudNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			CloudNiagaraSystem,
-			GetCameraComponent(),
-			NAME_None,
-			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			EAttachLocation::SnapToTarget,
-			true
-		);
+		    CloudNiagaraSystem,
+		    GetCameraComponent(),
+		    NAME_None,
+		    FVector::ZeroVector,
+		    FRotator::ZeroRotator,
+		    EAttachLocation::SnapToTarget,
+		    true);
 	}
 
 	// Sound Setup
 	if (CloudWindSound)
 	{
 		CloudWindAudioComponent = UGameplayStatics::SpawnSound2D(
-			this,
-			CloudWindSound,
-			0.0f, // Start with 0 volume
-			1.0f,
-			0.0f,
-			nullptr,
-			true,
-			true
-		);
+		    this,
+		    CloudWindSound,
+		    0.0f, // Start with 0 volume
+		    1.0f,
+		    0.0f,
+		    nullptr,
+		    true,
+		    true);
 
 		if (CloudWindAudioComponent)
 		{
-			CloudWindAudioComponent->bAutoDestroy = false; 
+			CloudWindAudioComponent->bAutoDestroy = false;
 			CloudWindAudioComponent->Play();
 		}
 	}
@@ -107,10 +125,9 @@ void AGS_RTSCamera::UpdateCloudNiagaraParameters()
 
 		// Calculate Alpha based on height (Same logic as Material)
 		float Alpha = FMath::GetMappedRangeValueClamped(
-			FVector2D(CloudHeightMin, CloudHeightMax),
-			FVector2D(0.0f, 1.0f),
-			CurrentZ
-		);
+		    FVector2D(CloudHeightMin, CloudHeightMax),
+		    FVector2D(0.0f, 1.0f),
+		    CurrentZ);
 
 		CloudNiagaraComponent->SetVariableFloat(FName("CloudAlpha"), Alpha);
 	}
@@ -125,10 +142,9 @@ void AGS_RTSCamera::UpdateCloudSoundParameters()
 
 		// Calculate Volume Alpha
 		float VolumeAlpha = FMath::GetMappedRangeValueClamped(
-			FVector2D(CloudHeightMin, CloudHeightMax),
-			FVector2D(0.0f, 1.0f),
-			CurrentZ
-		);
+		    FVector2D(CloudHeightMin, CloudHeightMax),
+		    FVector2D(0.0f, 1.0f),
+		    CurrentZ);
 
 		CloudWindAudioComponent->SetVolumeMultiplier(VolumeAlpha);
 	}
@@ -140,9 +156,9 @@ void AGS_RTSCamera::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	// Only update effects if camera height changed significantly
-	if (GetCameraComponent())
+	if (UCameraComponent* CameraComp = GetCameraComponent())
 	{
-		float CurrentZ = GetCameraComponent()->GetComponentLocation().Z;
+		float CurrentZ = CameraComp->GetComponentLocation().Z;
 		if (!FMath::IsNearlyEqual(CurrentZ, LastCameraZ, 1.0f)) // 1cm tolerance
 		{
 			LastCameraZ = CurrentZ;
@@ -150,6 +166,8 @@ void AGS_RTSCamera::Tick(float DeltaTime)
 			UpdateCloudSoundParameters();
 		}
 	}
+
+	UpdateZoomBack(DeltaTime);
 }
 
 UCameraComponent* AGS_RTSCamera::GetCameraComponent() const
@@ -170,6 +188,75 @@ USpringArmComponent* AGS_RTSCamera::GetSpringArmComponent() const
 		return CachedSpringArmComp;
 	}
 	return FindComponentByClass<USpringArmComponent>();
+}
+
+void AGS_RTSCamera::UpdateZoomBack(float DeltaTime)
+{
+	if (!bEnableZoomBack)
+		return;
+
+	UCameraComponent* CameraComp = GetCameraComponent();
+	USpringArmComponent* SpringArmComp = GetSpringArmComponent();
+
+	if (!CameraComp || !SpringArmComp)
+		return;
+
+	float CurrentHeight = CameraComp->GetComponentLocation().Z;
+
+	// 히스테리시스 적용 (트리거 높이는 높게, 리셋 높이는 낮게)
+	const float TriggerThreshold = CloudHeightMin + 100.0f;
+	const float ResetThreshold = CloudHeightMin;
+
+	// 1. 줌백 로직 (보간 진행 중)
+	if (bIsZoomingBack)
+	{
+		float CurrentArmLength = SpringArmComp->TargetArmLength;
+		float NewArmLength = FMath::FInterpTo(CurrentArmLength, ZoomBackSafeArmLength, DeltaTime, ZoomBackSpeed);
+		SpringArmComp->TargetArmLength = NewArmLength;
+
+		// 동기화 로직
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (FProperty* Prop = PC->GetClass()->FindPropertyByName(TEXT("ZoomFactor")))
+			{
+				if (FNumericProperty* NumericProp = CastField<FNumericProperty>(Prop))
+				{
+					float NewFactor = (NewArmLength - 1500.0f) / 500.0f;
+					NumericProp->SetFloatingPointPropertyValue(NumericProp->ContainerPtrToValuePtr<void>(PC), NewFactor);
+				}
+			}
+		}
+
+		// 종료 조건 (안전 높이 이하 도달 또는 보간 완료)
+		if (CurrentHeight <= ResetThreshold || FMath::IsNearlyEqual(NewArmLength, ZoomBackSafeArmLength, 1.0f) || CurrentArmLength < ZoomBackSafeArmLength - 10.0f)
+		{
+			bIsZoomingBack = false;
+			bIsWaitingToZoomBack = false;
+			ZoomBackTimer = 0.0f;
+		}
+		return;
+	}
+
+	// 2. 구름 영역 진입 체크
+	if (CurrentHeight > TriggerThreshold)
+	{
+		bIsWaitingToZoomBack = true;
+		ZoomBackTimer += DeltaTime;
+
+		if (ZoomBackTimer >= ZoomBackDelay)
+		{
+			bIsZoomingBack = true;
+			bIsWaitingToZoomBack = false;
+			ZoomBackTimer = 0.0f;
+		}
+	}
+	else if (CurrentHeight <= ResetThreshold)
+	{
+		// 안전한 높이 아래로 내려왔을 때만 리셋
+		bIsWaitingToZoomBack = false;
+		bIsZoomingBack = false;
+		ZoomBackTimer = 0.0f;
+	}
 }
 
 bool AGS_RTSCamera::HasCameraChanged() const
@@ -232,9 +319,8 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 		// 컴포넌트가 없으면 기본값 반환
 		FVector CameraLocation = GetActorLocation();
 		return FBox2D(
-			FVector2D(CameraLocation.X - 1000.0f, CameraLocation.Y - 1000.0f),
-			FVector2D(CameraLocation.X + 1000.0f, CameraLocation.Y + 1000.0f)
-		);
+		    FVector2D(CameraLocation.X - 1000.0f, CameraLocation.Y - 1000.0f),
+		    FVector2D(CameraLocation.X + 1000.0f, CameraLocation.Y + 1000.0f));
 	}
 
 	// 4 Corner Raycasting Method for Accurate Bounds
@@ -243,7 +329,7 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 
 	float HFOV = FMath::DegreesToRadians(CameraComp->FieldOfView);
 	float AspectRatio = CameraComp->AspectRatio;
-	
+
 	int32 ViewportSizeX = 0;
 	int32 ViewportSizeY = 0;
 
@@ -264,7 +350,8 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 	}
 
 	// Fallback
-	if (AspectRatio <= 0.0f) AspectRatio = 1.777f; // Default 16:9
+	if (AspectRatio <= 0.0f)
+		AspectRatio = 1.777f; // Default 16:9
 
 	// Calculate VFOV based on HFOV and AspectRatio
 	// tan(V/2) = tan(H/2) / AspectRatio
@@ -286,15 +373,16 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 
 	// Intersect with Z=0 Plane
 	// t = -CamZ / DirZ
-	auto IntersectGround = [&](const FVector& Dir) -> FVector2D {
+	auto IntersectGround = [&](const FVector& Dir) -> FVector2D
+	{
 		// Prevent divide by zero or looking up (Dir.Z should be negative)
-		if (Dir.Z >= -0.01f) 
+		if (Dir.Z >= -0.01f)
 		{
 			// Fallback: project forward a fixed distance if looking parallel/up
-			FVector Point = CamLoc + Dir * 5000.0f; 
+			FVector Point = CamLoc + Dir * 5000.0f;
 			return FVector2D(Point.X, Point.Y);
 		}
-		
+
 		float t = -CamLoc.Z / Dir.Z;
 		FVector Point = CamLoc + Dir * t;
 		return FVector2D(Point.X, Point.Y);
@@ -325,4 +413,3 @@ FBox2D AGS_RTSCamera::GetSimpleViewBounds() const
 
 	return ResultBounds;
 }
-
