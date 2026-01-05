@@ -22,9 +22,9 @@ public:
 
 	
 protected:
-	//[TODO] fix variable name
+	// 플레이어 정보 위젯을 담는 컨테이너 (VerticalBox)
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UVerticalBox> PlayerInfoWidgetList;
+	TObjectPtr<UVerticalBox> PlayerInfoContainer;
 
 	//[New - 6/19]
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
