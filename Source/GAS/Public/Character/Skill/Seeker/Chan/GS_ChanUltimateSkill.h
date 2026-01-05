@@ -17,7 +17,7 @@ UCLASS()
 class GAS_API UGS_ChanUltimateSkill : public UGS_SeekerSkillBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	UGS_ChanUltimateSkill();
 	virtual void ActiveSkill() override;
@@ -25,7 +25,7 @@ public:
 	virtual void OnSkillAnimationEnd() override;
 	virtual void InterruptSkill() override;
 
-	void HandleUltimateCollision(AActor* HitActor, UPrimitiveComponent* HitComp);
+	void HandleUltimateCollision(AActor* HitActor, UPrimitiveComponent* HitComp, const FHitResult& HitResult);
 
 protected:
 	// 공격
@@ -33,7 +33,7 @@ protected:
 	virtual void ApplyEffectToGuardian(AGS_Guardian* Target) override;
 
 private:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill Settings", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill Settings", meta = (AllowPrivateAccess = "true"))
 	float ChargeDistance = 1000.0f; // 돌진 거리
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill Settings", meta = (AllowPrivateAccess = "true"))
@@ -61,6 +61,8 @@ private:
 	FVector ChargeDirection;
 	FTimerHandle ChargeTimerHandle;
 	FTimerHandle ChargeUpdateTimerHandle;
+	FTimerHandle ChargeDelayTimerHandle;
+	FTimerHandle ForwardTraceTimerHandle; // 전방 장애물 감지용 타이머
 
 	// 캐릭터가 움직일 틱 간격 (예: 60FPS)
 	static constexpr float ChargeTickInterval = 0.016f;
@@ -78,6 +80,10 @@ private:
 	void EndCharge();
 
 	bool bInStructureCrash = false;
+	bool bIsCharging = false; // 돌진 중인지 여부
+
+	/** 전방 장애물 감지 (능동적 스윕 트레이스) */
+	void CheckForwardObstacle();
 
 	// 가디언용 넉백 설정
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill Settings", meta = (AllowPrivateAccess = "true"))

@@ -98,7 +98,10 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 	UAkAudioEvent* ActivateSound = nullptr;
 	if (ObscureData)
 	{
-		ActivateSound = SelectSoundEvent(ObscureData->ObscureActivateSound_TPS, ObscureData->ObscureActivateSound_RTS);
+		// Soft Reference 로드
+		UAkAudioEvent* ActivateSoundTPS = ObscureData->ObscureActivateSound_TPS.IsNull() ? nullptr : ObscureData->ObscureActivateSound_TPS.LoadSynchronous();
+		UAkAudioEvent* ActivateSoundRTS = ObscureData->ObscureActivateSound_RTS.IsNull() ? nullptr : ObscureData->ObscureActivateSound_RTS.LoadSynchronous();
+		ActivateSound = SelectSoundEvent(ActivateSoundTPS, ActivateSoundRTS);
 	}
 
 	const float ObscureDuration = GetEffectDuration();

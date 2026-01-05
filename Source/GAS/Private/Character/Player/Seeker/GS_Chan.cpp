@@ -41,6 +41,10 @@ AGS_Chan::AGS_Chan()
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Chan");
+
+	// 타격 보정 설정 (찬: 짧은 사거리, 넓은 유도각)
+	MagnetismDistance = 350.0f;
+	MagnetismAngle = 75.0f;
 }
 
 void AGS_Chan::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -107,10 +111,9 @@ void AGS_Chan::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AGS_Chan::OnUltimateOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (UGS_ChanUltimateSkill* Skill = Cast<UGS_ChanUltimateSkill>(
-		SkillComp->GetSkillFromSkillMap(ESkillSlot::Ultimate)))
+	        SkillComp->GetSkillFromSkillMap(ESkillSlot::Ultimate)))
 	{
-		Skill->HandleUltimateCollision(OtherActor, OtherComp);
-	
+		Skill->HandleUltimateCollision(OtherActor, OtherComp, SweepResult);
 	}
 }
 
@@ -149,7 +152,25 @@ void AGS_Chan::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
 	{
 		SeekerAudioComponent->PlayChanFinalAttackSound();
 	}
-	
+
+	// 조작감 개선: 콤보 인덱스별 차별화된 타격 정지(Hit-stop) 적용
+	// 멀티플레이 유의: 공격 흐름을 방해하지 않도록 시간을 이전보다 대폭 단축 (0.12 -> 0.05)
+	float BaseDuration = 0.05f;
+	float FinalDuration = BaseDuration;
+
+	if (ComboIndex == 4)
+	{
+		FinalDuration = 0.09f; // 피니셔: 짧고 강렬하게 강조
+	}
+	else
+	{
+		// 콤보 진행에 따른 점진적 강화 (최대 1.2배)
+		float Scale = 1.0f + (FMath::Min(2, FMath::Max(0, ComboIndex - 1)) * 0.1f);
+		FinalDuration = BaseDuration * Scale;
+	}
+
+	Multicast_ApplyHitStop(FinalDuration, 0.0f, true);
+
 	// 공격 성공 시 공격자에게 카메라 쉐이크 적용 (Chan 전용)
 	if (HasAuthority())
 	{
@@ -202,7 +223,7 @@ void AGS_Chan::ToIdle()
 
 void AGS_Chan::Client_UpdateChanAimingSkillBar_Implementation(float Stamina)
 {
-	if(ChanAimingSkillBarWidget)
+	if (ChanAimingSkillBarWidget)
 	{
 		ChanAimingSkillBarWidget->SetAimingProgress(Stamina);
 	}
@@ -240,7 +261,7 @@ void AGS_Chan::Multicast_DrawSkillRange_Implementation(FVector InLocation, float
 float AGS_Chan::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
 {
 	float ActualDamage = DamageAmount;
-	
+
 	// 방어 상태일 때는 스테미나 감소 (피격 애니메이션 방지)
 	if (bIsDefending)
 	{
@@ -283,12 +304,13 @@ void AGS_Chan::SetDefending(bool bDefending)
 {
 	if (HasAuthority())
 	{
-		if (bIsDefending == bDefending) return;
+		if (bIsDefending == bDefending)
+			return;
 
 		bIsDefending = bDefending;
 
 		GetWorldTimerManager().ClearTimer(StaminaHandle);
-		
+
 		// 방패의 방어용 콜리전 제어
 		for (int32 i = 0; i < 5; ++i)
 		{
@@ -312,7 +334,7 @@ void AGS_Chan::SetDefending(bool bDefending)
 				break;
 			}
 		}
-		
+
 		// 방어 상태에 따른 애니메이션 변경 (나중에 구현)
 		if (bDefending)
 		{
@@ -354,27 +376,27 @@ bool AGS_Chan::IsHitInShieldDefenseArea(const FVector& HitLocation) const
 				// 방패의 월드 위치와 방어용 콜리전 크기 가져오기
 				FVector ShieldLocation = Shield->GetActorLocation();
 				FVector ShieldForward = Shield->GetActorForwardVector();
-				
+
 				// 방패 방어 영역 계산 (방패 앞쪽 반구형 영역)
 				const float DefenseRadius = 200.0f; // 방패 방어 반경
-				const float DefenseAngle = 120.0f;  // 방패 방어 각도 (도)
-				
+				const float DefenseAngle = 120.0f; // 방패 방어 각도 (도)
+
 				// 타격 지점과 방패 사이의 거리 계산
 				FVector ToHit = HitLocation - ShieldLocation;
 				float Distance = ToHit.Size();
-				
+
 				// 거리가 방어 반경을 벗어나면 방어 불가
 				if (Distance > DefenseRadius)
 				{
 					return false;
 				}
-				
+
 				// 타격 지점이 방패 앞쪽에 있는지 확인 (각도 체크)
 				ToHit.Normalize();
 				float DotProduct = FVector::DotProduct(ShieldForward, ToHit);
 				float AngleInRadians = FMath::Acos(DotProduct);
 				float AngleInDegrees = FMath::RadiansToDegrees(AngleInRadians);
-				
+
 				// 방어 각도 내에 있으면 방어 가능
 				if (AngleInDegrees <= DefenseAngle * 0.5f)
 				{
@@ -384,7 +406,7 @@ bool AGS_Chan::IsHitInShieldDefenseArea(const FVector& HitLocation) const
 			break;
 		}
 	}
-	
+
 	// 방패를 찾지 못했거나 방어 영역 밖이면 방어 불가
 	return false;
 }

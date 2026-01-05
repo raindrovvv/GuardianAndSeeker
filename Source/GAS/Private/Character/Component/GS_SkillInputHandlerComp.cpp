@@ -18,7 +18,8 @@ UGS_SkillInputHandlerComp::UGS_SkillInputHandlerComp()
 
 void UGS_SkillInputHandlerComp::SetupEnhancedInput(UInputComponent* PlayerInputComponent)
 {
-	if (!OwnerCharacter) OwnerCharacter = Cast<AGS_Player>(GetOwner());
+	if (!OwnerCharacter)
+		OwnerCharacter = Cast<AGS_Player>(GetOwner());
 
 	if (APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController()))
 	{
@@ -79,7 +80,7 @@ void UGS_SkillInputHandlerComp::BeginPlay()
 	{
 		OwnerCharacter = Cast<AGS_Player>(GetOwner());
 	}
-	
+
 	check(OwnerCharacter);
 }
 
@@ -91,7 +92,7 @@ void UGS_SkillInputHandlerComp::OnRightClick(const FInputActionInstance& Instanc
 	{
 		return;
 	}
-	
+
 	if (!OwnerCharacter || !OwnerCharacter->GetSkillComp())
 	{
 		return;
@@ -104,6 +105,15 @@ void UGS_SkillInputHandlerComp::OnRightClick(const FInputActionInstance& Instanc
 	else
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("Right Click"));
+	}
+
+	// 입력 버퍼링을 위해 입력 시간 기록 (시커인 경우)
+	if (OwnerCharacter->IsLocallyControlled())
+	{
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+		{
+			Seeker->LastInputTime = GetWorld()->GetTimeSeconds();
+		}
 	}
 }
 
@@ -126,7 +136,14 @@ void UGS_SkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Instance
 	}
 	else
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("Left Click"));
+		// 입력 버퍼링을 위해 입력 시간 기록
+		if (OwnerCharacter->IsLocallyControlled())
+		{
+			if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+			{
+				Seeker->LastInputTime = GetWorld()->GetTimeSeconds();
+			}
+		}
 	}
 }
 
@@ -182,17 +199,18 @@ void UGS_SkillInputHandlerComp::OnKeyReset(const struct FInputActionInstance& In
 
 void UGS_SkillInputHandlerComp::OnHealSkill(const FInputActionInstance& Instance)
 {
-    if (!OwnerCharacter || OwnerCharacter->IsDead()) return;
+	if (!OwnerCharacter || OwnerCharacter->IsDead())
+		return;
 
-    UGS_SkillComp* SkillComp = OwnerCharacter->GetSkillComp();
-    if (!SkillComp) return;
+	UGS_SkillComp* SkillComp = OwnerCharacter->GetSkillComp();
+	if (!SkillComp)
+		return;
 
-    // Ready 슬롯(힐 스킬)의 스킬 객체 가져옴
-    UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(SkillComp->GetSkillFromSkillMap(ESkillSlot::HealPotion));
-    if (!HealSkill) return;
+	// Ready 슬롯(힐 스킬)의 스킬 객체 가져옴
+	UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(SkillComp->GetSkillFromSkillMap(ESkillSlot::HealPotion));
+	if (!HealSkill)
+		return;
 
-    // 클라이언트에서 먼저 스킬 사용 가능 여부 검사
+	// 클라이언트에서 먼저 스킬 사용 가능 여부 검사
 	SkillComp->Server_TryActivateSkill(ESkillSlot::HealPotion);
-
 }
-

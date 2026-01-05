@@ -34,8 +34,10 @@ void UGS_AresAimingSkill::ActiveSkill()
 			}
 		}
 
-		// 스킬 애니메이션 재생
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 
 		// 입력 제한
 		CachedAresOwner->SetMoveControlValue(false, false);
@@ -132,11 +134,12 @@ void UGS_AresAimingSkill::SpawnFirstProjectile()
 	// 궁극기 활성화 상태에 따라 투사체 모양 설정
 	if (ProjectileA)
 	{
-		ProjectileA->EffectType = bIsBerserker
+		ESwordAuraEffectType SelectedEffectType = bIsBerserker
 			? ESwordAuraEffectType::LeftBuff
 			: ESwordAuraEffectType::LeftNormal;
+		ProjectileA->EffectType = SelectedEffectType;
 		UGameplayStatics::FinishSpawningActor(ProjectileA, SpawnTransform);
-		ProjectileA->Multicast_StartSwordSlashVFX();
+		ProjectileA->Multicast_StartSwordSlashVFX(SelectedEffectType);
 	}
 
 	// 두 번째 발사 (90도 회전 방향)
@@ -186,14 +189,15 @@ void UGS_AresAimingSkill::SpawnSecondProjectile()
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn
 	);
 
-	// 궁극기 활성화 상태에 따라 투사체 모양 설정 
+	// 궁극기 활성화 상태에 따라 투사체 모양 설정
 	if (ProjectileB)
 	{
-		ProjectileB->EffectType = bIsBerserker
+		ESwordAuraEffectType SelectedEffectType = bIsBerserker
 			? ESwordAuraEffectType::RightBuff
 			: ESwordAuraEffectType::RightNormal;
+		ProjectileB->EffectType = SelectedEffectType;
 		UGameplayStatics::FinishSpawningActor(ProjectileB, SpawnTransform);
-		ProjectileB->Multicast_StartSwordSlashVFX();
+		ProjectileB->Multicast_StartSwordSlashVFX(SelectedEffectType);
 	}
 	
 	// 스킬 종료

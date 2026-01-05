@@ -33,8 +33,11 @@ void UGS_HealSkill::ActiveSkill()
 		ShowPotionDepletedEffect();
 		return;
 	}
-	
-	OwnerCharacter->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+
+	if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+	{
+		OwnerCharacter->Multicast_PlaySkillMontage(LoadedMontage);
+	}
 	bIsCoolingDown = true;
 
 	// 캐싱
@@ -267,7 +270,10 @@ int32 UGS_HealSkill::GetMaxHealCount()
 	if (Seeker->GetWeaponHandlingState() == EWeaponHandlingState::Sheathing)
 	{
 		Seeker->Multicast_SetMontageSlot(ESeekerMontageSlot::UpperBody);
-		Seeker->Multicast_PlaySkillMontage(SkillAnimMontages[2]); // // Hard coding // SJE
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(2))
+		{
+			Seeker->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 		Seeker->SetWeaponHandlingState(EWeaponHandlingState::Wielding);
 	}
 }*/

@@ -39,7 +39,7 @@ void UGS_DrakharVFXComponent::BeginPlay()
 	if (OwnerDrakhar)
 	{
 		FootManagerComponent = OwnerDrakhar->FindComponentByClass<UGS_FootManagerComponent>();
-		
+
 		// Find Arrow Components by name
 		TArray<UArrowComponent*> ArrowComponents;
 		OwnerDrakhar->GetComponents<UArrowComponent>(ArrowComponents);
@@ -54,7 +54,6 @@ void UGS_DrakharVFXComponent::BeginPlay()
 				EarthquakeVFXSpawnPoint = Arrow;
 			}
 		}
-		
 	}
 }
 
@@ -81,14 +80,14 @@ void UGS_DrakharVFXComponent::UpdateFlyingDustVFXLocation()
 		if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, Params))
 		{
 			ActiveFlyingDustVFXComponent->SetWorldLocation(HitResult.ImpactPoint);
-			if(!ActiveFlyingDustVFXComponent->IsActive())
+			if (!ActiveFlyingDustVFXComponent->IsActive())
 			{
 				ActiveFlyingDustVFXComponent->Activate(true);
 			}
 		}
 		else
 		{
-			if(ActiveFlyingDustVFXComponent->IsActive())
+			if (ActiveFlyingDustVFXComponent->IsActive())
 			{
 				ActiveFlyingDustVFXComponent->Deactivate();
 			}
@@ -98,12 +97,16 @@ void UGS_DrakharVFXComponent::UpdateFlyingDustVFXLocation()
 
 void UGS_DrakharVFXComponent::OnFlyStart()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld()->GetNetMode() == NM_DedicatedServer) { return; }
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
 
 	if (OwnerDrakhar->FlyingDustVFX && !IsValid(ActiveFlyingDustVFXComponent))
 	{
-		FVector Location = OwnerDrakhar->GetActorLocation() - FVector(0,0,OwnerDrakhar->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		FVector Location = OwnerDrakhar->GetActorLocation() - FVector(0, 0, OwnerDrakhar->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 
 		// VFX 거리 기반 컬링 (비행 먼지 VFX)
 		if (!OwnerDrakhar->ShouldPlayVFXAtLocation(Location, 4000.0f))
@@ -112,18 +115,18 @@ void UGS_DrakharVFXComponent::OnFlyStart()
 		}
 
 		ActiveFlyingDustVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->FlyingDustVFX, Location);
-		if(ActiveFlyingDustVFXComponent)
+		if (ActiveFlyingDustVFXComponent)
 		{
 			ActiveFlyingDustVFXComponent->SetAutoDestroy(false);
 			ActiveFlyingDustVFXComponent->Deactivate();
 
-            // Timer 시작 (설정 간격마다 위치 업데이트)
+			// Timer 시작 (설정 간격마다 위치 업데이트)
 			GetWorld()->GetTimerManager().SetTimer(
-				FlyingDustUpdateTimerHandle,
-				this,
-				&UGS_DrakharVFXComponent::UpdateFlyingDustVFXLocation,
-                FlyingDustUpdateInterval,
-				true  // Loop
+			    FlyingDustUpdateTimerHandle,
+			    this,
+			    &UGS_DrakharVFXComponent::UpdateFlyingDustVFXLocation,
+			    FlyingDustUpdateInterval,
+			    true // Loop
 			);
 		}
 	}
@@ -133,8 +136,12 @@ void UGS_DrakharVFXComponent::OnFlyStart()
 
 void UGS_DrakharVFXComponent::OnFlyEnd()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld()->GetNetMode() == NM_DedicatedServer) { return; }
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
 
 	// Timer 중지
 	if (GetWorld())
@@ -168,18 +175,20 @@ void UGS_DrakharVFXComponent::OnEarthquakeStart()
 		{
 			CameraShakeComponent->PlayCameraShake(OwnerDrakhar->EarthquakeShakeInfo);
 		}
-		
+
 		StartGroundCrackVFX();
 		StartDustCloudVFX();
-		
+
 		OwnerDrakhar->BP_OnEarthquakeStart();
 	}
 }
 
 void UGS_DrakharVFXComponent::StartWingRushVFX()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveWingRushVFXComponent && IsValid(ActiveWingRushVFXComponent))
 	{
@@ -188,7 +197,8 @@ void UGS_DrakharVFXComponent::StartWingRushVFX()
 	}
 
 	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverWingRushRibbonVFX : OwnerDrakhar->WingRushRibbonVFX;
-	if (!VFXToSpawn) return;
+	if (!VFXToSpawn)
+		return;
 
 	if (WingRushVFXSpawnPoint && IsValid(WingRushVFXSpawnPoint))
 	{
@@ -204,41 +214,44 @@ void UGS_DrakharVFXComponent::StartWingRushVFX()
 		FVector CurrentDashDirection = (OwnerDrakhar->DashEndLocation - OwnerDrakhar->DashStartLocation).GetSafeNormal();
 		if (!CurrentDashDirection.IsZero())
 		{
-            ActiveWingRushVFXComponent->SetVectorParameter(Param_DashDirection, CurrentDashDirection);
+			ActiveWingRushVFXComponent->SetVectorParameter(Param_DashDirection, CurrentDashDirection);
 		}
 
 		float DashSpeed = OwnerDrakhar->DashPower / OwnerDrakhar->DashDuration;
-        ActiveWingRushVFXComponent->SetFloatParameter(Param_DashSpeed, DashSpeed);
-        ActiveWingRushVFXComponent->SetFloatParameter(Param_Scale, 2.0f);
+		ActiveWingRushVFXComponent->SetFloatParameter(Param_DashSpeed, DashSpeed);
+		ActiveWingRushVFXComponent->SetFloatParameter(Param_Scale, 2.0f);
 		ActiveWingRushVFXComponent->SetWorldScale3D(FVector(3.0f, 3.0f, 3.0f));
 	}
 }
 
 void UGS_DrakharVFXComponent::StopWingRushVFX()
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveWingRushVFXComponent && IsValid(ActiveWingRushVFXComponent))
 	{
 		ActiveWingRushVFXComponent->Deactivate();
 		FTimerHandle VFXCleanupTimer;
 		TWeakObjectPtr<UGS_DrakharVFXComponent> WeakThis = this;
-        GetWorld()->GetTimerManager().SetTimer(VFXCleanupTimer, [WeakThis]() {
+		GetWorld()->GetTimerManager().SetTimer(VFXCleanupTimer, [WeakThis]()
+		                                       {
 			if (!WeakThis.IsValid()) return;
 
 			if (WeakThis->ActiveWingRushVFXComponent && IsValid(WeakThis->ActiveWingRushVFXComponent))
 			{
 				WeakThis->ActiveWingRushVFXComponent->DestroyComponent();
 			}
-			WeakThis->ActiveWingRushVFXComponent = nullptr;
-        }, WingRushCleanupDelay, false);
+			WeakThis->ActiveWingRushVFXComponent = nullptr; }, WingRushCleanupDelay, false);
 	}
 }
 
 void UGS_DrakharVFXComponent::StartDustVFX()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveDustVFXComponent && IsValid(ActiveDustVFXComponent))
 	{
@@ -247,7 +260,8 @@ void UGS_DrakharVFXComponent::StartDustVFX()
 	}
 
 	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverDustVFX : OwnerDrakhar->DustVFX;
-	if (!VFXToSpawn) return;
+	if (!VFXToSpawn)
+		return;
 
 	if (WingRushVFXSpawnPoint && IsValid(WingRushVFXSpawnPoint))
 	{
@@ -263,41 +277,44 @@ void UGS_DrakharVFXComponent::StartDustVFX()
 		FVector CurrentDashDirection = (OwnerDrakhar->DashEndLocation - OwnerDrakhar->DashStartLocation).GetSafeNormal();
 		if (!CurrentDashDirection.IsZero())
 		{
-            ActiveDustVFXComponent->SetVectorParameter(Param_DashDirection, CurrentDashDirection);
+			ActiveDustVFXComponent->SetVectorParameter(Param_DashDirection, CurrentDashDirection);
 		}
 
 		float DashSpeed = OwnerDrakhar->DashPower / OwnerDrakhar->DashDuration;
-        ActiveDustVFXComponent->SetFloatParameter(Param_DashSpeed, DashSpeed);
-        ActiveDustVFXComponent->SetFloatParameter(Param_DustIntensity, 3.0f);
+		ActiveDustVFXComponent->SetFloatParameter(Param_DashSpeed, DashSpeed);
+		ActiveDustVFXComponent->SetFloatParameter(Param_DustIntensity, 3.0f);
 		ActiveDustVFXComponent->SetWorldScale3D(FVector(2.0f, 2.0f, 2.0f));
 	}
 }
 
 void UGS_DrakharVFXComponent::StopDustVFX()
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveDustVFXComponent && IsValid(ActiveDustVFXComponent))
 	{
 		ActiveDustVFXComponent->Deactivate();
 		FTimerHandle DustVFXCleanupTimer;
 		TWeakObjectPtr<UGS_DrakharVFXComponent> WeakThis = this;
-        GetWorld()->GetTimerManager().SetTimer(DustVFXCleanupTimer, [WeakThis]() {
+		GetWorld()->GetTimerManager().SetTimer(DustVFXCleanupTimer, [WeakThis]()
+		                                       {
 			if (!WeakThis.IsValid()) return;
 
 			if (WeakThis->ActiveDustVFXComponent && IsValid(WeakThis->ActiveDustVFXComponent))
 			{
 				WeakThis->ActiveDustVFXComponent->DestroyComponent();
 			}
-			WeakThis->ActiveDustVFXComponent = nullptr;
-        }, DustCleanupDelay, false);
+			WeakThis->ActiveDustVFXComponent = nullptr; }, DustCleanupDelay, false);
 	}
 }
 
 void UGS_DrakharVFXComponent::StartGroundCrackVFX()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveGroundCrackVFXComponent && IsValid(ActiveGroundCrackVFXComponent))
 	{
@@ -305,7 +322,8 @@ void UGS_DrakharVFXComponent::StartGroundCrackVFX()
 		ActiveGroundCrackVFXComponent = nullptr;
 	}
 
-	if (!OwnerDrakhar->GroundCrackVFX) return;
+	if (!OwnerDrakhar->GroundCrackVFX)
+		return;
 
 	if (EarthquakeVFXSpawnPoint && IsValid(EarthquakeVFXSpawnPoint))
 	{
@@ -319,37 +337,40 @@ void UGS_DrakharVFXComponent::StartGroundCrackVFX()
 
 	if (ActiveGroundCrackVFXComponent)
 	{
-        ActiveGroundCrackVFXComponent->SetFloatParameter(Param_CrackIntensity, OwnerDrakhar->EarthquakeShakeInfo.Intensity);
-        ActiveGroundCrackVFXComponent->SetFloatParameter(Param_CrackRadius, OwnerDrakhar->EarthquakeShakeInfo.MaxDistance * 0.5f);
+		ActiveGroundCrackVFXComponent->SetFloatParameter(Param_CrackIntensity, OwnerDrakhar->EarthquakeShakeInfo.Intensity);
+		ActiveGroundCrackVFXComponent->SetFloatParameter(Param_CrackRadius, OwnerDrakhar->EarthquakeShakeInfo.MaxDistance * 0.5f);
 		ActiveGroundCrackVFXComponent->SetWorldScale3D(FVector(2.0f, 2.0f, 1.0f));
 	}
 }
 
 void UGS_DrakharVFXComponent::StopGroundCrackVFX()
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveGroundCrackVFXComponent && IsValid(ActiveGroundCrackVFXComponent))
 	{
 		ActiveGroundCrackVFXComponent->Deactivate();
 		FTimerHandle GroundCrackVFXCleanupTimer;
 		TWeakObjectPtr<UGS_DrakharVFXComponent> WeakThis = this;
-        GetWorld()->GetTimerManager().SetTimer(GroundCrackVFXCleanupTimer, [WeakThis]() {
+		GetWorld()->GetTimerManager().SetTimer(GroundCrackVFXCleanupTimer, [WeakThis]()
+		                                       {
             if (!WeakThis.IsValid()) return;
 
             if (WeakThis->ActiveGroundCrackVFXComponent && IsValid(WeakThis->ActiveGroundCrackVFXComponent))
             {
                 WeakThis->ActiveGroundCrackVFXComponent->DestroyComponent();
             }
-            WeakThis->ActiveGroundCrackVFXComponent = nullptr;
-        }, GroundCrackCleanupDelay, false);
+            WeakThis->ActiveGroundCrackVFXComponent = nullptr; }, GroundCrackCleanupDelay, false);
 	}
 }
 
 void UGS_DrakharVFXComponent::StartDustCloudVFX()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveDustCloudVFXComponent && IsValid(ActiveDustCloudVFXComponent))
 	{
@@ -357,7 +378,8 @@ void UGS_DrakharVFXComponent::StartDustCloudVFX()
 		ActiveDustCloudVFXComponent = nullptr;
 	}
 
-	if (!OwnerDrakhar->DustCloudVFX) return;
+	if (!OwnerDrakhar->DustCloudVFX)
+		return;
 
 	if (EarthquakeVFXSpawnPoint && IsValid(EarthquakeVFXSpawnPoint))
 	{
@@ -371,9 +393,9 @@ void UGS_DrakharVFXComponent::StartDustCloudVFX()
 
 	if (ActiveDustCloudVFXComponent)
 	{
-        ActiveDustCloudVFXComponent->SetFloatParameter(Param_DustIntensity, OwnerDrakhar->EarthquakeShakeInfo.Intensity * 1.5f);
-        ActiveDustCloudVFXComponent->SetFloatParameter(Param_DustRadius, OwnerDrakhar->EarthquakeShakeInfo.MaxDistance * 0.3f);
-        ActiveDustCloudVFXComponent->SetFloatParameter(Param_WindStrength, 5.0f);
+		ActiveDustCloudVFXComponent->SetFloatParameter(Param_DustIntensity, OwnerDrakhar->EarthquakeShakeInfo.Intensity * 1.5f);
+		ActiveDustCloudVFXComponent->SetFloatParameter(Param_DustRadius, OwnerDrakhar->EarthquakeShakeInfo.MaxDistance * 0.3f);
+		ActiveDustCloudVFXComponent->SetFloatParameter(Param_WindStrength, 5.0f);
 		ActiveDustCloudVFXComponent->SetWorldScale3D(FVector(3.0f, 3.0f, 2.0f));
 
 		FTimerHandle DustCloudAutoStopTimer;
@@ -383,29 +405,32 @@ void UGS_DrakharVFXComponent::StartDustCloudVFX()
 
 void UGS_DrakharVFXComponent::StopDustCloudVFX()
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (ActiveDustCloudVFXComponent && IsValid(ActiveDustCloudVFXComponent))
 	{
 		ActiveDustCloudVFXComponent->Deactivate();
 		FTimerHandle DustCloudVFXCleanupTimer;
 		TWeakObjectPtr<UGS_DrakharVFXComponent> WeakThis = this;
-		GetWorld()->GetTimerManager().SetTimer(DustCloudVFXCleanupTimer, [WeakThis]() {
+		GetWorld()->GetTimerManager().SetTimer(DustCloudVFXCleanupTimer, [WeakThis]()
+		                                       {
 			if (!WeakThis.IsValid()) return;
 
 			if (WeakThis->ActiveDustCloudVFXComponent && IsValid(WeakThis->ActiveDustCloudVFXComponent))
 			{
 				WeakThis->ActiveDustCloudVFXComponent->DestroyComponent();
 			}
-			WeakThis->ActiveDustCloudVFXComponent = nullptr;
-		}, 1.5f, false);
+			WeakThis->ActiveDustCloudVFXComponent = nullptr; }, 1.5f, false);
 	}
 }
 
 void UGS_DrakharVFXComponent::PlayAttackHitVFX(FVector ImpactPoint)
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	// VFX 거리 기반 컬링
 	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactPoint, 4000.0f))
@@ -422,7 +447,8 @@ void UGS_DrakharVFXComponent::PlayAttackHitVFX(FVector ImpactPoint)
 
 void UGS_DrakharVFXComponent::PlayEarthquakeImpactVFX(const FVector& ImpactLocation)
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	// VFX 거리 기반 컬링 (스킬 이펙트)
 	if (OwnerDrakhar && !OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
@@ -438,7 +464,8 @@ void UGS_DrakharVFXComponent::PlayEarthquakeImpactVFX(const FVector& ImpactLocat
 
 void UGS_DrakharVFXComponent::PlayFeverEarthquakeImpactVFX(const FVector& ImpactLocation)
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	// VFX 거리 기반 컬링 (궁극기 이펙트)
 	if (OwnerDrakhar && !OwnerDrakhar->ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
@@ -454,11 +481,12 @@ void UGS_DrakharVFXComponent::PlayFeverEarthquakeImpactVFX(const FVector& Impact
 
 void UGS_DrakharVFXComponent::HandleDraconicProjectileImpact(const FVector& ImpactLocation, const FVector& ImpactNormal, bool bHitCharacter)
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer || !OwnerDrakhar) return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer || !OwnerDrakhar)
+		return;
 
 	// 피버모드 상태 확인
 	bool bIsFeverMode = OwnerDrakhar->GetIsFeverMode();
-	
+
 	// 피버모드와 노멀모드에 따라 다른 VFX 선택
 	UNiagaraSystem* VFXToPlay = nullptr;
 	if (bHitCharacter)
@@ -471,31 +499,30 @@ void UGS_DrakharVFXComponent::HandleDraconicProjectileImpact(const FVector& Impa
 		// 일반 임팩트 VFX
 		VFXToPlay = bIsFeverMode ? OwnerDrakhar->FeverDraconicProjectileImpactVFX : OwnerDrakhar->DraconicProjectileImpactVFX;
 	}
-	
+
 	if (VFXToPlay && GetWorld())
 	{
 		// 피버모드에 따른 VFX 스케일 및 강도 조정
 		float BaseScale = bHitCharacter ? 1.5f : 1.0f;
 		float FeverModeMultiplier = bIsFeverMode ? 1.5f : 1.0f;
 		float FinalScale = BaseScale * FeverModeMultiplier;
-		
+
 		float BaseIntensity = bHitCharacter ? 2.0f : 1.0f;
 		float FinalIntensity = BaseIntensity * (bIsFeverMode ? 1.3f : 1.0f);
-		
+
 		UNiagaraComponent* ImpactVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			ImpactLocation,
-			FRotationMatrix::MakeFromZ(ImpactNormal).Rotator(),
-			FVector(FinalScale, FinalScale, FinalScale),
-			true, true, ENCPoolMethod::AutoRelease, true
-		);
-		
+		    GetWorld(),
+		    VFXToPlay,
+		    ImpactLocation,
+		    FRotationMatrix::MakeFromZ(ImpactNormal).Rotator(),
+		    FVector(FinalScale, FinalScale, FinalScale),
+		    true, true, ENCPoolMethod::AutoRelease, true);
+
 		if (ImpactVFXComponent)
 		{
 			ImpactVFXComponent->SetVectorParameter(FName("ImpactNormal"), ImpactNormal);
 			ImpactVFXComponent->SetFloatParameter(FName("ImpactIntensity"), FinalIntensity);
-			
+
 			// 피버모드에 따른 색상 변경
 			FLinearColor ImpactColor;
 			if (bIsFeverMode)
@@ -509,7 +536,7 @@ void UGS_DrakharVFXComponent::HandleDraconicProjectileImpact(const FVector& Impa
 				ImpactColor = bHitCharacter ? FLinearColor::Red : FLinearColor(1.0f, 0.5f, 0.0f, 1.0f);
 			}
 			ImpactVFXComponent->SetColorParameter(FName("ImpactColor"), ImpactColor);
-			
+
 			// 피버모드 시 추가적인 파라미터 설정
 			if (bIsFeverMode)
 			{
@@ -554,7 +581,7 @@ void UGS_DrakharVFXComponent::OnFeverModeChanged(bool bIsFeverMode)
 	{
 		RemoveFeverModeOverlay();
 	}
-	
+
 	if (OwnerDrakhar && OwnerDrakhar->HasAuthority() && !bIsFeverMode)
 	{
 		if (IsValid(ActiveDustVFXComponent) && ActiveDustVFXComponent->GetAsset() == OwnerDrakhar->FeverDustVFX)
@@ -566,13 +593,17 @@ void UGS_DrakharVFXComponent::OnFeverModeChanged(bool bIsFeverMode)
 
 void UGS_DrakharVFXComponent::ApplyFeverModeOverlay()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
-	
-	if (!OwnerDrakhar->FeverModeOverlayMaterial) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
+
+	if (!OwnerDrakhar->FeverModeOverlayMaterial)
+		return;
 
 	USkeletalMeshComponent* MeshComp = OwnerDrakhar->GetMesh();
-	if (!MeshComp) return;
+	if (!MeshComp)
+		return;
 
 	if (!FeverModeOverlayMID)
 	{
@@ -589,8 +620,10 @@ void UGS_DrakharVFXComponent::ApplyFeverModeOverlay()
 
 void UGS_DrakharVFXComponent::RemoveFeverModeOverlay()
 {
-	if (!OwnerDrakhar) return;
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) return;
+	if (!OwnerDrakhar)
+		return;
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		return;
 
 	if (USkeletalMeshComponent* MeshComp = OwnerDrakhar->GetMesh())
 	{
@@ -598,314 +631,3 @@ void UGS_DrakharVFXComponent::RemoveFeverModeOverlay()
 	}
 	FeverModeOverlayMID = nullptr;
 }
-
-// ======================
-// 디버프 VFX 함수 구현
-// ======================
-
-void UGS_DrakharVFXComponent::PlayDebuffVFX(EDebuffType DebuffType)
-{
-	if (!OwnerDrakhar || !OwnerDrakhar->HasAuthority()) return;
-
-	UNiagaraSystem* VFXToPlay = GetDebuffVFX(DebuffType);
-	if (!VFXToPlay) return;
-
-	// 기존 VFX 제거
-	RemoveDebuffVFX(DebuffType);
-
-	// 새로운 VFX 스폰 위치 및 스케일 계산
-	FVector Offset = GetDebuffVFXOffset(DebuffType);
-	FVector SpawnLocation = OwnerDrakhar->GetActorLocation() + Offset;
-	FVector Scale = GetDebuffVFXScale(DebuffType);
-
-	// 지속시간 설정
-	float Duration = GetDebuffVFXDuration(DebuffType);
-	if (Duration > 0.f)
-	{
-		// 현재 제거할 디버프 타입 설정
-		CurrentDebuffToRemove = DebuffType;
-
-		GetWorld()->GetTimerManager().SetTimer(
-			DebuffVFXTimerHandles.FindOrAdd(DebuffType),
-			this,
-			&UGS_DrakharVFXComponent::RemoveDebuffVFXTimerCallback,
-			Duration,
-			false
-		);
-	}
-
-	// 멀티캐스트로 모든 클라이언트(서버 포함)에서 VFX 생성
-	Multicast_PlayDebuffVFX(DebuffType, SpawnLocation, Scale);
-}
-
-void UGS_DrakharVFXComponent::RemoveDebuffVFX(EDebuffType DebuffType)
-{
-	if (UNiagaraComponent** VFXComponent = ActiveDebuffVFXComponents.Find(DebuffType))
-	{
-		if (*VFXComponent && IsValid(*VFXComponent))
-		{
-			(*VFXComponent)->Deactivate();
-			(*VFXComponent)->DestroyComponent();
-		}
-		ActiveDebuffVFXComponents.Remove(DebuffType);
-	}
-
-	// 타이머 제거
-	FTimerHandle* TimerHandle = DebuffVFXTimerHandles.Find(DebuffType);
-	if (TimerHandle && GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(*TimerHandle))
-	{
-		GetWorld()->GetTimerManager().ClearTimer(*TimerHandle);
-	}
-	DebuffVFXTimerHandles.Remove(DebuffType);
-
-	// 클라이언트들에게 알림
-	if (OwnerDrakhar && OwnerDrakhar->HasAuthority())
-	{
-		Multicast_RemoveDebuffVFX(DebuffType);
-	}
-}
-
-void UGS_DrakharVFXComponent::PlayDebuffExpireVFX(EDebuffType DebuffType)
-{
-	if (!OwnerDrakhar || !OwnerDrakhar->HasAuthority()) return;
-
-	UNiagaraSystem* VFXToPlay = GetDebuffExpireVFX(DebuffType);
-	if (!VFXToPlay)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("PlayDebuffExpireVFX: No Expire VFX found for debuff type: %d"), static_cast<uint8>(DebuffType));
-		return;
-	}
-
-	FVector Offset = GetDebuffExpireVFXOffset(DebuffType);
-	FVector SpawnLocation = OwnerDrakhar->GetActorLocation() + Offset;
-	FVector Scale = GetDebuffVFXScale(DebuffType);
-
-	UE_LOG(LogTemp, Warning, TEXT("PlayDebuffExpireVFX: Playing Expire VFX for type %d at location %s"), static_cast<uint8>(DebuffType), *SpawnLocation.ToString());
-
-	// 멀티캐스트로 모든 클라이언트(서버 포함)에서 VFX 생성
-	Multicast_PlayDebuffExpireVFX(DebuffType, SpawnLocation, Scale);
-}
-
-void UGS_DrakharVFXComponent::RemoveAllDebuffVFX()
-{
-	TArray<EDebuffType> ActiveDebuffTypes;
-	ActiveDebuffVFXComponents.GetKeys(ActiveDebuffTypes);
-
-	for (EDebuffType DebuffType : ActiveDebuffTypes)
-	{
-		RemoveDebuffVFX(DebuffType);
-	}
-}
-
-bool UGS_DrakharVFXComponent::IsDebuffVFXActive(EDebuffType DebuffType) const
-{
-	return ActiveDebuffVFXComponents.Contains(DebuffType);
-}
-
-// ======================
-// 디버프 VFX 헬퍼 함수 구현
-// ======================
-
-float UGS_DrakharVFXComponent::GetDebuffVFXDuration(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (const float* OverrideDuration = OverrideDebuffVFXDurationMap.Find(DebuffType))
-	{
-		return *OverrideDuration;
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffVFXDurationMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffVFXDurationMap[DebuffType];
-	}
-
-	// 기본값 반환
-	return 5.0f;
-}
-
-FVector UGS_DrakharVFXComponent::GetDebuffVFXScale(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (const FVector* OverrideScale = OverrideDebuffVFXScaleMap.Find(DebuffType))
-	{
-		return *OverrideScale;
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffVFXScaleMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffVFXScaleMap[DebuffType];
-	}
-
-	// 기본값 반환
-	return FVector(1.0f, 1.0f, 1.0f);
-}
-
-FVector UGS_DrakharVFXComponent::GetDebuffVFXOffset(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (const FVector* OverrideOffset = OverrideDebuffVFXOffsetMap.Find(DebuffType))
-	{
-		return *OverrideOffset;
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffVFXOffsetMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffVFXOffsetMap[DebuffType];
-	}
-
-	// 기본값 반환 (Z축으로 50 유닛 위)
-	return FVector(0.f, 0.f, 50.f);
-}
-
-FVector UGS_DrakharVFXComponent::GetDebuffExpireVFXOffset(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (const FVector* OverrideOffset = OverrideDebuffExpireVFXOffsetMap.Find(DebuffType))
-	{
-		return *OverrideOffset;
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffExpireVFXOffsetMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffExpireVFXOffsetMap[DebuffType];
-	}
-
-	// 기본값 반환 (Z축으로 50 유닛 위)
-	return FVector(0.f, 0.f, 50.f);
-}
-
-UNiagaraSystem* UGS_DrakharVFXComponent::GetDebuffVFX(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (OverrideDebuffVFXMap.Contains(DebuffType))
-	{
-		return OverrideDebuffVFXMap[DebuffType];
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffVFXMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffVFXMap[DebuffType];
-	}
-
-	return nullptr;
-}
-
-UNiagaraSystem* UGS_DrakharVFXComponent::GetDebuffExpireVFX(EDebuffType DebuffType) const
-{
-	// 오버라이드 설정 우선 확인
-	if (OverrideDebuffExpireVFXMap.Contains(DebuffType))
-	{
-		return OverrideDebuffExpireVFXMap[DebuffType];
-	}
-
-	// 데이터 에셋 설정 확인
-	if (DebuffVFXSettings && DebuffVFXSettings->DebuffExpireVFXMap.Contains(DebuffType))
-	{
-		return DebuffVFXSettings->DebuffExpireVFXMap[DebuffType];
-	}
-
-	return nullptr;
-}
-
-void UGS_DrakharVFXComponent::RemoveDebuffVFXTimerCallback()
-{
-	RemoveDebuffVFX(CurrentDebuffToRemove);
-}
-
-// ======================
-// 디버프 VFX 멀티캐스트 함수 구현
-// ======================
-
-void UGS_DrakharVFXComponent::Multicast_PlayDebuffVFX_Implementation(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale)
-{
-	if (!OwnerDrakhar || GetWorld()->GetNetMode() == NM_DedicatedServer) return;
-
-	// VFX 거리 기반 컬링 (디버프 VFX)
-	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
-	{
-		return;
-	}
-
-	UNiagaraSystem* VFXToPlay = GetDebuffVFX(DebuffType);
-	if (!VFXToPlay) return;
-
-	// SpawnSystemAtLocation을 사용하여 오프셋이 적용된 위치에 VFX 생성
-	UNiagaraComponent* VFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		GetWorld(),
-		VFXToPlay,
-		SpawnLocation,
-		FRotator::ZeroRotator,
-		Scale,
-		true,                // bAutoDestroy
-		true,                // bAutoActivate
-		ENCPoolMethod::None, // PoolingMethod
-		true                 // bPreCullCheck
-	);
-
-	if (VFXComponent)
-	{
-		ActiveDebuffVFXComponents.Add(DebuffType, VFXComponent);
-	}
-}
-
-void UGS_DrakharVFXComponent::Multicast_RemoveDebuffVFX_Implementation(EDebuffType DebuffType)
-{
-	if (GetWorld()->GetNetMode() == NM_DedicatedServer) return;
-
-	if (UNiagaraComponent** VFXComponent = ActiveDebuffVFXComponents.Find(DebuffType))
-	{
-		if (*VFXComponent && IsValid(*VFXComponent))
-		{
-			(*VFXComponent)->Deactivate();
-		}
-		ActiveDebuffVFXComponents.Remove(DebuffType);
-	}
-}
-
-void UGS_DrakharVFXComponent::Multicast_PlayDebuffExpireVFX_Implementation(EDebuffType DebuffType, FVector SpawnLocation, FVector Scale)
-{
-	if (!OwnerDrakhar) return;
-
-	// VFX 거리 기반 컬링 (디버프 만료 VFX)
-	if (!OwnerDrakhar->ShouldPlayVFXAtLocation(SpawnLocation, 4000.0f))
-	{
-		return;
-	}
-
-	UNiagaraSystem* VFXToPlay = GetDebuffExpireVFX(DebuffType);
-	if (!VFXToPlay)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Multicast_PlayDebuffExpireVFX: VFXToPlay is NULL for type %d"), static_cast<uint8>(DebuffType));
-		return;
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("Multicast_PlayDebuffExpireVFX: Spawning Expire VFX %s at location %s, NetMode: %d"), 
-		*VFXToPlay->GetName(), *SpawnLocation.ToString(), static_cast<int32>(GetWorld()->GetNetMode()));
-
-	// 모든 클라이언트(서버 포함)에서 VFX 생성
-	UNiagaraComponent* SpawnedVFX = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		GetWorld(),
-		VFXToPlay,
-		SpawnLocation,
-		FRotator::ZeroRotator,
-		Scale,
-		true,                // bAutoDestroy
-		true,                // bAutoActivate
-		ENCPoolMethod::None, // PoolingMethod
-		true                 // bPreCullCheck
-	);
-
-	if (SpawnedVFX)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Multicast_PlayDebuffExpireVFX: Expire VFX spawned successfully!"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Multicast_PlayDebuffExpireVFX: Failed to spawn Expire VFX!"));
-	}
-} 

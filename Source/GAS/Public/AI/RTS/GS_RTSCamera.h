@@ -15,8 +15,8 @@ UCLASS()
 class GAS_API AGS_RTSCamera : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// Sets default values for this actor's properties
 	AGS_RTSCamera();
 
@@ -24,23 +24,26 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent)
 	void HideWallAndCeiling();
-	
+
 	// 기존 블루프린트 컴포넌트들에 접근하기 위한 헬퍼 함수들
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	UCameraComponent* GetCameraComponent() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	USpringArmComponent* GetSpringArmComponent() const;
-	
+
 	// 간단한 뷰포트 경계 계산 (기존 컴포넌트 활용)
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	FBox2D GetSimpleViewBounds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Camera|ZoomBack")
+	bool IsZoomingBack() const { return bIsZoomingBack; }
 
 	// --- Cloud Fog Effect ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
@@ -63,6 +66,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|CloudFog")
 	USoundBase* CloudWindSound;
 
+	// --- Zoom-Back Effect ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|ZoomBack")
+	bool bEnableZoomBack = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|ZoomBack")
+	float ZoomBackDelay = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|ZoomBack")
+	float ZoomBackSpeed = 2.0f;
+
+	// 구름이 완전히 가리기 전 되돌아갈 안전한 높이 (알파 0.1 지점 등)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|ZoomBack")
+	float ZoomBackSafeArmLength = 1500.0f;
+
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
@@ -79,6 +96,7 @@ private:
 	void UpdateCloudMaterialParameters();
 	void UpdateCloudNiagaraParameters();
 	void UpdateCloudSoundParameters();
+	void UpdateZoomBack(float DeltaTime);
 
 private:
 	// 캐싱된 뷰 경계
@@ -102,4 +120,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USpringArmComponent> CachedSpringArmComp;
+
+	// Zoom-Back State
+	bool bIsWaitingToZoomBack = false;
+	bool bIsZoomingBack = false;
+	float ZoomBackTimer = 0.0f;
 };

@@ -36,8 +36,11 @@ constexpr float TRAP_MEDIUM_CULL_DISTANCE = 4500.0f;
 /** 큰 함정 컬링 거리 (60m) */
 constexpr float TRAP_LARGE_CULL_DISTANCE = 6000.0f;
 
-/** 방 모듈 컬링 거리 (80m) */
-constexpr float ROOM_CULL_DISTANCE = 8000.0f;
+/** 방 모듈 컬링 거리 (60m) - Draw Call 최적화를 위해 축소 */
+constexpr float ROOM_CULL_DISTANCE = 6000.0f;
+
+/** 폴리지 컬링 거리 (30m) - Nanite 미지원으로 인한 공격적 컬링 */
+constexpr float FOLIAGE_CULL_DISTANCE = 3000.0f;
 
 /** 무기 컬링 거리 (45m) */
 constexpr float WEAPON_CULL_DISTANCE = 4500.0f;
@@ -52,8 +55,8 @@ constexpr float HP_WIDGET_CULL_DISTANCE = 6000.0f;
 /** TPS 시점 컬링 거리 배율 */
 constexpr float TPS_CULL_DISTANCE_SCALE = 1.0f;
 
-/** RTS 시점 컬링 거리 배율 (더 넓은 시야 필요) */
-constexpr float RTS_CULL_DISTANCE_SCALE = 3.5f;
+/** RTS 시점 컬링 거리 배율 (시야와 성능 간 균형) */
+constexpr float RTS_CULL_DISTANCE_SCALE = 2.5f;
 
 /**
  * 현재 시점(RTS/TPS)에 맞는 최적의 컬링 거리를 계산합니다.
@@ -116,6 +119,19 @@ constexpr float NET_DISTANCE_CLOSE = 8000.0f;
 /** 중거리 임계값 (150m - RTS 시야 고려) */
 constexpr float NET_DISTANCE_MEDIUM = 15000.0f;
 
+// ========================================
+// Timer Optimization Settings (Adaptive)
+// ========================================
+
+/** 중요도가 높을 때 업데이트 간격 (0.1s) */
+constexpr float TIMER_INTERVAL_HIGH = 0.1f;
+
+/** 중요도가 낮을 때 업데이트 간격 (0.5s) */
+constexpr float TIMER_INTERVAL_LOW = 0.5f;
+
+/** 중요도가 매우 낮을 때 업데이트 간격 (1.0s) */
+constexpr float TIMER_INTERVAL_MIN = 1.0f;
+
 /**
  * 로컬 플레이어와의 거리에 따라 최적의 네트워크 업데이트 빈도를 계산합니다.
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
@@ -129,11 +145,65 @@ float CalculateNetUpdateFrequency(const UObject* WorldContext,
 // Shadow Casting Distance Optimization
 // ========================================
 
-/** 그림자 완전 비활성화 거리 (80m) */
-constexpr float SHADOW_DISABLE_DISTANCE = 8000.0f;
+/** 그림자 완전 비활성화 거리 (50m - 공격적 최적화) */
+constexpr float SHADOW_DISABLE_DISTANCE = 5000.0f;
 
-/** 동적 그림자 비활성화 거리 (40m - 정적 그림자만 유지) */
-constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 4000.0f;
+/** 동적 그림자 비활성화 거리 (25m - 정적 그림자만 유지) */
+constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 2500.0f;
+
+/** 몬스터 그림자 비활성화 거리 (35m - 던전 전투 범위 고려) */
+constexpr float MONSTER_SHADOW_DISTANCE = 3500.0f;
+
+// ========================================
+// VFX Optimization (Niagara)
+// ========================================
+
+/** VFX 완전 비활성화 거리 (60m) */
+constexpr float VFX_DISABLE_DISTANCE = 6000.0f;
+
+/** VFX 저품질 전환 거리 (30m - 파티클 수 50% 감소) */
+constexpr float VFX_LOW_QUALITY_DISTANCE = 3000.0f;
+
+/** VFX 중품질 전환 거리 (15m - 파티클 수 75% 유지) */
+constexpr float VFX_MEDIUM_QUALITY_DISTANCE = 1500.0f;
+
+/** 저품질 VFX 파티클 배율 */
+constexpr float VFX_LOW_QUALITY_SCALE = 0.5f;
+
+/** 중품질 VFX 파티클 배율 */
+constexpr float VFX_MEDIUM_QUALITY_SCALE = 0.75f;
+
+// ========================================
+// Combat Detection Settings
+// ========================================
+
+/** Seeker 전투 트리거 반경 기본값 (8m) - Monster HP 위젯 가시성 등에서 공유 */
+constexpr float DEFAULT_COMBAT_TRIGGER_RADIUS = 800.0f;
+
+/** TPS 모드에서 HP 위젯이 보이기 시작하는 최대 거리 (30m) */
+constexpr float TPS_HP_WIDGET_VISIBLE_DISTANCE = 3000.0f;
+
+/** HP 위젯 가시성 트레이스를 위한 허리 높이 오프셋 */
+constexpr float HP_WIDGET_VISIBILITY_TRACE_OFFSET = 50.0f;
+
+/** Significance Manager: UI 활성화 임계값 */
+constexpr float SIGNIFICANCE_THRESHOLD_UI = 0.4f;
+
+/** Significance Manager: UI 가시성 연산 스킵 임계값 */
+constexpr float SIGNIFICANCE_THRESHOLD_UI_SKIP = 0.1f;
+
+/** Significance Manager: 에셋 로딩 최소 임계값 (0.2 이하면 로드 스킵) */
+constexpr float SIGNIFICANCE_THRESHOLD_ASYNC_LOAD = 0.2f;
+
+/** Significance Manager: 중요도에 따른 타이머 주기 계산 */
+inline float GetAdaptiveTimerInterval(float Significance)
+{
+	if (Significance > 0.5f)
+		return TIMER_INTERVAL_HIGH;
+	if (Significance > 0.1f)
+		return TIMER_INTERVAL_LOW;
+	return TIMER_INTERVAL_MIN;
+}
 
 // ========================================
 // AI Perception Distance Optimization
@@ -146,9 +216,16 @@ constexpr float AI_PERCEPTION_DISTANCE_TPS = 5000.0f;
 constexpr float AI_PERCEPTION_DISTANCE_RTS = 15000.0f;
 
 /**
- * 현재 시점에 맞는 AI 인지 거리를 계산합니다.
+ * 현재 시점에 맞는 AI 인지 거리를 계산(최적화)
  * @param WorldContext 계산 기준이 되는 월드 컨텍스트
  * @return 시점 기반 AI 인지 거리
  */
 float CalculateAIPerceptionDistance(const UObject* WorldContext);
+
+/**
+ * 거리에 따라 그림자 캐스팅 여부를 업데이트(최적화)
+ * @param Actor 대상 액터
+ * @param MeshComp 대상 메시 컴포넌트
+ */
+void UpdateShadowCulling(const AActor* Actor, USceneComponent* MeshComp);
 } // namespace GS_Rendering

@@ -7,7 +7,9 @@
 #include "E_HitReact.h"
 #include "GS_HitReactComp.generated.h"
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitReactEnd, UAnimMontage*, Montage, bool, bInterrupted);
+
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 
 class GAS_API UGS_HitReactComp : public UActorComponent
 {
@@ -24,20 +26,25 @@ public:
 
 	UFUNCTION()
 	void StopHitReact(UAnimMontage* TargetMontage);
-	
+
 	UFUNCTION()
 	FName CalculateHitDirection(FVector HitDirection);
 
 	/*UFUNCTION()
-	void CheckAxeState(UAnimMontage* Montage, bool bInterrupted);*/ // SJE
+	void CheckAxeState(UAnimMontage* Montage, bool bInterrupted);*/
+	// SJE
 
 	FOnMontageEnded HitReactEndDelegate;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnHitReactEnd OnHitReactEnd;
 
 	UFUNCTION()
 	void OnEndDelegate(UAnimMontage* Montage, bool bInterrupted);
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// ============================================
 	// Hit React Cooldown System

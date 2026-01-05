@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "GS_SkillSet.h"
 #include "ESkill.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "GS_SkillComp.generated.h"
 
 USTRUCT()
@@ -43,14 +44,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillActivated, ESkillSlot, Skill
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillCooldownBlocked, ESkillSlot, SkillSlot);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnHealCountChanged, ESkillSlot, int32, int32);
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_SkillComp : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
 	UGS_SkillComp();
-	
+
 	FOnSkillCooldownChanged OnSkillCooldownChanged;
 	FOnHealCountChanged OnHealCountChanged;
 	UPROPERTY(BlueprintAssignable)
@@ -66,7 +67,7 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_TrySkillCanceledByDebuff(ESkillSlot Slot);
-	
+
 	UFUNCTION(Server, Reliable)
 	void Server_TrySkillCommand(ESkillSlot Slot);
 
@@ -84,7 +85,7 @@ public:
 
 	UFUNCTION()
 	void TrySkillAnimationEnd(ESkillSlot Slot);
-	
+
 	void SetSkill(ESkillSlot Slot, const FSkillInfo& Info);
 
 	UFUNCTION(BlueprintCallable)
@@ -93,7 +94,7 @@ public:
 	void SetSkillActiveState(ESkillSlot Slot, bool InIsActive);
 	bool IsSkillActive(ESkillSlot Slot) const;
 	UGS_SkillBase* GetActiveSkill() const;
-	
+
 	void StartCooldownForSkill(ESkillSlot Slot);
 
 	void SkillsInterrupt();
@@ -116,6 +117,12 @@ public:
 	void Multicast_PlayImpactVFX(ESkillSlot Slot, FVector Location);
 
 	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayImpactVFXOnTarget(ESkillSlot Slot, AActor* Target);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayEnvImpactVFX(ESkillSlot Slot, FVector Location, FRotator Rotation);
+
+	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayEndVFX(ESkillSlot Slot, FVector Location, FRotator Rotation);
 
 	UFUNCTION(NetMulticast, Reliable)
@@ -124,9 +131,12 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_StopLoopVFX(ESkillSlot Slot);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_StopCastVFX(ESkillSlot Slot);
+
 	// 쿨타임 변경
 	void ApplyCooldownModifier(ESkillSlot SkillSlot, float Modifier);
-	
+
 	void ResetCooldownModifier(ESkillSlot Slot);
 
 	// 스킬 데이터 테이블 접근자
@@ -147,7 +157,10 @@ protected:
 	// Loop VFX 컴포넌트 추적 (궁극기 아우라 등)
 	UPROPERTY()
 	TMap<ESkillSlot, class UNiagaraComponent*> ActiveLoopVFXComponents;
-	
+
+	// 중복 생성 및 취소 처리를 위한 비동기 로드 핸들 추적
+	TMap<ESkillSlot, FAsyncLoadHandle> PendingLoopVFXLoads;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SkillStates)
 	TArray<FSkillRuntimeState> ReplicatedSkillStates;
 
@@ -157,23 +170,23 @@ protected:
 	UPROPERTY(Replicated)
 	bool bCanUseSkill = true;
 
-	// cooldown 
+	// cooldown
 	UPROPERTY()
 	TMap<ESkillSlot, FSkillCooldownState> CooldownStates;
-    
+
 	UPROPERTY(ReplicatedUsing = OnRep_CooldownStates)
 	TArray<FSkillCooldownState> ReplicatedCooldownStates;
-	
+
 	//Skill Flag
 	UPROPERTY() // 오직 서버에서 판단.
 	int16 CurAllowedSkillsMask = 0;
 
 	UPROPERTY()
 	int16 DefaultAllowedSkillsMask = -1;
-	
+
 	UFUNCTION()
 	void InitSkills();
-	
+
 public:
 	UFUNCTION()
 	void ResetAllowedSkillsMask();
@@ -186,17 +199,23 @@ public:
 
 	UFUNCTION()
 	int16 GetCurAllowedSkillsMask();
-	
+
+	/** 특정 스킬 슬롯을 허용 목록에 추가 (액션 캔슬용) */
+	UFUNCTION()
+	void AddAllowedSkill(ESkillSlot Slot);
+
+	/** 특정 스킬 슬롯을 허용 목록에서 제거 */
+	UFUNCTION()
+	void RemoveAllowedSkill(ESkillSlot Slot);
+
 private:
 	UFUNCTION()
 	void OnRep_SkillStates();
-	
+
 	UFUNCTION()
 	void OnRep_CooldownStates();
 
 	void HandleCooldownComplete(ESkillSlot Slot);
 	void HandleCooldownProgress(ESkillSlot Slot);
 	void UpdateReplicatedCooldownStates();
-	
 };
-

@@ -29,7 +29,7 @@ AGS_WeaponAxe::AGS_WeaponAxe()
 	RootComponent = AxeMeshComponent;
 
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshAsset(
-		TEXT("/Game/Weapons/Greataxe_01/SKM_Greataxe_01.SKM_Greataxe_01"));
+	    TEXT("/Game/Weapons/Greataxe_01/SKM_Greataxe_01.SKM_Greataxe_01"));
 	if (MeshAsset.Succeeded())
 	{
 		AxeMeshComponent->SetSkeletalMesh(MeshAsset.Object);
@@ -42,7 +42,7 @@ AGS_WeaponAxe::AGS_WeaponAxe()
 }
 
 void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
-	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+                          int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!HasAuthority())
 	{
@@ -76,7 +76,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
 
 	Multicast_PlayHitSound(TargetType, CorrectHitResult);
-	
+
 	AGS_Character* Damaged = Cast<AGS_Character>(OtherActor);
 	AGS_Character* Attacker = OwnerChar;
 
@@ -100,7 +100,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	}
 
 	// --- 여기서부터는 유효한 적을 타격한 경우 ---
-	
+
 	// 1. 기본 VFX는 항상 재생
 	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
 
@@ -122,7 +122,7 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 		{
 			// 추가 사운드
 			Chan->Multicast_OnAttackHit(Chan->CurrentComboIndex);
-			
+
 			// 추가 VFX
 			if (Chan->FinalAttackHitVFX)
 			{
@@ -130,18 +130,21 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 			}
 		}
 	}
-	
+
 	UGS_StatComp* DamagedStat = Damaged->GetStatComp();
-	if (!DamagedStat) 
+	if (!DamagedStat)
 	{
-		return;	
+		return;
 	}
 
 	float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
 	FGS_DamageEvent DamageEvent;
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
-	
+
+	// Reaction Sync: 피격자에게도 짧은 히트스탑 적용 (멀티플레이 밸런스 조정: 0.18 -> 0.08)
+	Damaged->Multicast_ApplyHitStop(0.08f, 0.0f, false);
+
 	SafeDisableHitBoxCollision(HitBox);
 }
 
@@ -200,26 +203,24 @@ void AGS_WeaponAxe::PlayHitSound(EAxeHitTargetType TargetType, const FHitResult&
 
 			const float DistanceToListener = FVector::Dist(SweepResult.ImpactPoint, ListenerLocation);
 
-			
+
 			if (DistanceToListener <= MaxDistance)
 			{
 				UAkGameplayStatics::PostEventAtLocation(
-					SoundEventToPlay,
-					SweepResult.ImpactPoint,
-					FRotator::ZeroRotator,
-					GetWorld()
-				);
+				    SoundEventToPlay,
+				    SweepResult.ImpactPoint,
+				    FRotator::ZeroRotator,
+				    GetWorld());
 			}
 		}
 		else
 		{
 			// Fallback: 리스너 위치를 찾지 못할 경우 거리 체크 없이 재생
 			UAkGameplayStatics::PostEventAtLocation(
-				SoundEventToPlay,
-				SweepResult.ImpactPoint,
-				FRotator::ZeroRotator,
-				GetWorld()
-			);
+			    SoundEventToPlay,
+			    SweepResult.ImpactPoint,
+			    FRotator::ZeroRotator,
+			    GetWorld());
 		}
 	}
 }
@@ -247,14 +248,13 @@ void AGS_WeaponAxe::PlayHitVFX(EAxeHitTargetType TargetType, const FHitResult& S
 	if (VFXToPlay && GetWorld())
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			SweepResult.ImpactPoint,
-			SweepResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		    GetWorld(),
+		    VFXToPlay,
+		    SweepResult.ImpactPoint,
+		    SweepResult.ImpactNormal.Rotation(),
+		    FVector(1.0f),
+		    true,
+		    true);
 	}
 }
 
@@ -312,14 +312,13 @@ void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* V
 			if (VFXToPlay && GetWorld())
 			{
 				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-					GetWorld(),
-					VFXToPlay,
-					HitResult.ImpactPoint,
-					HitResult.ImpactNormal.Rotation(),
-					FVector(1.0f),
-					true,
-					true
-				);
+				    GetWorld(),
+				    VFXToPlay,
+				    HitResult.ImpactPoint,
+				    HitResult.ImpactNormal.Rotation(),
+				    FVector(1.0f),
+				    true,
+				    true);
 			}
 		}
 	}
@@ -338,13 +337,13 @@ void AGS_WeaponAxe::EnableHit()
 	{
 		HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	
+
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	ClearHitActors();
 
 	// 안전장치: 3초 후에 자동으로 비활성화
 	ClearSafetyTimer();
-	
+
 	// 레벨 전환 중이 아닌 경우에만 타이머 설정
 	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown && IsValid(World))
 	{
@@ -418,11 +417,11 @@ void AGS_WeaponAxe::ServerEnableHit_Implementation()
 	{
 		HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	
+
 	ClearHitActors();
 
 	ClearSafetyTimer();
-	
+
 	// 레벨 전환 중이 아닌 경우에만 타이머 설정
 	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown && IsValid(World))
 	{

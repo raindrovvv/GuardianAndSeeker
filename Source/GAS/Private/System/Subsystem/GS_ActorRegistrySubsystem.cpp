@@ -6,6 +6,7 @@
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "Props/Trap/NonTriggerTrap/GS_LavaTrap.h"
+#include "Props/Trap/GS_TrapManager.h"
 #include "UI/Character/GS_CompassIndicatorComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -35,13 +36,11 @@ void UGS_ActorRegistrySubsystem::CleanupInvalidEntries()
 {
 	// RemoveAllSwap은 배열의 순서를 유지하지 않지만,
 	// 등록된 캐릭터 리스트에서는 순서가 중요하지 않으므로 일반적인 RemoveAll보다 성능상 유리.
-	RegisteredMonsters.RemoveAllSwap([](const TWeakObjectPtr<AGS_Monster>& Ptr) {
-		return !Ptr.IsValid();
-	});
+	RegisteredMonsters.RemoveAllSwap([](const TWeakObjectPtr<AGS_Monster>& Ptr)
+	                                 { return !Ptr.IsValid(); });
 
-	RegisteredSeekers.RemoveAllSwap([](const TWeakObjectPtr<AGS_Seeker>& Ptr) {
-		return !Ptr.IsValid();
-	});
+	RegisteredSeekers.RemoveAllSwap([](const TWeakObjectPtr<AGS_Seeker>& Ptr)
+	                                { return !Ptr.IsValid(); });
 
 	if (RegisteredGuardian.IsStale())
 	{
@@ -53,13 +52,16 @@ void UGS_ActorRegistrySubsystem::CleanupInvalidEntries()
 		RegisteredRTSController = nullptr;
 	}
 
-	RegisteredLavaTraps.RemoveAllSwap([](const TWeakObjectPtr<AGS_LavaTrap>& Ptr) {
-		return !Ptr.IsValid();
-	});
+	RegisteredLavaTraps.RemoveAllSwap([](const TWeakObjectPtr<AGS_LavaTrap>& Ptr)
+	                                  { return !Ptr.IsValid(); });
 
-	RegisteredCompassIndicators.RemoveAllSwap([](const TWeakObjectPtr<UGS_CompassIndicatorComponent>& Ptr) {
-		return !Ptr.IsValid();
-	});
+	RegisteredCompassIndicators.RemoveAllSwap([](const TWeakObjectPtr<UGS_CompassIndicatorComponent>& Ptr)
+	                                          { return !Ptr.IsValid(); });
+
+	if (RegisteredTrapManager.IsStale())
+	{
+		RegisteredTrapManager = nullptr;
+	}
 }
 
 
@@ -159,10 +161,26 @@ void UGS_ActorRegistrySubsystem::UnregisterCompassIndicator(UGS_CompassIndicator
 	}
 }
 
+void UGS_ActorRegistrySubsystem::RegisterTrapManager(AGS_TrapManager* TrapManager)
+{
+	if (IsValid(TrapManager))
+	{
+		RegisteredTrapManager = TrapManager;
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterTrapManager(AGS_TrapManager* TrapManager)
+{
+	if (RegisteredTrapManager == TrapManager)
+	{
+		RegisteredTrapManager = nullptr;
+	}
+}
+
 void UGS_ActorRegistrySubsystem::GetAllHostileActors(TArray<AActor*>& OutActors) const
 {
 	OutActors.Reset();
-	
+
 	for (const auto& MonsterPtr : RegisteredMonsters)
 	{
 		if (MonsterPtr.IsValid())

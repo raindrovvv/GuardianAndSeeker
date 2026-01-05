@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Sound/GS_AudioComponentBase.h"
+#include "AkAudioEvent.h"
 #include "GS_DrakharAudioComponent.generated.h"
 
 class UAkAudioEvent;
@@ -11,12 +12,12 @@ class AGS_Drakhar;
  * 드라카르(가디언) 전용 오디오 컴포넌트
  * GS_AudioComponentBase를 상속받아 공통 기능 활용
  */
-UCLASS( ClassGroup=(Audio), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_DrakharAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UGS_DrakharAudioComponent();
 
 protected:
@@ -31,9 +32,9 @@ public:
 	void PlayDraconicFurySkillSound();
 	void PlayDraconicProjectileSound(const FVector& Location);
 	void PlayAttackHitSound();
-	void PlayFeverModeStartSound(bool bForcePlay = true);  // 피버모드는 중요하므로 기본적으로 강제 재생
+	void PlayFeverModeStartSound(bool bForcePlay = true); // 피버모드는 중요하므로 기본적으로 강제 재생
 	void PlayFeverModeEndSound();
-	void PlayFeverModeStateSound(bool bForcePlay = true);  // 피버모드는 중요하므로 기본적으로 강제 재생
+	void PlayFeverModeStateSound(bool bForcePlay = true); // 피버모드는 중요하므로 기본적으로 강제 재생
 	void StopFeverModeStateSound();
 	void PlayComboFinisherSound();
 	void PlayLandingSound();
@@ -44,7 +45,6 @@ public:
 	void PlayFeverModeStateSoundLocal();
 	void StopFeverModeStateSoundLocal();
 	void PlayHurtSoundLocal();
-	void PlayDeathSoundLocal();
 	void PlayDraconicProjectileImpactSoundLocal(const FVector& ImpactLocation, bool bHitCharacter);
 
 	// === Getter 함수 ===
@@ -55,31 +55,31 @@ private:
 	// === 멀티캐스트 RPC 함수 ===
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayComboAttackSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDashSkillSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayEarthquakeSkillSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDraconicFurySkillSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDraconicProjectileSound(const FVector& Location);
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayAttackHitSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStartSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeEndSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFeverModeStateSound();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StopFeverModeStateSound();
 
@@ -101,17 +101,17 @@ private:
 	int32 FeverModeStateSoundPlayingID;
 
 	// 쿨다운 값
-	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta=(ClampMin="0.1"))
+	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta = (ClampMin = "0.1"))
 	float DraconicFurySoundCooldown = 7.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta=(ClampMin="0.1"))
+	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta = (ClampMin = "0.1"))
 	float HurtSoundCooldown = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta=(ClampMin="0.1"))
+	UPROPERTY(EditDefaultsOnly, Category = "Audio|Cooldown", meta = (ClampMin = "0.1"))
 	float DashSkillSoundCooldown = 1.5f;
 
 	// 페이드아웃 시간 (ms)
-	UPROPERTY(EditDefaultsOnly, Category = "Audio|FadeOut", meta=(ClampMin="0", ClampMax="5000"))
+	UPROPERTY(EditDefaultsOnly, Category = "Audio|FadeOut", meta = (ClampMin = "0", ClampMax = "5000"))
 	int32 FeverModeStateFadeOutDuration = 500;
 
 	// === 타이머 핸들 ===
@@ -131,4 +131,4 @@ private:
 
 	// === Wwise 관련 헬퍼 함수 ===
 	void PlaySoundEvent(UAkAudioEvent* SoundEvent, const FVector& Location = FVector::ZeroVector);
-}; 
+};

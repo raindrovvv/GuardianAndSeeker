@@ -24,7 +24,7 @@ void UGS_AresUltimateSkill::ActiveSkill()
 
 	// 쿨타임 측정 시작
 	StartCoolDown();
-	
+
 	const FSkillInfo* SkillInfo = GetCurrentSkillInfo();
 	CachedAresOwner = Cast<AGS_Ares>(OwnerCharacter);
 
@@ -43,11 +43,14 @@ void UGS_AresUltimateSkill::ActiveSkill()
 		// 입력 제한 설정
 		//CachedAresOwner->Multicast_SetIsFullBodySlot(true);
 		CachedAresOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-		CachedAresOwner->Multicast_PlaySkillMontage(SkillAnimMontages[0]);
+		if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+		{
+			CachedAresOwner->Multicast_PlaySkillMontage(LoadedMontage);
+		}
 		//CachedAresOwner->SetSkillInputControl(false, false, false, false);
 		CachedAresOwner->SetMoveControlValue(false, false);
 	}
-	
+
 	// =======================
 	// VFX 재생 - 컴포넌트 RPC 사용
 	// =======================
@@ -89,6 +92,12 @@ void UGS_AresUltimateSkill::OnSkillAnimationEnd()
 	}
 }
 
+void UGS_AresUltimateSkill::InterruptSkill()
+{
+	// 궁극기는 10초 지속 버프 스킬이므로, 다른 스킬 사용으로 interrupt되지 않음
+	// bIsActive를 유지하여 검기 스킬에서 궁극기 VFX를 사용할 수 있도록 함
+}
+
 void UGS_AresUltimateSkill::BecomeBerserker()
 {
 	if (!OwnerCharacter)
@@ -103,8 +112,8 @@ void UGS_AresUltimateSkill::BecomeBerserker()
 	if (UGS_StatComp* StatComp = OwnerCharacter->GetStatComp())
 	{
 		FGS_StatRow BuffStat;
-		BuffStat.ATK = 50.f;     // 공격력 +50
-		BuffStat.ATS = 0.5f;     // 공격속도 +0.5 (예시)
+		BuffStat.ATK = 50.f; // 공격력 +50
+		BuffStat.ATS = 0.5f; // 공격속도 +0.5 (예시)
 
 		BuffAmount = BuffStat; // 나중에 되돌릴 때 사용할 변수
 		StatComp->ChangeStat(BuffStat);
@@ -126,6 +135,11 @@ void UGS_AresUltimateSkill::DeactiveSkill()
 	if (OwnerCharacter->HasAuthority() && OwningComp)
 	{
 		OwningComp->Multicast_StopLoopVFX(CurrentSkillType);
+
+		// 스킬 종료 VFX 재생
+		FVector SkillLocation = OwnerCharacter->GetActorLocation();
+		FRotator SkillRotation = OwnerCharacter->GetActorRotation();
+		OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
 	}
 
 	// 궁극기 루프 사운드 정지 및 종료 사운드 재생 (멀티캐스트)

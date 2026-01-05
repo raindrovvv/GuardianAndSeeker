@@ -3,17 +3,16 @@
 #include "Character/Skill/GS_SkillComp.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "Animation/Character/GS_SeekerAnimInstance.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Sound/GS_SeekerAudioComponent.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 UTexture2D* UGS_SkillBase::GetSkillImage()
 {
-	if (SkillImage)
-	{
-		return SkillImage;
-	}
-	return nullptr;
+	// Soft Reference를 동기 로드 (UI는 즉시 표시되어야 하므로)
+	return UGS_AssetLoader::SyncLoadAsset(SkillImage);
 }
 
 float UGS_SkillBase::GetCoolTime()
@@ -26,6 +25,9 @@ void UGS_SkillBase::InitSkill(AGS_Player* InOwner, UGS_SkillComp* InOwningComp, 
 	OwnerCharacter = InOwner;
 	OwningComp = InOwningComp;
 	CurrentSkillType = InSlot;
+
+	// VFX + 몽타주 에셋 프리로드 (비동기)
+	PreloadSkillAssets();
 }
 
 void UGS_SkillBase::ActiveSkill()
@@ -34,9 +36,9 @@ void UGS_SkillBase::ActiveSkill()
 	{
 		return;
 	}
-	
+
 	SetIsActive(true);
-	
+
 	return;
 }
 
@@ -48,7 +50,7 @@ void UGS_SkillBase::OnSkillCanceledByDebuff()
 void UGS_SkillBase::OnSkillAnimationEnd()
 {
 	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if(OwnerPlayer)
+	if (OwnerPlayer)
 	{
 		OwnerPlayer->GetSkillComp()->ResetAllowedSkillsMask();
 	}
@@ -98,7 +100,7 @@ void UGS_SkillBase::InterruptSkill()
 {
 	StopCastVFX();
 	SetIsActive(false);
-	
+
 	// Seeker의 경우 StateReset()이 이동/회전 제어, CanChangeSeekerGait 등을 복구함
 	// SetSeekerGait(Run)은 DeactiveSkill()에서 호출되므로 여기서는 StateReset만 호출
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
@@ -115,7 +117,7 @@ void UGS_SkillBase::SetIsActive(bool bInIsActive)
 
 	// SkillComp 내 스킬 상태 업데이트
 	AGS_Player* OwnerPlayer = Cast<AGS_Player>(OwnerCharacter);
-	if(OwnerPlayer)
+	if (OwnerPlayer)
 	{
 		OwnerPlayer->GetSkillComp()->SetSkillActiveState(CurrentSkillType, bInIsActive);
 	}
@@ -130,50 +132,162 @@ void UGS_SkillBase::StartCoolDown()
 }
 
 
+void UGS_SkillBase::PreloadSkillAssets()
+{
+	TArray<FSoftObjectPath> AssetsToLoad;
+
+	if (!SkillCastVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillCastVFX.ToSoftObjectPath());
+	}
+	if (!SkillRangeVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillRangeVFX.ToSoftObjectPath());
+	}
+	if (!SkillImpactVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillImpactVFX.ToSoftObjectPath());
+	}
+	if (!SkillEnvImpactVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillEnvImpactVFX.ToSoftObjectPath());
+	}
+	if (!SkillEndVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillEndVFX.ToSoftObjectPath());
+	}
+	if (!SkillLoopVFX.IsNull())
+	{
+		AssetsToLoad.Add(SkillLoopVFX.ToSoftObjectPath());
+	}
+
+	for (const TSoftObjectPtr<UAnimMontage>& MontagePtr : SkillAnimMontages)
+	{
+		if (!MontagePtr.IsNull())
+		{
+			AssetsToLoad.Add(MontagePtr.ToSoftObjectPath());
+		}
+	}
+
+	if (AssetsToLoad.Num() > 0)
+	{
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [this]()
+		                                         {
+			if (!IsValid(this))
+			{
+				return;
+			}
+
+			// 로드 완료 후 캐싱
+			CachedCastVFX = SkillCastVFX.Get();
+			CachedRangeVFX = SkillRangeVFX.Get();
+			CachedImpactVFX = SkillImpactVFX.Get();
+			CachedEnvImpactVFX = SkillEnvImpactVFX.Get();
+			CachedEndVFX = SkillEndVFX.Get();
+			CachedLoopVFX = SkillLoopVFX.Get();
+
+			CachedAnimMontages.SetNum(SkillAnimMontages.Num());
+			for (int32 i = 0; i < SkillAnimMontages.Num(); ++i)
+			{
+				CachedAnimMontages[i] = SkillAnimMontages[i].Get();
+			} });
+	}
+}
+
+UAnimMontage* UGS_SkillBase::GetCachedMontage(int32 Index)
+{
+	// 인덱스 유효성 검사
+	if (!SkillAnimMontages.IsValidIndex(Index))
+	{
+		return nullptr;
+	}
+
+	// 캐시된 몽타주가 있으면 반환
+	if (CachedAnimMontages.IsValidIndex(Index) && CachedAnimMontages[Index])
+	{
+		return CachedAnimMontages[Index];
+	}
+
+	// 캐시되지 않았으면 LoadSynchronous로 폴백 (안전장치)
+	if (!SkillAnimMontages[Index].IsNull())
+	{
+		UAnimMontage* LoadedMontage = UGS_AssetLoader::SyncLoadAsset(SkillAnimMontages[Index]);
+
+		// 폴백으로 로드한 몽타주도 캐싱 (다음번 사용을 위해)
+		if (LoadedMontage && CachedAnimMontages.IsValidIndex(Index))
+		{
+			CachedAnimMontages[Index] = LoadedMontage;
+		}
+
+		return LoadedMontage;
+	}
+
+	return nullptr;
+}
+
 void UGS_SkillBase::PlayCastVFX(FVector Location, FRotator Rotation)
 {
-	if (SkillCastVFX && OwnerCharacter)
+	// 캐싱된 VFX 사용 (프리로드되지 않은 경우 즉시 로드)
+	UNiagaraSystem* VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillCastVFX);
+	if (!VFXToUse)
 	{
-		// 기존 Cast VFX가 있으면 먼저 정리
-		StopCastVFX();
-		
+		return;
+	}
+
+	if (OwnerCharacter)
+	{
+		// === 깜빡임(Flickering) 방지 로직 ===
+		// 이미 해당 에셋이 재생 중이라면 중복 실행하지 않음
+		if (ActiveCastVFXComponent && IsValid(ActiveCastVFXComponent) && ActiveCastVFXComponent->GetAsset() == VFXToUse)
+		{
+			return;
+		}
+
+		// 기존 Cast VFX가 있으면 먼저 로컬에서 정리 (이미 멀티캐스트 내부이므로 추가 RPC 불필요)
+		Internal_StopCastVFX();
+
 		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			SkillCastVFX,
-			OwnerCharacter->GetRootComponent(),
-			NAME_None,
-			CastVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
-			Rotation,
-			EAttachLocation::KeepRelativeOffset,
-			true
-		);
+		    VFXToUse,
+		    OwnerCharacter->GetRootComponent(),
+		    NAME_None,
+		    CastVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
+		    Rotation,
+		    EAttachLocation::KeepRelativeOffset,
+		    true);
 
 		if (NiagaraComp)
 		{
 			// Cast VFX 컴포넌트 추적 저장
 			ActiveCastVFXComponent = NiagaraComp;
-			
+
 			FVector Forward = OwnerCharacter->GetActorForwardVector();
 			NiagaraComp->SetVectorParameter(FName("User.ForwardVector"), Forward);
 
-			NiagaraComp->SetVectorParameter(FName("User.FixedVector"), FVector(1,0,0));
-			
+			NiagaraComp->SetVectorParameter(FName("User.FixedVector"), FVector(1, 0, 0));
 		}
 	}
 }
 
 void UGS_SkillBase::PlayRangeVFX(FVector Location, float Radius)
 {
-	if (SkillRangeVFX && OwnerCharacter)
+	// 캐싱된 VFX 사용 (프리로드되지 않은 경우 즉시 로드)
+	UNiagaraSystem* VFXToUse = CachedRangeVFX.Get();
+	if (!VFXToUse)
+	{
+		VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillRangeVFX);
+		CachedRangeVFX = VFXToUse; // 캐싱
+	}
+
+	if (VFXToUse && OwnerCharacter)
 	{
 		UNiagaraComponent* SpawnedVFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			SkillRangeVFX,
-			OwnerCharacter->GetRootComponent(),
-			NAME_None,
-			RangeVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
-			FRotator::ZeroRotator,
-			EAttachLocation::KeepRelativeOffset,
-			true
-		);
+		    VFXToUse,
+		    OwnerCharacter->GetRootComponent(),
+		    NAME_None,
+		    RangeVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
+		    FRotator::ZeroRotator,
+		    EAttachLocation::KeepRelativeOffset,
+		    true);
 
 		if (SpawnedVFX)
 		{
@@ -189,58 +303,121 @@ void UGS_SkillBase::PlayRangeVFX(FVector Location, float Radius)
 
 void UGS_SkillBase::PlayImpactVFX(FVector Location)
 {
-	if (SkillImpactVFX && OwnerCharacter)
+	// 캐싱된 VFX 사용 (프리로드되지 않은 경우 즉시 로드)
+	UNiagaraSystem* VFXToUse = CachedImpactVFX.Get();
+	if (!VFXToUse)
+	{
+		VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillImpactVFX);
+		CachedImpactVFX = VFXToUse; // 캐싱
+	}
+
+	if (VFXToUse && OwnerCharacter)
 	{
 		// 이 함수는 타겟 정보를 받지 않으므로, 월드 위치에 생성.
 		// 타겟에 부착하려면 별도 함수 필요.
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			SkillImpactVFX,
-			Location,
-			FRotator::ZeroRotator,
-			SkillVFXScale,
-			true, true, ENCPoolMethod::None
-		);
+		    GetWorld(),
+		    VFXToUse,
+		    Location,
+		    FRotator::ZeroRotator,
+		    SkillVFXScale,
+		    true, true, ENCPoolMethod::None);
 	}
 }
 
 // 타겟에 직접 Impact VFX를 부착하는 새 함수
 void UGS_SkillBase::PlayImpactVFXOnTarget(AActor* Target)
 {
-	if (SkillImpactVFX && Target)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAttached(
-			SkillImpactVFX,
-			Target->GetRootComponent(),
-			NAME_None,
-			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			EAttachLocation::SnapToTarget,
-			true
-		);
-	}
+	if (!Target || SkillImpactVFX.IsNull())
+		return;
+
+	TWeakObjectPtr<AActor> WeakTarget(Target);
+	TWeakObjectPtr<UGS_SkillBase> WeakThis(this);
+
+	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    SkillImpactVFX,
+	    [WeakThis, WeakTarget](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (WeakThis.IsValid() && WeakTarget.IsValid() && LoadedVFX)
+		    {
+			    // 캐싱
+			    WeakThis->CachedImpactVFX = LoadedVFX;
+
+			    UNiagaraFunctionLibrary::SpawnSystemAttached(
+			        LoadedVFX,
+			        WeakTarget->GetRootComponent(),
+			        NAME_None,
+			        WeakThis->ImpactVFXOffset,
+			        FRotator::ZeroRotator,
+			        EAttachLocation::KeepRelativeOffset,
+			        true);
+		    }
+	    });
+}
+
+void UGS_SkillBase::PlayEnvImpactVFX(FVector Location, FRotator Rotation)
+{
+	if (SkillEnvImpactVFX.IsNull() || !GetWorld())
+		return;
+
+	TWeakObjectPtr<UGS_SkillBase> WeakThis(this);
+	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    SkillEnvImpactVFX,
+	    [WeakThis, Location, Rotation](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (WeakThis.IsValid() && LoadedVFX)
+		    {
+			    // 캐싱
+			    WeakThis->CachedEnvImpactVFX = LoadedVFX;
+
+			    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			        WeakThis->GetWorld(),
+			        LoadedVFX,
+			        Location + Rotation.RotateVector(WeakThis->EnvImpactVFXOffset),
+			        Rotation);
+		    }
+	    });
 }
 
 void UGS_SkillBase::PlayEndVFX(FVector Location, FRotator Rotation)
 {
-	if (SkillEndVFX && OwnerCharacter)
+	// 캐싱된 VFX 사용 (프리로드되지 않은 경우 즉시 로드)
+	UNiagaraSystem* VFXToUse = CachedEndVFX.Get();
+	if (!VFXToUse)
+	{
+		VFXToUse = UGS_AssetLoader::SyncLoadAsset(SkillEndVFX);
+		CachedEndVFX = VFXToUse; // 캐싱
+	}
+
+	if (VFXToUse && OwnerCharacter)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAttached(
-			SkillEndVFX,
-			OwnerCharacter->GetRootComponent(),
-			NAME_None,
-			EndVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
-			Rotation,
-			EAttachLocation::KeepRelativeOffset,
-			true
-		);
+		    VFXToUse,
+		    OwnerCharacter->GetRootComponent(),
+		    NAME_None,
+		    EndVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
+		    Rotation,
+		    EAttachLocation::KeepRelativeOffset,
+		    true);
 	}
-	
+
 	// End VFX 재생 시 Cast VFX 정리
 	StopCastVFX();
 }
 
 void UGS_SkillBase::StopCastVFX()
+{
+	// 서버에서 중지 요청 시 모든 클라이언트에도 전파
+	if (OwnerCharacter && OwnerCharacter->HasAuthority() && OwningComp)
+	{
+		OwningComp->Multicast_StopCastVFX(CurrentSkillType);
+		return;
+	}
+
+	Internal_StopCastVFX();
+}
+
+void UGS_SkillBase::Internal_StopCastVFX()
 {
 	if (ActiveCastVFXComponent && IsValid(ActiveCastVFXComponent))
 	{
@@ -263,10 +440,9 @@ const FSkillInfo* UGS_SkillBase::GetCurrentSkillInfo() const
 	{
 		return nullptr;
 	}
-	
+
 	// 캐릭터 타입을 기반으로 RowName 구하기
-	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(
-		UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
+	FName RowName = FName(*UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).RightChop(UEnum::GetValueAsString(OwnerCharacter->GetCharacterType()).Find(TEXT("::")) + 2));
 
 	FString Context;
 	const FGS_SkillSet* SkillSet = SkillDataTable->FindRow<FGS_SkillSet>(RowName, Context);
@@ -337,7 +513,7 @@ void UGS_SkillBase::PlaySkillEndSound() const
 void UGS_SkillBase::BeginDestroy()
 {
 	Super::BeginDestroy();
-	if(IsValid(GetWorld()) && bIsActive)
+	if (IsValid(GetWorld()) && bIsActive)
 	{
 		DeactiveSkill();
 		OnSkillAnimationEnd();

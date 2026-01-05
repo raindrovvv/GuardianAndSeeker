@@ -5,10 +5,10 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Character/Player/Monster/GS_Monster.h"
-// #include "Character/GS_Character.h"
 #include "Navigation/CrowdFollowingComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 const FName AGS_AIController::HomePosKey(TEXT("HomePosition"));
 const FName AGS_AIController::MoveLocationKey(TEXT("MoveLocation"));
@@ -63,18 +63,50 @@ void AGS_AIController::OnPossess(APawn* InPawn)
 
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(InPawn))
 	{
-		BTAsset = Monster->BTAsset;
-		BBAsset = Monster->BBAsset;
-	}
-
-	UBlackboardComponent* BlackboardComponent = Blackboard;
-	if (BBAsset && UseBlackboard(BBAsset, BlackboardComponent))
-	{
-		BlackboardComponent->SetValueAsVector(HomePosKey, InPawn->GetActorLocation());
-
-		if (BTAsset)
+		TArray<FSoftObjectPath> AssetsToLoad;
+		if (!Monster->BTAsset.IsNull())
 		{
-			RunBehaviorTree(BTAsset);
+			AssetsToLoad.Add(Monster->BTAsset.ToSoftObjectPath());
+		}
+		if (!Monster->BBAsset.IsNull())
+		{
+			AssetsToLoad.Add(Monster->BBAsset.ToSoftObjectPath());
+		}
+
+		if (AssetsToLoad.Num() > 0)
+		{
+			// TWeakObjectPtr로 캡처하여 비동기 콜백 안전성 확보
+			TWeakObjectPtr<AGS_AIController> WeakThis(this);
+			TWeakObjectPtr<AGS_Monster> WeakMonster(Monster);
+			TWeakObjectPtr<APawn> WeakPawn(InPawn);
+
+			// 비동기 로드 시작
+			UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis, WeakMonster, WeakPawn]()
+			{
+				// 로드 완료 후 모든 객체가 유효하고 컨트롤러가 여전히 이 폰을 소유하는지 확인
+				AGS_AIController* StrongThis = WeakThis.Get();
+				AGS_Monster* StrongMonster = WeakMonster.Get();
+				APawn* StrongPawn = WeakPawn.Get();
+
+				if (!StrongThis || !StrongMonster || StrongThis->GetPawn() != StrongPawn)
+				{
+					return;
+				}
+
+				UBehaviorTree* LoadedBT = StrongMonster->BTAsset.Get();
+				UBlackboardData* LoadedBB = StrongMonster->BBAsset.Get();
+
+				UBlackboardComponent* BlackboardComponent = StrongThis->Blackboard;
+				if (LoadedBB && StrongThis->UseBlackboard(LoadedBB, BlackboardComponent))
+				{
+					BlackboardComponent->SetValueAsVector(StrongThis->HomePosKey, StrongPawn->GetActorLocation());
+
+					if (LoadedBT)
+					{
+						StrongThis->RunBehaviorTree(LoadedBT);
+					}
+				}
+			});
 		}
 	}
 
@@ -132,6 +164,11 @@ ETeamAttitude::Type AGS_AIController::GetTeamAttitudeTowards(const AActor& Other
 
 void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	if (Blackboard->GetValueAsBool(DebuffLockedKey))
 	{
 		return;
@@ -212,41 +249,49 @@ void AGS_AIController::TargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimul
 
 void AGS_AIController::SetNewTarget(AActor* NewTarget)
 {
-	if (NewTarget)
+	if (!NewTarget || !IsValid(Blackboard))
 	{
-		Blackboard->SetValueAsObject(TargetActorKey, NewTarget);
+		return;
+	}
 
-		// 새 타겟인 경우 델리게이트 연결
-		AGS_Character* NewTargetCharacter = Cast<AGS_Character>(NewTarget);
-		if (NewTargetCharacter && TargetCharacter.Get() != NewTargetCharacter)
+	Blackboard->SetValueAsObject(TargetActorKey, NewTarget);
+
+	// 새 타겟인 경우 델리게이트 연결
+	AGS_Character* NewTargetCharacter = Cast<AGS_Character>(NewTarget);
+	if (NewTargetCharacter && TargetCharacter.Get() != NewTargetCharacter)
+	{
+		if (TargetCharacter.IsValid())
 		{
-			if (TargetCharacter.IsValid())
-			{
-				TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);
-			}
+			TargetCharacter->OnDeathDelegate.RemoveDynamic(this, &AGS_AIController::OnTargetDied);
+		}
 
-			TargetCharacter = NewTargetCharacter;
-			if (!NewTargetCharacter->IsDead())
-			{
-				TargetCharacter->OnDeathDelegate.AddDynamic(this, &AGS_AIController::OnTargetDied);
-			}
+		TargetCharacter = NewTargetCharacter;
+		if (!NewTargetCharacter->IsDead())
+		{
+			TargetCharacter->OnDeathDelegate.AddDynamic(this, &AGS_AIController::OnTargetDied);
 		}
 	}
 }
 
 void AGS_AIController::OnTargetDied()
 {
-	if (Blackboard)
+	if (!IsValid(Blackboard))
 	{
-		Blackboard->ClearValue(TargetActorKey);
-		Blackboard->SetValueAsEnum(CommandKey, 0);
+		return;
 	}
 
+	Blackboard->ClearValue(TargetActorKey);
+	Blackboard->SetValueAsEnum(CommandKey, 0);
 	TargetCharacter = nullptr;
 }
 
 void AGS_AIController::ClearCurrentTarget()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->ClearValue(TargetActorKey);
 
 	if (TargetCharacter.IsValid())
@@ -259,17 +304,32 @@ void AGS_AIController::ClearCurrentTarget()
 
 void AGS_AIController::LockTarget(AGS_Character* Target)
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->SetValueAsObject(TargetActorKey, Target);
 	Blackboard->SetValueAsBool(TargetLockedKey, true);
 }
 
 void AGS_AIController::UnlockTarget()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	Blackboard->SetValueAsBool(TargetLockedKey, false);
 }
 
 void AGS_AIController::EnterConfuseState()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	PrevTargetActor = Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey));
 	Blackboard->ClearValue(TargetActorKey);
 	Blackboard->SetValueAsBool(DebuffLockedKey, true);
@@ -278,6 +338,11 @@ void AGS_AIController::EnterConfuseState()
 
 void AGS_AIController::ExitConfuseState()
 {
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	PerceptionComponent->SetSenseEnabled(UAISense_Sight::StaticClass(), true);
 	Blackboard->SetValueAsBool(DebuffLockedKey, false);
 

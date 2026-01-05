@@ -12,7 +12,7 @@
 #include "Weapon/Projectile/Seeker/GS_ArrowType.h"
 #include "GS_ArrowFXComponent.generated.h"
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_ArrowFXComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -30,11 +30,11 @@ public:
 
 	// Hit VFX 재생
 	UFUNCTION(BlueprintCallable, Category = "Arrow FX")
-	void PlayHitVFX(ETargetType TargetType, const FHitResult& SweepResult);
+	void PlayHitVFX(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
 
 	// Hit Sound 재생
 	UFUNCTION(BlueprintCallable, Category = "Arrow FX")
-	void PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult);
+	void PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
 
 	// 화살 타입 설정 (외부에서 호출용)
 	UFUNCTION(BlueprintCallable, Category = "Arrow FX")
@@ -43,17 +43,17 @@ public:
 	// 멀티캐스트 함수들 - Trail VFX
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_StartArrowTrailVFX(EArrowType ArrowType);
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_StopArrowTrailVFX();
 
 	// 멀티캐스트 함수들 - Hit VFX
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayHitVFX(ETargetType TargetType, const FHitResult& SweepResult);
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayHitVFX(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
 
 	// 멀티캐스트 함수들 - Hit Sound
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult);
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
 
 protected:
 	virtual void BeginPlay() override;
@@ -84,9 +84,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX")
 	FVector TrailVFXScale = FVector::OneVector;
 
-	// 히트 VFX 에셋
+	// 히트 VFX 에셋 (타입별)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX")
-	UNiagaraSystem* HitPawnVFX;
+	UNiagaraSystem* NormalHitPawnVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX")
+	UNiagaraSystem* AxeHitPawnVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX")
+	UNiagaraSystem* ChildHitPawnVFX;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX")
 	UNiagaraSystem* HitStructureVFX;
@@ -102,4 +108,8 @@ private:
 	// 컴포넌트가 부착될 소유자 액터
 	UPROPERTY()
 	AActor* OwnerActor;
-}; 
+
+	// 현재 화살 타입 (히트 VFX 선택용)
+	UPROPERTY(Replicated)
+	EArrowType CurrentArrowType = EArrowType::Normal;
+};

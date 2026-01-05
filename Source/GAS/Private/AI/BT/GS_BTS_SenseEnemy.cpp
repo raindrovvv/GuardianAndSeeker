@@ -32,6 +32,11 @@ void UGS_BTS_SenseEnemy::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	}
 
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	if (!IsValid(Blackboard))
+	{
+		return;
+	}
+
 	if (Blackboard->GetValueAsBool(AGS_AIController::DebuffLockedKey))
 	{
 		return;

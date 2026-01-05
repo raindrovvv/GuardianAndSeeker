@@ -15,7 +15,7 @@ class GAS_API AGS_SeekerMerciArrowNormal : public AGS_SeekerMerciArrow
 public:
 	AGS_SeekerMerciArrowNormal();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Arrow")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Arrow")
 	EArrowType ArrowType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Arrow")
@@ -25,8 +25,10 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual EArrowType GetArrowType() const override;
 	virtual void ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor) override;
 	virtual bool HandleTargetTypeGeneric(ETargetType TargetType, const FHitResult& SweepResult) override;
+
 private:
 	TSet<AActor*> DamagedActors;
 };

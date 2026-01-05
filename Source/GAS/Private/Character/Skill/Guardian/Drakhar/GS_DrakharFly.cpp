@@ -59,18 +59,18 @@ void UGS_DrakharFly::ExecuteSkillEffect()
 		return;
 	}
 
-	// 애니메이션 몽타주 유효성 체크
-	if (SkillAnimMontages.Num() == 0 || !SkillAnimMontages[0])
+	UAnimMontage* LoadedMontage = GetCachedMontage(0);
+	if (!LoadedMontage)
 	{
 		return;
 	}
 
 	if (bIsFlying)
 	{
-		OwnerCharacter->MulticastRPCPlaySkillMontage(SkillAnimMontages[0]);
+		OwnerCharacter->MulticastRPCPlaySkillMontage(LoadedMontage);
 	}
 	else
 	{
-		OwnerCharacter->MulicastRPCStopCurrentSkillMontage(SkillAnimMontages[0]);
+		OwnerCharacter->MulicastRPCStopCurrentSkillMontage(LoadedMontage);
 	}
 }

@@ -55,7 +55,7 @@ void AGS_WeaponEquipable::ClearSafetyTimer()
 			TimerManager.ClearTimer(SafetyTimerHandle);
 		}
 	}
-	
+
 	// 타이머 핸들 무효화
 	SafetyTimerHandle.Invalidate();
 }
@@ -126,16 +126,19 @@ void AGS_WeaponEquipable::SafeDisableHitBoxCollision(UBoxComponent* InHitBox)
 		return;
 	}
 
-	// 다음 프레임에 콜리전 비활성화 (물리 쿼리 충돌 방지)
+	// 기존 예약된 타이머가 있다면 정리
+	ClearSafetyTimer();
+
+	// 다음 프레임 근처에서 안전하게 콜리전 비활성화 (물리 쿼리 충돌 방지)
+	// SetTimerForNextTick 대신 SafetyTimerHandle을 사용하여 중간에 취소 가능하게 함
 	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown)
 	{
 		TWeakObjectPtr<UBoxComponent> WeakHitBox = InHitBox;
-		World->GetTimerManager().SetTimerForNextTick([WeakHitBox]()
-		{
+		World->GetTimerManager().SetTimer(SafetyTimerHandle, [WeakHitBox]()
+		                                  {
 			if (WeakHitBox.IsValid() && IsValid(WeakHitBox.Get()) && !WeakHitBox->IsBeingDestroyed())
 			{
 				WeakHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			}
-		});
+			} }, 0.01f, false); // 아주 짧은 지연시간 후 비활성화
 	}
 }

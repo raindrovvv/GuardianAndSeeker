@@ -9,6 +9,8 @@
 #include "Animation/Character/E_SeekerAnim.h"
 #include "Props/Item/E_ItemType.h"
 #include "Character/Skill/GS_SkillComp.h"
+#include "AkAudioEvent.h"
+#include "Rendering/GS_RenderingConstants.h"
 
 #include "GS_Seeker.generated.h"
 
@@ -53,6 +55,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDyingStateChanged, bool, bIsDyin
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnReviveProgressChanged, float, Progress);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, bIsDetected);
 
+// Seeker Gait Speeds (Ratios)
+static constexpr float GAIT_SPEED_WALK = 0.45f;
+static constexpr float GAIT_SPEED_RUN = 0.75f;
+static constexpr float GAIT_SPEED_SPRINT = 1.0f;
+static constexpr float GAIT_SPEED_CRAWL = 0.2f;
+
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
 enum class ECollisionSoundType : uint8
@@ -68,7 +76,7 @@ class GAS_API AGS_Seeker : public AGS_Player, public IGS_ManualDataInterface
 	GENERATED_BODY()
 
 public:
-	AGS_Seeker();
+	AGS_Seeker(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -102,7 +110,7 @@ public:
 	EGait GetLastSeekerGait();
 
 	UFUNCTION()
-	void StateReset();
+	virtual void StateReset();
 
 	UFUNCTION()
 	void OnRep_SeekerGait();
@@ -135,6 +143,7 @@ public:
 	UFUNCTION(Server, Reliable)
 	virtual void Server_OnComboAttack();
 
+
 	// Damage Handler
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
@@ -161,7 +170,7 @@ public:
 	FTimerHandle AttackSoundResetTimerHandle;
 
 	// Weapon
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	UChildActorComponent* Weapon;
 
 	// Item
@@ -193,7 +202,7 @@ public:
 	/*UPROPERTY(Replicated)
 	bool bComboEnded = true;*/
 
-	UPROPERTY(EditAnywhere, Category="Animation")
+	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* ComboAnimMontage;
 
 	UPROPERTY(Replicated)
@@ -205,39 +214,59 @@ public:
 	UPROPERTY(Replicated)
 	bool bNextCombo = false;
 
+	/** 마지막 입력 시간 (입력 버퍼링용) */
+	float LastInputTime = -1.0f;
+
+	/** 입력 버퍼링 허용 시간 (0.2초) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float InputBufferWindow = 0.25f;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SeekerGait)
 	EGait SeekerGait;
 
 	UPROPERTY(Replicated)
 	EGait LastSeekerGait;
 
-	UPROPERTY(BlueprintAssignable, Category="RTS")
+	/** 타격 보정(Target Magnetism) 거리 */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float MagnetismDistance = 400.0f;
+
+	/** 타격 보정 허용 각도 (도) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float MagnetismAngle = 60.0f;
+
+	/** 최적의 타겟 찾기 (보정용) */
+	AActor* GetBestMagnetismTarget() const;
+
+	UPROPERTY(BlueprintAssignable, Category = "RTS")
 	FOnSeekerHover OnSeekerHover;
 
 	// ================
 	// LowHP 스크린 효과
 	// ================
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
 	UPostProcessComponent* LowHealthPostProcessComp;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
-	UMaterialInterface* LowHealthEffectMaterial;
+	// Soft Reference로 메모리 최적화
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	TSoftObjectPtr<UMaterialInterface> LowHealthEffectMaterial;
 
 	// LowHealth 전용 컴포넌트
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
 	UGS_LowHealthEffectComponent* LowHealthEffectComp;
 
 	// ================
 	// 가디언 감지 스크린 효과
 	// ================
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Detection|Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Detection|Effects")
 	UPostProcessComponent* DetectionPostProcessComp;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Detection|Effects")
-	UMaterialInterface* DetectionEffectMaterial; // MPP_Detect
+	// Soft Reference로 메모리 최적화
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Detection|Effects")
+	TSoftObjectPtr<UMaterialInterface> DetectionEffectMaterial; // MPP_Detect
 
 	// Detection 전용 컴포넌트
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Detection|Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Detection|Effects")
 	UGS_DetectionEffectComponent* DetectionEffectComp;
 
 	UFUNCTION()
@@ -264,36 +293,36 @@ public:
 	// ================
 	// 함정 VFX 컴포넌트
 	// ================
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UNiagaraComponent* FeetLavaVFX_L;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UNiagaraComponent* FeetLavaVFX_R;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UNiagaraComponent* BodyLavaVFX;
 
 	// ================
 	// 빈사 상태 불꽃 VFX 컴포넌트
 	// ================
 	/** 푸른 불꽃 기둥 VFX ("불꽃의 안식처") */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dying|VFX")
 	UNiagaraComponent* DyingFlameEffectComp;
 
 	/** 바닥 마법진 VFX */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Dying|VFX")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dying|VFX")
 	UNiagaraComponent* DyingMagicCircleComp;
 
 	// ================
-	// 빈사 상태 사운드
+	// 빈사 상태 사운드 - Soft Reference로 메모리 최적화
 	// ================
 	/** 빈사 상태 진입 시 불꽃 발동 사운드 ("화륵!") */
-	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
-	UAkAudioEvent* DyingFlameActivationSound;
+	UPROPERTY(EditDefaultsOnly, Category = "Dying|Audio")
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameActivationSound;
 
 	/** 빈사 타이머 위험 구간 경고 사운드 (10초 이하) */
-	UPROPERTY(EditDefaultsOnly, Category="Dying|Audio")
-	UAkAudioEvent* DyingFlameDangerSound;
+	UPROPERTY(EditDefaultsOnly, Category = "Dying|Audio")
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameDangerSound;
 
 	// ================
 	// 전투 음악 관리
@@ -303,8 +332,8 @@ public:
 	class USphereComponent* CombatTrigger;
 
 	// 전투 탐지 반경
-	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta=(ClampMin="0"))
-	float CombatTriggerRadius = 800.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta = (ClampMin = "0"))
+	float CombatTriggerRadius = GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS;
 
 	// 몬스터가 전투 음악 시작/중지를 요청할 때 호출
 	UFUNCTION(BlueprintCallable)
@@ -341,8 +370,11 @@ protected:
 	virtual FName GetManualRowName_Implementation() const override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Input")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input")
 	UGS_SkillInputHandlerComp* SkillInputHandlerComponent;
+
+	UFUNCTION()
+	void HandleHitReactEnd(UAnimMontage* Montage, bool bInterrupted);
 
 	// 동적 머티리얼 파라미터 사용
 	UPROPERTY()
@@ -390,7 +422,7 @@ protected:
 	// ================
 	// LowHP 스크린 효과
 	// ================
-	UPROPERTY(EditDefaultsOnly, Category="Effects", meta=(ClampMin="0.0", ClampMax="1.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Effects", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float LowHealthThresholdRatio = 0.3f;
 
 	virtual void OnHoverBegin() override;
@@ -399,7 +431,7 @@ protected:
 	virtual bool ShowDecal() override;
 
 private:
-	UPROPERTY(VisibleAnywhere, Category="State", Replicated)
+	UPROPERTY(VisibleAnywhere, Category = "State", Replicated)
 	FSeekerState SeekerState;
 
 	UPROPERTY()
@@ -444,12 +476,12 @@ private:
 	void OnRep_DetectionIntensity();
 
 	// ==========================================
-	// 가디언 감지 HUD 시스템
+	// 가디언 감지 HUD 시스템 - Soft Reference로 메모리 최적화
 	// ==========================================
 
 	/** 감지 HUD 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Detection")
-	TSubclassOf<class UUserWidget> DetectionHUDWidgetClass;
+	TSoftClassPtr<class UUserWidget> DetectionHUDWidgetClass;
 
 	void StartCombatMusic();
 	void StopCombatMusic();
@@ -713,7 +745,7 @@ private:
 	// ========================================
 
 	/** 타이머 주기 상수 */
-	static constexpr float REVIVE_DECAY_TICK_INTERVAL = 0.1f;  // 100ms
+	static constexpr float REVIVE_DECAY_TICK_INTERVAL = 0.1f; // 100ms
 
 	/** 빈사 상태 여부 */
 	UPROPERTY(ReplicatedUsing = OnRep_IsInDyingState)
@@ -761,9 +793,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Dying|Effects")
 	UPostProcessComponent* DyingPostProcessComp;
 
-	/** 빈사 상태 PostProcess 머티리얼 */
+	/** 빈사 상태 PostProcess 머티리얼 - Soft Reference로 메모리 최적화 */
 	UPROPERTY(EditDefaultsOnly, Category = "Dying|Effects")
-	UMaterialInterface* DyingEffectMaterial;
+	TSoftObjectPtr<UMaterialInterface> DyingEffectMaterial;
 
 	/** 빈사 상태 동적 머티리얼 */
 	UPROPERTY()

@@ -56,7 +56,9 @@ void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& Tar
 	const float WarningDuration = FireballData->WarningDuration;
 	const float EffectRadius = GetEffectRadius();
 
-	if (UMaterialInterface* WarningDecalMaterial = FireballData->WarningDecalMaterial)
+	// Soft Reference 로드
+	UMaterialInterface* WarningDecalMaterial = FireballData->WarningDecalMaterial.IsNull() ? nullptr : FireballData->WarningDecalMaterial.LoadSynchronous();
+	if (WarningDecalMaterial)
 	{
 		FVector DecalLocation = TargetLocation;
 		DecalLocation.Z += 5.f;
@@ -116,13 +118,15 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 	const FVector SpawnLocation = TargetLocation + FVector(0.f, 0.f, FallStartHeight);
 	const FRotator SpawnRotation = FRotator(-90.f, 0.f, 0.f);
 
-	if (FireballData->ProjectileClass)
+	// Soft Reference 로드
+	TSubclassOf<AActor> LoadedProjectileClass = FireballData->ProjectileClass.IsNull() ? nullptr : FireballData->ProjectileClass.LoadSynchronous();
+	if (LoadedProjectileClass)
 	{
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		AActor* Fireball = World->SpawnActor<AActor>(
-			FireballData->ProjectileClass,
+			LoadedProjectileClass,
 			SpawnLocation,
 			SpawnRotation,
 			SpawnParams
@@ -141,12 +145,17 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 	return;
 	}
 
-	if (FireballData->TrailVFX)
+	// Soft Reference 로드
+	UNiagaraSystem* LoadedTrailVFX = FireballData->TrailVFX.IsNull() ? nullptr : FireballData->TrailVFX.LoadSynchronous();
+	if (LoadedTrailVFX)
 	{
-		PlaySkillVFX(FireballData->TrailVFX, SpawnLocation);
+		PlaySkillVFX(LoadedTrailVFX, SpawnLocation);
 	}
 
-	UAkAudioEvent* FallSound = SelectSoundEvent(FireballData->FallSound_TPS, FireballData->FallSound_RTS);
+	// Soft Reference 로드
+	UAkAudioEvent* FallSoundTPS = FireballData->FallSound_TPS.IsNull() ? nullptr : FireballData->FallSound_TPS.LoadSynchronous();
+	UAkAudioEvent* FallSoundRTS = FireballData->FallSound_RTS.IsNull() ? nullptr : FireballData->FallSound_RTS.LoadSynchronous();
+	UAkAudioEvent* FallSound = SelectSoundEvent(FallSoundTPS, FallSoundRTS);
 	if (FallSound)
 	{
 		PlaySkillSound(FallSound, TargetLocation);
@@ -177,12 +186,17 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 				return;
 			}
 
-			if (FireballDataInner->ExplosionVFX)
+			// Soft Reference 로드
+			UNiagaraSystem* LoadedExplosionVFX = FireballDataInner->ExplosionVFX.IsNull() ? nullptr : FireballDataInner->ExplosionVFX.LoadSynchronous();
+			if (LoadedExplosionVFX)
 			{
-				WeakThis->PlaySkillVFX(FireballDataInner->ExplosionVFX, TargetLocation);
+				WeakThis->PlaySkillVFX(LoadedExplosionVFX, TargetLocation);
 			}
 
-			UAkAudioEvent* ExpSound = WeakThis->SelectSoundEvent(FireballDataInner->ExplosionSound_TPS, FireballDataInner->ExplosionSound_RTS);
+			// Soft Reference 로드
+			UAkAudioEvent* ExpSoundTPS = FireballDataInner->ExplosionSound_TPS.IsNull() ? nullptr : FireballDataInner->ExplosionSound_TPS.LoadSynchronous();
+			UAkAudioEvent* ExpSoundRTS = FireballDataInner->ExplosionSound_RTS.IsNull() ? nullptr : FireballDataInner->ExplosionSound_RTS.LoadSynchronous();
+			UAkAudioEvent* ExpSound = WeakThis->SelectSoundEvent(ExpSoundTPS, ExpSoundRTS);
 			if (ExpSound)
 			{
 				WeakThis->PlaySkillSound(ExpSound, TargetLocation);

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
+#include "Delegates/DelegateCombinations.h"
 #include "GS_Drakhar.generated.h"
 
 class UGS_DrakharFeverGauge;
@@ -26,18 +27,22 @@ UCLASS()
 class GAS_API AGS_Drakhar : public AGS_Guardian
 {
 	GENERATED_BODY()
-	
+
 public:
-	AGS_Drakhar();
+	AGS_Drakhar(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	void OnDamageStart() override;
-	
+
+	/** Significance Manager: 거대 캐릭터 전용 최적화 */
+	virtual void OnSignificanceChanged(float NewSignificance) override;
+	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AGS_EarthquakeEffect> GC_EarthquakeEffect;
-	
+
 	//[combo attack variables]
 	UPROPERTY(Replicated)
 	bool bCanCombo;
@@ -48,9 +53,9 @@ public:
 
 	UFUNCTION()
 	void OnRep_ComboAttackCount();
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool IsAttacking;
-	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (DisplayName = "IsAttacking"))
+	bool bIsAttacking;
+
 	//[Draconic Fury Variables]
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TSubclassOf<AGS_DrakharProjectile> DraconicProjectile;
@@ -64,64 +69,64 @@ public:
 	//[fever mode]
 	FOnCurrentFeverGaugeChangedDelegate OnCurrentFeverGaugeChanged;
 	UPROPERTY()
-	bool bIsAttckingDuringFever;
+	bool bIsAttackingDuringFever;
 	FTimerHandle ResetAttackTimer;
 
 	//[health regeneration]
 	bool bIsDamaged = false;
-	
+
 	//[Input Binding Function]
 	virtual void Ctrl() override;
 	virtual void CtrlStop() override;
 	virtual void LeftMouse() override;
 	virtual void RightMouse() override;
-	
+
 	virtual void OnAttackHit(AGS_Character* HitCharacter) override;
 	virtual void OnFeverGaugeUpdate(float DeltaGauge) override;
 	virtual void OnQuitSkill() override;
-	
+
 	//[Attack Functions]
 	virtual void MeleeAttackCheck() override;
-	
+
 	//[COMBO ATTACK]
 	void SetNextComboAttackSection(FName InSectionName);
 	void ResetComboAttackSection();
 	void PlayComboAttackMontage();
-	
+
 	UFUNCTION()
 	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& PayLoad);
-	
+
 	UFUNCTION(Server, Reliable)
 	void ServerRPCNewComboAttack();
 
-	UFUNCTION(Server,Reliable)
+	UFUNCTION(Server, Reliable)
 	void ServerRPCShootEnergy();
-	
+
 	UFUNCTION(Server, Reliable)
 	void ServerRPCResetValue();
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCComboAttack();
 
 	void ComboLastAttack();
-	
+
 	//[Dash Skill]
 	UFUNCTION(Server, Reliable)
 	void ServerRPCDoDash(float DeltaTime);
-	
+
 	UFUNCTION(Server, Reliable)
 	void ServerRPCEndDash();
 
 	UFUNCTION(Server, Reliable)
 	void ServerRPCCalculateDashLocation();
-	
+
 	UFUNCTION()
 	void DashAttackCheck();
 
 	//[Earthquake Skill]
 	UFUNCTION(Server, Reliable)
 	void ServerRPCEarthquakeAttackCheck();
-	
+
 	//[DraconicFury Skill]
 	UFUNCTION(Server, Reliable)
 	void ServerRPCSpawnDraconicFury();
@@ -141,24 +146,24 @@ public:
 
 	void StartCtrl() override;
 	void StopCtrl() override;
-	
+
 	//[Fever Mode]
 	FORCEINLINE float GetCurrentFeverGauge() const { return CurrentFeverGauge; }
 	FORCEINLINE float GetMaxFeverGauge() const { return MaxFeverGauge; }
-	FORCEINLINE bool GetIsFeverMode() const {return IsFeverMode; }
-	
+	FORCEINLINE bool GetIsFeverMode() const { return bIsFeverMode; }
+
 	void SetFeverGaugeWidget(UGS_DrakharFeverGauge* InDrakharFeverGaugeWidget);
 	void SetFeverGauge(float InValue);
 	void ResetIsAttackingDuringFeverMode();
 	void StartIsAttackingTimer();
-	
+
 	// Optimization: Pre-allocated collections to reduce GC pressure
 	TSet<AGS_Character*> CachedDamagedCharacters;
 	TArray<FVector> CachedPillarLocations;
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCFeverMontagePlay();
-	
+
 	//new skill
 	void FeverComoLastAttack();
 	void PlayDelayedComboFinisherSounds();
@@ -181,7 +186,7 @@ public:
 	void SetStaminaGaugeWidget(UGS_DrakharStaminaGauge* InDrakharStaminaGaugeWidget);
 	void StartFlyingStaminaTimer();
 	FORCEINLINE float GetCurrentStaminaGauge() const { return FlyingStaminaCoolTime; }
-	FORCEINLINE float GetMaxStaminaGauge() const {return MaxFlyingStaminaCoolTime; }
+	FORCEINLINE float GetMaxStaminaGauge() const { return MAX_FLYING_STAMINA_COOLTIME; }
 	void EndFlyingStaminaTimer();
 	FOnCurrentStaminaGaugeChangedDelegate OnCurrentStaminaGaugeChanged;
 
@@ -197,28 +202,47 @@ public:
 	// UFUNCTION(NetMulticast, Unreliable) void MulticastPlayFeverModeStateSound();
 	// UFUNCTION(NetMulticast, Unreliable) void MulticastStopFeverModeStateSound();
 	// === Multicast RPCs for VFX only ===
-	UFUNCTION(NetMulticast, Unreliable) void MulticastPlayFeverModeEndEffects();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStartWingRushVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStopWingRushVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStartDustVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStopDustVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStartGroundCrackVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStopGroundCrackVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStartDustCloudVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastStopDustCloudVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastPlayEarthquakeImpactVFX(const FVector& ImpactLocation);
-	UFUNCTION(NetMulticast, Unreliable) void MulticastPlayFeverEarthquakeImpactVFX(const FVector& ImpactLocation);
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_PlayAttackHitVFX(FVector ImpactPoint);
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayFeverModeEndEffects();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStartWingRushVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStopWingRushVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStartDustVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStopDustVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStartGroundCrackVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStopGroundCrackVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStartDustCloudVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStopDustCloudVFX();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayEarthquakeImpactVFX(const FVector& ImpactLocation);
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayFeverEarthquakeImpactVFX(const FVector& ImpactLocation);
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_PlayAttackHitVFX(FVector ImpactPoint);
 	//UFUNCTION(NetMulticast, Unreliable) void MulticastPlayFeverModeEndVFX();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFlyStart();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFlyEnd();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnUltimateStart();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnEarthquakeStart();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeStart();
-	UFUNCTION(NetMulticast, Unreliable) void MulticastRPC_OnFeverModeEnd();
-	
-	UFUNCTION(NetMulticast, Unreliable) void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
-	
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnFlyStart();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnFlyEnd();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnUltimateStart();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnEarthquakeStart();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnFeverModeStart();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPC_OnFeverModeEnd();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayBloodEffect(FVector HitLocation, FVector HitNormal, float Scale);
+
 	// === Blueprint Events ===
 	UFUNCTION(BlueprintImplementableEvent, Category = "Skill|Fly", meta = (DisplayName = "On Fly Start"))
 	void BP_OnFlyStart();
@@ -248,7 +272,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX|Earthquake", meta = (DisplayName = "Earthquake VFX Spawn Point"))
 	UArrowComponent* EarthquakeVFXSpawnPoint;
-	
+
 public:
 	//dash skill public variables for vfx component
 	FVector DashStartLocation;
@@ -354,36 +378,46 @@ private:
 	// 카메라 효과 단계
 	enum class ECameraEffectPhase : uint8
 	{
-		None,      // 효과 없음
-		ZoomIn,    // 줌인 단계
-		ZoomOut,   // 줌아웃 단계 ("쾅" 효과)
-		Restore    // 원래 상태로 복귀
+		None, // 효과 없음
+		ZoomIn, // 줌인 단계
+		ZoomOut, // 줌아웃 단계 ("쾅" 효과)
+		Restore // 원래 상태로 복귀
 	};
 
 	ECameraEffectPhase CurrentCameraEffectPhase = ECameraEffectPhase::None;
 
 	// 카메라 효과 상수
-	static constexpr float CAMERA_UPDATE_INTERVAL = 0.01f;      // 타이머 간격 (10ms)
-	static constexpr float FOV_TOLERANCE = 0.5f;                 // FOV 도달 판정 허용 오차
-	static constexpr float ARM_LENGTH_TOLERANCE = 5.0f;          // Arm Length 도달 판정 허용 오차
-	static constexpr float FINAL_FOV_TOLERANCE = 0.1f;           // 최종 FOV 복귀 판정 허용 오차
-	static constexpr float FINAL_ARM_LENGTH_TOLERANCE = 1.0f;    // 최종 Arm Length 복귀 판정 허용 오차
+	static constexpr float CAMERA_UPDATE_INTERVAL = 0.01f; // 타이머 간격 (10ms)
+	static constexpr float FOV_TOLERANCE = 0.5f; // FOV 도달 판정 허용 오차
+	static constexpr float ARM_LENGTH_TOLERANCE = 5.0f; // Arm Length 도달 판정 허용 오차
+	static constexpr float FINAL_FOV_TOLERANCE = 0.1f; // 최종 FOV 복귀 판정 허용 오차
+	static constexpr float FINAL_ARM_LENGTH_TOLERANCE = 1.0f; // 최종 Arm Length 복귀 판정 허용 오차
 
 	//move spring arm for flying
 	float DefaultSpringArmLength;
 	float TargetSpringArmLength;
 	bool bIsFlying;
-	
+
+	//[HitStop]
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float ComboHitStopDuration = 0.08f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float FinisherHitStopDuration = 0.15f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float SkillHitStopDuration = 0.1f;
+
 	//[NEW COMBO ATTACK]
 	FName ComboAttackSectionName;
 	FName DefaultComboAttackSectionName;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta=(AllowPrivateAccess))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TObjectPtr<UAnimMontage> ComboAttackMontage;
-	
+
 	//[dash skill]
 	UPROPERTY()
 	TSet<AGS_Character*> DamagedCharactersFromDash;
-	
+
 	FVector DashDirection;
 	float DashInterpAlpha;
 
@@ -406,47 +440,47 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_FeverGauge)
 	float CurrentFeverGauge;
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsFeverMode)
-	bool IsFeverMode;
+	UPROPERTY(ReplicatedUsing = OnRep_IsFeverMode, meta = (DisplayName = "IsFeverMode"))
+	bool bIsFeverMode;
 
 	FTimerHandle FeverTimer;
 	FTimerHandle FeverStateSoundDelayTimer;
 
 	//[Flying CoolTime]
-	UPROPERTY(ReplicatedUsing=OnRep_FlyingStaminaCoolTime)
+	UPROPERTY(ReplicatedUsing = OnRep_FlyingStaminaCoolTime)
 	float FlyingStaminaCoolTime;
-	const float MaxFlyingStaminaCoolTime = 7.f; // 최대 스테미나
-	const float ValidFlyingStaminaCoolTime = 2.f; // 날기 시작 가능한 정도
-	bool isStartCoolTime = true;
-	
+	static constexpr float MAX_FLYING_STAMINA_COOLTIME = 7.0f; // 최대 스테미나
+	static constexpr float VALID_FLYING_STAMINA_COOLTIME = 2.0f; // 날기 시작 가능한 정도
+	bool bIsStartCoolTime = true;
+
 	FTimerHandle FlyingStartStaminaCoolTimeHandler;
 	FTimerHandle FlyingEndStaminaCoolTimeHandler;
-	
+
 	// === 카메라 줌 효과 설정 ===
 
 	// 카메라 줌인 효과 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "1.0", UIMin = "0.1", UIMax = "1.0"))
-	float FeverEndZoomInFOVMultiplier = 0.7f;  // FOV 줌인 비율 (기본 30% 줌인)
+	float FeverEndZoomInFOVMultiplier = 0.7f; // FOV 줌인 비율 (기본 30% 줌인)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "1.0", UIMin = "0.1", UIMax = "1.0"))
-	float FeverEndZoomInArmMultiplier = 0.6f;  // 카메라 암 줌인 비율 (기본 40% 가까이)
+	float FeverEndZoomInArmMultiplier = 0.6f; // 카메라 암 줌인 비율 (기본 40% 가까이)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "10.0", ClampMax = "100.0", UIMin = "10.0", UIMax = "100.0"))
-	float FeverEndZoomInSpeed = 30.0f;  // 줌인 속도
+	float FeverEndZoomInSpeed = 30.0f; // 줌인 속도
 
 	// 카메라 줌아웃 효과 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", ClampMax = "1.5", UIMin = "1.0", UIMax = "1.5"))
-	float FeverEndZoomOutFOVMultiplier = 1.05f;  // FOV 줌아웃 비율 (기본 5% 더 나감)
+	float FeverEndZoomOutFOVMultiplier = 1.05f; // FOV 줌아웃 비율 (기본 5% 더 나감)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", ClampMax = "1.5", UIMin = "1.0", UIMax = "1.5"))
-	float FeverEndZoomOutArmMultiplier = 1.1f;  // 카메라 암 줌아웃 비율 (기본 10% 더 멀리)
+	float FeverEndZoomOutArmMultiplier = 1.1f; // 카메라 암 줌아웃 비율 (기본 10% 더 멀리)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "10.0", ClampMax = "100.0", UIMin = "10.0", UIMax = "100.0"))
-	float FeverEndZoomOutSpeed = 40.0f;  // 줌아웃 속도 (빠른 "쾅" 효과)
+	float FeverEndZoomOutSpeed = 40.0f; // 줌아웃 속도 (빠른 "쾅" 효과)
 
 	// 카메라 복귀 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|FeverModeEnd", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", ClampMax = "20.0", UIMin = "1.0", UIMax = "20.0"))
-	float FeverEndCameraRestoreSpeed = 8.0f;  // 복귀 속도
+	float FeverEndCameraRestoreSpeed = 8.0f; // 복귀 속도
 
 	// 카메라 효과용 런타임 변수들
 	float OriginalFOV = 90.0f;
@@ -458,8 +492,8 @@ private:
 	float PillarForwardOffset = 300.f;
 	float PillarSideSpacing = 400.f;
 	float PillarRadius = 200.f;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta=(AllowPrivateAccess))
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TObjectPtr<UAnimMontage> FeverOnMontage;
 
 	UPROPERTY()
@@ -468,16 +502,16 @@ private:
 	//[draconic fury]
 	void GetRandomDraconicFuryTarget();
 	void EndDraconicFury();
-	
+
 	UFUNCTION()
 	void OnRep_FeverGauge();
-	
+
 	UFUNCTION()
 	void OnRep_IsFeverMode();
 
 	UFUNCTION()
 	void OnRep_FlyingStaminaCoolTime();
-	
+
 	// 월드 컨텍스트 검증 함수 (레벨 전환 시 크래시 방지)
 	bool IsWorldContextValid() const;
 

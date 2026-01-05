@@ -26,6 +26,10 @@ AGS_Ares::AGS_Ares()
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Ares");
+
+	// 타격 보정 설정 (아레스: 긴 사거리, 좁은 유도각)
+	MagnetismDistance = 500.0f;
+	MagnetismAngle = 45.0f;
 }
 
 // Called when the game starts or when spawned
@@ -35,7 +39,7 @@ void AGS_Ares::BeginPlay()
 
 	SetReplicateMovement(true);
 	GetMesh()->SetIsReplicated(true);
-	
+
 	// Moving 스킬 객체를 가져와서 카메라 설정값 전달
 	if (SkillComp)
 	{
@@ -43,12 +47,12 @@ void AGS_Ares::BeginPlay()
 		if (MovingSkill)
 		{
 			MovingSkill->SetCameraSettings(
-				MovingSkill_ZoomOutDistance,
-				MovingSkill_CameraZoomCurve,
-				MovingSkill_EnableMotionBlur,
-				MovingSkill_MotionBlurPeakAmount,
-				MovingSkill_MotionBlurCurve,
-				MovingSkill_MotionBlurExponent);
+			    MovingSkill_ZoomOutDistance,
+			    MovingSkill_CameraZoomCurve,
+			    MovingSkill_EnableMotionBlur,
+			    MovingSkill_MotionBlurPeakAmount,
+			    MovingSkill_MotionBlurCurve,
+			    MovingSkill_MotionBlurExponent);
 		}
 	}
 }
@@ -76,7 +80,7 @@ void AGS_Ares::ServerAttackMontage()
 }
 
 void AGS_Ares::MulticastPlayComboSection_Implementation(int32 ComboIndex)
-{	
+{
 	Super::MulticastPlayComboSection_Implementation(ComboIndex);
 
 	// SeekerAudioComponent를 통해 아레스 전용 콤보 공격 사운드 재생 (1-based 인덱스 전달)
@@ -89,15 +93,24 @@ void AGS_Ares::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 
 void AGS_Ares::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
 {
-	if (!SeekerAudioComponent)
+	// 조작감 개선: 콤보 인덱스별 차별화된 타격 정지(Hit-stop) 적용
+	// 멀티플레이 유의: 대검의 무게감은 유지하되 끊김 현상을 줄이기 위해 시간 조정 (0.11 -> 0.07)
+	float BaseDuration = 0.07f;
+	float FinalDuration = BaseDuration;
+
+	if (ComboIndex >= 4)
 	{
-		return;
+		FinalDuration = 0.11f; // 대검 피니셔: 묵직하지만 빠른 복구 유도
+	}
+	else
+	{
+		// 콤보 진행에 따른 점진적 강화 (최대 1.2배)
+		float Scale = 1.0f + (FMath::Min(2, FMath::Max(0, ComboIndex - 1)) * 0.1f);
+		FinalDuration = BaseDuration * Scale;
 	}
 
-	// GS_SeekerAudioComponent의 PlayAresComboAttackSoundWithExtra 함수에서 
-	// 추가 사운드가 자동으로 재생되므로 별도 처리 불필요
-	// 필요시 여기서 추가 로직 구현 가능
-	
+	Multicast_ApplyHitStop(FinalDuration, 0.0f, true);
+
 	// 공격 성공 시 공격자에게 카메라 쉐이크 적용 (Ares 전용)
 	if (HasAuthority())
 	{
@@ -145,4 +158,3 @@ void AGS_Ares::Multicast_RestoreDashCameraZoom_Implementation()
 		}
 	}
 }
-

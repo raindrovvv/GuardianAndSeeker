@@ -10,15 +10,15 @@ UCLASS()
 class GAS_API AGS_TrapManager : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AGS_TrapManager();
 
 	virtual void BeginPlay() override;
-	
+
 	void RegisterTrap(AGS_TrapBase* Trap);
 	void UnregisterTrap(AGS_TrapBase* Trap);
-	
+
 protected:
 	UPROPERTY(Replicated)
 	TArray<TWeakObjectPtr<AGS_TrapBase>> RegisteredTraps;
@@ -34,4 +34,5 @@ protected:
 
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };

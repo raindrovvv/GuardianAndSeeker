@@ -23,13 +23,12 @@
 #if WITH_EDITOR
 // Console variable for debug visualization
 static TAutoConsoleVariable<int32> CVarShowFootstepDebug(
-	TEXT("FootManager.ShowDebug"),
-	0,
-	TEXT("Show footstep debug traces and hit points\n")
-	TEXT("0: Disabled (default)\n")
-	TEXT("1: Enabled"),
-	ECVF_Cheat
-);
+    TEXT("FootManager.ShowDebug"),
+    0,
+    TEXT("Show footstep debug traces and hit points\n")
+        TEXT("0: Disabled (default)\n")
+            TEXT("1: Enabled"),
+    ECVF_Cheat);
 #endif
 
 // Static socket name definitions
@@ -44,16 +43,16 @@ UGS_FootManagerComponent::UGS_FootManagerComponent()
 
 	// Initialize cached skeletal mesh to nullptr
 	CachedSkeletalMesh = nullptr;
-	
+
 	// Initialize footstep sound event to nullptr
 	FootstepSoundEvent = nullptr;
-	
+
 	// Initialize minimum movement speed
-	MinimumMovementSpeed = 3.0f;  // 작은 캐릭터용으로 더 높게 설정
+	MinimumMovementSpeed = 3.0f; // 작은 캐릭터용으로 더 높게 설정
 
 	// Initialize footstep anti-spam settings
-	FootstepCooldownTime = 0.25f;  // 발자국 간 최소 간격 (초)
-	MinimumFootstepDistance = 70.0f;  // 마지막 발자국으로부터 최소 거리 (cm)
+	FootstepCooldownTime = 0.25f; // 발자국 간 최소 간격 (초)
+	MinimumFootstepDistance = 70.0f; // 마지막 발자국으로부터 최소 거리 (cm)
 	LastFootstepTime = 0.0f;
 	LastFootstepLocation = FVector::ZeroVector;
 
@@ -135,13 +134,13 @@ UGS_FootManagerComponent::UGS_FootManagerComponent()
 void UGS_FootManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	CachedSkeletalMesh = GetOwnerSkeletalMesh();
-	
+
 	if (!CachedSkeletalMesh)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("GS_FootManagerComponent: No SkeletalMeshComponent found on owner %s"), 
-			*GetOwner()->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("GS_FootManagerComponent: No SkeletalMeshComponent found on owner %s"),
+		       *GetOwner()->GetName());
 	}
 }
 
@@ -184,6 +183,29 @@ void UGS_FootManagerComponent::HandleFootstep(EFootStep Foot)
 	if (HitResult.PhysMaterial.IsValid())
 	{
 		SurfaceType = UPhysicalMaterial::DetermineSurfaceType(HitResult.PhysMaterial.Get());
+
+#if WITH_EDITOR
+		if (CVarShowFootstepDebug.GetValueOnGameThread() > 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[FootManager] %s - Surface: %d, PhysMat: %s, HitActor: %s"),
+			       *GetOwner()->GetName(),
+			       static_cast<int32>(SurfaceType),
+			       *HitResult.PhysMaterial.Get()->GetName(),
+			       HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("None"));
+		}
+#endif
+	}
+	else
+	{
+#if WITH_EDITOR
+		if (CVarShowFootstepDebug.GetValueOnGameThread() > 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[FootManager] %s - No PhysMaterial! HitActor: %s, Component: %s"),
+			       *GetOwner()->GetName(),
+			       HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("None"),
+			       HitResult.Component.IsValid() ? *HitResult.Component->GetName() : TEXT("None"));
+		}
+#endif
 	}
 
 	const FVector& HitLocation = HitResult.Location;
@@ -227,7 +249,7 @@ void UGS_FootManagerComponent::HandleFoleyEvent()
 	if (AActor* Owner = GetOwner())
 	{
 		FVector CharacterVelocity;
-		
+
 		if (ACharacter* Character = Cast<ACharacter>(Owner))
 		{
 			CharacterVelocity = Character->GetVelocity();
@@ -241,7 +263,7 @@ void UGS_FootManagerComponent::HandleFoleyEvent()
 			static FVector PreviousLocation = Owner->GetActorLocation();
 			const FVector CurrentLocation = Owner->GetActorLocation();
 			const float DeltaTime = GetWorld()->GetDeltaSeconds();
-			
+
 			if (DeltaTime > 0.0f)
 			{
 				CharacterVelocity = (CurrentLocation - PreviousLocation) / DeltaTime;
@@ -250,12 +272,12 @@ void UGS_FootManagerComponent::HandleFoleyEvent()
 			{
 				CharacterVelocity = FVector::ZeroVector;
 			}
-			
+
 			PreviousLocation = CurrentLocation;
 		}
 
 		const float HorizontalSpeed = FVector(CharacterVelocity.X, CharacterVelocity.Y, 0.0f).Size();
-		
+
 		if (HorizontalSpeed < MinimumMovementSpeed)
 		{
 			return;
@@ -263,7 +285,7 @@ void UGS_FootManagerComponent::HandleFoleyEvent()
 	}
 
 	EFootStep DetectedFoot = DetectActiveFootstep();
-	
+
 	HandleFootstep(DetectedFoot);
 }
 
@@ -282,7 +304,7 @@ EFootStep UGS_FootManagerComponent::DetectActiveFootstep()
 	const float LeftFootHeight = LeftFootLocation.Z;
 	const float RightFootHeight = RightFootLocation.Z;
 	const float HeightDifference = FMath::Abs(LeftFootHeight - RightFootHeight);
-	
+
 	// Use the foot that is currently lower (closer to ground)
 	if (HeightDifference > 1.0f)
 	{
@@ -292,28 +314,28 @@ EFootStep UGS_FootManagerComponent::DetectActiveFootstep()
 	// Method 2: Velocity-based detection (fallback)
 	static FVector PrevLeftFootLocation = LeftFootLocation;
 	static FVector PrevRightFootLocation = RightFootLocation;
-	
+
 	const FVector LeftFootVelocity = LeftFootLocation - PrevLeftFootLocation;
 	const FVector RightFootVelocity = RightFootLocation - PrevRightFootLocation;
-	
+
 	// Update previous locations for next frame
 	PrevLeftFootLocation = LeftFootLocation;
 	PrevRightFootLocation = RightFootLocation;
-	
+
 	// The foot with lower velocity is more likely to be in contact with ground
 	const float LeftFootSpeed = LeftFootVelocity.Size();
 	const float RightFootSpeed = RightFootVelocity.Size();
-	
+
 	// Method 3: Alternating fallback
 	static EFootStep LastDetectedFoot = EFootStep::RightFoot;
-	
+
 	if (FMath::Abs(LeftFootSpeed - RightFootSpeed) < 0.5f)
 	{
 		// Speeds are similar, alternate between feet
 		LastDetectedFoot = (LastDetectedFoot == EFootStep::LeftFoot) ? EFootStep::RightFoot : EFootStep::LeftFoot;
 		return LastDetectedFoot;
 	}
-	
+
 	// Return the foot with lower speed
 	LastDetectedFoot = (LeftFootSpeed < RightFootSpeed) ? EFootStep::LeftFoot : EFootStep::RightFoot;
 	return LastDetectedFoot;
@@ -328,7 +350,7 @@ bool UGS_FootManagerComponent::PerformFootTrace(EFootStep Foot, FHitResult& OutH
 
 	// Get foot socket name based on foot type
 	const FName SocketName = GetFootSocketName(Foot);
-	
+
 	// Check if socket exists (cache this check for better performance)
 	if (!CachedSkeletalMesh->DoesSocketExist(SocketName))
 	{
@@ -343,11 +365,11 @@ bool UGS_FootManagerComponent::PerformFootTrace(EFootStep Foot, FHitResult& OutH
 	// Setup optimized trace parameters
 	FCollisionQueryParams TraceParams(FName("FootTrace"), false, GetOwner());
 	TraceParams.bReturnPhysicalMaterial = true;
-	TraceParams.bTraceComplex = false;  // 성능 최적화: Simple collision 사용
-	
+	TraceParams.bTraceComplex = false; // 성능 최적화: Simple collision 사용
+
 	// 성능 최적화: 불필요한 오브젝트 제외
-	TraceParams.AddIgnoredActor(GetOwner());  // 자기 자신 제외
-	
+	TraceParams.AddIgnoredActor(GetOwner()); // 자기 자신 제외
+
 	// 추가 최적화: ResponseParams 설정으로 특정 오브젝트 타입만 체크
 	FCollisionResponseParams ResponseParams;
 	ResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Ignore);
@@ -355,27 +377,26 @@ bool UGS_FootManagerComponent::PerformFootTrace(EFootStep Foot, FHitResult& OutH
 
 	// Perform optimized line trace
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(
-		OutHitResult,
-		TraceStart,
-		TraceEnd,
-		TraceChannel,
-		TraceParams,
-		ResponseParams
-	);
+	    OutHitResult,
+	    TraceStart,
+	    TraceEnd,
+	    TraceChannel,
+	    TraceParams,
+	    ResponseParams);
 
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	if (CVarShowFootstepDebug.GetValueOnGameThread() > 0)
 	{
 		const FColor DebugColor = bHit ? FColor::Green : FColor::Red;
 		DrawDebugLine(GetWorld(), TraceStart, TraceEnd, DebugColor, false, 2.0f, 0, 2.0f);
-		
+
 		if (bHit)
 		{
 			DrawDebugPoint(GetWorld(), OutHitResult.Location, 8.0f, FColor::Yellow, false, 2.0f);
 			DrawDebugLine(GetWorld(), OutHitResult.Location, OutHitResult.Location + (OutHitResult.Normal * 20.0f), FColor::Blue, false, 2.0f, 0, 1.0f);
 		}
 	}
-	#endif
+#endif
 
 	return bHit;
 }
@@ -411,18 +432,17 @@ void UGS_FootManagerComponent::SpawnFootstepDecal(EPhysicalSurface Surface, cons
 
 	// 방향 조정을 위해 Z축으로 -90도 회전 추가
 	DecalRotation += FRotator(0.0f, 0.0f, -90.0f);
-	
+
 	// 에디터에서 설정 가능한 발자국 회전 오프셋 적용
 	DecalRotation += FRotator(0.0f, DecalRotationOffsetYaw, 0.0f);
 
 	UDecalComponent* SpawnedDecal = UGameplayStatics::SpawnDecalAtLocation(
-		GetWorld(),
-		DecalMaterial,
-		FootDecalSize,
-		DecalSpawnLocation,
-		DecalRotation,
-		FootDecalLifeSpan
-	);
+	    GetWorld(),
+	    DecalMaterial,
+	    FootDecalSize,
+	    DecalSpawnLocation,
+	    DecalRotation,
+	    FootDecalLifeSpan);
 
 	if (SpawnedDecal)
 	{
@@ -455,10 +475,9 @@ void UGS_FootManagerComponent::PlayFootstepSound(EPhysicalSurface Surface, const
 	}
 
 	AkAudioDevice->SetSwitch(
-		*SwitchGroupName,
-		**SwitchValue,
-		GetOwner()
-	);
+	    *SwitchGroupName,
+	    **SwitchValue,
+	    GetOwner());
 
 	UAkComponent* AkComp = GetOwner()->FindComponentByClass<UAkComponent>();
 	if (!IsValid(AkComp))
@@ -528,11 +547,10 @@ void UGS_FootManagerComponent::SpawnFootDustEffect(EPhysicalSurface Surface, con
 	const FRotator EffectRotation = FRotationMatrix::MakeFromZ(Normal).Rotator();
 
 	UNiagaraComponent* SpawnedEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		GetWorld(),
-		VFXToSpawn,
-		Location,
-		EffectRotation
-	);
+	    GetWorld(),
+	    VFXToSpawn,
+	    Location,
+	    EffectRotation);
 
 	if (SpawnedEffect)
 	{
@@ -632,7 +650,7 @@ UNiagaraSystem* UGS_FootManagerComponent::GetWaterEffectByDepth(float WaterDepth
 	{
 		return WaterSplashEffect;
 	}
-	
+
 	UNiagaraSystem* const* FoundVFX = FootDustEffects.Find(SurfaceType6);
 	return (FoundVFX && *FoundVFX) ? *FoundVFX : nullptr;
 }
@@ -662,12 +680,11 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (MainEffect && SpawnedEffects < MaxConcurrentWaterEffects)
 	{
 		UNiagaraComponent* SpawnedEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			MainEffect,
-			Location,
-			EffectRotation
-		);
-		
+		    GetWorld(),
+		    MainEffect,
+		    Location,
+		    EffectRotation);
+
 		if (SpawnedEffect)
 		{
 			SpawnedEffect->SetWorldScale3D(FVector(WaterSplashScale));
@@ -679,11 +696,10 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (WaterRippleEffect && SpawnedEffects < MaxConcurrentWaterEffects)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			WaterRippleEffect,
-			Location + FVector(0, 0, -2.0f), // Slightly lower for ripples
-			EffectRotation
-		);
+		    GetWorld(),
+		    WaterRippleEffect,
+		    Location + FVector(0, 0, -2.0f), // Slightly lower for ripples
+		    EffectRotation);
 		SpawnedEffects++;
 	}
 
@@ -691,11 +707,10 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (WaterDepth >= DeepWaterThreshold && WaterBubbleEffect && SpawnedEffects < MaxConcurrentWaterEffects)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			WaterBubbleEffect,
-			Location + FVector(FMath::RandRange(-5.0f, 5.0f), FMath::RandRange(-5.0f, 5.0f), 0),
-			EffectRotation
-		);
+		    GetWorld(),
+		    WaterBubbleEffect,
+		    Location + FVector(FMath::RandRange(-5.0f, 5.0f), FMath::RandRange(-5.0f, 5.0f), 0),
+		    EffectRotation);
 		SpawnedEffects++;
 	}
 
@@ -703,14 +718,13 @@ void UGS_FootManagerComponent::SpawnCombinedWaterEffects(const FVector& Location
 	if (WaterMistEffect && SpawnedEffects < MaxConcurrentWaterEffects)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			WaterMistEffect,
-			Location + FVector(0, 0, 5.0f), // Slightly higher for mist
-			EffectRotation
-		);
+		    GetWorld(),
+		    WaterMistEffect,
+		    Location + FVector(0, 0, 5.0f), // Slightly higher for mist
+		    EffectRotation);
 		SpawnedEffects++;
 	}
 
 	// Trigger Blueprint event
 	OnFootDustSpawned(SurfaceType6, Location);
-} 
+}

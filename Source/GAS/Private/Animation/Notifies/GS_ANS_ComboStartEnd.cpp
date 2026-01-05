@@ -10,7 +10,7 @@ void UGS_ANS_ComboStartEnd::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimS
 	AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(MeshComp->GetOwner());
 	if (IsValid(Drakhar))
 	{
-		Drakhar->IsAttacking = true;
+		Drakhar->bIsAttacking = true;
 	}
 }
 
@@ -22,6 +22,6 @@ void UGS_ANS_ComboStartEnd::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSeq
 	AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(MeshComp->GetOwner());
 	if (IsValid(Drakhar))
 	{
-		Drakhar->IsAttacking = false;
+		Drakhar->bIsAttacking = false;
 	}
 }

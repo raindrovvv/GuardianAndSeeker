@@ -30,7 +30,7 @@ UGS_ArcaneBoardManager::UGS_ArcaneBoardManager()
 		GridLayoutTable = GridLayoutTableFinder.Object;
 	}
 
-	/*InitDataCache();*/
+	InitDataCache();
 }
 
 bool UGS_ArcaneBoardManager::SetCurrClass(ECharacterClass NewClass)
@@ -45,25 +45,31 @@ bool UGS_ArcaneBoardManager::SetCurrClass(ECharacterClass NewClass)
 		//캐시에 없으면 데이터 테이블에서 직접 로드
 		if (IsValid(GridLayoutTable))
 		{
-			FString RowName = UGS_EnumUtils::GetEnumAsString(NewClass);
-			FGridLayoutTableRow* LayoutRow = GridLayoutTable->FindRow<FGridLayoutTableRow>(*RowName, TEXT("SetCurrClass"));
+			TArray<FGridLayoutTableRow*> AllRows;
+			GridLayoutTable->GetAllRows<FGridLayoutTableRow>(TEXT("SetCurrClass"), AllRows);
 
-			if (LayoutRow && !LayoutRow->GridLayoutAsset.IsNull())
+			UGS_GridLayoutDataAsset* FoundAsset = nullptr;
+			for (FGridLayoutTableRow* Row : AllRows)
 			{
-				UGS_GridLayoutDataAsset* LayoutAsset = LayoutRow->GridLayoutAsset.LoadSynchronous();
-				if (LayoutAsset)
+				if (Row && !Row->GridLayoutAsset.IsNull())
 				{
-					GridLayoutCache.Add(NewClass, LayoutAsset);
+					UGS_GridLayoutDataAsset* LayoutAsset = Row->GridLayoutAsset.LoadSynchronous();
+					if (LayoutAsset && LayoutAsset->CharacterClass == NewClass)
+					{
+						FoundAsset = LayoutAsset;
+						break;
+					}
 				}
-				else
-				{
-					UE_LOG(LogTemp, Error, TEXT("그리드 레이아웃 에셋 로드 실패: %s"), *RowName);
-					return false;
-				}
+			}
+
+			if (FoundAsset)
+			{
+				GridLayoutCache.Add(NewClass, FoundAsset);
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("그리드 레이아웃 데이터 없음: %s"), *RowName);
+				FString ClassName = UGS_EnumUtils::GetEnumAsString(NewClass);
+				UE_LOG(LogTemp, Error, TEXT("그리드 레이아웃 데이터 없음: %s"), *ClassName);
 				return false;
 			}
 		}
@@ -85,7 +91,7 @@ bool UGS_ArcaneBoardManager::SetCurrClass(ECharacterClass NewClass)
 		CalculateStatEffects();
 		AppliedBoardStats = CurrBoardStats;
 	}
-	
+
 	bHasUnsavedChanges = false;
 
 	return true;
@@ -180,8 +186,8 @@ bool UGS_ArcaneBoardManager::PlaceRune(uint8 RuneID, const FIntPoint& Pos, TArra
 	//룬 배치 정보 저장
 	FPlacedRuneInfo NewRune(RuneID, Pos);
 	PlacedRunes.Add(NewRune);
-	
-	for(const FPlacedRuneInfo& rune : PlacedRunes)
+
+	for (const FPlacedRuneInfo& rune : PlacedRunes)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("%d"), rune.RuneID);
 	}
@@ -267,7 +273,7 @@ void UGS_ArcaneBoardManager::CalculateStatEffects()
 			else if (RuneData.StatEffect.StatName == FName("DEF"))
 			{
 				BaseResult.DEF += RuneData.StatEffect.Value;
-				
+
 				if (bIsRuneConnected && BonusResult.DEF == 0)
 				{
 					BonusResult.DEF = BonusValue;
@@ -602,7 +608,7 @@ void UGS_ArcaneBoardManager::FindConnectedCells(const FIntPoint CellPos, TSet<FI
 		CurrGridState[CellPos].bIsConnected = true;
 	}
 
-	TArray<FIntPoint> Directions = { {0, 1}, {0, -1}, {1, 0}, {-1, 0} };
+	TArray<FIntPoint> Directions = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
 	for (const FIntPoint& Dir : Directions)
 	{
 		FIntPoint NextPos = CellPos + Dir;

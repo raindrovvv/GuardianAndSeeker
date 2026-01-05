@@ -8,7 +8,7 @@
 
 UGS_ShadowFangSkill::UGS_ShadowFangSkill()
 {
-	Cooltime = 20.0f; 
+	Cooltime = 20.0f;
 	Damage = 0.0f;
 }
 
@@ -25,7 +25,7 @@ void UGS_ShadowFangSkill::SpawnBuffZone()
 	{
 		return;
 	}
-	
+
 	FVector SpawnLocation = OwnerCharacter->GetActorLocation();
 	FRotator SpawnRotation = FRotator::ZeroRotator;
 

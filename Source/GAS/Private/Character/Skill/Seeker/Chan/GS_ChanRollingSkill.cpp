@@ -32,7 +32,10 @@ void UGS_ChanRollingSkill::OnSkillAnimationEnd()
 	{
 		if (CachedChanOwner->HasAuthority())
 		{
-			CachedChanOwner->Multicast_StopSkillMontage(SkillAnimMontages[0]);
+			if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+			{
+				CachedChanOwner->Multicast_StopSkillMontage(LoadedMontage);
+			}
 			CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 			CachedChanOwner->CanChangeSeekerGait = true;
 

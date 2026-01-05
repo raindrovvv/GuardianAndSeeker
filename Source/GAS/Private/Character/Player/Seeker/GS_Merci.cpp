@@ -24,6 +24,9 @@
 #include "Character/GS_Character.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
+#include "Component/GS_VisualPoolComp.h"
+#include "Weapon/Projectile/Seeker/GS_ArrowVisualActor.h"
 #include "Character/Skill/GS_SkillComp.h"
 //#include "Weapon/Equipable/"
 
@@ -35,14 +38,24 @@ AGS_Merci::AGS_Merci()
 
 	Weapon = CreateDefaultSubobject<UChildActorComponent>(TEXT("MerciBow"));
 	Weapon->SetupAttachment(GetMesh(), TEXT("BowSocket"));
-	
+
 	Quiver = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("QuiverMesh"));
 	Quiver->SetupAttachment(GetMesh(), TEXT("QuiverSocket"));
 	Quiver->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Quiver->SetSimulatePhysics(false);
-	
+
 	CharacterType = ECharacterType::Merci;
 	SkillInputHandlerComponent = CreateDefaultSubobject<UGS_MerciSkillInputHandlerComp>(TEXT("SkillInputHandlerComp"));
+
+	VisualPool = CreateDefaultSubobject<UGS_VisualPoolComp>(TEXT("VisualPool"));
+
+	// [최적화 설정]
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		// AlwaysTickPose: 시야에서 사라져도 노티파이(화살 장전 등)는 작동하게 함 (뼈 연산만 생략)
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+		MeshComp->SetBoundsScale(1.1f);
+	}
 
 	// KeyManual에서 쓰일 캐릭터 타입 저장
 	ManualRowName = FName("Merci");
@@ -81,7 +94,22 @@ void AGS_Merci::Client_UpdateTargetUI_Implementation(AActor* NewTarget, AActor* 
 void AGS_Merci::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->bEnableUpdateRateOptimizations = !IsLocallyControlled();
+		// 서버에서는 공격 로직(화살 발사 위치 계산, 노티파이 등)을 위해 항상 뼈를 갱신
+		if (HasAuthority())
+		{
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		}
+		else
+		{
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		}
+		MeshComp->SetBoundsScale(1.1f);
+	}
+
 	SetActorTickEnabled(true);
 
 	CurrentArrowType = EArrowType::Normal;
@@ -96,14 +124,18 @@ void AGS_Merci::BeginPlay()
 		GetWorld()->GetTimerManager().SetTimer(ChildArrowRegenTimer, this, &AGS_Merci::RegenChildArrow, RegenInterval, true);
 	}
 
-	Mesh = this->GetMesh();
-	UE_LOG(LogTemp, Warning, TEXT("AnimInstance: %s"), *GetNameSafe(GetMesh()->GetAnimInstance()));
 	if (ZoomCurve)
 	{
 		FOnTimelineFloat TimelineCallback;
 		TimelineCallback.BindUFunction(this, FName("UpdateZoom"));
 
 		ZoomTimeline.AddInterpFloat(ZoomCurve, TimelineCallback);
+	}
+
+	// === Visual Pool 초기화 (서버에서만 실행, 클라이언트는 복제본을 받음) ===
+	if (HasAuthority() && VisualPool && VisualArrowClass)
+	{
+		VisualPool->Initialize(VisualArrowClass, 20); // 20발 선스폰
 	}
 }
 
@@ -123,14 +155,14 @@ void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 	}
 
 	SetIsLockedRotationToController(true);
-	
+
 	// 가장 먼저 활 시위를 당길 수 있는 상황인지를 판단
 	if (!GetSkillComp()->IsSkillAllowed(ESkillSlot::Combo))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, IsSkillAllowed == false"));
 		return;
 	}
-	
+
 
 	// DrawBow 가 Client 외에 Server 에서 호출될 일이 있나? Client 에서 해당 함수가 호출되었다면 이미 쥐에서 Return 으로 막히는 거 아닌가?
 	if (!GetDrawState())
@@ -138,7 +170,7 @@ void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 		Client_UpdateCrosshairAim(true);
 
 		// 줌 시작
-		if(!GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+		if (!GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 		{
 			Client_StartZoom();
 		}
@@ -175,22 +207,22 @@ void AGS_Merci::ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float
 	SetIsLockedRotationToController(false);
 
 	Client_UpdateCrosshairAim(false);
-	
+
 	if (GetSkillComp()->IsSkillActive(ESkillSlot::Rolling))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Is Rolling not Release"));
 		return;
 	}
-	
+
 	// 줌 중지
 	if (!(this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate)))
 	{
 		Client_StopZoom(5.0f);
 	}
-	
+
 	// 몽타주 정지
 	// Multicast_StopDrawMontage();
-	
+
 	// 조준 완료 시(활을 끝까지 당겼을 때)
 	if (GetAimState())
 	{
@@ -202,11 +234,11 @@ void AGS_Merci::ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float
 
 		// 화살 발사
 		Server_FireArrow(ArrowClass, SpreadAngleDeg, NumArrows);
-		bIsFullyDrawn = false;  // 상태 초기화
+		bIsFullyDrawn = false; // 상태 초기화
 	}
 
 	GetSkillComp()->ResetAllowedSkillsMask();
-	
+
 	// 달리기 상태 설정
 	SetSeekerGait(EGait::Run);
 
@@ -242,9 +274,9 @@ void AGS_Merci::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 
 void AGS_Merci::PlayDrawMontage(UAnimMontage* DrawMontage)
 {
-	if (Mesh && DrawMontage)
+	if (GetMesh() && DrawMontage)
 	{
-		float Duration = Mesh->GetAnimInstance()->Montage_Play(DrawMontage);
+		float Duration = GetMesh()->GetAnimInstance()->Montage_Play(DrawMontage);
 		if (Duration > 0.0f)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Montage_Play called, duration: %f"), Duration);
@@ -262,10 +294,10 @@ void AGS_Merci::PlayDrawMontage(UAnimMontage* DrawMontage)
 
 void AGS_Merci::Multicast_StopDrawMontage_Implementation()
 {
-	if (Mesh && Mesh->GetAnimInstance())
+	if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Multicast_StopDrawMontage"));
-		Mesh->GetAnimInstance()->Montage_Stop(0.2f); // BlendOut 0.2초
+		GetMesh()->GetAnimInstance()->Montage_Stop(0.2f); // BlendOut 0.2초
 	}
 }
 
@@ -315,7 +347,7 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 	FVector TraceStart = ViewLoc;
 	FVector TraceEnd = TraceStart + ViewRot.Vector() * 8000.0f;
 	//Multicast_DrawDebugLine(TraceStart, TraceEnd, FColor::Green);
-	
+
 	// 3. Ray가 무언가에 부딪히면 그 위치를 목표로 설정, 아니면 끝 지점 사용
 	FHitResult Hit;
 	FCollisionQueryParams Params;
@@ -333,7 +365,7 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 		UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), HitActor ? *HitActor->GetName() : TEXT("None"));
 		UE_LOG(LogTemp, Warning, TEXT("Hit Component: %s"), HitComponent ? *HitComponent->GetName() : TEXT("None"));
 	}
-	
+
 
 	// 4. 무기의 소켓 위치에서 목표 위치로 향하는 방향 계산
 	FVector SpawnLocation = Weapon->GetSocketLocation("BowstringSocket");
@@ -348,7 +380,7 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 	FVector VFXLocation = SpawnLocation;
 	FRotator VFXRotation = BaseRotation;
 
-	
+
 	// 선형 보정 (예: 최대 2000 거리까지, 최대 20도 상승)
 	//float MaxDistance = 5000.0f;
 	//float MaxPitch = 40.0f;
@@ -381,13 +413,13 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnParams.Instigator = this;
 
-		AGS_SeekerMerciArrow* SpawnedArrow =GetWorld()->SpawnActor<AGS_SeekerMerciArrow>(ArrowClass, SpawnLocation, ArrowRot, SpawnParams);
-		
-		if(SpawnedArrow)
+		AGS_SeekerMerciArrow* SpawnedArrow = GetWorld()->SpawnActor<AGS_SeekerMerciArrow>(ArrowClass, SpawnLocation, ArrowRot, SpawnParams);
+
+		if (SpawnedArrow)
 		{
 			SpawnedArrow->SetOwner(this);
 		}
-		
+
 		// 7. 화살 타입 설정
 		if (AGS_SeekerMerciArrowNormal* NormalArrow = Cast<AGS_SeekerMerciArrowNormal>(SpawnedArrow)) // 연기화살 제외
 		{
@@ -403,20 +435,16 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 		}
 
 		// 8. 유도 화살
-		if (this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+		if (AGS_SeekerMerciArrow* HomingArrow = Cast<AGS_SeekerMerciArrow>(SpawnedArrow))
 		{
-			if (AGS_SeekerMerciArrow* HomingArrow = Cast<AGS_SeekerMerciArrow>(SpawnedArrow))
+			// 현재 유효한 자동 조준 타겟이 있다면 유도 설정
+			if (AutoAimTarget && IsValid(AutoAimTarget))
 			{
-				if (AutoAimTarget)
-				{
-					HomingArrow->Multicast_InitHomingTarget(AutoAimTarget);
-				}
+				HomingArrow->Multicast_InitHomingTarget(AutoAimTarget);
 			}
-		}
-		else
-		{
-			if (AGS_SeekerMerciArrow* HomingArrow = Cast<AGS_SeekerMerciArrow>(SpawnedArrow))
+			else
 			{
+				// 타겟이 없으면 일반 화살로 초기화
 				HomingArrow->Multicast_InitHomingTarget(nullptr);
 			}
 		}
@@ -424,11 +452,9 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 	}
 	// 8. 화살 발사 VFX 및 사운드 호출 (멀티캐스트로 모든 클라이언트에서 재생)
 	Multicast_PlayArrowShotVFX(VFXLocation, VFXRotation, NumArrows);
-	
+
 	// 실제로 화살이 발사될 때만 사운드 재생
 	Multicast_PlayArrowShotSound();
-
-	
 }
 
 void AGS_Merci::Server_ChangeArrowType_Implementation(int32 Direction)
@@ -445,15 +471,12 @@ void AGS_Merci::Server_ChangeArrowType_Implementation(int32 Direction)
 }
 
 void AGS_Merci::SetAutoAimTarget(AActor* Target)
-{ 
+{
 	if (HasAuthority())
 	{
-		// 타겟 설정
-		if (Target)
-		{
-			AutoAimTarget = Target;
-			OnRep_AutoAimTarget(); // 즉시 로컬 처리
-		}
+		// 타겟 설정 (Target이 nullptr이어도 업데이트 되어야 타겟 해제가 됨)
+		AutoAimTarget = Target;
+		OnRep_AutoAimTarget(); // 즉시 로컬 처리
 	}
 }
 
@@ -491,7 +514,7 @@ void AGS_Merci::Multicast_DrawDebugLine_Implementation(FVector Start, FVector En
 
 void AGS_Merci::OnDrawMontageEnded()
 {
-	bIsFullyDrawn = true;  // 활 완전히 당김 상태 설정
+	bIsFullyDrawn = true; // 활 완전히 당김 상태 설정
 	SetAimState(true);
 	SetDrawState(false);
 	UE_LOG(LogTemp, Warning, TEXT("OnDrawMontageEnded in server"));
@@ -509,9 +532,22 @@ void AGS_Merci::Server_NotifyDrawMontageEnded_Implementation()
 	SetDrawState(false);
 }
 
+void AGS_Merci::StateReset()
+{
+	Super::StateReset();
+
+	// 새로운 액션(구르기 등)으로 인해 상태가 리셋될 때, 피격 복구용 타이머도 함께 제거하여
+	// 0.5초 뒤에 갑자기 상태가 다시 풀리는(가령 구르기 중 제어권 복구 등) 현상을 방지함.
+	if (GetWorldTimerManager().IsTimerActive(DamageRecoveryTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(DamageRecoveryTimerHandle);
+	}
+}
+
 void AGS_Merci::Client_SetWidgetVisibility_Implementation(bool bVisible)
 {
-	if (!IsLocallyControlled()) return;
+	if (!IsLocallyControlled())
+		return;
 
 	if (WidgetCrosshair)
 	{
@@ -536,12 +572,11 @@ void AGS_Merci::Client_StopZoom_Implementation(float Duration)
 	}
 
 	GetWorldTimerManager().SetTimer(
-		ReverseTimerHandle,
-		this,
-		&AGS_Merci::ZoomTimelineReverse,
-		Duration,
-		false
-		);
+	    ReverseTimerHandle,
+	    this,
+	    &AGS_Merci::ZoomTimelineReverse,
+	    Duration,
+	    false);
 }
 
 void AGS_Merci::SetCrosshairWidget(UGS_CrossHairImage* InCrosshairWidget)
@@ -624,8 +659,11 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		return 0.0f;
 	}
 
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
 	// 활을 들고 있는 경우 (궁극기 상태가 아닐 때만 피격 시 해제)
-	if ((GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+	// 가벼운 데미지(10 미만)에는 취소되지 않도록 임계값 추가
+	if (ActualDamage >= 20.0f && (GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 	{
 		// 활 쏘기 애니메이션 재생 정지
 		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
@@ -641,8 +679,11 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		SetAimState(false);
 		bIsFullyDrawn = false;
 
-		// 키 제한
-		GetSkillComp()->SetCurAllowedSkillsMask(0);
+		// 키 제한 (구르기는 허용)
+		if (GetSkillComp())
+		{
+			GetSkillComp()->SetCurAllowedSkillsMask(1 << static_cast<int32>(ESkillSlot::Rolling));
+		}
 
 		// 0.5초 뒤 상태 리셋 (피격 후 복구 보장)
 		GetWorldTimerManager().ClearTimer(DamageRecoveryTimerHandle);
@@ -652,15 +693,13 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		SetSeekerGait(EGait::Run);
 	}
 
-	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-	
 	// 데미지를 받은 후 적절한 사운드 재생
 	if (SeekerAudioComponent && ActualDamage > 0.0f)
 	{
 		// 죽었는지 확인 (체력이 0 이하인지)
 		float CurrentHealth = GetStatComp() ? GetStatComp()->GetCurrentHealth() : -1.0f;
 	}
-	
+
 	return ActualDamage;
 }
 
@@ -676,7 +715,7 @@ int32 AGS_Merci::GetMaxChildArrows()
 
 void AGS_Merci::OnRep_CurrentArrowType()
 {
-	if(ArrowTypeWidget)
+	if (ArrowTypeWidget)
 	{
 		ArrowTypeWidget->UpdateArrowImage(CurrentArrowType);
 		if (CurrentArrowType == EArrowType::Normal)
@@ -709,7 +748,7 @@ void AGS_Merci::OnRep_CurrentAxeArrows()
 {
 	if (ArrowTypeWidget)
 	{
-		if(CurrentArrowType==EArrowType::Axe)
+		if (CurrentArrowType == EArrowType::Axe)
 		{
 			ArrowTypeWidget->UpdateArrowCount(CurrentAxeArrows);
 		}
@@ -739,7 +778,7 @@ void AGS_Merci::OnRep_CurrentChildArrows()
 
 void AGS_Merci::RegenAxeArrow()
 {
-	if (!HasAuthority()) 
+	if (!HasAuthority())
 	{
 		return;
 	}
@@ -752,7 +791,7 @@ void AGS_Merci::RegenAxeArrow()
 
 void AGS_Merci::RegenChildArrow()
 {
-	if (!HasAuthority()) 
+	if (!HasAuthority())
 	{
 		return;
 	}
@@ -774,49 +813,49 @@ void AGS_Merci::OnRep_AutoAimTarget()
 void AGS_Merci::Client_DrawDebugSphere_Implementation(FVector Loc, float Radius, FColor Color, float Duration)
 {
 	DrawDebugSphere(
-		GetWorld(),
-		Loc,
-		Radius,              // 반지름
-		16,                 // 세그먼트
-		Color,        // 색상
-		false,              // 지속 여부
-		Duration,               // 지속 시간 (2초)
-		0,
-		2.0f                // 선 두께
+	    GetWorld(),
+	    Loc,
+	    Radius, // 반지름
+	    16, // 세그먼트
+	    Color, // 색상
+	    false, // 지속 여부
+	    Duration, // 지속 시간 (2초)
+	    0,
+	    2.0f // 선 두께
 	);
 }
 
 void AGS_Merci::Multicast_PlayArrowShotVFX_Implementation(FVector Location, FRotator Rotation, int32 NumArrows)
 {
-	if (!GetWorld()) return;
-	
+	if (!GetWorld())
+		return;
+
 	// 화살 수에 따라 다른 VFX 선택
 	UNiagaraSystem* VFXToPlay = (NumArrows > 1) ? MultiShotVFX : ArrowShotVFX;
-	
+
 	if (VFXToPlay)
 	{
 		FVector PositionOffset = (NumArrows > 1) ? MultiShotVFXOffset : ArrowShotVFXOffset;
-		
+
 		// 로컬 오프셋을 월드 스페이스로 변환하여 적용
 		FVector WorldOffset = Rotation.RotateVector(PositionOffset);
 		FVector FinalLocation = Location + WorldOffset;
-		
+
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			FinalLocation,
-			Rotation,
-			FVector::OneVector,
-			true,
-			true
-		);
+		    GetWorld(),
+		    VFXToPlay,
+		    FinalLocation,
+		    Rotation,
+		    FVector::OneVector,
+		    true,
+		    true);
 	}
 }
 
 
 void AGS_Merci::Multicast_PlayArrowShotSound_Implementation()
 {
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer) 
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}

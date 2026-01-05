@@ -112,8 +112,9 @@ void AGS_RTSController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// UnitSelection을 클라이언트에서 서버로 리플리케이션
-	DOREPLIFETIME(AGS_RTSController, UnitSelection);
+	// UnitSelection은 Owner(Guardian 본인)만 알면 되는 정보
+	// 다른 플레이어에게는 불필요 → 대역폭 절약
+	DOREPLIFETIME_CONDITION(AGS_RTSController, UnitSelection, COND_OwnerOnly);
 }
 
 AActor* AGS_RTSController::GetViewTarget() const
@@ -590,6 +591,18 @@ void AGS_RTSController::OnLeftMousePressed()
 			OnRTSCommandChanged.Broadcast(CurrentCommand);
 			UpdateCursorForEdgeScroll();
 		}
+		else
+		{
+			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			if (CommandCancelSound)
+			{
+				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+			}
+
+			CurrentCommand = ERTSCommand::None;
+			OnRTSCommandChanged.Broadcast(CurrentCommand);
+			UpdateCursorForEdgeScroll();
+		}
 		break;
 	case ERTSCommand::Attack:
 		if (bHit)
@@ -615,6 +628,18 @@ void AGS_RTSController::OnLeftMousePressed()
 			CurrentCommand = ERTSCommand::None;
 			OnRTSCommandChanged.Broadcast(CurrentCommand);
 			// ShowAttackCursor() 내의 타이머가 0.2초 후 UpdateCursorForEdgeScroll()를 호출함
+		}
+		else
+		{
+			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			if (CommandCancelSound)
+			{
+				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+			}
+
+			CurrentCommand = ERTSCommand::None;
+			OnRTSCommandChanged.Broadcast(CurrentCommand);
+			UpdateCursorForEdgeScroll();
 		}
 		break;
 	default:
@@ -699,6 +724,11 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 	FHitResult GroundHit;
 	if (!GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel2), true, GroundHit))
 	{
+		// 허공 우클릭: 불가능 사운드 재생
+		if (CommandCancelSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CommandCancelSound);
+		}
 		return;
 	}
 
