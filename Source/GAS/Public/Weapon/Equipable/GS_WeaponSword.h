@@ -12,11 +12,11 @@
 UENUM(BlueprintType)
 enum class ESwordHitTargetType : uint8
 {
-	Guardian		UMETA(DisplayName = "Guardian"),
-	DungeonMonster	UMETA(DisplayName = "DungeonMonster"),
-	Seeker			UMETA(DisplayName = "Seeker"),
-	Structure		UMETA(DisplayName = "Structure"),
-	Other			UMETA(DisplayName = "Other")
+	Guardian UMETA(DisplayName = "Guardian"),
+	DungeonMonster UMETA(DisplayName = "DungeonMonster"),
+	Seeker UMETA(DisplayName = "Seeker"),
+	Structure UMETA(DisplayName = "Structure"),
+	Other UMETA(DisplayName = "Other")
 };
 
 /**
@@ -32,7 +32,7 @@ public:
 
 	UFUNCTION()
 	void EnableHit();
-	
+
 	UFUNCTION()
 	void DisableHit();
 
@@ -40,16 +40,15 @@ public:
 	void ServerEnableHit();
 	UFUNCTION(Server, Reliable)
 	void ServerDisableHit();
-	
+
 	UFUNCTION()
 	void OnHit(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult
-	);
+	    UPrimitiveComponent* OverlappedComponent,
+	    AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp,
+	    int32 OtherBodyIndex,
+	    bool bFromSweep,
+	    const FHitResult& SweepResult);
 
 	// 히트 사운드 에셋들
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
@@ -72,14 +71,13 @@ public:
 	UNiagaraSystem* HitSeekerVFX;
 
 
-	
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Attack")
 	USkeletalMeshComponent* Mesh;
-	
+
 	UPROPERTY(VisibleAnywhere, Category = "Attack")
 	class UBoxComponent* HitBox;
 
@@ -93,7 +91,7 @@ private:
 
 	// RTS 모드 지원을 위한 리스너 위치 가져오기
 	bool GetListenerLocation(FVector& OutLocation) const;
-	
+
 	// RTS 모드 감지
 	bool IsRTSMode() const;
 

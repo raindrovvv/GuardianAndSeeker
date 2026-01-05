@@ -9,6 +9,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Controller.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
@@ -136,6 +137,13 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	CombatTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerBeginOverlap);
 	CombatTrigger->OnComponentEndOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerEndOverlap);
 
+	// 공격 자석 효과 및 조작감 설정
+	MagnetismDistance = 400.0f;
+	MagnetismAngle = 60.0f;
+	MagnetismMovementWeight = 0.5f;
+	BaseAttackRange = 250.0f;
+	HomingDuration = 0.25f;
+
 	//함정 - 화살발사기의 화살 채널 설정(Projectile)
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Overlap);
@@ -162,6 +170,11 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	ItemData->ItemMeshs.Add(FName(TEXT("HP_Potion_Empty")), EmptyPotionMesh.Object);
 
 	ItemDatas.Add(EItemType::HP_Potion, ItemData);
+}
+
+void AGS_Seeker::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
 }
 
 void AGS_Seeker::BeginPlay()
@@ -270,6 +283,22 @@ void AGS_Seeker::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 공격 초반 타겟 추적 (Homing) 처리
+	if (HomingRemainingTime > 0.0f)
+	{
+		HomingRemainingTime -= DeltaTime;
+		if (AActor* Target = GetBestMagnetismTarget())
+		{
+			FVector Direction = Target->GetActorLocation() - GetActorLocation();
+			Direction.Z = 0.0f;
+			if (!Direction.IsNearlyZero())
+			{
+				FRotator TargetRot = Direction.Rotation();
+				FRotator NewRot = FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaTime, 15.0f); // 부드럽게 회전
+				SetActorRotation(NewRot);
+			}
+		}
+	}
 	// 현재 시커의 Tick 로직은 모두 타이머(UpdatePeripheralSensor, UpdateDyingStateTimer)로 이동되었습니다.
 	// 하위 클래스(Merci의 Zoom 등)에서 필요할 경우 하위 클래스에서 Tick을 켜고 사용할 수 있습니다.
 }
@@ -585,6 +614,9 @@ void AGS_Seeker::ComboInputOpen()
 		float CurrentTime = GetWorld()->GetTimeSeconds();
 		if (LastInputTime > 0.0f && (CurrentTime - LastInputTime) <= InputBufferWindow)
 		{
+			// 조작감 개선: 클라이언트에서 즉시 회전 보정 (Prediction)
+			PreAttackSnap();
+
 			// 버퍼 소진: 다음 공격 요청
 			Server_OnComboAttack();
 			LastInputTime = -1.0f; // 버퍼 초기화
@@ -627,7 +659,23 @@ float AGS_Seeker::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent
 		return 0.0f;
 	}
 
-	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	// 특정 단계 이상의 콤보 공격 중에는 피격 애니메이션(Hit-React) 무시
+	bool bOldCanHitReact = CanHitReact;
+	if (ComboAnimMontage && GetMesh() && GetMesh()->GetAnimInstance())
+	{
+		// 현재 콤보 진행 단계가 임계값 이상인 경우에만 슈퍼 아머 적용
+		if (GetMesh()->GetAnimInstance()->Montage_IsPlaying(ComboAnimMontage) && CurrentComboIndex >= SuperArmorComboThreshold)
+		{
+			CanHitReact = false;
+		}
+	}
+
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	// 상태 복구
+	CanHitReact = bOldCanHitReact;
+
+	return ActualDamage;
 }
 
 void AGS_Seeker::Server_OnComboAttack_Implementation()
@@ -696,32 +744,58 @@ AActor* AGS_Seeker::GetBestMagnetismTarget() const
 	AActor* BestTarget = nullptr;
 	float MinScore = TNumericLimits<float>::Max();
 
-	FVector Forward = GetActorForwardVector();
-	FVector Location = GetActorLocation();
+	// 1. 기준 방향 설정 (카메라 방향 및 이동 입력 반영)
+	FVector SearchOrigin = GetActorLocation();
+	FVector CameraDir = GetActorForwardVector();
 
-	for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
-		AGS_Monster* Monster = MonsterPtr.Get();
-		if (!IsValid(Monster) || Monster->IsDead())
+		FVector ViewLocation;
+		FRotator ViewRotation;
+		PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+		CameraDir = ViewRotation.Vector();
+		CameraDir.Z = 0.0f;
+		CameraDir.Normalize();
+	}
+
+	// 이동 입력 방향 반영 (Input-Driven Priority)
+	FVector InputDir = GetLastMovementInputVector();
+	InputDir.Z = 0.0f;
+
+	// 카메라 방향과 이동 입력 방향을 블렌딩하여 최종 탐색 방향 결정
+	FVector FinalSearchDir = CameraDir;
+	if (!InputDir.IsNearlyZero())
+	{
+		InputDir.Normalize();
+		// MagnetismMovementWeight 비율만큼 이동 입력 방향 반영
+		FinalSearchDir = FMath::Lerp(CameraDir, InputDir, MagnetismMovementWeight).GetSafeNormal();
+	}
+
+	// 주변의 모든 적(몬스터, 가디언 등)을 검사
+	for (const TWeakObjectPtr<AGS_Character>& EnemyPtr : NearbyEnemies)
+	{
+		AGS_Character* Enemy = EnemyPtr.Get();
+		if (!IsValid(Enemy) || Enemy->IsDead())
 			continue;
 
-		FVector ToMonster = Monster->GetActorLocation() - Location;
-		float Distance = ToMonster.Size();
+		FVector ToEnemy = Enemy->GetActorLocation() - SearchOrigin;
+		ToEnemy.Z = 0.0f;
+		float Distance = ToEnemy.Size();
 
 		if (Distance <= MagnetismDistance)
 		{
-			ToMonster.Normalize();
-			float Dot = FVector::DotProduct(Forward, ToMonster);
-			float Angle = FMath::RadiansToDegrees(FMath::Acos(Dot));
+			ToEnemy.Normalize();
+			float Dot = FVector::DotProduct(FinalSearchDir, ToEnemy);
+			float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
 
 			if (Angle <= MagnetismAngle)
 			{
-				// 거리와 각도를 조합한 점수 (낮을수록 좋음)
-				float Score = (Distance / MagnetismDistance) + (Angle / MagnetismAngle);
+				// 거리와 각도를 조합한 점수
+				float Score = (Distance / MagnetismDistance) + (Angle / MagnetismAngle) * 2.0f;
 				if (Score < MinScore)
 				{
 					MinScore = Score;
-					BestTarget = Monster;
+					BestTarget = Enemy;
 				}
 			}
 		}
@@ -730,40 +804,64 @@ AActor* AGS_Seeker::GetBestMagnetismTarget() const
 	return BestTarget;
 }
 
-void AGS_Seeker::ServerAttackMontage_Implementation()
+void AGS_Seeker::PreAttackSnap()
 {
+	// 조작감 개선: 공격 시점에 Homing 시작
+	HomingRemainingTime = HomingDuration;
+
 	// 타격 보정 (Target Magnetism) 로직 적용
 	if (AActor* Target = GetBestMagnetismTarget())
 	{
-		// 1. 타겟 방향으로 부드럽게 회전 보정
+		// 1. 타겟 방향으로 즉시 회전 보정
 		FVector Direction = Target->GetActorLocation() - GetActorLocation();
 		Direction.Z = 0.0f;
 		if (!Direction.IsNearlyZero())
 		{
 			SetActorRotation(Direction.Rotation());
 		}
-
-		// 2. 타겟 방향으로 약간의 전진 보정 (Lunge)
-		// 너무 가까우면 보정하지 않음
-		float Dist = Direction.Size();
-		if (Dist > 100.0f)
+	}
+	else
+	{
+		// 2. 타겟이 없는 경우: 플레이어가 바라보는 방향(카메라)으로 보정
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
 		{
-			FVector LungeImpulse = Direction.GetSafeNormal() * 300.0f; // 기본 추진력
-			LaunchCharacter(LungeImpulse, true, false);
+			FVector ViewLocation;
+			FRotator ViewRotation;
+			PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+			SetActorRotation(FRotator(0.f, ViewRotation.Yaw, 0.f));
+		}
+	}
+}
+
+void AGS_Seeker::ServerAttackMontage_Implementation()
+{
+	// 공격 시작 전 최종 보정 (서버 동기화용)
+	PreAttackSnap();
+
+	// 타격 보정 타겟이 있는 경우 가변 돌진(Adaptive Lunge) 수행
+	if (AActor* Target = GetBestMagnetismTarget())
+	{
+		FVector Direction = Target->GetActorLocation() - GetActorLocation();
+		Direction.Z = 0.0f;
+		float Distance = Direction.Size();
+
+		// [가변 돌진 (Adaptive Lunge)]
+		// 타겟이 사거리(BaseAttackRange)보다 멀리 있을 때만 부족한 만큼 돌진
+		if (Distance > BaseAttackRange)
+		{
+			// 거리에 비례하되 최대치 제한 (부드러운 접근)
+			float LungeStrength = FMath::Min(500.0f, (Distance - BaseAttackRange + 100.0f) * 1.5f);
+			LaunchCharacter(Direction.GetSafeNormal() * LungeStrength, true, false);
 		}
 	}
 	else
 	{
-		// 3. 전 방향 공격 보정 (Input-Driven Lunge)
-		// 적이 없을 때 플레이어가 입력한 이동 방향으로 살짝 전진
+		// 타겟이 없을 때 플레이어가 입력한 이동 방향으로 고정 돌진
 		FVector InputDir = GetLastMovementInputVector();
 		if (!InputDir.IsNearlyZero())
 		{
-			InputDir.Normalize();
-			// 입력 방향으로 즉시 회전 (조작감 향상)
-			SetActorRotation(InputDir.Rotation());
-			// 살짝 전진 추진력 부여
-			LaunchCharacter(InputDir * 200.0f, true, false);
+			LaunchCharacter(InputDir.GetSafeNormal() * 200.0f, true, false);
 		}
 	}
 
@@ -873,19 +971,23 @@ void AGS_Seeker::OnRep_CurrentEffectStrength()
 // 상태 전환에 따른 음악 함수 관련
 // ============================
 
-// 몬스터 감지 시스템 (시커가 몬스터를 감지)
+// 몬스터 및 가디언 감지 시스템 (시커의 조작감 보정용)
 void AGS_Seeker::OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (OtherActor && OtherActor->IsA(AGS_Monster::StaticClass()))
+	if (AGS_Character* OtherChar = Cast<AGS_Character>(OtherActor))
 	{
-		if (AGS_Monster* Monster = Cast<AGS_Monster>(OtherActor))
+		// 적대 관계인 경우에만 추가 (몬스터 또는 적 팀 플레이어/가디언)
+		if (IsEnemy(OtherChar))
 		{
-			AddCombatMonster(Monster);
+			AddCombatEnemy(OtherChar);
 
-			// 로컬 클라이언트에서만 CombatTrigger 상태 설정 (HP 위젯 가시성 제어용)
+			// 로컬 클라이언트에서만 UI 설정 (HP 위젯 등)
 			if (IsLocallyControlled())
 			{
-				Monster->SetInSeekerCombatTrigger(true);
+				if (AGS_Monster* Monster = Cast<AGS_Monster>(OtherChar))
+				{
+					Monster->SetInSeekerCombatTrigger(true);
+				}
 			}
 		}
 	}
@@ -893,18 +995,15 @@ void AGS_Seeker::OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp
 
 void AGS_Seeker::OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if (OtherActor && OtherActor->IsA(AGS_Monster::StaticClass()))
+	if (AGS_Character* OtherChar = Cast<AGS_Character>(OtherActor))
 	{
-		if (AGS_Monster* Monster = Cast<AGS_Monster>(OtherActor))
-		{
-			RemoveCombatMonster(Monster);
+		RemoveCombatEnemy(OtherChar);
 
-			// 로컬 클라이언트에서만 CombatTrigger 상태 설정 및 HP 위젯 숨김
-			if (IsLocallyControlled())
+		if (IsLocallyControlled())
+		{
+			if (AGS_Monster* Monster = Cast<AGS_Monster>(OtherChar))
 			{
 				Monster->SetInSeekerCombatTrigger(false);
-
-				// CombatTrigger를 벗어나면 즉시 HP 위젯 숨김
 				if (UGS_HPTextWidgetComp* HPWidgetComp = Monster->FindComponentByClass<UGS_HPTextWidgetComp>())
 				{
 					HPWidgetComp->SetVisibility(false);
@@ -914,26 +1013,16 @@ void AGS_Seeker::OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedCompon
 	}
 }
 
-void AGS_Seeker::PossessedBy(AController* NewController)
+void AGS_Seeker::AddCombatEnemy(AGS_Character* Enemy)
 {
-	Super::PossessedBy(NewController);
-
-	// 상태 초기화
-	StateReset();
-}
-
-void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
-{
-	if (!IsValid(Monster))
-	{
+	if (!IsValid(Enemy))
 		return;
-	}
 
-	// TWeakObjectPtr 배열이므로 수동으로 중복 확인
+	// 중복 확인 및 추가
 	bool bAlreadyContains = false;
-	for (const TWeakObjectPtr<AGS_Monster>& Ptr : NearbyMonsters)
+	for (const TWeakObjectPtr<AGS_Character>& Ptr : NearbyEnemies)
 	{
-		if (Ptr.Get() == Monster)
+		if (Ptr.Get() == Enemy)
 		{
 			bAlreadyContains = true;
 			break;
@@ -942,50 +1031,72 @@ void AGS_Seeker::AddCombatMonster(AGS_Monster* Monster)
 
 	if (!bAlreadyContains)
 	{
-		NearbyMonsters.Add(TWeakObjectPtr<AGS_Monster>(Monster));
+		NearbyEnemies.Add(TWeakObjectPtr<AGS_Character>(Enemy));
 
-		// 몬스터 사망 시 호출될 델리게이트 바인딩
-		Monster->OnMonsterDead.AddUniqueDynamic(this, &AGS_Seeker::HandleMonsterDeath);
+		// 사망 시 목록에서 제거하기 위한 델리게이트 바인딩
+		Enemy->OnDeathDelegate.AddUniqueDynamic(this, &AGS_Seeker::HandleEnemyDeath);
 
-		// 첫 번째 몬스터가 추가되면 음악 시작 (서버에서 클라이언트로 명령)
-		if (NearbyMonsters.Num() == 1)
+		// 적이 몬스터인 경우 추가 로직 (기존 음악 시스템 유지)
+		if (NearbyEnemies.Num() == 1)
 		{
 			StartCombatMusic();
 		}
 	}
 }
 
-void AGS_Seeker::ClearNearbyMonsters()
+void AGS_Seeker::RemoveCombatEnemy(AGS_Character* Enemy)
 {
-	for (int32 i = NearbyMonsters.Num() - 1; i >= 0; --i)
-	{
-		if (NearbyMonsters[i].IsValid())
-		{
-			NearbyMonsters[i]->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
-		}
-	}
-	NearbyMonsters.Reset();
-}
-
-void AGS_Seeker::RemoveCombatMonster(AGS_Monster* Monster)
-{
-	if (!Monster)
+	if (!Enemy)
 		return;
 
-	NearbyMonsters.RemoveAll([Monster](const TWeakObjectPtr<AGS_Monster>& Ptr)
-	                         { return Ptr.Get() == Monster; });
-	Monster->OnMonsterDead.RemoveDynamic(this, &AGS_Seeker::HandleMonsterDeath);
-
-	// 모든 몬스터가 제거되면 음악 중지
-	if (NearbyMonsters.Num() == 0)
+	for (int32 i = NearbyEnemies.Num() - 1; i >= 0; --i)
 	{
-		ClientRPCStopCombatMusic();
+		if (NearbyEnemies[i].Get() == Enemy)
+		{
+			Enemy->OnDeathDelegate.RemoveDynamic(this, &AGS_Seeker::HandleEnemyDeath);
+			NearbyEnemies.RemoveAt(i);
+			break;
+		}
+	}
+
+	if (NearbyEnemies.Num() == 0)
+	{
+		StopCombatMusic();
 	}
 }
 
-void AGS_Seeker::HandleMonsterDeath(AGS_Monster* DeadMonster)
+void AGS_Seeker::ClearNearbyEnemies()
 {
-	RemoveCombatMonster(DeadMonster);
+	for (int32 i = NearbyEnemies.Num() - 1; i >= 0; --i)
+	{
+		if (NearbyEnemies[i].IsValid())
+		{
+			NearbyEnemies[i]->OnDeathDelegate.RemoveDynamic(this, &AGS_Seeker::HandleEnemyDeath);
+		}
+	}
+	NearbyEnemies.Reset();
+}
+
+void AGS_Seeker::HandleEnemyDeath()
+{
+	// 유효하지 않은(죽은) 대상을 배열에서 정리
+	for (int32 i = NearbyEnemies.Num() - 1; i >= 0; --i)
+	{
+		if (!NearbyEnemies[i].IsValid() || NearbyEnemies[i]->IsDead())
+		{
+			NearbyEnemies.RemoveAt(i);
+		}
+	}
+
+	if (NearbyEnemies.Num() == 0)
+	{
+		StopCombatMusic();
+	}
+}
+
+void AGS_Seeker::StopCombatMusic()
+{
+	ClientRPCStopCombatMusic();
 }
 
 void AGS_Seeker::StartCombatMusic()
@@ -996,11 +1107,11 @@ void AGS_Seeker::StartCombatMusic()
 		return;
 	}
 
-	// 무효한 몬스터 제거 (TWeakObjectPtr이므로 유효성 체크만 수행)
-	NearbyMonsters.RemoveAll([](const TWeakObjectPtr<AGS_Monster>& M)
-	                         { return !M.IsValid(); });
+	// 무효한 적 제거
+	NearbyEnemies.RemoveAll([](const TWeakObjectPtr<AGS_Character>& E)
+	                        { return !E.IsValid(); });
 
-	if (NearbyMonsters.Num() == 0)
+	if (NearbyEnemies.Num() == 0)
 	{
 		return;
 	}
@@ -1013,20 +1124,17 @@ void AGS_Seeker::StartCombatMusic()
 			UAkAudioEvent* CombatStartEvent = nullptr;
 			UAkAudioEvent* CombatStopEvent = nullptr;
 
-			// 유효한 이벤트를 가진 몬스터를 우선 탐색
-			for (const TWeakObjectPtr<AGS_Monster>& MonsterPtr : NearbyMonsters)
+			// 유효한 이벤트를 가진 적(주로 몬스터)을 우선 탐색
+			for (const TWeakObjectPtr<AGS_Character>& EnemyPtr : NearbyEnemies)
 			{
-				AGS_Monster* Monster = MonsterPtr.Get();
-				if (!IsValid(Monster))
+				if (AGS_Monster* Monster = Cast<AGS_Monster>(EnemyPtr.Get()))
 				{
-					continue;
-				}
-				// Soft Reference 로드
-				if (!Monster->CombatMusicEvent.IsNull())
-				{
-					CombatStartEvent = Monster->CombatMusicEvent.LoadSynchronous();
-					CombatStopEvent = Monster->CombatMusicStopEvent.IsNull() ? nullptr : Monster->CombatMusicStopEvent.LoadSynchronous();
-					break;
+					if (!Monster->CombatMusicEvent.IsNull())
+					{
+						CombatStartEvent = Monster->CombatMusicEvent.LoadSynchronous();
+						CombatStopEvent = Monster->CombatMusicStopEvent.IsNull() ? nullptr : Monster->CombatMusicStopEvent.LoadSynchronous();
+						break;
+					}
 				}
 			}
 
@@ -1036,17 +1144,9 @@ void AGS_Seeker::StartCombatMusic()
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[Seeker] StartCombatMusic - 유효한 CombatMusicEvent가 없습니다. (NearbyMonsters: %d)"), NearbyMonsters.Num());
+				UE_LOG(LogTemp, Warning, TEXT("[Seeker] StartCombatMusic - 유효한 CombatMusicEvent가 없습니다. (NearbyEnemies: %d)"), NearbyEnemies.Num());
 			}
 		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("[Seeker] StartCombatMusic - AudioManager를 찾을 수 없습니다!"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[Seeker] StartCombatMusic - GameInstance를 찾을 수 없습니다!"));
 	}
 }
 
@@ -1057,29 +1157,33 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 	{
 		if (UGS_AudioManager* AudioManager = GameInstance->GetSubsystem<UGS_AudioManager>())
 		{
-			// 현재 재생 중인 전투 BGM 이벤트 가져오기 (가장 마지막에 추가된 몬스터 기준 또는 다른 로직)
 			UAkAudioEvent* CombatStopEventToUse = nullptr;
-			if (AudioManager->GetCurrentCombatMusicStopEvent()) // AudioManager에 저장된 StopEvent가 우선
+
+			if (AudioManager->GetCurrentCombatMusicStopEvent())
 			{
 				CombatStopEventToUse = AudioManager->GetCurrentCombatMusicStopEvent();
 			}
-			else if (!NearbyMonsters.IsEmpty() && NearbyMonsters.Last().IsValid() && !NearbyMonsters.Last().Get()->CombatMusicStopEvent.IsNull()) // 몬스터 배열에서 가져오기
+			else if (!NearbyEnemies.IsEmpty())
 			{
-				// Soft Reference 로드
-				CombatStopEventToUse = NearbyMonsters.Last().Get()->CombatMusicStopEvent.LoadSynchronous();
+				if (AGS_Monster* Monster = Cast<AGS_Monster>(NearbyEnemies.Last().Get()))
+				{
+					if (!Monster->CombatMusicStopEvent.IsNull())
+					{
+						CombatStopEventToUse = Monster->CombatMusicStopEvent.LoadSynchronous();
+					}
+				}
 			}
 
-			// EndCombatSequence 호출 시 CombatStopEvent도 전달
 			AudioManager->EndCombatSequence(this, CombatStopEventToUse);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("AGS_Seeker::StopCombatMusic() - AudioManager not found"));
+			UE_LOG(LogTemp, Error, TEXT("AGS_Seeker::ClientRPCStopMusic - AudioManager를 찾을 수 없습니다!"));
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("AGS_Seeker::StopCombatMusic() - GameInstance not found"));
+		UE_LOG(LogTemp, Error, TEXT("AGS_Seeker::ClientRPCStopMusic - GameInstance를 찾을 수 없습니다!"));
 	}
 }
 
@@ -1103,7 +1207,7 @@ void AGS_Seeker::OnDeath()
 	Super::OnDeath();
 
 	ClientRPCStopCombatMusic();
-	ClearNearbyMonsters();
+	ClearNearbyEnemies();
 }
 
 
@@ -1124,7 +1228,7 @@ void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, b
 	if (!bIsNowAlive) // 자신이 죽었을 때
 	{
 		ClientRPCStopCombatMusic();
-		ClearNearbyMonsters();
+		ClearNearbyEnemies();
 	}
 }
 

@@ -28,7 +28,7 @@ UGS_WeaponVFXComponent::UGS_WeaponVFXComponent()
 	bHitAuraDeactivating = false;
 	bEnchantDeactivating = false;
 	bTrailDeactivating = false;
-	
+
 	// 캐시 초기화
 	CachedWeaponMeshComponent = nullptr;
 	CachedOwnerSeekerType = ESeekerAuraType::Default;
@@ -38,11 +38,11 @@ UGS_WeaponVFXComponent::UGS_WeaponVFXComponent()
 void UGS_WeaponVFXComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// ======================
 	// 성능 최적화: 캐싱 초기화
 	// ======================
-	
+
 	// 1. 무기 메시 컴포넌트 캐싱 (FindComponentByClass는 매우 느리므로 한 번만 호출)
 	if (AActor* Owner = GetOwner())
 	{
@@ -59,15 +59,15 @@ void UGS_WeaponVFXComponent::BeginPlay()
 			CachedWeaponMeshComponent = Owner->GetRootComponent();
 		}
 	}
-	
+
 	// 2. 소유자 시커 타입 캐싱
 	CacheOwnerSeekerType();
-	
+
 	// 3. 기본 Slash VFX 로드 및 캐싱 (런타임 로딩 방지)
 	if (!CachedFallbackSlashVFX)
 	{
-		CachedFallbackSlashVFX = LoadObject<UNiagaraSystem>(nullptr, 
-			TEXT("/Game/VFX/RealisticBlood/Burst/Niagara/NS_BloodBurst_Med.NS_BloodBurst_Med"));
+		CachedFallbackSlashVFX = LoadObject<UNiagaraSystem>(nullptr,
+		                                                    TEXT("/Game/VFX/RealisticBlood/Burst/Niagara/NS_BloodBurst_Med.NS_BloodBurst_Med"));
 	}
 }
 
@@ -75,7 +75,7 @@ void UGS_WeaponVFXComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	// 모든 VFX 정리
 	ClearAllVFX();
-	
+
 	// 타이머 정리 (성능 최적화: GetWorld() 한 번만 호출)
 	if (UWorld* World = GetWorld())
 	{
@@ -127,7 +127,7 @@ void UGS_WeaponVFXComponent::ActivateHitAura(ESeekerAuraType SeekerType)
 		// 즉시 정리 (기존 VFX 제거)
 		CleanupHitAuraVFXComponent();
 	}
-	
+
 	// 만약 비활성화 중이었다면 상태 리셋
 	if (bHitAuraDeactivating)
 	{
@@ -206,9 +206,9 @@ void UGS_WeaponVFXComponent::PlaySlashVFX(const FHitResult& HitResult, ESeekerAu
 	FVector WeaponVelocity = GetOwner() ? GetOwner()->GetVelocity() : FVector::ZeroVector;
 	if (WeaponVelocity.IsNearlyZero(1.f))
 	{
-		WeaponVelocity = HitResult.ImpactNormal * -100.0f; 
+		WeaponVelocity = HitResult.ImpactNormal * -100.0f;
 	}
-	
+
 	Multicast_PlaySlashVFX(HitResult.ImpactPoint, WeaponVelocity, AttackerSeekerType);
 }
 
@@ -288,7 +288,7 @@ void UGS_WeaponVFXComponent::ClearAllVFX()
 	CleanupTrailVFXComponent();
 	CleanupChargeVFXComponent();
 	CleanupEnchantVFXComponent();
-	
+
 	// 현재 아우라 타입 리셋
 	CurrentAuraType = ESeekerAuraType::Default;
 }
@@ -314,13 +314,13 @@ void UGS_WeaponVFXComponent::Multicast_ActivateHitAura_Implementation(ESeekerAur
 		ActiveHitAuraVFXComponent->DestroyComponent();
 		ActiveHitAuraVFXComponent = nullptr;
 	}
-	
+
 	// 기존 타이머들 정리 (성능 최적화)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(HitAuraCleanupTimerHandle);
 	}
-	
+
 	bHitAuraDeactivating = false;
 
 	// 무기 메시 컴포넌트 가져오기
@@ -335,9 +335,9 @@ void UGS_WeaponVFXComponent::Multicast_ActivateHitAura_Implementation(ESeekerAur
 		// 성능 최적화: TWeakObjectPtr로 안전한 캡처 및 불필요한 복사 방지
 		TWeakObjectPtr<UNiagaraSystem> WeakVFXSystem = VFXSystem;
 		TWeakObjectPtr<USceneComponent> WeakMeshComponent = MeshComponent;
-		
+
 		World->GetTimerManager().SetTimerForNextTick([this, WeakVFXSystem, WeakMeshComponent, LocationOffset, RotationOffset, Scale, SeekerType]()
-		{
+		                                             {
 			// 타이머 콜백에서 실제 VFX 생성
 			if (!IsValidForVFXOperation() || !WeakMeshComponent.IsValid() || !WeakVFXSystem.IsValid())
 			{
@@ -365,31 +365,29 @@ void UGS_WeaponVFXComponent::Multicast_ActivateHitAura_Implementation(ESeekerAur
 				
 				// 비활성화 상태 리셋
 				bHitAuraDeactivating = false;
-			}
-		});
-		
+			} });
+
 		return; // 타이머 콜백에서 처리하므로 여기서 종료
 	}
 
 	// World가 없는 경우 기존 방식으로 시도
 	ActiveHitAuraVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-		VFXSystem,
-		MeshComponent,
-		AttachSocketName,
-		LocationOffset,
-		RotationOffset,
-		EAttachLocation::KeepRelativeOffset,
-		true
-	);
+	    VFXSystem,
+	    MeshComponent,
+	    AttachSocketName,
+	    LocationOffset,
+	    RotationOffset,
+	    EAttachLocation::KeepRelativeOffset,
+	    true);
 
 	if (ActiveHitAuraVFXComponent)
 	{
 		// 스케일 적용
 		ActiveHitAuraVFXComponent->SetRelativeScale3D(Scale);
-		
+
 		// 현재 아우라 타입 설정
 		CurrentAuraType = SeekerType;
-		
+
 		// 비활성화 상태 리셋
 		bHitAuraDeactivating = false;
 	}
@@ -404,7 +402,7 @@ void UGS_WeaponVFXComponent::Multicast_DeactivateHitAura_Implementation()
 
 		// 상태 표시
 		bHitAuraDeactivating = true;
-		
+
 		// 2초 후 완전 정리 (서버가 아닌 경우에만, 서버는 SoftDeactivateHitAura에서 처리)
 		// 성능 최적화: GetWorld() 한 번만 호출
 		if (!GetOwner()->HasAuthority())
@@ -433,9 +431,9 @@ void UGS_WeaponVFXComponent::Multicast_ActivateTrailVFX_Implementation(bool bAct
 			{
 				World->GetTimerManager().ClearTimer(TrailCleanupTimerHandle);
 			}
-			
+
 			bTrailDeactivating = false;
-			
+
 			// 기존 컴포넌트가 있고 유효하면 재활성화
 			if (TrailVFXComponent && IsValid(TrailVFXComponent))
 			{
@@ -443,7 +441,7 @@ void UGS_WeaponVFXComponent::Multicast_ActivateTrailVFX_Implementation(bool bAct
 				return;
 			}
 		}
-		
+
 		UNiagaraSystem* VFXSystem = GetWeaponVFX(EWeaponVFXType::Trail, SeekerType);
 		if (VFXSystem && !TrailVFXComponent)
 		{
@@ -451,15 +449,14 @@ void UGS_WeaponVFXComponent::Multicast_ActivateTrailVFX_Implementation(bool bAct
 			if (MeshComponent)
 			{
 				TrailVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-					VFXSystem,
-					MeshComponent,
-					AttachSocketName,
-					FVector::ZeroVector,
-					FRotator::ZeroRotator,
-					EAttachLocation::KeepRelativeOffset,
-					true
-				);
-				
+				    VFXSystem,
+				    MeshComponent,
+				    AttachSocketName,
+				    FVector::ZeroVector,
+				    FRotator::ZeroRotator,
+				    EAttachLocation::KeepRelativeOffset,
+				    true);
+
 				bTrailDeactivating = false;
 			}
 		}
@@ -470,18 +467,17 @@ void UGS_WeaponVFXComponent::Multicast_ActivateTrailVFX_Implementation(bool bAct
 		{
 			TrailVFXComponent->Deactivate(); // 새 파티클 생성 중지
 			bTrailDeactivating = true;
-			
+
 			// 0.3초 후 완전 제거 (기존 파티클이 자연스럽게 사라지도록)
 			// 성능 최적화: GetWorld() 한 번만 호출
 			if (UWorld* World = GetWorld())
 			{
 				World->GetTimerManager().SetTimer(
-					TrailCleanupTimerHandle,
-					this,
-					&UGS_WeaponVFXComponent::CleanupTrailVFXComponent,
-					0.3f,  // 페이드아웃 시간 (나이아가라 시스템의 Particle Lifetime에 맞춤)
-					false
-				);
+				    TrailCleanupTimerHandle,
+				    this,
+				    &UGS_WeaponVFXComponent::CleanupTrailVFXComponent,
+				    0.3f, // 페이드아웃 시간 (나이아가라 시스템의 Particle Lifetime에 맞춤)
+				    false);
 			}
 		}
 	}
@@ -506,14 +502,13 @@ void UGS_WeaponVFXComponent::Multicast_ActivateChargeVFX_Implementation(float Ch
 			if (MeshComponent)
 			{
 				ChargeVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-					VFXSystem,
-					MeshComponent,
-					AttachSocketName,
-					FVector::ZeroVector,
-					FRotator::ZeroRotator,
-					EAttachLocation::KeepRelativeOffset,
-					true
-				);
+				    VFXSystem,
+				    MeshComponent,
+				    AttachSocketName,
+				    FVector::ZeroVector,
+				    FRotator::ZeroRotator,
+				    EAttachLocation::KeepRelativeOffset,
+				    true);
 
 				if (ChargeVFXComponent)
 				{
@@ -541,14 +536,13 @@ void UGS_WeaponVFXComponent::Multicast_PlaySpecialAttackVFX_Implementation(ESeek
 		{
 			// 일회성 이펙트이므로 컴포넌트를 따로 저장하지 않음
 			UNiagaraFunctionLibrary::SpawnSystemAttached(
-				VFXSystem,
-				MeshComponent,
-				AttachSocketName,
-				GetVFXLocationOffset(EWeaponVFXType::SpecialAttack, SeekerType),
-				GetVFXRotationOffset(EWeaponVFXType::SpecialAttack, SeekerType),
-				EAttachLocation::KeepRelativeOffset,
-				true
-			);
+			    VFXSystem,
+			    MeshComponent,
+			    AttachSocketName,
+			    GetVFXLocationOffset(EWeaponVFXType::SpecialAttack, SeekerType),
+			    GetVFXRotationOffset(EWeaponVFXType::SpecialAttack, SeekerType),
+			    EAttachLocation::KeepRelativeOffset,
+			    true);
 		}
 	}
 }
@@ -578,15 +572,14 @@ void UGS_WeaponVFXComponent::Multicast_PlayGuardSuccessVFX_Implementation(FVecto
 		{
 			// 방패 중앙에서 이펙트 재생
 			UNiagaraComponent* VFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-				VFXSystem,
-				MeshComponent,
-				AttachSocketName,
-				GetVFXLocationOffset(EWeaponVFXType::GuardSuccess, DefenderSeekerType),
-				ImpactNormal.Rotation() + GetVFXRotationOffset(EWeaponVFXType::GuardSuccess, DefenderSeekerType),
-				EAttachLocation::KeepRelativeOffset,
-				true
-			);
-			
+			    VFXSystem,
+			    MeshComponent,
+			    AttachSocketName,
+			    GetVFXLocationOffset(EWeaponVFXType::GuardSuccess, DefenderSeekerType),
+			    ImpactNormal.Rotation() + GetVFXRotationOffset(EWeaponVFXType::GuardSuccess, DefenderSeekerType),
+			    EAttachLocation::KeepRelativeOffset,
+			    true);
+
 			// 스케일 별도 설정
 			if (VFXComponent)
 			{
@@ -597,14 +590,13 @@ void UGS_WeaponVFXComponent::Multicast_PlayGuardSuccessVFX_Implementation(FVecto
 		{
 			// 메시 컴포넌트가 없으면 충돌 지점에서 재생
 			UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				GetWorld(),
-				VFXSystem,
-				ImpactPoint,
-				ImpactNormal.Rotation(),
-				FVector(1.0f),
-				true,
-				true
-			);
+			    GetWorld(),
+			    VFXSystem,
+			    ImpactPoint,
+			    ImpactNormal.Rotation(),
+			    FVector(1.0f),
+			    true,
+			    true);
 		}
 	}
 }
@@ -626,14 +618,13 @@ void UGS_WeaponVFXComponent::Multicast_ActivateEnchantVFX_Implementation(ESeeker
 		if (MeshComponent)
 		{
 			EnchantVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-				VFXSystem,
-				MeshComponent,
-				AttachSocketName,
-				GetVFXLocationOffset(EWeaponVFXType::Enchant, SeekerType),
-				GetVFXRotationOffset(EWeaponVFXType::Enchant, SeekerType),
-				EAttachLocation::KeepRelativeOffset,
-				true
-			);
+			    VFXSystem,
+			    MeshComponent,
+			    AttachSocketName,
+			    GetVFXLocationOffset(EWeaponVFXType::Enchant, SeekerType),
+			    GetVFXRotationOffset(EWeaponVFXType::Enchant, SeekerType),
+			    EAttachLocation::KeepRelativeOffset,
+			    true);
 
 			if (EnchantVFXComponent)
 			{
@@ -669,8 +660,8 @@ void UGS_WeaponVFXComponent::Multicast_PlaySlashVFX_Implementation(FVector Impac
 		const FRotator SlashRotation = WeaponVelocity.Rotation();
 		const FVector ScaleVector = GetVFXScale(EWeaponVFXType::Slash, SeekerType);
 
-		DelayedHitLocation = ImpactPoint;  // 위치 저장
-		DelayedHitNormal = WeaponVelocity.GetSafeNormal(); 
+		DelayedHitLocation = ImpactPoint; // 위치 저장
+		DelayedHitNormal = WeaponVelocity.GetSafeNormal();
 		DelayedScale = ScaleVector.X;
 
 		// 타이머 설정 (딜레이 후 DelayedBloodEffect 호출)
@@ -678,12 +669,11 @@ void UGS_WeaponVFXComponent::Multicast_PlaySlashVFX_Implementation(FVector Impac
 		if (UWorld* World = GetWorld())
 		{
 			World->GetTimerManager().SetTimer(
-				BloodEffectDelayTimerHandle,
-				this,
-				&UGS_WeaponVFXComponent::DelayedBloodEffect,
-				0.125f,  // 조정 가능한 딜레이
-				false
-			);
+			    BloodEffectDelayTimerHandle,
+			    this,
+			    &UGS_WeaponVFXComponent::DelayedBloodEffect,
+			    0.125f, // 조정 가능한 딜레이
+			    false);
 		}
 	}
 }
@@ -774,7 +764,7 @@ void UGS_WeaponVFXComponent::CleanupTrailVFXComponent()
 		TrailVFXComponent->DestroyComponent();
 		TrailVFXComponent = nullptr;
 	}
-	bTrailDeactivating = false;  // 상태 리셋
+	bTrailDeactivating = false; // 상태 리셋
 }
 
 void UGS_WeaponVFXComponent::CleanupChargeVFXComponent()
@@ -837,7 +827,7 @@ void UGS_WeaponVFXComponent::CacheOwnerSeekerType()
 			CachedOwnerSeekerType = ESeekerAuraType::Merci;
 			return;
 		}
-		
+
 		// 무기의 Owner의 Owner를 확인 (중첩된 소유 구조인 경우)
 		if (AActor* CharacterOwner = WeaponOwner->GetOwner())
 		{
@@ -858,7 +848,7 @@ void UGS_WeaponVFXComponent::CacheOwnerSeekerType()
 			}
 		}
 	}
-	
+
 	CachedOwnerSeekerType = ESeekerAuraType::Default;
 }
 
