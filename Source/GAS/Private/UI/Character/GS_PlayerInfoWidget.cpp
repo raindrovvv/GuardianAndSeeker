@@ -35,11 +35,12 @@ void UGS_PlayerInfoWidget::InitializePlayerInfoWidget(AGS_Player* InPlayer)
 		OnCurrentHPBarChanged(InPlayer->GetStatComp());
 
 		PlayerName->SetText(FText::FromString(InPlayer->GetPlayerState()->GetPlayerName()));
-		
-		ESeekerJob SeekerJob = Cast<AGS_PlayerState>(InPlayer->GetPlayerState())->CurrentSeekerJob;
-		
-		//[TODO] why Seeker job is not updated?
-		if (InPlayer->CharacterType ==ECharacterType::Chan)
+
+		// CharacterType에서 SeekerJob으로 직접 변환
+		// (PlayerState의 CurrentSeekerJob은 타이밍 이슈로 신뢰할 수 없음)
+		ESeekerJob SeekerJob = ESeekerJob::Chan; // 기본값
+
+		if (InPlayer->CharacterType == ECharacterType::Chan)
 		{
 			SeekerJob = ESeekerJob::Chan;
 		}

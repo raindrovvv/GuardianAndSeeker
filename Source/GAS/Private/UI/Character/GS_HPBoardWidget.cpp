@@ -24,12 +24,12 @@ void UGS_HPBoardWidget::NativeConstruct()
 
 void UGS_HPBoardWidget::InitBoardWidget()
 {
-	if (!IsValid(PlayerInfoWidgetClass) || !IsValid(PlayerInfoWidgetList))
+	if (!IsValid(PlayerInfoWidgetClass) || !IsValid(PlayerInfoContainer))
 	{
 		return;
 	}
-	
-	PlayerInfoWidgetList->ClearChildren();
+
+	PlayerInfoContainer->ClearChildren();
 
 	AGameStateBase* GS = UGameplayStatics::GetGameState(this);
 	if (IsValid(GS))
@@ -52,7 +52,7 @@ void UGS_HPBoardWidget::InitBoardWidget()
 						}
 						PlayerInfoWidget->SetOwningActor(Player);
 						PlayerInfoWidget->InitializePlayerInfoWidget(Player);
-						PlayerInfoWidgetList->AddChildToVerticalBox(PlayerInfoWidget);
+						PlayerInfoContainer->AddChildToVerticalBox(PlayerInfoWidget);
 					}
 				}
 			}

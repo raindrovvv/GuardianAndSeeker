@@ -766,7 +766,6 @@ void AGS_BuildManager::ResetDungeonData()
 {
 	for (const auto& Pair : OccupancyData)
 	{
-		FIntPoint CellCoordinates = Pair.Key;
 		const FDEOccupancyData& Data = Pair.Value;
 		
 		if (IsValid(Data.RoomOccupancyActor))
