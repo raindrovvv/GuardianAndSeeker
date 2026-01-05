@@ -140,6 +140,10 @@ public:
 	UFUNCTION()
 	void ComboInputClose();
 
+	/** 공격 시작 전 즉각적인 회전 및 타겟팅 보정 (클라이언트 예측용) */
+	UFUNCTION()
+	void PreAttackSnap();
+
 	UFUNCTION(Server, Reliable)
 	virtual void Server_OnComboAttack();
 
@@ -234,6 +238,25 @@ public:
 	/** 타격 보정 허용 각도 (도) */
 	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
 	float MagnetismAngle = 60.0f;
+
+	/** 타격 보정 시 이동 입력 가중치 (0~1) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float MagnetismMovementWeight = 0.5f;
+
+	/** 기본 공격 사거리 (이 거리보다 멀 때만 돌진 수행) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float BaseAttackRange = 200.0f;
+
+	/** 공격 초반부 타겟 추격(Homing) 시간 */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	float HomingDuration = 0.25f;
+
+	/** 슈퍼 아머가 발동되는 콤보 인덱스 임계값 (이 인덱스 이상일 때만 피격 무시) */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
+	int32 SuperArmorComboThreshold = 3;
+
+	/** 남은 Homing 시간 */
+	float HomingRemainingTime = 0.0f;
 
 	/** 최적의 타겟 찾기 (보정용) */
 	AActor* GetBestMagnetismTarget() const;
@@ -337,12 +360,18 @@ public:
 
 	// 몬스터가 전투 음악 시작/중지를 요청할 때 호출
 	UFUNCTION(BlueprintCallable)
-	void AddCombatMonster(AGS_Monster* Monster);
+	void AddCombatEnemy(class AGS_Character* Enemy);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveCombatMonster(AGS_Monster* Monster);
+	void RemoveCombatEnemy(class AGS_Character* Enemy);
 
-	// 새로운 몬스터 감지 시스템 (시커의 CombatTrigger)
+	UFUNCTION()
+	void ClearNearbyEnemies();
+
+	/** 적(몬스터 또는 가디언) 사망 시 처리 */
+	UFUNCTION()
+	void HandleEnemyDeath();
+
 	UFUNCTION()
 	void OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
@@ -434,13 +463,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "State", Replicated)
 	FSeekerState SeekerState;
 
+	/** 현재 주변에 있는 적들의 목록 (타격 보정용) */
 	UPROPERTY()
-	TArray<TWeakObjectPtr<AGS_Monster>> NearbyMonsters;
-
-	void ClearNearbyMonsters();
-
-	UFUNCTION()
-	void HandleMonsterDeath(AGS_Monster* DeadMonster);
+	TArray<TWeakObjectPtr<class AGS_Character>> NearbyEnemies;
 
 	UPROPERTY()
 	FTimerHandle LowHealthEffectTimer;

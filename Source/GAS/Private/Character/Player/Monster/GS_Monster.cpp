@@ -523,7 +523,7 @@ void AGS_Monster::OnDeath()
 			{
 				if (AGS_Seeker* Seeker = SeekerPtr.Get())
 				{
-					Seeker->RemoveCombatMonster(this);
+					Seeker->RemoveCombatEnemy(this);
 				}
 			}
 		}

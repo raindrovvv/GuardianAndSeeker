@@ -14,23 +14,23 @@ class UNiagaraComponent;
 UENUM(BlueprintType)
 enum class EWeaponVFXType : uint8
 {
-	HitAura			UMETA(DisplayName = "Hit Aura"),		// 타격 시 아우라
-	Trail			UMETA(DisplayName = "Trail"),			// 무기 궤적
-	Charge			UMETA(DisplayName = "Charge"),			// 차징 이펙트
-	SpecialAttack	UMETA(DisplayName = "Special Attack"),	// 특수 공격
-	Enchant			UMETA(DisplayName = "Enchant"),			// 인챈트 효과
-	Slash			UMETA(DisplayName = "Slash"),			// 베기 이펙트
-	GuardSuccess	UMETA(DisplayName = "Guard Success")	// 방어 성공 이펙트
+	HitAura UMETA(DisplayName = "Hit Aura"), // 타격 시 아우라
+	Trail UMETA(DisplayName = "Trail"), // 무기 궤적
+	Charge UMETA(DisplayName = "Charge"), // 차징 이펙트
+	SpecialAttack UMETA(DisplayName = "Special Attack"), // 특수 공격
+	Enchant UMETA(DisplayName = "Enchant"), // 인챈트 효과
+	Slash UMETA(DisplayName = "Slash"), // 베기 이펙트
+	GuardSuccess UMETA(DisplayName = "Guard Success") // 방어 성공 이펙트
 };
 
 // 시커 타입별 아우라 이펙트 정의
 UENUM(BlueprintType)
 enum class ESeekerAuraType : uint8
 {
-	Chan		UMETA(DisplayName = "Chan"),
-	Ares		UMETA(DisplayName = "Ares"), 
-	Merci		UMETA(DisplayName = "Merci"),
-	Default		UMETA(DisplayName = "Default")
+	Chan UMETA(DisplayName = "Chan"),
+	Ares UMETA(DisplayName = "Ares"),
+	Merci UMETA(DisplayName = "Merci"),
+	Default UMETA(DisplayName = "Default")
 };
 
 // VFX 설정 구조체
@@ -72,18 +72,18 @@ public:
 	TMap<EWeaponVFXType, FWeaponVFXSeekerSettings> VFXSettingsMap;
 };
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_WeaponVFXComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
 	UGS_WeaponVFXComponent();
-	
+
 	// 공통 VFX 설정 Data Asset
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX|Settings")
 	UGS_WeaponVFXDataAsset* WeaponVFXSettings;
-	
+
 	// 개별 VFX 오버라이드 (특정 무기만 다른 VFX 사용시)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX|Override")
 	TMap<EWeaponVFXType, FWeaponVFXSeekerSettings> OverrideVFXSettingsMap;
@@ -95,11 +95,11 @@ public:
 	// 무기에 붙일 소켓 이름 (비어있으면 Root에 붙음)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "VFX|Settings")
 	FName AttachSocketName = NAME_None;
-	
+
 	// 아우라 VFX 활성화 (히트 감지 시 호출)
 	UFUNCTION(BlueprintCallable, Category = "WeaponVFX")
 	void ActivateHitAura(ESeekerAuraType SeekerType);
-	
+
 	// 아우라 VFX 비활성화
 	UFUNCTION(BlueprintCallable, Category = "WeaponVFX")
 	void DeactivateHitAura();
@@ -111,11 +111,11 @@ public:
 	// 슬래시 VFX 재생 (충돌 감지 시 호출)
 	UFUNCTION(BlueprintCallable, Category = "WeaponVFX")
 	void PlaySlashVFX(const FHitResult& HitResult, ESeekerAuraType AttackerSeekerType);
-	
+
 	// ======================
 	// 확장 VFX 기능들
 	// ======================
-	
+
 	// 무기 트레일 이펙트
 	UFUNCTION(BlueprintCallable, Category = "WeaponVFX")
 	void ActivateTrailVFX(bool bActivate = true);
@@ -152,7 +152,7 @@ private:
 	// ======================
 	// VFX 가져오기 헬퍼 함수
 	// ======================
-	
+
 	// VFX 시스템 가져오기 (오버라이드 우선, 없으면 공통 설정)
 	UNiagaraSystem* GetWeaponVFX(EWeaponVFXType VFXType, ESeekerAuraType SeekerType) const;
 	float GetVFXDuration(EWeaponVFXType VFXType, ESeekerAuraType SeekerType) const;
@@ -163,49 +163,49 @@ private:
 	// ======================
 	// VFX 재생 (멀티캐스트)
 	// ======================
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_ActivateHitAura(ESeekerAuraType SeekerType, FVector LocationOffset, FRotator RotationOffset, FVector Scale, float Duration);
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_DeactivateHitAura();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySlashVFX(FVector ImpactPoint, FVector WeaponVelocity, ESeekerAuraType SeekerType);
-	
+
 	// 확장 VFX용 멀티캐스트 함수들
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ActivateTrailVFX(bool bActivate, ESeekerAuraType SeekerType);
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ActivateChargeVFX(float ChargeLevel, ESeekerAuraType SeekerType);
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpecialAttackVFX(ESeekerAuraType SeekerType);
-	
+
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ActivateEnchantVFX(ESeekerAuraType SeekerType, float Duration);
-	
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayGuardSuccessVFX(FVector ImpactPoint, FVector ImpactNormal, ESeekerAuraType DefenderSeekerType);
 
 	// ======================
 	// VFX 관리 시스템
 	// ======================
-	
+
 	// 현재 재생 중인 VFX 컴포넌트들
 	UPROPERTY()
 	UNiagaraComponent* ActiveHitAuraVFXComponent;
-	
+
 	UPROPERTY()
 	UNiagaraComponent* TrailVFXComponent;
-	
+
 	UPROPERTY()
 	UNiagaraComponent* ChargeVFXComponent;
-	
+
 	UPROPERTY()
 	UNiagaraComponent* EnchantVFXComponent;
-	
+
 	// 현재 아우라 타입
 	ESeekerAuraType CurrentAuraType;
 
@@ -216,7 +216,7 @@ private:
 	FTimerHandle EnchantCleanupTimerHandle;
 	FTimerHandle BloodEffectDelayTimerHandle;
 	FTimerHandle TrailCleanupTimerHandle;
-	
+
 	// VFX 자동 제거 타이머 콜백
 	void DeactivateHitAuraTimerCallback();
 	void CleanupHitAuraTimerCallback();
@@ -225,7 +225,7 @@ private:
 
 	// 혈흔 이펙트 딜레이 콜백
 	void DelayedBloodEffect();
-	
+
 	// VFX 컴포넌트 상태 관리
 	bool bHitAuraDeactivating;
 	bool bEnchantDeactivating;
@@ -235,13 +235,13 @@ private:
 	FVector DelayedHitLocation;
 	FVector DelayedHitNormal;
 	float DelayedScale;
-	
+
 	// 안전한 VFX 컴포넌트 정리
 	void CleanupHitAuraVFXComponent();
 	void CleanupTrailVFXComponent();
 	void CleanupChargeVFXComponent();
 	void CleanupEnchantVFXComponent();
-	
+
 	// 부드러운 VFX 비활성화
 	void SoftDeactivateHitAura();
 	void SoftDeactivateEnchant();
@@ -251,24 +251,24 @@ private:
 
 	// 레벨 전환 시 안전성 검사
 	bool IsValidForVFXOperation() const;
-	
+
 	// 현재 소유자의 시커 타입 자동 감지
 	ESeekerAuraType GetOwnerSeekerType() const;
-	
+
 	// 소유자 시커 타입 캐싱 (무기 장착 시 호출)
 	void CacheOwnerSeekerType();
-	
+
 	// ======================
 	// 성능 최적화 캐시
 	// ======================
-	
+
 	// 캐싱된 무기 메시 컴포넌트
 	UPROPERTY()
 	TObjectPtr<USceneComponent> CachedWeaponMeshComponent;
-	
+
 	// 캐싱된 소유자 시커 타입
 	ESeekerAuraType CachedOwnerSeekerType;
-	
+
 	// 캐싱된 기본 Slash VFX (런타임 로딩 방지)
 	UPROPERTY()
 	TObjectPtr<UNiagaraSystem> CachedFallbackSlashVFX;

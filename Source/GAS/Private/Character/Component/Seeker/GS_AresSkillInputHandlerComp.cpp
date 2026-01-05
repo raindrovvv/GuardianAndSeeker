@@ -9,7 +9,7 @@ void UGS_AresSkillInputHandlerComp::OnRightClick(const FInputActionInstance& Ins
 	Super::OnRightClick(Instance);
 
 	// UE_LOG(LogTemp, Warning, TEXT("Right Click Ares"));
-	
+
 	if (OwnerCharacter->IsDead())
 	{
 		return;
@@ -33,20 +33,20 @@ void UGS_AresSkillInputHandlerComp::OnRightClick(const FInputActionInstance& Ins
 void UGS_AresSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Instance)
 {
 	Super::OnLeftClick(Instance);
-	
+
 	AGS_Ares* Ares = Cast<AGS_Ares>(OwnerCharacter);
-	
+
 	/*if (!(Ares->GetSkillInputControl().CanInputLC))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Left Click Lock"));
 		return;
 	}*/
-	
+
 	if (OwnerCharacter->IsDead())
 	{
 		return;
 	}
-	
+
 	if (!bCtrlHeld)
 	{
 		if (Ares)
@@ -56,14 +56,12 @@ void UGS_AresSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 				Ares->GetSkillComp()->Server_TrySkillCommand(ESkillSlot::Aiming);
 			}
 			else
-			{				
+			{
 				if (Ares->CanAcceptComboInput)
 				{
+					// 조작감 개선: 클라이언트에서 즉시 회전 보정
+					Ares->PreAttackSnap();
 					Ares->Server_OnComboAttack();
-				}
-				else
-				{
-					
 				}
 			}
 		}
@@ -80,12 +78,12 @@ void UGS_AresSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 void UGS_AresSkillInputHandlerComp::OnLeftClickRelease(const FInputActionInstance& Instance)
 {
 	Super::OnLeftClickRelease(Instance);
-	
+
 	if (OwnerCharacter->IsDead())
 	{
 		return;
 	}
-	
+
 	/*if (bWasCtrlHeldWhenLeftClicked && OwnerCharacter->GetSkillInputControl().CanInputCtrl)
 	{
 		OwnerCharacter->GetSkillComp()->Server_TrySkillCommand(ESkillSlot::Moving);
@@ -100,7 +98,7 @@ void UGS_AresSkillInputHandlerComp::OnLeftClickRelease(const FInputActionInstanc
 void UGS_AresSkillInputHandlerComp::OnRoll(const struct FInputActionInstance& Instance)
 {
 	AGS_Ares* Ares = Cast<AGS_Ares>(OwnerCharacter);
-	
+
 	if (Ares->IsDead())
 	{
 		return;
