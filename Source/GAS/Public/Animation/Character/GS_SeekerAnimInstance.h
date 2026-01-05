@@ -26,7 +26,7 @@ class GAS_API UGS_SeekerAnimInstance : public UGS_CharacterAnimInstance
 	GENERATED_BODY()
 public:
 	UGS_SeekerAnimInstance();
-	
+
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
@@ -45,24 +45,24 @@ public:
 	void SetMustTurnInPlace(bool MustTurn);
 
 	// Offset Root Bone
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "OffsetRootBone")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "OffsetRootBone")
 	float GetOffsetRootTranslationHalfLife();
-	
+
 	// Lean
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Lean")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Lean")
 	FVector CalculateRelativeAccelerationAmount();
-	
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Lean")
+
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Lean")
 	float Get_LeanAmount();
 
 	// Steering
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Steering")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Steering")
 	bool EnableSteering();
 
-	UFUNCTION(BlueprintPure, meta=(NotBlueprintThreadSafe="ture"), Category = "AimOffset")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "AimOffset")
 	FVector2D Get_AOValue();
 
-	UFUNCTION(BlueprintPure, meta=(NotBlueprintThreadSafe="ture"), Category = "AimOffset")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "AimOffset")
 	bool Enable_AO();
 
 	UFUNCTION(BlueprintCallable, Category = "Montage")
@@ -80,7 +80,7 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Montage", meta = (BlueprintThreadSafe))
 	uint8 CurMontageSlot = 0;
-	
+
 	// Chooser
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Motion Matching")
 	TObjectPtr<UGS_ChooserInputObj> ChooserInputObj;
@@ -108,6 +108,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Trajectory")
 	float PreviousDesiredController;
 
+	FVector2D Get_AOValue_Internal();
+	bool Enable_AO_Internal();
+
+	UPROPERTY(BlueprintReadOnly, Category = "AimOffset")
+	FVector2D CachedAOValue;
+
+	UPROPERTY(BlueprintReadOnly, Category = "AimOffset")
+	bool bCachedEnableAO = false;
+
 	// ========================================
 	// 빈사 상태
 	// ========================================
@@ -116,6 +125,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "State")
 	bool bIsDying = false;
 
-	UFUNCTION(BlueprintPure, Category = "Montage")
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Montage")
 	bool IsMontageSlotActive(ESeekerMontageSlot InputMontageSlot);
 };
