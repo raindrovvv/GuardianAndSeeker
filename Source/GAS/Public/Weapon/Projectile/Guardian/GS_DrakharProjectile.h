@@ -113,6 +113,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Indicator|Trace")
 	float FallbackGroundZPosition = -1000.0f;
 
+	// === 데미지 설정 ===
+
+	// 기본 데미지 (스킬 계수 적용 가능)
+	UPROPERTY(EditAnywhere, Category = "Damage", meta = (ClampMin = "0.0"))
+	float BaseDamage = 120.0f;
+
 private:
 	// === 타이머 핸들 ===
 

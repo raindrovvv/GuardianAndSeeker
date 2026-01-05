@@ -227,6 +227,13 @@ void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		StatComp->OnCurrentHPChanged.Clear();
 	}
 
+	// 타이머 정리
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		TimerManager.ClearTimer(HitReactTimerHandle);
+	}
+
 	// Stability: DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
 	// (DestroyComponent 호출 시 ensure(!IsDefaultSubobject()) 실패 위험)
 	if (IsValid(HPTextWidgetComp))

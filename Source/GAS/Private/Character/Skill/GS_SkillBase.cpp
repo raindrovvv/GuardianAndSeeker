@@ -171,25 +171,26 @@ void UGS_SkillBase::PreloadSkillAssets()
 
 	if (AssetsToLoad.Num() > 0)
 	{
-		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [this]()
+		// TWeakObjectPtr로 캡처하여 UObject 파괴 후 람다 호출 시 안전성 확보
+		TWeakObjectPtr<UGS_SkillBase> WeakThis(this);
+
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
 		                                         {
-			if (!IsValid(this))
+			if (UGS_SkillBase* Strong = WeakThis.Get())
 			{
-				return;
-			}
+				// 로드 완료 후 캐싱
+				Strong->CachedCastVFX = Strong->SkillCastVFX.Get();
+				Strong->CachedRangeVFX = Strong->SkillRangeVFX.Get();
+				Strong->CachedImpactVFX = Strong->SkillImpactVFX.Get();
+				Strong->CachedEnvImpactVFX = Strong->SkillEnvImpactVFX.Get();
+				Strong->CachedEndVFX = Strong->SkillEndVFX.Get();
+				Strong->CachedLoopVFX = Strong->SkillLoopVFX.Get();
 
-			// 로드 완료 후 캐싱
-			CachedCastVFX = SkillCastVFX.Get();
-			CachedRangeVFX = SkillRangeVFX.Get();
-			CachedImpactVFX = SkillImpactVFX.Get();
-			CachedEnvImpactVFX = SkillEnvImpactVFX.Get();
-			CachedEndVFX = SkillEndVFX.Get();
-			CachedLoopVFX = SkillLoopVFX.Get();
-
-			CachedAnimMontages.SetNum(SkillAnimMontages.Num());
-			for (int32 i = 0; i < SkillAnimMontages.Num(); ++i)
-			{
-				CachedAnimMontages[i] = SkillAnimMontages[i].Get();
+				Strong->CachedAnimMontages.SetNum(Strong->SkillAnimMontages.Num());
+				for (int32 i = 0; i < Strong->SkillAnimMontages.Num(); ++i)
+				{
+					Strong->CachedAnimMontages[i] = Strong->SkillAnimMontages[i].Get();
+				}
 			} });
 	}
 }

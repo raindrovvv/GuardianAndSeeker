@@ -146,8 +146,7 @@ bool AGS_DrakharProjectile::TryApplyDamageToCharacter(AActor* HitActor)
 	FGS_DamageEvent DamageEvent;
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 
-	const float DamageAmount = 120.0f; // TODO: 스킬 계수로 변경
-	DamagedCharacter->TakeDamage(DamageAmount, DamageEvent, ProjectileOwner->GetInstigatorController(), this);
+	DamagedCharacter->TakeDamage(BaseDamage, DamageEvent, ProjectileOwner->GetInstigatorController(), this);
 
 	return true;
 }
