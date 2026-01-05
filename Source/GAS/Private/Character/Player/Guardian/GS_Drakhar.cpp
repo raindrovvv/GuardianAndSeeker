@@ -23,27 +23,25 @@
 #include "UI/Character/GS_DrakharFeverGauge.h"
 #include "Character/Component/GS_DrakharVFXComponent.h"
 #include "Character/Component/GS_DrakharAudioComponent.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "UI/Character/GS_DrakharStaminaGauge.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 
-AGS_Drakhar::AGS_Drakhar()
+AGS_Drakhar::AGS_Drakhar(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UGS_DrakharVFXComponent>(TEXT("VFXComponent")))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Guardian의 VFXComponent를 제거하고 Drakhar 전용 컴포넌트로 교체
-	if (VFXComponent)
-	{
-		VFXComponent->DestroyComponent();
-		VFXComponent = nullptr;
-	}
+	// Super(AGS_Guardian)에서 생성한 "VFXComponent"가 UGS_DrakharVFXComponent 클래스로 생성.
+	DrakharVFXComponent = Cast<UGS_DrakharVFXComponent>(VFXComponent);
 
-	DrakharVFXComponent = CreateDefaultSubobject<UGS_DrakharVFXComponent>(TEXT("DrakharVFXComponent"));
-	AudioComponent = CreateDefaultSubobject<UGS_DrakharAudioComponent>(TEXT("AudioComponent"));
+	AudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DrakharAudioComponent>(this, TEXT("AudioComponent"));
 	BaseAudioComponent = AudioComponent;
-	FootManagerComponent = CreateDefaultSubobject<UGS_FootManagerComponent>(TEXT("FootManagerComponent"));
+
+	FootManagerComponent = ObjectInitializer.CreateDefaultSubobject<UGS_FootManagerComponent>(this, TEXT("FootManagerComponent"));
 
 	// === 어스퀘이크 카메라 쉐이크 기본값 설정 ===
 	EarthquakeShakeInfo.Intensity = 8.0f;
@@ -224,6 +222,43 @@ void AGS_Drakhar::OnDamageStart()
 	}
 }
 
+void AGS_Drakhar::OnSignificanceChanged(float NewSignificance)
+{
+	Super::OnSignificanceChanged(NewSignificance);
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		if (NewSignificance < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI_SKIP)
+		{
+			// 매우 멀리 있음: 틱 최소화 및 정적 LOD 강제
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+			MeshComp->bEnableUpdateRateOptimizations = true;
+		}
+		else if (NewSignificance < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI)
+		{
+			// 중간 거리: URO 활성화
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+			MeshComp->bEnableUpdateRateOptimizations = true;
+		}
+		else
+		{
+			// 가까움: 최고 품질
+			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+			MeshComp->bEnableUpdateRateOptimizations = false;
+		}
+	}
+}
+
+float AGS_Drakhar::CalculateSignificance(const FTransform& Viewpoint)
+{
+	// 가디언은 매우 중요하므로 기본 중요도를 높게 설정하되,
+	// 화면 밖이거나 너무 멀면 낮춤 (AGS_Character의 기본 구현 활용)
+	float Sig = Super::CalculateSignificance(Viewpoint);
+
+	// Drakhar(보스) 전용 보정: 보스는 화면에 조금이라도 걸치면 최소 중요도를 높게 유지
+	return FMath::Max(Sig, 0.2f);
+}
+
 void AGS_Drakhar::Ctrl()
 {
 	Super::Ctrl();
@@ -380,8 +415,8 @@ void AGS_Drakhar::MeleeAttackCheck()
 						Multicast_PlayBloodEffect(HitLocation, HitNormal, 1.0f);
 					}
 
-					// 히트 스톱 효과
-					MulticastRPCApplyHitStop(DamagedCharacter);
+					// 히트 스톱 효과 (일반 콤보)
+					MulticastRPCApplyHitStop(DamagedCharacter, ComboHitStopDuration);
 
 					// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
@@ -444,6 +479,9 @@ void AGS_Drakhar::ComboLastAttack()
 					MulticastRPC_PlayAttackHitVFX(DamagedPlayer->GetActorLocation());
 					if (AudioComponent)
 						AudioComponent->PlayAttackHitSound();
+
+					// 히트 스톱 효과 (피니셔)
+					MulticastRPCApplyHitStop(DamagedPlayer, FinisherHitStopDuration);
 
 					// 공격 성공 시 공격자에게 강한 카메라 쉐이크 적용
 					if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
@@ -549,6 +587,9 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 		if (AudioComponent)
 			AudioComponent->PlayAttackHitSound();
 
+		// 히트 스톱 효과 (스킬)
+		MulticastRPCApplyHitStop(DamagedCharacter, SkillHitStopDuration);
+
 		// 공격 성공 시 공격자에게 카메라 쉐이크 적용
 		if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 		{
@@ -652,6 +693,9 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 			MulticastRPC_PlayAttackHitVFX(DamagedCharacter->GetActorLocation());
 			if (AudioComponent)
 				AudioComponent->PlayAttackHitSound();
+
+			// 히트 스톱 효과 (스킬)
+			MulticastRPCApplyHitStop(DamagedCharacter, SkillHitStopDuration);
 
 			FVector DrakharLocation = GetActorLocation();
 			FVector DamagedLocation = DamagedCharacter->GetActorLocation();

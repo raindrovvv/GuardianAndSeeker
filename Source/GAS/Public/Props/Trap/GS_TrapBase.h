@@ -30,8 +30,8 @@ UCLASS()
 class GAS_API AGS_TrapBase : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AGS_TrapBase();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trap")
@@ -69,8 +69,8 @@ public:
 	//함정 활성화
 	UFUNCTION()
 	void OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	                              UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	                              bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(Server, Reliable)
 	void Server_ActivateTrap(AActor* TargetActor);
@@ -103,7 +103,6 @@ public:
 	/** TrapAkComponent를 에디터에서 설정하는 헬퍼 함수 */
 	UFUNCTION(BlueprintCallable, Category = "Audio", CallInEditor)
 	void SetTrapAkComponent(class UAkComponent* NewAkComponent);
-
 
 
 	/** 활성화 사운드 재생 */
@@ -163,13 +162,13 @@ public:
 	//Damage Box에 오버랩 되었을 때
 	UFUNCTION()
 	virtual void OnDamageBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	                                UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	                                bool bFromSweep, const FHitResult& SweepResult);
 
 	//Damage Box가 충돌했을 때 (바닥, 천장 등)
 	UFUNCTION()
 	virtual void OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+	                            UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 
 	UFUNCTION(BlueprintNativeEvent)
 	void DamageBoxEffect(AActor* OtherActor);
@@ -192,7 +191,7 @@ public:
 	void CustomTrapEffect(AActor* TargetActor);
 	void CustomTrapEffect_Implementation(AActor* TargetActor);
 
-	UFUNCTION(BlueprintCallable, Category="Trap")
+	UFUNCTION(BlueprintCallable, Category = "Trap")
 	void PushCharacterInBox(UBoxComponent* CollisionBox, float PushPower = 600.0f);
 
 	//Damage 관련 함수
@@ -253,4 +252,10 @@ private:
 
 	/** 함정 크기에 따른 최적 컬링 거리 계산 */
 	float GetTrapCullDistance() const;
+
+	/** 그림자 컬링을 위한 타이머 */
+	FTimerHandle ShadowCullingTimerHandle;
+
+	/** 그림자 컬링 상태 업데이트 */
+	void UpdateShadowCulling();
 };

@@ -15,14 +15,14 @@ USTRUCT(BlueprintType)
 struct FSkillInputControl
 {
 	GENERATED_BODY();
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Control")
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
 	bool CanInputLC = true; // Left Click
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Control")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
 	bool CanInputRC = true; // Right Click
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Control")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
 	bool CanInputRoll = true; // SpaceBar;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Control")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
 	bool CanInputCtrl = true; // Ctrl
 };
 
@@ -32,7 +32,7 @@ class GAS_API AGS_Player : public AGS_Character
 	GENERATED_BODY()
 
 public:
-	AGS_Player();
+	AGS_Player(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	// component
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Components")
@@ -43,7 +43,7 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TObjectPtr<UGS_SteamNameWidgetComp> SteamNameWidgetComp;
-	
+
 	// 시야방해
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Character|Components", meta = (AllowPrivateAccess = "true"))
 	class UPostProcessComponent* PostProcessComponent;
@@ -81,7 +81,7 @@ public:
 	void Client_StopVisionObscured();
 
 	void StopVisionObscured();
-	
+
 	UFUNCTION()
 	void HandleTimelineProgress(float Value);
 
@@ -104,7 +104,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	void SetupCameraAudioListener();
-    
+
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	bool IsLocalPlayer() const;
 
@@ -113,21 +113,22 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_StopSkillMontage(UAnimMontage* Montage);
-	
+
 	virtual void OnDeath() override;
 
 	// Collision Set
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_SetCollisionResponseToChannel(ECollisionChannel Channel, ECollisionResponse NewResponse);
-	
+
 	// Skll Input Control
 	void SetSkillInputControl(bool CanLeftClick, bool CanRightClick, bool CanRollClick, bool CanCtrlClick = true);
 	FSkillInputControl GetSkillInputControl();
-	
+
 	FORCEINLINE UGS_SkillComp* GetSkillComp() const { return SkillComp; }
 	virtual void SetCanUseSkill(bool bCanUse) override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -135,7 +136,7 @@ protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void BeginDestroy() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_SkillComp> SkillComp;
 
@@ -159,5 +160,4 @@ private:
 
 	// 오디오 디바이스 캐싱
 	FAkAudioDevice* CachedAudioDevice = nullptr;
-
 };

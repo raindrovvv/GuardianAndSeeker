@@ -15,6 +15,7 @@
 #include "Character/Component/GS_StatRow.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 #include "NiagaraSystem.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 UGS_ChanMovingSkill::UGS_ChanMovingSkill()
 {
@@ -50,14 +51,14 @@ void UGS_ChanMovingSkill::ActiveSkill()
 		{
 			FVector SkillLocation = OwnerCharacter->GetActorLocation();
 			FRotator SkillRotation = OwnerCharacter->GetActorRotation();
-			
+
 			// 스킬 시전 VFX 재생
 			OwningComp->Multicast_PlayCastVFX(CurrentSkillType, SkillLocation, SkillRotation);
-			
+
 			// 스킬 범위 표시 VFX 재생
 			OwningComp->Multicast_PlayRangeVFX(CurrentSkillType, SkillLocation, 800.0f);
 		}
-			
+
 		// 스킬 시작 사운드 재생 (멀티캐스트)
 		if (OwnerCharacter->HasAuthority())
 		{
@@ -84,7 +85,7 @@ void UGS_ChanMovingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
-	if(CachedChanOwner.IsValid())
+	if (CachedChanOwner.IsValid())
 	{
 		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 		CachedChanOwner->SetMoveControlValue(true, true);
@@ -114,7 +115,7 @@ void UGS_ChanMovingSkill::InterruptSkill()
 	{
 		CachedChanOwner->GetWorldTimerManager().ClearTimer(DEFBuffHandle);
 	}
-	
+
 	SetIsActive(false);
 }
 
@@ -197,27 +198,46 @@ void UGS_ChanMovingSkill::AggroToOwner()
 
 			HitActors.Add(HitActor);
 
-			// Soft Reference 로드
-			UNiagaraSystem* LoadedImpactVFX = SkillImpactVFX.IsNull() ? nullptr : SkillImpactVFX.LoadSynchronous();
-
-			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor)) // 몬스터일 경우
+			// === 효과 즉시 적용 (서버) ===
+			// 디버프 등 게임플레이에 영향을 주는 수치는 에셋 로드와 상관없이 즉시 적용.
+			if (AGS_Monster* TargetMonster = Cast<AGS_Monster>(HitActor))
 			{
 				ApplyEffectToDungeonMonster(TargetMonster);
-				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				if (LoadedImpactVFX)
-				{
-					TargetMonster->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
-				}
 			}
-			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor)) // 가디언일 경우
+			else if (AGS_Guardian* TargetGuardian = Cast<AGS_Guardian>(HitActor))
 			{
 				ApplyEffectToGuardian(TargetGuardian);
-				// Impact VFX 재생 (오프셋은 추후 함수 시그니처 변경 시 적용)
-				if (LoadedImpactVFX)
-				{
-					TargetGuardian->PlayImpactVFX(LoadedImpactVFX, SkillVFXScale);
-				}
 			}
+
+			// === VFX 비동기 로드 및 재생 ===
+			TWeakObjectPtr<AActor> WeakHitActor(HitActor);
+			TWeakObjectPtr<UGS_ChanMovingSkill> WeakThis(this);
+
+			// 이미 로드된 에셋이 있다면 즉시 재생 (성능 최적화)
+			if (UNiagaraSystem* CachedVFX = SkillImpactVFX.Get())
+			{
+				if (AGS_Character* TargetChar = Cast<AGS_Character>(HitActor))
+				{
+					TargetChar->PlayImpactVFX(CachedVFX, SkillVFXScale);
+				}
+				continue;
+			}
+
+			UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+			    SkillImpactVFX,
+			    [WeakThis, WeakHitActor](UNiagaraSystem* LoadedImpactVFX)
+			    {
+				    if (!WeakThis.IsValid() || !WeakHitActor.IsValid() || !LoadedImpactVFX)
+				    {
+					    return;
+				    }
+
+				    if (AGS_Character* TargetChar = Cast<AGS_Character>(WeakHitActor.Get()))
+				    {
+					    // Impact VFX 재생 (이미 효과는 위에서 적용됨)
+					    TargetChar->PlayImpactVFX(LoadedImpactVFX, WeakThis->SkillVFXScale);
+				    }
+			    });
 		}
 	}
 }
@@ -228,7 +248,7 @@ void UGS_ChanMovingSkill::StrengthenDefense()
 	if (UGS_StatComp* StatComp = OwnerCharacter->GetStatComp())
 	{
 		FGS_StatRow BuffStat;
-		BuffStat.DEF = ExtraDefense;     // 방어력 *2(+200.0f)
+		BuffStat.DEF = ExtraDefense; // 방어력 *2(+200.0f)
 
 		BuffAmount = BuffStat; // 나중에 되돌릴 때 사용할 변수
 		StatComp->ChangeStat(BuffStat);
@@ -245,4 +265,3 @@ void UGS_ChanMovingSkill::DeactiveDEFBuff()
 		StatComp->ResetStat(BuffAmount);
 	}
 }
-

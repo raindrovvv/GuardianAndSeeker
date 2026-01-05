@@ -22,35 +22,36 @@
 #include "Rendering/GS_RenderingConstants.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 
-AGS_Player::AGS_Player()
+AGS_Player::AGS_Player(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	SkillComp = CreateDefaultSubobject<UGS_SkillComp>(TEXT("SkillComp"));
+	SkillComp = ObjectInitializer.CreateDefaultSubobject<UGS_SkillComp>(this, TEXT("SkillComp"));
 
-	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+	SpringArmComp = ObjectInitializer.CreateDefaultSubobject<USpringArmComponent>(this, TEXT("SpringArm"));
 	SpringArmComp->TargetArmLength = 400.f;
 	SpringArmComp->bUsePawnControlRotation = true;
 	SpringArmComp->SetupAttachment(RootComponent);
 
-	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	CameraComp = ObjectInitializer.CreateDefaultSubobject<UCameraComponent>(this, TEXT("Camera"));
 	CameraComp->bUsePawnControlRotation = false;
 	CameraComp->SetupAttachment(SpringArmComp, USpringArmComponent::SocketName);
-	
-	PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
+
+	PostProcessComponent = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("PostProcessComponent"));
 	PostProcessComponent->SetupAttachment(GetRootComponent());
 	PostProcessComponent->bUnbound = true; // 시야 안 전체에만 적용할 경우 false
 	PostProcessComponent->BlendWeight = 0.f; // 기본은 비활성화
 
 	//steam name widget
-	SteamNameWidgetComp = CreateDefaultSubobject<UGS_SteamNameWidgetComp>(TEXT("SteamWidgetComp"));
+	SteamNameWidgetComp = ObjectInitializer.CreateDefaultSubobject<UGS_SteamNameWidgetComp>(this, TEXT("SteamWidgetComp"));
 	SteamNameWidgetComp->SetupAttachment(RootComponent);
 	SteamNameWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
-	SteamNameWidgetComp->GetBodyInstance()->TermBody(); 
+	SteamNameWidgetComp->GetBodyInstance()->TermBody();
 	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SteamNameWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 	SteamNameWidgetComp->SetOwnerNoSee(true);
-	
+
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlurMat(TEXT("/Game/VFX/MI_AbscureDebuff"));
 	if (BlurMat.Succeeded())
 	{
@@ -66,11 +67,11 @@ AGS_Player::AGS_Player()
 	TeamId = FGenericTeamId(1);
 
 	// AkComponent 생성
-	AkComponent = CreateDefaultSubobject<UAkComponent>(TEXT("AkComponent"));
+	AkComponent = ObjectInitializer.CreateDefaultSubobject<UAkComponent>(this, TEXT("AkComponent"));
 	AkComponent->SetupAttachment(GetRootComponent());
 
 	// 카메라 위치 오디오 리스너 컴포넌트 생성 (TPS 표준)
-	CameraAudioListenerComponent = CreateDefaultSubobject<UAkComponent>(TEXT("CameraAudioListenerComponent"));
+	CameraAudioListenerComponent = ObjectInitializer.CreateDefaultSubobject<UAkComponent>(this, TEXT("CameraAudioListenerComponent"));
 	// CameraComp에 Attach하여 카메라 위치에서 오디오 리스닝
 	CameraAudioListenerComponent->SetupAttachment(CameraComp);
 
@@ -127,7 +128,7 @@ void AGS_Player::BeginPlay()
 
 	// 카메라 위치에 오디오 리스너 설정 (모든 클라이언트에서)
 	SetupCameraAudioListener();
-	
+
 	// 로컬 플레이어만 추가 오디오 설정
 	if (IsLocalPlayer())
 	{
@@ -196,7 +197,7 @@ void AGS_Player::Tick(float DeltaSeconds)
 			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
 			{
 				float DistSq = FVector::DistSquared(CameraManager->GetCameraLocation(), GetActorLocation());
-				
+
 				// 30m (3000 units) 기준으로 컬링 (9,000,000 DistSq)
 				bool bInRange = (DistSq < 9000000.f);
 
@@ -294,8 +295,8 @@ void AGS_Player::Client_StartVisionObscured_Implementation()
 }
 
 void AGS_Player::StartVisionObscured()
-{ 
-	if(GetLocalRole() == ROLE_AutonomousProxy)
+{
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
 		if (!bIsObscuring && ObscureCurve)
 		{
@@ -332,7 +333,6 @@ void AGS_Player::StopVisionObscured()
 			PostProcessComponent->BlendWeight = 0.0f;
 		}
 	}
-	
 }
 
 void AGS_Player::HandleTimelineProgress(float Value)
@@ -369,16 +369,16 @@ void AGS_Player::OnDeath()
 	// 예: 카메라 연출, UI 변경, 리스폰 타이머 등
 
 	// TODO: 추후 빈사 상태 등 복잡한 사망 처리가 필요할 시, 이 로직은 해당 상태 전환 함수로 이동해야 함.
-	
+
 	// 현재 사용 중인 스킬 강제 중단 및 VFX 정리
 	if (SkillComp)
 	{
-		if(UGS_SkillBase* CurrentSkill = SkillComp->GetActiveSkill())
+		if (UGS_SkillBase* CurrentSkill = SkillComp->GetActiveSkill())
 		{
 			CurrentSkill->InterruptSkill();
 		}
 	}
-	
+
 	GetCharacterMovement()->DisableMovement();
 
 	AGS_PlayerState* GS_PS = Cast<AGS_PlayerState>(GetPlayerState());
@@ -394,7 +394,7 @@ void AGS_Player::OnDeath()
 }
 
 void AGS_Player::Multicast_SetCollisionResponseToChannel_Implementation(ECollisionChannel Channel,
-	ECollisionResponse NewResponse)
+                                                                        ECollisionResponse NewResponse)
 {
 	GetCapsuleComponent()->SetCollisionResponseToChannel(Channel, NewResponse);
 }
@@ -403,7 +403,7 @@ void AGS_Player::SetSkillInputControl(bool CanLeftClick, bool CanRightClick, boo
 {
 	SkillInputControl.CanInputLC = CanLeftClick;
 	SkillInputControl.CanInputRC = CanRightClick;
-	SkillInputControl.CanInputRoll= CanRollClick;
+	SkillInputControl.CanInputRoll = CanRollClick;
 	SkillInputControl.CanInputCtrl = CanCtrlClick;
 }
 
@@ -506,7 +506,7 @@ void AGS_Player::Multicast_PlaySkillMontage_Implementation(UAnimMontage* Montage
 			{
 				AnimInstance->Montage_Stop(0.0f, Montage); // 이걸 꼭 해줘야 새로 PlayRate가 반영됨
 			}
-			
+
 			AnimInstance->Montage_Play(Montage);
 			AnimInstance->Montage_JumpToSection(Section, Montage);
 		}
@@ -561,14 +561,14 @@ void AGS_Player::UpdateSteamNameWidgetRotation()
 	{
 		return;
 	}
-    
+
 	if (APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
 		FVector CameraForward = CameraManager->GetCameraRotation().Vector();
 		FVector CameraRight = FVector::CrossProduct(CameraForward, FVector::UpVector).GetSafeNormal();
 		FVector CameraUp = FVector::CrossProduct(CameraRight, CameraForward).GetSafeNormal();
 		FRotator WidgetRotation = UKismetMathLibrary::MakeRotFromXZ(-CameraForward, CameraUp);
-        
+
 		SteamNameWidgetComp->SetWorldRotation(WidgetRotation);
 	}
 }
@@ -602,13 +602,13 @@ float AGS_Player::CalculateSignificance(const FTransform& Viewpoint)
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(this))
 	{
 		if (Seeker->IsInDyingState())
-			return 0.6f;  // 중간~높은 중요도 → 30Hz 네트워크, 중간 애니메이션 품질
+			return 0.6f; // 중간~높은 중요도 → 30Hz 네트워크, 중간 애니메이션 품질
 	}
 
 	// 죽은 Player는 중간 중요도 유지 (TPS 시점에서 파티원 시체가 보임)
 	// Monster와 달리 Player는 죽어도 화면에 보이므로 애니메이션/네트워크 유지 필요
 	if (IsDead())
-		return 0.5f;  // 중간 중요도 → 30Hz 네트워크 업데이트, 중간 애니메이션 품질
+		return 0.5f; // 중간 중요도 → 30Hz 네트워크 업데이트, 중간 애니메이션 품질
 
 	float Score = 0.1f;
 	FVector ActorLoc = GetActorLocation();

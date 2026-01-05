@@ -10,6 +10,7 @@
 #include "AkAudioEvent.h"
 #include "NiagaraSystem.h"
 #include "Weapon/Projectile/GS_TargetType.h"
+#include "Weapon/Projectile/Seeker/GS_ArrowType.h"
 #include "GS_SeekerMerciArrow.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnArrowHitEnemy, AActor*, HitActor);
@@ -40,6 +41,8 @@ public:
 
 	UFUNCTION()
 	void OnTargetDied();
+
+	virtual EArrowType GetArrowType() const;
 
 protected:
 	virtual void BeginPlay() override;

@@ -29,12 +29,16 @@ class GAS_API AGS_Drakhar : public AGS_Guardian
 	GENERATED_BODY()
 
 public:
-	AGS_Drakhar();
+	AGS_Drakhar(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	void OnDamageStart() override;
+
+	/** Significance Manager: 거대 캐릭터 전용 최적화 */
+	virtual void OnSignificanceChanged(float NewSignificance) override;
+	virtual float CalculateSignificance(const FTransform& Viewpoint) override;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AGS_EarthquakeEffect> GC_EarthquakeEffect;
@@ -393,6 +397,16 @@ private:
 	float DefaultSpringArmLength;
 	float TargetSpringArmLength;
 	bool bIsFlying;
+
+	//[HitStop]
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float ComboHitStopDuration = 0.08f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float FinisherHitStopDuration = 0.15f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HitStop")
+	float SkillHitStopDuration = 0.1f;
 
 	//[NEW COMBO ATTACK]
 	FName ComboAttackSectionName;

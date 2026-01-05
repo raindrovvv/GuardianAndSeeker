@@ -9,6 +9,9 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GS_AssetLoader.generated.h"
 
+// 비동기 로드 핸들 타입 별칭
+using FAsyncLoadHandle = TSharedPtr<struct FStreamableHandle>;
+
 /**
  * 에셋 로드 완료 시 호출되는 델리게이트
  * @param LoadedAsset 로드된 에셋 (nullptr이면 로드 실패)

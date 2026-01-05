@@ -34,8 +34,8 @@ AGS_WeaponShield::AGS_WeaponShield()
 	RootComponent = ShieldMeshComponent;
 
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshAsset(
-		TEXT("/Game/Weapons/Shield_02/SKM_Shield_02_L.SKM_Shield_02_L"));
-	
+	    TEXT("/Game/Weapons/Shield_02/SKM_Shield_02_L.SKM_Shield_02_L"));
+
 	if (MeshAsset.Succeeded())
 	{
 		ShieldMeshComponent->SetSkeletalMesh(MeshAsset.Object);
@@ -48,12 +48,12 @@ AGS_WeaponShield::AGS_WeaponShield()
 	AttackHitBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	AttackHitBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	AttackHitBox->SetGenerateOverlapEvents(true);
-	
+
 	// 공격용 콜리전 크기 설정
 	AttackHitBox->SetBoxExtent(FVector(80.0f, 120.0f, 150.0f));
 	AttackHitBox->SetRelativeLocation(FVector(50.0f, 0.0f, 0.0f));
 	AttackHitBox->OnComponentBeginOverlap.AddDynamic(this, &AGS_WeaponShield::OnAttackHit);
-	
+
 	// 방어용 콜리전
 	DefenseHitBox = CreateDefaultSubobject<UBoxComponent>("DefenseHitBox");
 	DefenseHitBox->SetupAttachment(ShieldMeshComponent);
@@ -63,7 +63,7 @@ AGS_WeaponShield::AGS_WeaponShield()
 	DefenseHitBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	DefenseHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel4, ECR_Overlap);
 	DefenseHitBox->SetGenerateOverlapEvents(true);
-	
+
 	// 방어용 콜리전 크기 설정 (방패 주변으로 최적화)
 	DefenseHitBox->SetBoxExtent(FVector(50.0f, 70.0f, 90.0f));
 	DefenseHitBox->SetRelativeLocation(FVector(20.0f, 0.0f, 0.0f));
@@ -146,7 +146,7 @@ void AGS_WeaponShield::BeginPlay()
 {
 	Super::BeginPlay();
 	OwnerChar = Cast<AGS_Character>(GetOwner());
-	
+
 	if (AttackHitBox)
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -173,9 +173,8 @@ void AGS_WeaponShield::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 
-
 void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
-	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+                                   int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!HasAuthority())
 	{
@@ -209,7 +208,7 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
 
 	Multicast_PlayHitSound(TargetType, CorrectHitResult);
-	
+
 	AGS_Character* Damaged = Cast<AGS_Character>(OtherActor);
 	AGS_Character* Attacker = OwnerChar;
 
@@ -233,7 +232,7 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 	}
 
 	// --- 여기서부터는 유효한 적을 타격한 경우 ---
-	
+
 	// 1. 기본 VFX는 항상 재생
 	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
 
@@ -256,18 +255,21 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 			Chan->Multicast_OnAttackHit(Chan->CurrentComboIndex);
 		}
 	}
-	
+
 	UGS_StatComp* DamagedStat = Damaged->GetStatComp();
-	if (!DamagedStat) 
+	if (!DamagedStat)
 	{
-		return;	
+		return;
 	}
 
 	float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
 	FGS_DamageEvent DamageEvent;
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
 	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
-	
+
+	// Reaction Sync: 피격자에게도 짧은 히트스탑 적용 (멀티플레이 밸런스 조정: 0.18 -> 0.08)
+	Damaged->Multicast_ApplyHitStop(0.08f, 0.0f, false);
+
 	// 공격 후 콜리전 비활성화 (지속 데미지 방지, 다음 프레임에 안전하게)
 	SafeDisableHitBoxCollision(AttackHitBox);
 }
@@ -327,26 +329,24 @@ void AGS_WeaponShield::PlayHitSound(EShieldHitTargetType TargetType, const FHitR
 
 			const float DistanceToListener = FVector::Dist(SweepResult.ImpactPoint, ListenerLocation);
 
-			
+
 			if (DistanceToListener <= MaxDistance)
 			{
 				UAkGameplayStatics::PostEventAtLocation(
-					SoundEventToPlay,
-					SweepResult.ImpactPoint,
-					FRotator::ZeroRotator,
-					GetWorld()
-				);
+				    SoundEventToPlay,
+				    SweepResult.ImpactPoint,
+				    FRotator::ZeroRotator,
+				    GetWorld());
 			}
 		}
 		else
 		{
 			// Fallback: 리스너 위치를 찾지 못할 경우 거리 체크 없이 재생
 			UAkGameplayStatics::PostEventAtLocation(
-				SoundEventToPlay,
-				SweepResult.ImpactPoint,
-				FRotator::ZeroRotator,
-				GetWorld()
-			);
+			    SoundEventToPlay,
+			    SweepResult.ImpactPoint,
+			    FRotator::ZeroRotator,
+			    GetWorld());
 		}
 	}
 }
@@ -374,14 +374,13 @@ void AGS_WeaponShield::PlayHitVFX(EShieldHitTargetType TargetType, const FHitRes
 	if (VFXToPlay && GetWorld())
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			SweepResult.ImpactPoint,
-			SweepResult.ImpactNormal.Rotation(),
-			FVector(1.0f),
-			true,
-			true
-		);
+		    GetWorld(),
+		    VFXToPlay,
+		    SweepResult.ImpactPoint,
+		    SweepResult.ImpactNormal.Rotation(),
+		    FVector(1.0f),
+		    true,
+		    true);
 	}
 }
 
@@ -412,16 +411,15 @@ void AGS_WeaponShield::PlayGuardSuccessVFX(EShieldHitTargetType TargetType, cons
 		// 방패 중앙에서 이펙트 재생
 		FVector ShieldCenter = ShieldMeshComponent->GetComponentLocation();
 		FRotator ShieldRotation = ShieldMeshComponent->GetComponentRotation();
-		
+
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToPlay,
-			ShieldCenter,
-			ShieldRotation,
-			FVector(1.2f), // 방패 이펙트는 약간 크게
-			true,
-			true
-		);
+		    GetWorld(),
+		    VFXToPlay,
+		    ShieldCenter,
+		    ShieldRotation,
+		    FVector(1.2f), // 방패 이펙트는 약간 크게
+		    true,
+		    true);
 	}
 
 	// WeaponVFXComponent를 통한 시커별 개별 가드 이펙트도 재생
@@ -486,14 +484,13 @@ void AGS_WeaponShield::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem
 			if (VFXToPlay && GetWorld())
 			{
 				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-					GetWorld(),
-					VFXToPlay,
-					HitResult.ImpactPoint,
-					HitResult.ImpactNormal.Rotation(),
-					FVector(1.0f),
-					true,
-					true
-				);
+				    GetWorld(),
+				    VFXToPlay,
+				    HitResult.ImpactPoint,
+				    HitResult.ImpactNormal.Rotation(),
+				    FVector(1.0f),
+				    true,
+				    true);
 			}
 		}
 	}
@@ -556,22 +553,20 @@ void AGS_WeaponShield::PlayGuardSuccessSound(EShieldHitTargetType TargetType, co
 			if (DistanceToListener <= MaxDistance)
 			{
 				UAkGameplayStatics::PostEventAtLocation(
-					SoundEventToPlay,
-					SweepResult.ImpactPoint,
-					FRotator::ZeroRotator,
-					GetWorld()
-				);
+				    SoundEventToPlay,
+				    SweepResult.ImpactPoint,
+				    FRotator::ZeroRotator,
+				    GetWorld());
 			}
 		}
 		else
 		{
 			// Fallback: 리스너 위치를 찾지 못할 경우 거리 체크 없이 재생
 			UAkGameplayStatics::PostEventAtLocation(
-				SoundEventToPlay,
-				SweepResult.ImpactPoint,
-				FRotator::ZeroRotator,
-				GetWorld()
-			);
+			    SoundEventToPlay,
+			    SweepResult.ImpactPoint,
+			    FRotator::ZeroRotator,
+			    GetWorld());
 		}
 	}
 }
@@ -605,7 +600,7 @@ void AGS_WeaponShield::EnableAttackHit()
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	
+
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	AttackHitActors.Empty();
 }
@@ -638,7 +633,7 @@ void AGS_WeaponShield::ServerDisableAttackHit_Implementation()
 	{
 		return;
 	}
-	
+
 	// AttackHitBox 안전하게 비활성화
 	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
 	{
@@ -659,16 +654,16 @@ void AGS_WeaponShield::ServerEnableAttackHit_Implementation()
 	{
 		return;
 	}
-	
+
 	// AttackHitBox 안전하게 활성화
 	if (AttackHitBox && IsValid(AttackHitBox) && !AttackHitBox->IsBeingDestroyed())
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	
+
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	AttackHitActors.Empty();
-		
+
 	// 안전장치: 3초 후에 자동으로 비활성화 (AnimNotify가 실행되지 않을 경우 대비)
 	ClearSafetyTimer();
 
@@ -719,7 +714,7 @@ void AGS_WeaponShield::ServerDisableHit_Implementation()
 }
 
 void AGS_WeaponShield::OnDefenseHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
-	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+                                    int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!HasAuthority())
 	{
@@ -751,13 +746,13 @@ void AGS_WeaponShield::OnDefenseHit(UPrimitiveComponent* OverlappedComponent, AA
 		// 콜리전이 비활성화 상태면 공격 중이 아니므로 방어 판정 안함
 		return;
 	}
-	
+
 	// OwnerChar 유효성 확인 (레벨 전환 시 null일 수 있음.)
 	if (!IsOwnerCharValid())
 	{
 		return;
 	}
-	
+
 	// 실제 공격자(캐릭터)를 찾기. OtherActor는 무기일 수 있음.
 	AActor* AttackerActor = FindUltimateAttacker(OtherActor);
 
@@ -844,16 +839,16 @@ void AGS_WeaponShield::OnDefenseEndOverlap(UPrimitiveComponent* OverlappedCompon
 	{
 		return;
 	}
-	
+
 	// 레벨 전환 시 null 참조 방지
 	if (!IsValidForLevelTransition() || !OtherActor)
 	{
 		return;
 	}
-	
+
 	// 실제 공격자(캐릭터)를 찾기
 	AActor* AttackerActor = FindUltimateAttacker(OtherActor);
-	
+
 	// 방어용 히트 액터 목록에서 제거하여 다음 공격 시 가드 이펙트가 다시 나올 수 있도록 함
 	DefenseHitActors.Remove(AttackerActor);
 }
@@ -871,10 +866,10 @@ void AGS_WeaponShield::EnableDefenseHit()
 	{
 		DefenseHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	
+
 	// 방어용 히트 액터 목록 초기화 (새로운 방어 시작 시)
 	DefenseHitActors.Empty();
-	
+
 	// Start 1.5s Timer instead of Tick
 	if (UWorld* World = GetWorld())
 	{
@@ -895,7 +890,7 @@ void AGS_WeaponShield::DisableDefenseHit()
 	{
 		DefenseHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
-	
+
 	// Clear Defense Timer
 	if (UWorld* World = GetWorld())
 	{
@@ -985,7 +980,7 @@ void AGS_WeaponShield::DisableAllCollisions()
 	{
 		AttackHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
-	
+
 	// DefenseHitBox 안전하게 비활성화
 	if (DefenseHitBox && IsValid(DefenseHitBox) && !DefenseHitBox->IsBeingDestroyed())
 	{

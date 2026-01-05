@@ -19,43 +19,45 @@
 #include "Components/WidgetComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Rendering/GS_RenderingConstants.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "Sound/GS_MonsterAudioComponent.h"
 #include "System/GameState/GS_InGameGS.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "TimerManager.h"
+#include "Misc/App.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 
-AGS_Monster::AGS_Monster()
+AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	AIControllerClass = AGS_AIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	MonsterSkillComp =
-	    CreateDefaultSubobject<UGS_MonsterSkillComp>(TEXT("MonsterSkillComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UGS_MonsterSkillComp>(this, TEXT("MonsterSkillComp"));
 
 	SkillCooldownWidgetComp =
-	    CreateDefaultSubobject<UWidgetComponent>(TEXT("SkillCooldownWidgetComp"));
+	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("SkillCooldownWidgetComp"));
 	SkillCooldownWidgetComp->SetupAttachment(RootComponent);
 	SkillCooldownWidgetComp->SetVisibility(false);
 	SkillCooldownWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
 	SkillCooldownWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SkillCooldownWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 
-	AkComponent = CreateDefaultSubobject<UAkComponent>("AkComponent");
+	AkComponent = ObjectInitializer.CreateDefaultSubobject<UAkComponent>(this, TEXT("AkComponent"));
 	AkComponent->SetupAttachment(RootComponent);
 
 	// 몬스터 오디오 컴포넌트 생성
-	MonsterAudioComponent = CreateDefaultSubobject<UGS_MonsterAudioComponent>(
-	    "MonsterAudioComponent");
-	BaseAudioComponent = MonsterAudioComponent;
+	MonsterAudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_MonsterAudioComponent>(this,
+	                                                                                            TEXT("MonsterAudioComponent"));
 	BaseAudioComponent = MonsterAudioComponent;
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
-	VFXComponent = CreateDefaultSubobject<UGS_VFXComponent>("VFXComponent");
+	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
 
 	// UI 컴포넌트 생성 및 초기화
 	TargetedUIComponent =
-	    CreateDefaultSubobject<UWidgetComponent>(TEXT("TargetedUI"));
+	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));
 	TargetedUIComponent->SetupAttachment(RootComponent);
 	TargetedUIComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	TargetedUIComponent->SetWidgetSpace(EWidgetSpace::Screen);
@@ -103,7 +105,7 @@ void AGS_Monster::BeginPlay()
 	SetActorTickEnabled(false);
 
 	// 클라이언트: 그림자 컬링 및 HP 위젯 가시성을 타이머로 처리 (0.1초 간격)
-	if (!IsRunningDedicatedServer())
+	if (FApp::CanEverRender())
 	{
 		// 타이머 로드 밸런싱 (Load Balancing)
 		// 모든 몬스터가 동일한 프레임에 연산을 수행하지 않도록, 시작 시간을 0.0 ~ 0.1초 사이로 랜덤 분산.
@@ -129,7 +131,7 @@ void AGS_Monster::BeginPlay()
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
 	// DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
-	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	if (!FApp::CanEverRender())
 	{
 		if (IsValid(AkComponent))
 		{
@@ -155,12 +157,14 @@ void AGS_Monster::BeginPlay()
 		HPTextWidgetComp->SetComponentTickInterval(0.1f);
 	}
 
-	// Bind to HP change for attack detection
+	// Bind to HP change for attack detection (중복 바인딩 방지)
 	if (StatComp)
 	{
 		LastKnownHP = StatComp->GetCurrentHealth();
-		StatComp->OnCurrentHPChanged.AddUObject(this,
-		                                        &AGS_Monster::HandleHPChanged);
+		if (!StatComp->OnCurrentHPChanged.IsBoundToObject(this))
+		{
+			StatComp->OnCurrentHPChanged.AddUObject(this, &AGS_Monster::HandleHPChanged);
+		}
 	}
 
 	// Bind to owner's RTSController for attack notifications
@@ -203,7 +207,7 @@ void AGS_Monster::BeginPlay()
 	}
 
 	// === Skeletal Mesh Distance Culling 설정 (클라이언트만) ===
-	if (!IsRunningDedicatedServer() && GetMesh())
+	if (FApp::CanEverRender() && GetMesh())
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
 		float CullDistance =
@@ -218,25 +222,24 @@ void AGS_Monster::BeginPlay()
 
 		// === Animation Optimization (Client) ===
 		MeshComp->bEnableUpdateRateOptimizations = true;
-		// 몽타주 재생 중에는 화면 밖이라도 틱을 유지하여 공격 판정(AnimNotify) 보장
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+		// 화면 밖이거나 멀리 있으면 메시 렌더링을 위한 틱을 중단 (중요도 시스템과 연동)
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 
-		UE_LOG(LogTemp, Log,
-		       TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"),
-		       *GetName(), CullDistance);
+		// 캡슐 그림자로 원거리 최적화 (이동 방향만 인지되도록)
+		MeshComp->SetCastCapsuleDirectShadow(true);
+
+		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
 	}
 
 	// === Animation Optimization (Server) ===
-	if (IsRunningDedicatedServer() && GetMesh())
+	if (!FApp::CanEverRender() && GetMesh())
 	{
-		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
-		GetMesh()->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		// 서버는 판정(AnimNotify)을 위해 반드시 Refresh Bones 필요
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만) ===
-	if (!IsRunningDedicatedServer())
+	if (FApp::CanEverRender())
 	{
 		UpdateShadowCulling();
 	}
@@ -610,14 +613,27 @@ void AGS_Monster::Attack()
 
 void AGS_Monster::Multicast_PlayAttackMontage_Implementation()
 {
-	// Soft Reference 로드
-	if (!AttackMontage.IsNull())
+	if (AttackMontage.IsNull())
 	{
-		if (UAnimMontage* LoadedMontage = AttackMontage.LoadSynchronous())
-		{
-			MonsterAnim->Montage_Play(LoadedMontage);
-		}
+		return;
 	}
+
+	// 최적화: 중요도가 너무 낮으면 (멀리 있으면) 애니메이션/에셋 로딩 스킵
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_ASYNC_LOAD)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<AGS_Monster> WeakThis(this);
+	UGS_AssetLoader::AsyncLoadAsset<UAnimMontage>(
+	    AttackMontage,
+	    [WeakThis](UAnimMontage* LoadedMontage)
+	    {
+		    if (WeakThis.IsValid() && LoadedMontage && WeakThis->MonsterAnim)
+		    {
+			    WeakThis->MonsterAnim->Montage_Play(LoadedMontage);
+		    }
+	    });
 }
 
 void AGS_Monster::SetSelected(bool bSelected, bool bPlaySound)
@@ -832,7 +848,35 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 	UpdateWidgetOptimization(TargetedUIComponent);
 	UpdateWidgetOptimization(SkillCooldownWidgetComp);
 
+	// 5. 가변 타이머 주기 조정 (Adaptive Timer)
+	// 중요도에 따라 타이머 주기를 동적으로 변경하여 CPU 부하 분산
+	if (!IsRunningDedicatedServer())
+	{
+		float NewInterval = GS_Rendering::GetAdaptiveTimerInterval(NewSignificance);
+
+		auto UpdateTimerInterval = [&](FTimerHandle& Handle, void (AGS_Monster::*Func)())
+		{
+			if (Handle.IsValid())
+			{
+				float Remaining = GetWorldTimerManager().GetTimerRemaining(Handle);
+				GetWorldTimerManager().ClearTimer(Handle);
+				GetWorldTimerManager().SetTimer(Handle, this, Func, NewInterval, true, FMath::Min(Remaining, NewInterval));
+			}
+		};
+
+		UpdateTimerInterval(ShadowCullingTimerHandle, &AGS_Monster::UpdateShadowCulling);
+		UpdateTimerInterval(HPWidgetVisibilityTimerHandle, &AGS_Monster::UpdateHPWidgetVisibility);
+	}
+
 	// 참고: 몬스터는 BeginPlay에서 bCanEverTick = false로 설정됨
 	// 모든 주기적 로직은 타이머로 이동되어 Tick을 사용하지 않음
 	// (UpdateShadowCulling, UpdateHPWidgetVisibility 등)
+}
+
+void AGS_Monster::UpdateShadowCulling()
+{
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		GS_Rendering::UpdateShadowCulling(this, MeshComp);
+	}
 }

@@ -29,7 +29,7 @@ class GAS_API AGS_Monster : public AGS_Character
 	GENERATED_BODY()
 
 public:
-	AGS_Monster();
+	AGS_Monster(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "RTS")
 	bool bCommandLocked;
@@ -165,6 +165,9 @@ private:
 
 	/** HP 위젯 가시성 업데이트 (타이머에서 호출) */
 	void UpdateHPWidgetVisibility();
+
+	/** 그림자 컬링 업데이트 (타이머에서 호출) */
+	void UpdateShadowCulling();
 
 	/** 로컬 시커의 CombatTrigger 내부에 있는지 여부 (클라이언트 로컬) */
 	bool bIsInSeekerCombatTrigger = false;

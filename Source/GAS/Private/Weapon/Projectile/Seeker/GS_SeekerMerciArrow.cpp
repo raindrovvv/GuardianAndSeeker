@@ -2,6 +2,7 @@
 
 
 #include "Weapon/Projectile/Seeker/GS_SeekerMerciArrow.h"
+#include "Weapon/Projectile/Seeker/GS_ArrowType.h"
 #include "Weapon/Projectile/Seeker/GS_ArrowVisualActor.h"
 #include "Weapon/Projectile/Component/GS_ArrowFXComponent.h"
 #include "Component/GS_VisualPoolComp.h"
@@ -264,21 +265,29 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 	// 맞은 대상 구분
 	ETargetType TargetType = DetermineTargetType(OtherActor);
 
+	// Overlap 시 ImpactPoint가 0인 경우 보정 (VFX 스폰 및 데미지 위치 정확도 향상)
+	FHitResult FixedHitResult = SweepResult;
+	if (FixedHitResult.ImpactPoint.IsZero())
+	{
+		FixedHitResult.ImpactPoint = GetActorLocation();
+		FixedHitResult.ImpactNormal = -GetActorForwardVector();
+	}
+
 	// 이펙트와 사운드 처리 (가상함수로 만들어 자식에서 오버라이드 가능)
-	ProcessHitEffects(TargetType, SweepResult);
+	ProcessHitEffects(TargetType, FixedHitResult);
 
 	// 서버에서만 데미지 및 로직 처리
 	if (HasAuthority())
 	{
 		// 데미지 처리 (자식 클래스에서 구현)
-		ProcessDamageLogic(TargetType, SweepResult, OtherActor);
+		ProcessDamageLogic(TargetType, FixedHitResult, OtherActor);
 	}
 	bool bShouldContinueMovement = false;
 
 	if (HasAuthority())
 	{
 		// HandleTargetTypeGeneric에서 관통 여부를 반환값으로 받음
-		bShouldContinueMovement = HandleTargetTypeGeneric(TargetType, SweepResult);
+		bShouldContinueMovement = HandleTargetTypeGeneric(TargetType, FixedHitResult);
 
 		if (!IsValid(this))
 		{
@@ -308,7 +317,7 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 	SetActorEnableCollision(false);
 
 	// 박힘 처리를 위한 SkeletalMesh 검사 및 처리
-	ProcessStickLogic(OtherActor, TargetType, SweepResult);
+	ProcessStickLogic(OtherActor, TargetType, FixedHitResult);
 }
 
 ETargetType AGS_SeekerMerciArrow::DetermineTargetType(AActor* OtherActor) const
@@ -372,13 +381,19 @@ void AGS_SeekerMerciArrow::ProcessHitEffects(ETargetType TargetType, const FHitR
 	// 히트 사운드 & VFX 재생 (컴포넌트로 위임)
 	if (ArrowFXComponent)
 	{
-		ArrowFXComponent->PlayHitSound(TargetType, SweepResult);
-		ArrowFXComponent->PlayHitVFX(TargetType, SweepResult);
+		EArrowType CurrentType = GetArrowType();
+		ArrowFXComponent->PlayHitSound(TargetType, SweepResult, CurrentType);
+		ArrowFXComponent->PlayHitVFX(TargetType, SweepResult, CurrentType);
 	}
 }
 
 void AGS_SeekerMerciArrow::ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor)
 {
+}
+
+EArrowType AGS_SeekerMerciArrow::GetArrowType() const
+{
+	return EArrowType::Normal;
 }
 
 void AGS_SeekerMerciArrow::ProcessStickLogic(AActor* HitActor, ETargetType TargetType, const FHitResult& SweepResult)

@@ -1,5 +1,6 @@
 #include "Props/Trap/GS_TrapBase.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "NiagaraComponent.h"
 #include "Character/GS_Character.h"
 #include "Engine/DamageEvents.h"
 #include "Character/Skill/GS_SkillComp.h"
@@ -18,6 +19,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "DungeonEditor/Component/PlaceInfoComponent.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "GeometryCacheComponent.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -112,11 +114,6 @@ void AGS_TrapBase::BeginPlay()
 		if (TrapManager)
 		{
 			TrapManager->RegisterTrap(this);
-			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager in BeginPlay"));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[TrapBase] TrapManager is not in BeginPlay"));
 		}
 	}
 
@@ -128,6 +125,10 @@ void AGS_TrapBase::BeginPlay()
 	if (!IsRunningDedicatedServer())
 	{
 		ApplyDistanceCulling();
+
+		// 그림자 컬링 타이머 시작 (0.5초 간격)
+		float RandomVariance = FMath::RandRange(0.0f, 0.5f);
+		GetWorld()->GetTimerManager().SetTimer(ShadowCullingTimerHandle, this, &AGS_TrapBase::UpdateShadowCulling, 0.5f, true, RandomVariance);
 	}
 }
 
@@ -137,6 +138,7 @@ void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(CheckOverlapTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(ShadowCullingTimerHandle);
 	}
 
 	// 델리게이트 해제 (객체 파괴 시 안정성)
@@ -490,7 +492,6 @@ void AGS_TrapBase::OnDamageBoxHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 	// 환경에 부딪힌 경우 충돌 사운드 재생
 	if (bPlayHitSoundOnEnvironmentImpact && IsEnvironmentHit(OtherActor, OtherComp))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] Environment Hit detected - Trap: %s, Hit: %s"), *GetName(), *GetNameSafe(OtherActor));
 		PlayHitSound();
 	}
 }
@@ -580,7 +581,6 @@ void AGS_TrapBase::Server_DamageBoxEffect_Implementation(AActor* OtherActor)
 
 void AGS_TrapBase::Multicast_DamageBoxEffect_Implementation(AActor* TargetActor)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Multicast_DamageBoxEffect_Implementation called"));
 	DamageBoxEffect(TargetActor);
 }
 
@@ -1119,7 +1119,41 @@ void AGS_TrapBase::ApplyDistanceCulling()
 		}
 	}
 
-	UE_LOG(LogTemp, Verbose, TEXT("[Trap:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
+	// Geometry Cache 컴포넌트 최적화 (인스턴싱/Nanite 미지원으로 공격적 컬링)
+	TArray<UGeometryCacheComponent*> GeoCacheComponents;
+	GetComponents<UGeometryCacheComponent>(GeoCacheComponents);
+
+	// Geometry Cache는 더 공격적인 컬링 거리 사용
+	const float GeoCacheCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::FOLIAGE_CULL_DISTANCE);
+
+	for (UGeometryCacheComponent* GeoCacheComp : GeoCacheComponents)
+	{
+		if (IsValid(GeoCacheComp))
+		{
+			GeoCacheComp->SetCullDistance(GeoCacheCullDistance);
+			GeoCacheComp->SetCachedMaxDrawDistance(GeoCacheCullDistance);
+			GeoCacheComp->bAllowCullDistanceVolume = true;
+			GeoCacheComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
+		}
+	}
+
+	// === Niagara (VFX) 최적화 ===
+	TArray<UNiagaraComponent*> NiagaraComponents;
+	GetComponents<UNiagaraComponent>(NiagaraComponents);
+
+	const float VFXCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::VFX_DISABLE_DISTANCE);
+
+	for (UNiagaraComponent* NiagaraComp : NiagaraComponents)
+	{
+		if (IsValid(NiagaraComp))
+		{
+			// 거리 기반 자동 비활성화 설정
+			NiagaraComp->SetCullDistance(VFXCullDistance);
+			NiagaraComp->SetCachedMaxDrawDistance(VFXCullDistance);
+			NiagaraComp->bAllowCullDistanceVolume = true;
+		}
+	}
+	UE_LOG(LogTemp, Verbose, TEXT("[Trap:%s] Rendering Optimization - Cull Distance: %.1f, GeoCache: %.1f, VFX: %.1f"), *GetName(), CullDistance, GeoCacheCullDistance, VFXCullDistance);
 }
 
 float AGS_TrapBase::GetTrapCullDistance() const
@@ -1165,4 +1199,18 @@ bool AGS_TrapBase::IsEnvironmentHit(AActor* HitActor, UPrimitiveComponent* HitCo
 	}
 
 	return false;
+}
+
+void AGS_TrapBase::UpdateShadowCulling()
+{
+	TArray<UPrimitiveComponent*> PrimitiveComponents;
+	GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+	for (UPrimitiveComponent* Primitive : PrimitiveComponents)
+	{
+		if (IsValid(Primitive))
+		{
+			GS_Rendering::UpdateShadowCulling(this, Primitive);
+		}
+	}
 }

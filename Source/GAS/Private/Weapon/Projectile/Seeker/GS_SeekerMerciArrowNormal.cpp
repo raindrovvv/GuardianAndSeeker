@@ -18,13 +18,11 @@
 
 AGS_SeekerMerciArrowNormal::AGS_SeekerMerciArrowNormal()
 {
-
 }
 
 void AGS_SeekerMerciArrowNormal::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor)
@@ -81,7 +79,7 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 	}
 
 	// 데미지 적용
-	
+
 	// 데미지 대상이 AetherExtractor일 경우
 	if (TargetType == ETargetType::AetherExtractor)
 	{
@@ -90,21 +88,19 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 			UE_LOG(LogTemp, Warning, TEXT("[AGS_MerciArrowNormal]OnHit is called"));
 			float Damage = OwnerCharacter->GetStatComp()->GetAttackPower();
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerCharacter);
-
 		}
 	}
 
 	else if (DamageToApply > 0.f)
 	{
 		UGameplayStatics::ApplyPointDamage(
-			HitActor,
-			DamageToApply,
-			GetActorForwardVector(),
-			SweepResult,
-			GetInstigatorController(),
-			this,
-			DamageTypeClass
-		);
+		    HitActor,
+		    DamageToApply,
+		    GetActorForwardVector(),
+		    SweepResult,
+		    GetInstigatorController(),
+		    this,
+		    DamageTypeClass);
 
 		// 데미지 적용 후 대상 기록 (중복 방지)
 		DamagedActors.Add(HitActor);
@@ -131,7 +127,7 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 		}
 
 		UE_LOG(LogTemp, Warning, TEXT("Damage Applied: %.2f to %s (ArrowType: %d)"),
-			DamageToApply, *HitActor->GetName(), (int32)ArrowType);
+		       DamageToApply, *HitActor->GetName(), (int32)ArrowType);
 	}
 }
 
@@ -202,3 +198,7 @@ void AGS_SeekerMerciArrowNormal::ChangeArrowType(EArrowType Type)
 	}
 }
 
+EArrowType AGS_SeekerMerciArrowNormal::GetArrowType() const
+{
+	return ArrowType;
+}

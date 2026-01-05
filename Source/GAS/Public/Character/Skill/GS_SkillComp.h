@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "GS_SkillSet.h"
 #include "ESkill.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "GS_SkillComp.generated.h"
 
 USTRUCT()
@@ -157,6 +158,9 @@ protected:
 	UPROPERTY()
 	TMap<ESkillSlot, class UNiagaraComponent*> ActiveLoopVFXComponents;
 
+	// 중복 생성 및 취소 처리를 위한 비동기 로드 핸들 추적
+	TMap<ESkillSlot, FAsyncLoadHandle> PendingLoopVFXLoads;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SkillStates)
 	TArray<FSkillRuntimeState> ReplicatedSkillStates;
 
@@ -195,6 +199,14 @@ public:
 
 	UFUNCTION()
 	int16 GetCurAllowedSkillsMask();
+
+	/** 특정 스킬 슬롯을 허용 목록에 추가 (액션 캔슬용) */
+	UFUNCTION()
+	void AddAllowedSkill(ESkillSlot Slot);
+
+	/** 특정 스킬 슬롯을 허용 목록에서 제거 */
+	UFUNCTION()
+	void RemoveAllowedSkill(ESkillSlot Slot);
 
 private:
 	UFUNCTION()

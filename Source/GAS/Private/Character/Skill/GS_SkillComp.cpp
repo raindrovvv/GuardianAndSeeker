@@ -11,6 +11,7 @@
 #include "Character/E_Character.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 
 UGS_SkillComp::UGS_SkillComp()
@@ -135,6 +136,24 @@ void UGS_SkillComp::SetCurAllowedSkillsMask(int16 BitMask)
 int16 UGS_SkillComp::GetCurAllowedSkillsMask()
 {
 	return CurAllowedSkillsMask;
+}
+
+void UGS_SkillComp::AddAllowedSkill(ESkillSlot Slot)
+{
+	if (Slot == ESkillSlot::End)
+		return;
+
+	int16 BitFlag = (1 << static_cast<int32>(Slot));
+	CurAllowedSkillsMask |= BitFlag;
+}
+
+void UGS_SkillComp::RemoveAllowedSkill(ESkillSlot Slot)
+{
+	if (Slot == ESkillSlot::End)
+		return;
+
+	int16 BitFlag = (1 << static_cast<int32>(Slot));
+	CurAllowedSkillsMask &= ~BitFlag;
 }
 
 void UGS_SkillComp::InitSkills()
@@ -652,44 +671,87 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 		return;
 	}
 
-	// Skill 객체에서 프리로드된 Loop VFX 가져오기
+	// Skill 객체에서 Loop VFX 가져오기
 	UGS_SkillBase* Skill = GetSkillFromSkillMap(Slot);
-	if (!Skill)
+	if (!Skill || Skill->SkillLoopVFX.IsNull())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[SkillComp] Multicast_PlayLoopVFX: Skill을 찾을 수 없습니다!"));
 		return;
 	}
 
-	UNiagaraSystem* LoopVFX = Skill->SkillLoopVFX.Get();
-	if (!LoopVFX)
+	// === 깜빡임(Flickering) 방지 로직 ===
+	// TSoftObjectPtr::Get()은 로드되어 있어도 null을 반환할 수 있으므로 SyncLoadAsset 사용 (이미 로드된 에셋은 즉시 반환함)
+	UNiagaraSystem* TargetVFX = UGS_AssetLoader::SyncLoadAsset(Skill->SkillLoopVFX);
+
+	if (UNiagaraComponent** FoundComponent = ActiveLoopVFXComponents.Find(Slot))
 	{
-		// 프리로드되지 않은 경우 동기 로드 시도
-		LoopVFX = Skill->SkillLoopVFX.LoadSynchronous();
+		if (*FoundComponent && IsValid(*FoundComponent) && (*FoundComponent)->GetAsset() == TargetVFX)
+		{
+			// 이미 같은 VFX가 재생 중이므로 종료
+			return;
+		}
 	}
 
-	if (!LoopVFX)
+	TWeakObjectPtr<UGS_SkillComp> WeakThis(this);
+	TWeakObjectPtr<AActor> WeakTarget(AttachTarget);
+
+	// 이전 비동기 로드 취소
+	if (FAsyncLoadHandle* Handle = PendingLoopVFXLoads.Find(Slot))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[SkillComp] Multicast_PlayLoopVFX: SkillLoopVFX가 유효하지 않습니다!"));
-		return;
+		Handle->Get()->CancelHandle();
+		PendingLoopVFXLoads.Remove(Slot);
 	}
 
-	// 기존 Loop VFX가 있으면 먼저 정리
-	Multicast_StopLoopVFX(Slot);
+	FAsyncLoadHandle NewHandle = UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	    Skill->SkillLoopVFX,
+	    [WeakThis, WeakTarget, Slot, TargetVFX](UNiagaraSystem* LoadedVFX)
+	    {
+		    if (!WeakThis.IsValid() || !WeakTarget.IsValid() || !LoadedVFX)
+		    {
+			    return;
+		    }
 
-	// 새로운 Loop VFX 생성 (AttachTarget에 부착)
-	UNiagaraComponent* LoopVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-	    LoopVFX,
-	    AttachTarget->GetRootComponent(),
-	    NAME_None,
-	    Skill->LoopVFXOffset, // 데이터 테이블에서 설정된 오프셋 사용
-	    FRotator::ZeroRotator,
-	    EAttachLocation::KeepRelativeOffset,
-	    true // bAutoDestroy
-	);
+		    // 비동기 로드 완료 시점에 다시 한 번 체크
+		    if (UNiagaraComponent** ActiveComp = WeakThis->ActiveLoopVFXComponents.Find(Slot))
+		    {
+			    if (*ActiveComp && IsValid(*ActiveComp) && (*ActiveComp)->GetAsset() == LoadedVFX)
+			    {
+				    return;
+			    }
+		    }
 
-	if (LoopVFXComponent)
+		    // 기존 Loop VFX 정리
+		    WeakThis->Multicast_StopLoopVFX(Slot);
+
+		    UGS_SkillBase* CurrentSkill = WeakThis->GetSkillFromSkillMap(Slot);
+		    if (!CurrentSkill)
+		    {
+			    return;
+		    }
+
+		    // 새로운 Loop VFX 생성 (Explicit Destroy를 위해 bAutoDestroy=false 권장)
+		    UNiagaraComponent* LoopVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		        LoadedVFX,
+		        WeakTarget->GetRootComponent(),
+		        NAME_None,
+		        CurrentSkill->LoopVFXOffset,
+		        FRotator::ZeroRotator,
+		        EAttachLocation::KeepRelativeOffset,
+		        false // bAutoDestroy -> StopLoopVFX에서 명시적으로 제어
+		    );
+
+		    if (LoopVFXComponent)
+		    {
+			    LoopVFXComponent->Activate();
+			    WeakThis->ActiveLoopVFXComponents.Add(Slot, LoopVFXComponent);
+		    }
+
+		    // 로드 완료 후 맵에서 제거
+		    WeakThis->PendingLoopVFXLoads.Remove(Slot);
+	    });
+
+	if (NewHandle.IsValid())
 	{
-		ActiveLoopVFXComponents.Add(Slot, LoopVFXComponent);
+		PendingLoopVFXLoads.Add(Slot, NewHandle);
 	}
 }
 
@@ -699,6 +761,13 @@ void UGS_SkillComp::Multicast_StopLoopVFX_Implementation(ESkillSlot Slot)
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
 	{
 		return;
+	}
+
+	// 로딩 중인 것도 취소
+	if (FAsyncLoadHandle* Handle = PendingLoopVFXLoads.Find(Slot))
+	{
+		Handle->Get()->CancelHandle();
+		PendingLoopVFXLoads.Remove(Slot);
 	}
 
 	// 해당 슬롯의 Loop VFX 컴포넌트 찾기

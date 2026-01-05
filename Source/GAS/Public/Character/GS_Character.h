@@ -7,6 +7,7 @@
 #include "Component/GS_HitReactComp.h"
 #include "CharacterDataAsset.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "GS_Character.generated.h"
 
 class UGS_StatComp;
@@ -61,7 +62,7 @@ class GAS_API AGS_Character : public ACharacter, public IGenericTeamAgentInterfa
 	GENERATED_BODY()
 
 public:
-	AGS_Character();
+	AGS_Character(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
@@ -105,6 +106,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
 	FGS_CameraShakeInfo AttackSuccessShake;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo LightDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo NormalDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	FGS_CameraShakeInfo HeavyDamageShake;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float LightDamageThreshold = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float NormalDamageThreshold = 25.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects|CameraShake")
+	float HeavyDamageThreshold = 45.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Effects|CameraShake")
+	float CameraKnockbackDistance = 5.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Effects|CameraShake")
+	float CameraKnockbackRecoverySpeed = 10.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stat", meta = (AllowPrivateAccess))
 	TObjectPtr<UGS_HPTextWidgetComp> HPTextWidgetComp;
 
@@ -147,12 +172,15 @@ public:
 	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
 
 	//serverRPC
+	/** 타격 정격(Hit-stop) 효과 적용 (멀티캐스트) */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_ApplyHitStop(float Duration, float TimeDilation, bool bPlayShake = false);
 	UFUNCTION(Server, Reliable)
 	void ServerRPCMeleeAttack(AGS_Character* InDamagedCharacter);
 
 	//clientRPC for camera shake
 	UFUNCTION(Client, Unreliable)
-	void Client_PlayTakeDamageShake(APlayerController* TargetPC);
+	void Client_PlayTakeDamageShake(APlayerController* TargetPC, const FGS_CameraShakeInfo& ShakeInfo, float KnockbackMultiplier = 1.0f);
 
 	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShake(APlayerController* TargetPC);
@@ -237,6 +265,12 @@ public:
 	/** 현재 중요도 값 반환 */
 	FORCEINLINE float GetSignificance() const { return CurrentSignificance; }
 
+	/** 현재 누적된 카메라 낙아웃 거리 */
+	float CurrentCameraKnockback = 0.0f;
+
+	/** 카메라 낙아웃 효과 적용 */
+	void ApplyCameraKnockback(float IntensityMultiplier = 1.0f);
+
 protected:
 	/** 현재 중요도 상태 저장 (0.0 ~ 1.0) */
 	float CurrentSignificance = 1.0f;
@@ -315,6 +349,9 @@ protected:
 private:
 	UPROPERTY(ReplicatedUsing = OnRep_ImpactVFX)
 	FImpactVFXInfo RepImpactVFX;
+
+	// 중복 생성 방지를 위한 비동기 로드 핸들
+	FAsyncLoadHandle PendingImpactVFXLoad;
 
 private:
 	void SpawnAndAttachWeapons();
