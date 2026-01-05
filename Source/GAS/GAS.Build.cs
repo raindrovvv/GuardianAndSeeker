@@ -38,7 +38,8 @@ public class GAS : ModuleRules
             "GeometryCollectionEngine",
             "NavigationSystem",
             "MediaAssets",
-            "SignificanceManager"
+            "SignificanceManager",
+            "GeometryCache"
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

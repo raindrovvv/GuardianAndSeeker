@@ -24,6 +24,7 @@
 #include "System/GameState/GS_InGameGS.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "TimerManager.h"
+#include "Misc/App.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
 
 AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
@@ -104,7 +105,7 @@ void AGS_Monster::BeginPlay()
 	SetActorTickEnabled(false);
 
 	// 클라이언트: 그림자 컬링 및 HP 위젯 가시성을 타이머로 처리 (0.1초 간격)
-	if (!IsRunningDedicatedServer())
+	if (FApp::CanEverRender())
 	{
 		// 타이머 로드 밸런싱 (Load Balancing)
 		// 모든 몬스터가 동일한 프레임에 연산을 수행하지 않도록, 시작 시간을 0.0 ~ 0.1초 사이로 랜덤 분산.
@@ -130,7 +131,7 @@ void AGS_Monster::BeginPlay()
 	// === 데디케이티드 서버 크래시 방지 ===
 	// 생성자에서 만든 AkComponent가 리스너 없는 서버에서 Tick하면 크래시 발생
 	// DefaultSubobject는 DestroyComponent 대신 비활성화만 수행
-	if (IsRunningDedicatedServer() || GetNetMode() == NM_DedicatedServer)
+	if (!FApp::CanEverRender())
 	{
 		if (IsValid(AkComponent))
 		{
@@ -206,7 +207,7 @@ void AGS_Monster::BeginPlay()
 	}
 
 	// === Skeletal Mesh Distance Culling 설정 (클라이언트만) ===
-	if (!IsRunningDedicatedServer() && GetMesh())
+	if (FApp::CanEverRender() && GetMesh())
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
 		float CullDistance =
@@ -221,25 +222,24 @@ void AGS_Monster::BeginPlay()
 
 		// === Animation Optimization (Client) ===
 		MeshComp->bEnableUpdateRateOptimizations = true;
-		// 몽타주 재생 중에는 화면 밖이라도 틱을 유지하여 공격 판정(AnimNotify) 보장
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+		// 화면 밖이거나 멀리 있으면 메시 렌더링을 위한 틱을 중단 (중요도 시스템과 연동)
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 
-		UE_LOG(LogTemp, Log,
-		       TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"),
-		       *GetName(), CullDistance);
+		// 캡슐 그림자로 원거리 최적화 (이동 방향만 인지되도록)
+		MeshComp->SetCastCapsuleDirectShadow(true);
+
+		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
 	}
 
 	// === Animation Optimization (Server) ===
-	if (IsRunningDedicatedServer() && GetMesh())
+	if (!FApp::CanEverRender() && GetMesh())
 	{
-		// 서버는 항상 틱을 수행하여 판정 및 로직 보장
-		GetMesh()->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		// 서버는 판정(AnimNotify)을 위해 반드시 Refresh Bones 필요
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만) ===
-	if (!IsRunningDedicatedServer())
+	if (FApp::CanEverRender())
 	{
 		UpdateShadowCulling();
 	}

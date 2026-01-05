@@ -694,7 +694,14 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 	TWeakObjectPtr<UGS_SkillComp> WeakThis(this);
 	TWeakObjectPtr<AActor> WeakTarget(AttachTarget);
 
-	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	// 이전 비동기 로드 취소
+	if (FAsyncLoadHandle* Handle = PendingLoopVFXLoads.Find(Slot))
+	{
+		Handle->Get()->CancelHandle();
+		PendingLoopVFXLoads.Remove(Slot);
+	}
+
+	FAsyncLoadHandle NewHandle = UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
 	    Skill->SkillLoopVFX,
 	    [WeakThis, WeakTarget, Slot, TargetVFX](UNiagaraSystem* LoadedVFX)
 	    {
@@ -717,7 +724,9 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 
 		    UGS_SkillBase* CurrentSkill = WeakThis->GetSkillFromSkillMap(Slot);
 		    if (!CurrentSkill)
+		    {
 			    return;
+		    }
 
 		    // 새로운 Loop VFX 생성 (Explicit Destroy를 위해 bAutoDestroy=false 권장)
 		    UNiagaraComponent* LoopVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
@@ -735,7 +744,15 @@ void UGS_SkillComp::Multicast_PlayLoopVFX_Implementation(ESkillSlot Slot, AActor
 			    LoopVFXComponent->Activate();
 			    WeakThis->ActiveLoopVFXComponents.Add(Slot, LoopVFXComponent);
 		    }
+
+		    // 로드 완료 후 맵에서 제거
+		    WeakThis->PendingLoopVFXLoads.Remove(Slot);
 	    });
+
+	if (NewHandle.IsValid())
+	{
+		PendingLoopVFXLoads.Add(Slot, NewHandle);
+	}
 }
 
 void UGS_SkillComp::Multicast_StopLoopVFX_Implementation(ESkillSlot Slot)
@@ -744,6 +761,13 @@ void UGS_SkillComp::Multicast_StopLoopVFX_Implementation(ESkillSlot Slot)
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
 	{
 		return;
+	}
+
+	// 로딩 중인 것도 취소
+	if (FAsyncLoadHandle* Handle = PendingLoopVFXLoads.Find(Slot))
+	{
+		Handle->Get()->CancelHandle();
+		PendingLoopVFXLoads.Remove(Slot);
 	}
 
 	// 해당 슬롯의 Loop VFX 컴포넌트 찾기

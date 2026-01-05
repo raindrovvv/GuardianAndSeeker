@@ -681,8 +681,14 @@ void AGS_Character::OnRep_ImpactVFX()
 
 	TWeakObjectPtr<AGS_Character> WeakThis(this);
 
+	// 이전 비동기 로드 취소
+	if (PendingImpactVFXLoad.IsValid())
+	{
+		PendingImpactVFXLoad->CancelHandle();
+	}
+
 	// 비동기 로드 시작
-	UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
+	PendingImpactVFXLoad = UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
 	    CurrentVFXInfo.VFXAsset,
 	    [WeakThis, CurrentVFXInfo](UNiagaraSystem* LoadedVFX)
 	    {

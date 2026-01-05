@@ -13,6 +13,7 @@
 #include "Components/WidgetComponent.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "Rendering/GS_RenderingConstants.h"
+#include "Misc/App.h"
 
 
 AGS_Guardian::AGS_Guardian(const FObjectInitializer& ObjectInitializer)
@@ -57,7 +58,7 @@ void AGS_Guardian::BeginPlay()
 	// === 애니메이션 틱 최적화 설정 ===
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		if (IsRunningDedicatedServer())
+		if (!FApp::CanEverRender())
 		{
 			// 서버는 화면이 없으므로 항상 틱을 수행하여 판정(AnimNotify) 누락 방지
 			MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
@@ -119,7 +120,7 @@ void AGS_Guardian::OnSignificanceChanged(float NewSignificance)
 
 	// 가변 타이머 주기 조정 (Adaptive Timer)
 	// 중요도에 따라 타이머 주기를 동적으로 변경하여 CPU 부하 분산
-	if (!IsRunningDedicatedServer())
+	if (FApp::CanEverRender())
 	{
 		float NewInterval = GS_Rendering::GetAdaptiveTimerInterval(NewSignificance);
 

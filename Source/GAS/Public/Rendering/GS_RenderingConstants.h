@@ -36,8 +36,11 @@ constexpr float TRAP_MEDIUM_CULL_DISTANCE = 4500.0f;
 /** 큰 함정 컬링 거리 (60m) */
 constexpr float TRAP_LARGE_CULL_DISTANCE = 6000.0f;
 
-/** 방 모듈 컬링 거리 (80m) */
-constexpr float ROOM_CULL_DISTANCE = 8000.0f;
+/** 방 모듈 컬링 거리 (60m) - Draw Call 최적화를 위해 축소 */
+constexpr float ROOM_CULL_DISTANCE = 6000.0f;
+
+/** 폴리지 컬링 거리 (30m) - Nanite 미지원으로 인한 공격적 컬링 */
+constexpr float FOLIAGE_CULL_DISTANCE = 3000.0f;
 
 /** 무기 컬링 거리 (45m) */
 constexpr float WEAPON_CULL_DISTANCE = 4500.0f;
@@ -52,8 +55,8 @@ constexpr float HP_WIDGET_CULL_DISTANCE = 6000.0f;
 /** TPS 시점 컬링 거리 배율 */
 constexpr float TPS_CULL_DISTANCE_SCALE = 1.0f;
 
-/** RTS 시점 컬링 거리 배율 (더 넓은 시야 필요) */
-constexpr float RTS_CULL_DISTANCE_SCALE = 3.5f;
+/** RTS 시점 컬링 거리 배율 (시야와 성능 간 균형) */
+constexpr float RTS_CULL_DISTANCE_SCALE = 2.5f;
 
 /**
  * 현재 시점(RTS/TPS)에 맞는 최적의 컬링 거리를 계산합니다.
@@ -142,11 +145,33 @@ float CalculateNetUpdateFrequency(const UObject* WorldContext,
 // Shadow Casting Distance Optimization
 // ========================================
 
-/** 그림자 완전 비활성화 거리 (80m) */
-constexpr float SHADOW_DISABLE_DISTANCE = 8000.0f;
+/** 그림자 완전 비활성화 거리 (50m - 공격적 최적화) */
+constexpr float SHADOW_DISABLE_DISTANCE = 5000.0f;
 
-/** 동적 그림자 비활성화 거리 (40m - 정적 그림자만 유지) */
-constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 4000.0f;
+/** 동적 그림자 비활성화 거리 (25m - 정적 그림자만 유지) */
+constexpr float DYNAMIC_SHADOW_DISABLE_DISTANCE = 2500.0f;
+
+/** 몬스터 그림자 비활성화 거리 (35m - 던전 전투 범위 고려) */
+constexpr float MONSTER_SHADOW_DISTANCE = 3500.0f;
+
+// ========================================
+// VFX Optimization (Niagara)
+// ========================================
+
+/** VFX 완전 비활성화 거리 (60m) */
+constexpr float VFX_DISABLE_DISTANCE = 6000.0f;
+
+/** VFX 저품질 전환 거리 (30m - 파티클 수 50% 감소) */
+constexpr float VFX_LOW_QUALITY_DISTANCE = 3000.0f;
+
+/** VFX 중품질 전환 거리 (15m - 파티클 수 75% 유지) */
+constexpr float VFX_MEDIUM_QUALITY_DISTANCE = 1500.0f;
+
+/** 저품질 VFX 파티클 배율 */
+constexpr float VFX_LOW_QUALITY_SCALE = 0.5f;
+
+/** 중품질 VFX 파티클 배율 */
+constexpr float VFX_MEDIUM_QUALITY_SCALE = 0.75f;
 
 // ========================================
 // Combat Detection Settings

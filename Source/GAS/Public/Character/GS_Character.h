@@ -7,6 +7,7 @@
 #include "Component/GS_HitReactComp.h"
 #include "CharacterDataAsset.h"
 #include "Character/Component/GS_CameraShakeTypes.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "GS_Character.generated.h"
 
 class UGS_StatComp;
@@ -348,6 +349,9 @@ protected:
 private:
 	UPROPERTY(ReplicatedUsing = OnRep_ImpactVFX)
 	FImpactVFXInfo RepImpactVFX;
+
+	// 중복 생성 방지를 위한 비동기 로드 핸들
+	FAsyncLoadHandle PendingImpactVFXLoad;
 
 private:
 	void SpawnAndAttachWeapons();

@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "GS_SkillSet.h"
 #include "ESkill.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "GS_SkillComp.generated.h"
 
 USTRUCT()
@@ -156,6 +157,9 @@ protected:
 	// Loop VFX 컴포넌트 추적 (궁극기 아우라 등)
 	UPROPERTY()
 	TMap<ESkillSlot, class UNiagaraComponent*> ActiveLoopVFXComponents;
+
+	// 중복 생성 및 취소 처리를 위한 비동기 로드 핸들 추적
+	TMap<ESkillSlot, FAsyncLoadHandle> PendingLoopVFXLoads;
 
 	UPROPERTY(ReplicatedUsing = OnRep_SkillStates)
 	TArray<FSkillRuntimeState> ReplicatedSkillStates;
