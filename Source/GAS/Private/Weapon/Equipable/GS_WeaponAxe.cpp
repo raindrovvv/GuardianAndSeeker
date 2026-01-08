@@ -3,6 +3,7 @@
 
 #include "Weapon/Equipable/GS_WeaponAxe.h"
 #include "Character/GS_Character.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
@@ -22,7 +23,7 @@
 // Sets default values
 AGS_WeaponAxe::AGS_WeaponAxe()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this actor to call Tick() every frame.
 	PrimaryActorTick.bCanEverTick = false;
 
 	AxeMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("AxeMeshComponent"));
@@ -49,14 +50,20 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 		return;
 	}
 
+	// [안전장치] 현재 공격 시퀀스가 활성화된 상태인지 확인
+	if (ActiveNotifyCount <= 0)
+	{
+		return;
+	}
+
 	// 레벨 전환 시 null 참조 방지
 	if (!IsValidForLevelTransition())
 	{
 		return;
 	}
 
-	// 중복 히트 방지
-	if (!OtherActor || OtherActor == this || HitActors.Contains(OtherActor))
+	// 중복 히트 및 자기 자신/소유자 히트 방지
+	if (!OtherActor || OtherActor == this || OtherActor == OwnerChar || HitActors.Contains(OtherActor))
 	{
 		return;
 	}
@@ -67,85 +74,80 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 		return;
 	}
 
+	// [필수] 환경(땅, 벽 등)을 포함한 모든 유효 타격에 대해 사운드 및 VFX 재생
 	HitActors.Add(OtherActor);
-
-	// 맞은 대상 구분
 	EAxeHitTargetType TargetType = DetermineTargetType(OtherActor);
-
-	// HitResult 생성 (Overlap에서는 정확한 히트 포인트가 없을 수 있음)
 	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
 
 	Multicast_PlayHitSound(TargetType, CorrectHitResult);
+	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
 
 	AGS_Character* Damaged = Cast<AGS_Character>(OtherActor);
 	AGS_Character* Attacker = OwnerChar;
 
-	//에테르 추출기
+	// 에테르 추출기 처리
 	if (!Damaged && Attacker)
 	{
 		if (AGS_AetherExtractor* AetherExtractor = Cast<AGS_AetherExtractor>(OtherActor))
 		{
 			float Damage = Attacker->GetStatComp()->GetAttackPower();
-			FGS_DamageEvent DamageEvent;
 			AetherExtractor->TakeDamageBySeeker(Damage, OwnerChar);
 			SafeDisableHitBoxCollision(HitBox);
 		}
 	}
 
+	// [핵심] 캐릭터와 특수 오브젝트가 아닌 경우 여기서 종료 (데미지 처리 스킵)
 	if (!Damaged || !Attacker || !Damaged->IsEnemy(Attacker))
 	{
-		// 적이 아닌 대상(벽 등)을 타격한 경우, 기본 VFX만 재생하고 종료
-		Multicast_PlayHitVFX(TargetType, CorrectHitResult);
+		return;
+	}
+
+	// [중요] 캐릭터 앞방향 체크 (뒤에 있는 적 무시)
+	// 약 140도 범위 내에 있는 타겟만 공격 허용
+	if (!IsInFrontAngle(Damaged))
+	{
 		return;
 	}
 
 	// --- 여기서부터는 유효한 적을 타격한 경우 ---
 
-	// 1. 기본 VFX는 항상 재생
-	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
+	// 데미지 적용
+	UGS_StatComp* DamagedStat = Damaged->GetStatComp();
+	if (DamagedStat)
+	{
+		float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
+		FGS_DamageEvent DamageEvent;
+		DamageEvent.HitReactType = EHitReactType::Interrupt;
+		Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
-	// 2. 슬래시 이펙트 재생 (혈흔 이펙트)
+		// 피격자 히트스탑 적용
+		Damaged->Multicast_ApplyHitStop(0.08f, 0.0f, false);
+	}
+
+	// [중복 방지] 타격 성공 즉시 콜리전 비활성화 (지연 없이 즉각 차단)
+	if (HitBox)
+	{
+		HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 1. 기본 VFX 및 슬래시 이펙트 재생
+	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
 	if (WeaponVFXComponent)
 	{
-		// 공격자(OwnerChar)의 시커 타입을 직접 전달
 		ESeekerAuraType AttackerAuraType = GetSeekerAuraType(OwnerChar);
 		WeaponVFXComponent->PlaySlashVFX(CorrectHitResult, AttackerAuraType);
 	}
 
-	// 3. 아우라 이펙트 트리거 (가디언이나 몬스터를 타격했을 때)
+	// 2. 아우라 이펙트 트리거
 	TriggerHitAuraOnHit(Damaged);
 
-	// 3. '찬'의 4번째 공격일 경우 추가 효과(사운드, VFX) 재생
-	if (AGS_Chan* Chan = Cast<AGS_Chan>(Attacker))
+	// 캐릭터 클래스에 위임하여 특수 효과 처리
+	int32 CurrentCombo = 0;
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Attacker))
 	{
-		if (Chan->CurrentComboIndex == 4)
-		{
-			// 추가 사운드
-			Chan->Multicast_OnAttackHit(Chan->CurrentComboIndex);
-
-			// 추가 VFX
-			if (Chan->FinalAttackHitVFX)
-			{
-				Multicast_PlaySpecialHitVFX(Chan->FinalAttackHitVFX, CorrectHitResult);
-			}
-		}
+		CurrentCombo = Seeker->CurrentComboIndex;
 	}
-
-	UGS_StatComp* DamagedStat = Damaged->GetStatComp();
-	if (!DamagedStat)
-	{
-		return;
-	}
-
-	float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
-	FGS_DamageEvent DamageEvent;
-	DamageEvent.HitReactType = EHitReactType::Interrupt;
-	Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
-
-	// Reaction Sync: 피격자에게도 짧은 히트스탑 적용 (멀티플레이 밸런스 조정: 0.18 -> 0.08)
-	Damaged->Multicast_ApplyHitStop(0.08f, 0.0f, false);
-
-	SafeDisableHitBoxCollision(HitBox);
+	Attacker->OnAttackHitSuccess(CurrentCombo, CorrectHitResult);
 }
 
 EAxeHitTargetType AGS_WeaponAxe::DetermineTargetType(AActor* OtherActor) const
@@ -192,36 +194,9 @@ void AGS_WeaponAxe::PlayHitSound(EAxeHitTargetType TargetType, const FHitResult&
 		break;
 	}
 
-	if (SoundEventToPlay && GetWorld())
+	if (SoundEventToPlay)
 	{
-		FVector ListenerLocation;
-		if (GetListenerLocation(ListenerLocation))
-		{
-			// RTS 모드와 TPS 모드에 따른 거리 체크
-			const bool bRTS = IsRTSMode();
-			const float MaxDistance = bRTS ? 10000.0f : 2000.0f; // RTS: 100m, TPS: 20m
-
-			const float DistanceToListener = FVector::Dist(SweepResult.ImpactPoint, ListenerLocation);
-
-
-			if (DistanceToListener <= MaxDistance)
-			{
-				UAkGameplayStatics::PostEventAtLocation(
-				    SoundEventToPlay,
-				    SweepResult.ImpactPoint,
-				    FRotator::ZeroRotator,
-				    GetWorld());
-			}
-		}
-		else
-		{
-			// Fallback: 리스너 위치를 찾지 못할 경우 거리 체크 없이 재생
-			UAkGameplayStatics::PostEventAtLocation(
-			    SoundEventToPlay,
-			    SweepResult.ImpactPoint,
-			    FRotator::ZeroRotator,
-			    GetWorld());
-		}
+		PlayHitSoundAtLocation(SoundEventToPlay, SweepResult.ImpactPoint);
 	}
 }
 
@@ -273,6 +248,9 @@ void AGS_WeaponAxe::Multicast_PlayHitSound_Implementation(EAxeHitTargetType Targ
 	}
 
 	PlayHitSound(TargetType, SweepResult);
+
+	/** 멀티 레이어 사운드 (피격/잔향) 재생 */
+	PlayLayeredHitSound(SweepResult, SweepResult.GetActor());
 }
 
 bool AGS_WeaponAxe::Multicast_PlayHitVFX_Validate(EAxeHitTargetType TargetType, const FHitResult& SweepResult)
@@ -288,41 +266,18 @@ void AGS_WeaponAxe::Multicast_PlayHitVFX_Implementation(EAxeHitTargetType Target
 		return;
 	}
 
-	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
+	// 거리 기반 VFX 컬링 (전역 상수 60m 사용)
+	if (OwnerChar && OwnerChar->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, GS_Rendering::VFX_DISABLE_DISTANCE))
 	{
-		if (Character->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, 3500.0f))
-		{
-			PlayHitVFX(TargetType, SweepResult);
-		}
+		PlayHitVFX(TargetType, SweepResult);
 	}
 }
 
-void AGS_WeaponAxe::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
+UBoxComponent* AGS_WeaponAxe::GetHitBox() const
 {
-	// 레벨 전환 시 null 참조 방지
-	if (!IsValidForLevelTransition())
-	{
-		return;
-	}
-
-	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
-	{
-		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
-		{
-			if (VFXToPlay && GetWorld())
-			{
-				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				    GetWorld(),
-				    VFXToPlay,
-				    HitResult.ImpactPoint,
-				    HitResult.ImpactNormal.Rotation(),
-				    FVector(1.0f),
-				    true,
-				    true);
-			}
-		}
-	}
+	return HitBox;
 }
+
 
 void AGS_WeaponAxe::EnableHit()
 {
@@ -338,8 +293,11 @@ void AGS_WeaponAxe::EnableHit()
 		HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
 
-	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
-	ClearHitActors();
+	// [중요] 중복 타격 방지: 공격 시퀀스가 처음 시작될 때만 히트 목록 초기화
+	if (ActiveNotifyCount == 1)
+	{
+		ClearHitActors();
+	}
 
 	// 안전장치: 3초 후에 자동으로 비활성화
 	ClearSafetyTimer();
@@ -347,11 +305,10 @@ void AGS_WeaponAxe::EnableHit()
 	// 레벨 전환 중이 아닌 경우에만 타이머 설정
 	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown && IsValid(World))
 	{
-		// 추가로 타이머 매니저의 유효성도 확인
 		FTimerManager& TimerManager = World->GetTimerManager();
 		if (&TimerManager)
 		{
-			TimerManager.SetTimer(SafetyTimerHandle, this, &AGS_WeaponAxe::DisableHit, 3.0f, false);
+			TimerManager.SetTimer(SafetyTimerHandle, this, &AGS_WeaponAxe::DisableHit, DEFAULT_SAFETY_DURATION, false);
 		}
 	}
 }
@@ -370,28 +327,25 @@ void AGS_WeaponAxe::DisableHit()
 		HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
-	// 타이머 정리
+	// 타이머 및 노티파이 카운트 정리
 	ClearSafetyTimer();
+	ActiveNotifyCount = 0;
 }
 
 void AGS_WeaponAxe::ServerDisableHit_Implementation()
 {
-	// 레벨 전환 시 null 참조 방지
-	if (!IsValidForLevelTransition())
+	Super::ServerDisableHit_Implementation();
+
+	// 아직 다른 활성 노티파이가 있다면 비활성화 건너뜀
+	if (ActiveNotifyCount > 0)
 	{
 		return;
 	}
 
-	// 추가 안전성 검사: 액터와 컴포넌트 유효성 확인
-	if (!IsValid(this) || IsActorBeingDestroyed())
-	{
-		return;
-	}
-
-	// HitBox 안전하게 비활성화
+	// 모든 노티파이가 끝났을 때만 안전하게 비활성화
 	if (HitBox && IsValid(HitBox) && !HitBox->IsBeingDestroyed())
 	{
-		HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SafeDisableHitBoxCollision(HitBox);
 	}
 
 	// 타이머 정리
@@ -400,36 +354,49 @@ void AGS_WeaponAxe::ServerDisableHit_Implementation()
 
 void AGS_WeaponAxe::ServerEnableHit_Implementation()
 {
-	// 레벨 전환 시 null 참조 방지
-	if (!IsValidForLevelTransition())
-	{
-		return;
-	}
-
-	// 추가 안전성 검사: 액터와 컴포넌트 유효성 확인
-	if (!IsValid(this) || IsActorBeingDestroyed())
-	{
-		return;
-	}
+	Super::ServerEnableHit_Implementation();
 
 	// HitBox 안전하게 활성화
 	if (HitBox && IsValid(HitBox) && !HitBox->IsBeingDestroyed())
 	{
 		HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+		// 물리 상태 즉시 업데이트
+		HitBox->UpdateOverlaps();
 	}
 
-	ClearHitActors();
-
+	// === 안전장치: 3초 후 자동 비활성화 ===
 	ClearSafetyTimer();
-
-	// 레벨 전환 중이 아닌 경우에만 타이머 설정
-	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown && IsValid(World))
+	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown)
 	{
-		// 추가로 타이머 매니저의 유효성도 확인
-		FTimerManager& TimerManager = World->GetTimerManager();
-		if (&TimerManager)
+		World->GetTimerManager().SetTimer(SafetyTimerHandle, this, &AGS_WeaponAxe::ServerDisableHit, DEFAULT_SAFETY_DURATION, false);
+	}
+
+	// 이미 겹쳐 있는 액터들에 대해 강제 히트 판정
+	// UpdateOverlaps()만으로는 이미 겹친 상태에서 BeginOverlap 이벤트가 발생하지 않으므로
+	// 수동으로 겹침 검사 후 OnHit 호출
+	if (HitBox)
+	{
+		TArray<AActor*> OverlappingActors;
+		HitBox->GetOverlappingActors(OverlappingActors);
+
+		for (AActor* Actor : OverlappingActors)
 		{
-			TimerManager.SetTimer(SafetyTimerHandle, this, &AGS_WeaponAxe::DisableHit, 3.0f, false);
+			if (Actor && Actor != this && Actor != OwnerChar && !HitActors.Contains(Actor))
+			{
+				// 캐릭터 앞방향 체크 (뒤에 있는 적 무시)
+				if (!IsInFrontAngle(Actor))
+				{
+					continue;
+				}
+
+				FHitResult Hit;
+				Hit.HitObjectHandle = FActorInstanceHandle(Actor);
+				Hit.Component = Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+
+				// OnHit 수동 호출 (bFromSweep = false)
+				OnHit(HitBox, Actor, Hit.Component.Get(), 0, false, Hit);
+			}
 		}
 	}
 }
@@ -447,38 +414,6 @@ void AGS_WeaponAxe::BeginPlay()
 	{
 		HitBox->ComponentTags.AddUnique(FName("DEFENSIBLE_ATTACK"));
 	}
-}
-
-
-bool AGS_WeaponAxe::GetListenerLocation(FVector& OutLocation) const
-{
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!LocalPC)
-	{
-		return false;
-	}
-
-	if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(LocalPC))
-	{
-		if (RTSController->GetViewTarget())
-		{
-			OutLocation = RTSController->GetViewTarget()->GetActorLocation();
-			return true;
-		}
-	}
-	else if (LocalPC->GetPawn())
-	{
-		OutLocation = LocalPC->GetPawn()->GetActorLocation();
-		return true;
-	}
-
-	return false;
-}
-
-bool AGS_WeaponAxe::IsRTSMode() const
-{
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	return LocalPC && Cast<AGS_RTSController>(LocalPC) != nullptr;
 }
 
 // 특화 헬퍼 함수 구현 (타이머 관련)

@@ -11,11 +11,11 @@
 UENUM(BlueprintType)
 enum class EAxeHitTargetType : uint8
 {
-	Guardian		UMETA(DisplayName = "Guardian"),
-	DungeonMonster	UMETA(DisplayName = "DungeonMonster"),
-	Seeker			UMETA(DisplayName = "Seeker"),
-	Structure		UMETA(DisplayName = "Structure"),
-	Other			UMETA(DisplayName = "Other")
+	Guardian UMETA(DisplayName = "Guardian"),
+	DungeonMonster UMETA(DisplayName = "DungeonMonster"),
+	Seeker UMETA(DisplayName = "Seeker"),
+	Structure UMETA(DisplayName = "Structure"),
+	Other UMETA(DisplayName = "Other")
 };
 
 UCLASS()
@@ -33,24 +33,18 @@ public:
 
 	UFUNCTION()
 	void OnHit(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult
-	);
+	    UPrimitiveComponent* OverlappedComponent,
+	    AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp,
+	    int32 OtherBodyIndex,
+	    bool bFromSweep,
+	    const FHitResult& SweepResult);
 
-	UFUNCTION()
-	void EnableHit();
-	
-	UFUNCTION()
-	void DisableHit();
+	virtual void EnableHit() override;
+	virtual void DisableHit() override;
 
-	UFUNCTION(Server, Reliable)
-	void ServerEnableHit();
-	UFUNCTION(Server, Reliable)
-	void ServerDisableHit();
+	virtual void ServerEnableHit_Implementation() override;
+	virtual void ServerDisableHit_Implementation() override;
 
 	// 히트 사운드 에셋들
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
@@ -77,12 +71,7 @@ protected:
 	virtual EAxeHitTargetType DetermineTargetType(AActor* OtherActor) const;
 	virtual void PlayHitSound(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	virtual void PlayHitVFX(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
-
-	// RTS 모드 지원을 위한 리스너 위치 가져오기
-	bool GetListenerLocation(FVector& OutLocation) const;
-	
-	// RTS 모드 감지
-	bool IsRTSMode() const;
+	virtual class UBoxComponent* GetHitBox() const override;
 
 	// 특화 헬퍼 함수 (타이머 관련)
 	virtual void ClearSafetyTimer() override;
@@ -97,8 +86,4 @@ protected:
 	void Multicast_PlayHitVFX(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitVFX_Validate(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(EAxeHitTargetType TargetType, const FHitResult& SweepResult);
-
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 };
-

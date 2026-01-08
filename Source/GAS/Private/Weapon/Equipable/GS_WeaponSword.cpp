@@ -4,6 +4,7 @@
 #include "Weapon/Equipable/GS_WeaponSword.h"
 #include "Character/GS_Character.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Player/Seeker/GS_Ares.h"
@@ -63,6 +64,13 @@ void AGS_WeaponSword::EnableHit()
 
 	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
 	ClearHitActors();
+
+	// === 안전장치: 3초 후 자동 비활성화 ===
+	ClearSafetyTimer();
+	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown)
+	{
+		World->GetTimerManager().SetTimer(SafetyTimerHandle, this, &AGS_WeaponSword::DisableHit, DEFAULT_SAFETY_DURATION, false);
+	}
 }
 
 void AGS_WeaponSword::DisableHit()
@@ -78,6 +86,10 @@ void AGS_WeaponSword::DisableHit()
 	{
 		HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
+
+	// 타이머 및 노티파이 카운트 정리
+	ClearSafetyTimer();
+	ActiveNotifyCount = 0;
 }
 
 void AGS_WeaponSword::ServerEnableHit_Implementation()
@@ -102,15 +114,22 @@ void AGS_WeaponSword::ServerEnableHit_Implementation()
 	{
 		HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
-		// [중요] 물리 상태 즉시 업데이트 (다음 틱까지 기다리지 않고 겹침 상태 갱신)
+		// [중요] 물리 상태 즉시 업데이트 (다음 틱까지 기다리지 않고 갱신)
 		HitBox->UpdateOverlaps();
 	}
 
-	// 히트 액터 목록 초기화 (새로운 공격 시작 시)
-	ClearHitActors();
+	// [중요] 중복 타격 방지: 공격 시퀀스가 처음 시작될 때만 히트 목록 초기화
+	if (ActiveNotifyCount == 1)
+	{
+		ClearHitActors();
+	}
 
-	// 예약된 히트박스 비활성화가 있다면 취소 (아레스 3타 등 연속 공격 지원)
+	// === 안전장치: 3초 후 자동 비활성화 (노티파이가 씹힐 경우 대비) ===
 	ClearSafetyTimer();
+	if (UWorld* World = GetWorld(); World && !World->bIsTearingDown)
+	{
+		World->GetTimerManager().SetTimer(SafetyTimerHandle, this, &AGS_WeaponSword::ServerDisableHit, DEFAULT_SAFETY_DURATION, false);
+	}
 
 	// [중요] 이미 겹쳐 있는 액터들에 대해 강제 히트 판정
 	if (HitBox)
@@ -142,7 +161,7 @@ void AGS_WeaponSword::ServerDisableHit_Implementation()
 		return;
 	}
 
-	// 추가 안전성 검사: 액터와 컴포넌트 유효성 확인
+	// 추가 안전성 검사
 	if (!IsValid(this) || IsActorBeingDestroyed())
 	{
 		return;
@@ -151,7 +170,7 @@ void AGS_WeaponSword::ServerDisableHit_Implementation()
 	// 현재 활성화된 노티파이 카운트 감소
 	ActiveNotifyCount = FMath::Max(0, ActiveNotifyCount - 1);
 
-	// 아직 다른 활성 노티파이가 있다면 비활성화 건너뜀 (섹션 전환 시 씹힘 방지)
+	// 아직 다른 활성 노티파이가 있다면 비활성화 건너뜀
 	if (ActiveNotifyCount > 0)
 	{
 		return;
@@ -162,6 +181,9 @@ void AGS_WeaponSword::ServerDisableHit_Implementation()
 	{
 		SafeDisableHitBoxCollision(HitBox);
 	}
+
+	// 타이머 정리
+	ClearSafetyTimer();
 }
 
 void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -169,6 +191,12 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 {
 	if (!HasAuthority())
 		return;
+
+	// [안전장치] 현재 공격 애니메이션 노티파이가 활성화된 상태가 아니면 무시
+	if (ActiveNotifyCount <= 0)
+	{
+		return;
+	}
 
 	// [필수] 레벨 전환 및 소유자 본인 타격 철저 차단
 	if (!IsValidForLevelTransition() || !OtherActor || OtherActor == this || OtherActor == OwnerChar || HitActors.Contains(OtherActor))
@@ -179,76 +207,50 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 	if (!IsOwnerCharValid())
 		return;
 
-	// [핵심] 환경(땅, 벽 등) 타격 무시 - 오직 캐릭터와 특수 오브젝트만 처리
+	// [필수] 환경(땅, 벽 등)을 포함한 모든 유효 타격에 대해 사운드 및 VFX 재생
+	HitActors.Add(OtherActor);
+	ESwordHitTargetType TargetType = DetermineTargetType(OtherActor);
+	FHitResult CorrectHitResult = CreateCorrectHitResult(SweepResult, bFromSweep);
+
+	Multicast_PlayHitSound(TargetType, CorrectHitResult);
+	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
+
+	// [핵심] 캐릭터와 특수 오브젝트가 아닌 경우 여기서 종료 (데미지 처리 스킵)
 	AGS_Character* Damaged = Cast<AGS_Character>(OtherActor);
 	AGS_AetherExtractor* Extractor = Cast<AGS_AetherExtractor>(OtherActor);
 
 	if (!Damaged && !Extractor)
 	{
-		return; // 환경 오브젝트는 HitActors에 추가하지 않음
+		return;
 	}
-
-	// 유효한 타겟만 HitActors에 추가 (중복 타격 방지)
-	HitActors.Add(OtherActor);
-
-	ESwordHitTargetType TargetType = DetermineTargetType(OtherActor);
-
-	// HitResult 보정 로직
-	FHitResult CorrectHitResult = SweepResult;
-
-	// [핵심] 수동 판정이나 Sweep 정보가 없는 경우, VFX가 묻히지 않도록 표면 지점 강제 계산
-	if (Damaged && (!bFromSweep || CorrectHitResult.ImpactPoint.IsNearlyZero()))
-	{
-		FVector TargetLoc = Damaged->GetActorLocation();
-		FVector WeaponLoc = HitBox ? HitBox->GetComponentLocation() : GetActorLocation();
-
-		FVector Dir = (WeaponLoc - TargetLoc).GetSafeNormal();
-		if (Dir.IsNearlyZero())
-			Dir = OwnerChar->GetActorForwardVector() * -1.0f;
-
-		float Radius = 50.0f;
-		if (UCapsuleComponent* Cap = Damaged->GetCapsuleComponent())
-		{
-			Radius = Cap->GetScaledCapsuleRadius();
-		}
-
-		CorrectHitResult.ImpactPoint = TargetLoc + (Dir * Radius);
-		CorrectHitResult.ImpactNormal = Dir;
-		CorrectHitResult.Location = CorrectHitResult.ImpactPoint;
-	}
-
-	Multicast_PlayHitSound(TargetType, CorrectHitResult);
-	Multicast_PlayHitVFX(TargetType, CorrectHitResult);
 
 	AGS_Character* Attacker = OwnerChar;
 
 	// 캐릭터 대상일 때만 데미지 및 특수 효과 처리
 	if (Damaged && Attacker && Damaged->IsEnemy(Attacker))
 	{
-		// 데미지 계산 수행
+		// [지연 해소] 데미지 계산 및 적용을 최상위로 이동 (연출보다 먼저 처리)
 		UGS_StatComp* DamagedStat = Damaged->GetStatComp();
-		if (!DamagedStat)
+		if (DamagedStat)
 		{
-			return;
+			float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
+			FGS_DamageEvent DamageEvent;
+			DamageEvent.HitReactType = EHitReactType::Interrupt;
+			Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
+
+			// 피격자 히트스탑 (안정적인 피드백 제공)
+			Damaged->Multicast_ApplyHitStop(0.06f, 0.0f, false);
 		}
 
-		float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
-
-		// 2. 슬래시 이펙트 재생 (실제 데미지가 발생할 때만, 찬이 방어 중이 아닐 때만)
-		bool bShouldPlaySlashVFX = (Damage > 0.0f && WeaponVFXComponent);
-
-		// 찬이 방어 상태인지 확인하여 혈흔 이펙트 제거
-		if (AGS_Chan* ChanTarget = Cast<AGS_Chan>(Damaged))
+		// [중복 방지] 타격 성공 즉시 콜리전 비활성화 (지연 없이 즉각 차단)
+		if (HitBox)
 		{
-			if (ChanTarget->bIsDefending)
-			{
-				bShouldPlaySlashVFX = false; // 찬이 가드 상태일 때는 혈흔 이펙트 없음
-			}
+			HitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 
-		if (bShouldPlaySlashVFX)
+		// 2. 슬래시 이펙트 재생 (실제 데미지가 발생할 때만, 피격자가 방어 중이 아닐 때만)
+		if (WeaponVFXComponent && !Damaged->IsDefending())
 		{
-			// 공격자(OwnerChar)의 시커 타입을 직접 전달
 			ESeekerAuraType AttackerAuraType = GetSeekerAuraType(OwnerChar);
 			WeaponVFXComponent->PlaySlashVFX(CorrectHitResult, AttackerAuraType);
 		}
@@ -256,36 +258,13 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 		// 3. 아우라 이펙트 트리거 (가디언이나 몬스터를 타격했을 때)
 		TriggerHitAuraOnHit(Damaged);
 
-		// 4. '아레스'의 특수 공격일 경우 추가 효과(사운드, VFX) 재생
-		if (AGS_Ares* Ares = Cast<AGS_Ares>(Attacker))
+		// 4. 캐릭터별 특수 공격 효과 처리 (다형성 활용)
+		int32 CurrentCombo = 0;
+		if (AGS_Seeker* SeekerAttacker = Cast<AGS_Seeker>(Attacker))
 		{
-			if (Ares->CurrentComboIndex == 4)
-			{
-				// 추가 사운드
-				Ares->Multicast_OnAttackHit(Ares->CurrentComboIndex);
-
-				// 추가 VFX
-				if (Ares->FinalAttackHitVFX)
-				{
-					Multicast_PlaySpecialHitVFX(Ares->FinalAttackHitVFX, CorrectHitResult);
-				}
-			}
+			CurrentCombo = SeekerAttacker->CurrentComboIndex;
 		}
-
-		FVector ShotDir = (Damaged->GetActorLocation() - OwnerChar->GetActorLocation()).GetSafeNormal();
-		/*FPointDamageEvent DamageEvent;
-	DamageEvent.ShotDirection = ShotDir;
-	DamageEvent.HitInfo = SweepResult;
-	DamageEvent.DamageTypeClass = UDamageType::StaticClass();*/
-		FGS_DamageEvent DamageEvent;
-		DamageEvent.HitReactType = EHitReactType::Interrupt;
-		Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
-
-		// Reaction Sync: 피격자에게도 짧은 히트스탑 적용 (멀티플레이 밸런스 조정: 0.14 -> 0.06)
-		Damaged->Multicast_ApplyHitStop(0.06f, 0.0f, false);
-
-		// 한 번의 공격에 한 명의 적만 맞도록 히트박스 비활성화 (다음 프레임에 안전하게)
-		SafeDisableHitBoxCollision(HitBox);
+		Attacker->OnAttackHitSuccess(CurrentCombo, CorrectHitResult);
 	}
 }
 
@@ -335,35 +314,9 @@ void AGS_WeaponSword::PlayHitSound(ESwordHitTargetType TargetType, const FHitRes
 		break;
 	}
 
-	if (SoundEventToPlay && GetWorld())
+	if (SoundEventToPlay)
 	{
-		FVector ListenerLocation;
-		if (GetListenerLocation(ListenerLocation))
-		{
-			// RTS 모드와 TPS 모드에 따른 거리 체크
-			const bool bRTS = IsRTSMode();
-			const float MaxDistance = bRTS ? 10000.0f : 2000.0f; // RTS: 100m, TPS: 20m
-
-			const float DistanceToListener = FVector::Dist(SweepResult.ImpactPoint, ListenerLocation);
-
-			if (DistanceToListener <= MaxDistance)
-			{
-				UAkGameplayStatics::PostEventAtLocation(
-				    SoundEventToPlay,
-				    SweepResult.ImpactPoint,
-				    FRotator::ZeroRotator,
-				    GetWorld());
-			}
-		}
-		else
-		{
-			// Fallback: 리스너 위치를 찾지 못할 경우 거리 체크 없이 재생
-			UAkGameplayStatics::PostEventAtLocation(
-			    SoundEventToPlay,
-			    SweepResult.ImpactPoint,
-			    FRotator::ZeroRotator,
-			    GetWorld());
-		}
+		PlayHitSoundAtLocation(SoundEventToPlay, SweepResult.ImpactPoint);
 	}
 }
 
@@ -389,7 +342,7 @@ void AGS_WeaponSword::PlayHitVFX(ESwordHitTargetType TargetType, const FHitResul
 		break;
 	}
 
-	if (VFXToPlay && GetWorld())
+	if (VFXToPlay && IsValid(GetWorld()))
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		    GetWorld(),
@@ -417,6 +370,9 @@ void AGS_WeaponSword::Multicast_PlayHitSound_Implementation(ESwordHitTargetType 
 	}
 
 	PlayHitSound(TargetType, SweepResult);
+
+	/** 멀티 레이어 사운드 (피격/잔향) 재생 */
+	PlayLayeredHitSound(SweepResult, SweepResult.GetActor());
 }
 
 bool AGS_WeaponSword::Multicast_PlayHitVFX_Validate(ESwordHitTargetType TargetType, const FHitResult& SweepResult)
@@ -432,128 +388,18 @@ void AGS_WeaponSword::Multicast_PlayHitVFX_Implementation(ESwordHitTargetType Ta
 		return;
 	}
 
-	// 서버가 호출한 타격 이펙트는 거리 상관없이 무조건 재생 (필터링 완화)
-	PlayHitVFX(TargetType, SweepResult);
-}
-
-void AGS_WeaponSword::Multicast_PlaySpecialHitVFX_Implementation(UNiagaraSystem* VFXToPlay, const FHitResult& HitResult)
-{
-	// 레벨 전환 시 null 참조 방지
-	if (!IsValidForLevelTransition())
+	// 거리 기반 VFX 컬링 (전역 상수 60m 사용)
+	if (OwnerChar && OwnerChar->ShouldPlayVFXAtLocation(SweepResult.ImpactPoint, GS_Rendering::VFX_DISABLE_DISTANCE))
 	{
-		return;
-	}
-
-	if (AGS_Character* Character = Cast<AGS_Character>(GetOwner()))
-	{
-		if (Character->ShouldPlayVFXAtLocation(HitResult.ImpactPoint, 4000.0f))
-		{
-			if (VFXToPlay && GetWorld())
-			{
-				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				    GetWorld(),
-				    VFXToPlay,
-				    HitResult.ImpactPoint,
-				    HitResult.ImpactNormal.Rotation(),
-				    FVector(1.0f),
-				    true,
-				    true);
-			}
-		}
+		PlayHitVFX(TargetType, SweepResult);
 	}
 }
 
-// 히트 포인트 계산 구현
-FHitResult AGS_WeaponSword::CalculateMoreAccurateHitPoint(AActor* OtherActor) const
+
+// 히트 박스 반환 구현
+UBoxComponent* AGS_WeaponSword::GetHitBox() const
 {
-	FHitResult ResultHit;
-
-	if (!OtherActor || !HitBox || !GetWorld())
-	{
-		// 기본값으로 무기 위치 사용
-		ResultHit.ImpactPoint = GetActorLocation();
-		ResultHit.Location = GetActorLocation();
-		ResultHit.ImpactNormal = FVector::UpVector;
-		ResultHit.Normal = FVector::UpVector;
-		return ResultHit;
-	}
-
-	// HitBox의 월드 위치와 타겟의 위치 계산
-	FVector HitBoxLocation = HitBox->GetComponentLocation();
-	FVector TargetLocation = OtherActor->GetActorLocation();
-
-	// HitBox에서 타겟으로의 방향 벡터
-	FVector TraceDirection = (TargetLocation - HitBoxLocation).GetSafeNormal();
-
-	// Line Trace 거리 (HitBox 크기의 2배 정도)
-	float TraceDistance = FVector::Dist(HitBoxLocation, TargetLocation) + 100.0f;
-
-	// Line Trace 시작점과 끝점
-	FVector TraceStart = HitBoxLocation;
-	FVector TraceEnd = HitBoxLocation + (TraceDirection * TraceDistance);
-
-	// Line Trace 파라미터 설정
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this); // 무기 자체는 무시
-	QueryParams.AddIgnoredActor(GetOwner()); // 무기 소유자도 무시
-	QueryParams.bTraceComplex = false;
-
-	// Line Trace 실행
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-	    ResultHit,
-	    TraceStart,
-	    TraceEnd,
-	    ECC_Pawn, // Pawn 채널로 트레이스
-	    QueryParams);
-
-	if (bHit && ResultHit.GetActor() == OtherActor)
-	{
-		// 트레이스가 성공하고 올바른 타겟을 맞췄다면 해당 결과 사용
-	}
-	else
-	{
-		// 트레이스가 실패했다면 두 객체 간의 중점 계산
-		FVector MidPoint = (HitBoxLocation + TargetLocation) * 0.5f;
-		FVector ToTarget = (TargetLocation - HitBoxLocation).GetSafeNormal();
-
-		ResultHit.ImpactPoint = MidPoint;
-		ResultHit.Location = MidPoint;
-		ResultHit.ImpactNormal = -ToTarget; // 타겟을 향하는 반대 방향
-		ResultHit.Normal = -ToTarget;
-	}
-
-	return ResultHit;
-}
-
-bool AGS_WeaponSword::GetListenerLocation(FVector& OutLocation) const
-{
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!LocalPC)
-	{
-		return false;
-	}
-
-	if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(LocalPC))
-	{
-		if (RTSController->GetViewTarget())
-		{
-			OutLocation = RTSController->GetViewTarget()->GetActorLocation();
-			return true;
-		}
-	}
-	else if (LocalPC->GetPawn())
-	{
-		OutLocation = LocalPC->GetPawn()->GetActorLocation();
-		return true;
-	}
-
-	return false;
-}
-
-bool AGS_WeaponSword::IsRTSMode() const
-{
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	return LocalPC && Cast<AGS_RTSController>(LocalPC) != nullptr;
+	return HitBox;
 }
 
 // 특화 헬퍼 함수 구현
@@ -561,7 +407,7 @@ FHitResult AGS_WeaponSword::CreateCorrectHitResult(const FHitResult& OriginalRes
 {
 	if (!bFromSweep && IsOwnerCharValid() && OriginalResult.GetActor())
 	{
-		// Sword의 경우 더 정확한 히트 포인트 계산을 위해 기존 함수 활용
+		// Sword의 경우 더 정확한 히트 포인트 계산을 위해 전용 함수 활용
 		return CalculateMoreAccurateHitPoint(OriginalResult.GetActor());
 	}
 

@@ -29,22 +29,24 @@ public:
 	UNiagaraSystem* BloodEffectSystem;
 
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-	const FHitResult& Hit) override;
-	
+	                   UPrimitiveComponent* OtherComp, FVector NormalImpulse,
+	                   const FHitResult& Hit) override;
+
 protected:
 	virtual void BeginPlay() override;
 	UFUNCTION()
 	virtual void OnBeginOverlap(
-		UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	    UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	    bool bFromSweep, const FHitResult& SweepResult);
 
 private:
 	FTimerHandle DestroyTimerHandle;
 
-	UFUNCTION() 
+	UFUNCTION()
 	void HandleProjectileDestroy();
+
+	bool bHasHit = false;
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitSound(FVector HitLocation);

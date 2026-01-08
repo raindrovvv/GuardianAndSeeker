@@ -30,16 +30,11 @@ class GAS_API AGS_WeaponSword : public AGS_WeaponEquipable
 public:
 	AGS_WeaponSword();
 
-	UFUNCTION()
-	void EnableHit();
+	virtual void EnableHit() override;
+	virtual void DisableHit() override;
 
-	UFUNCTION()
-	void DisableHit();
-
-	UFUNCTION(Server, Reliable)
-	void ServerEnableHit();
-	UFUNCTION(Server, Reliable)
-	void ServerDisableHit();
+	virtual void ServerEnableHit_Implementation() override;
+	virtual void ServerDisableHit_Implementation() override;
 
 	UFUNCTION()
 	void OnHit(
@@ -86,17 +81,9 @@ private:
 	virtual void PlayHitSound(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	virtual void PlayHitVFX(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 
-	// 히트 포인트 계산
-	FHitResult CalculateMoreAccurateHitPoint(AActor* OtherActor) const;
-
-	// RTS 모드 지원을 위한 리스너 위치 가져오기
-	bool GetListenerLocation(FVector& OutLocation) const;
-
-	// RTS 모드 감지
-	bool IsRTSMode() const;
-
-	// 특화 헬퍼 함수
+	// FHitResult 보정 로직 (부모 클래스의 CalculateMoreAccurateHitPoint 활용)
 	FHitResult CreateCorrectHitResult(const FHitResult& OriginalResult, bool bFromSweep) const override;
+	virtual class UBoxComponent* GetHitBox() const override;
 
 	// 멀티캐스트 함수들
 	UFUNCTION(NetMulticast, Unreliable)
@@ -108,7 +95,4 @@ private:
 	void Multicast_PlayHitVFX(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	bool Multicast_PlayHitVFX_Validate(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(ESwordHitTargetType TargetType, const FHitResult& SweepResult);
-
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 };
