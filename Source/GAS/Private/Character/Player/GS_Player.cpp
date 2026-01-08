@@ -51,6 +51,8 @@ AGS_Player::AGS_Player(const FObjectInitializer& ObjectInitializer)
 	SteamNameWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SteamNameWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 	SteamNameWidgetComp->SetOwnerNoSee(true);
+	SteamNameWidgetComp->SetCullDistance(GS_Rendering::STEAM_NAME_WIDGET_CULL_DISTANCE);
+	SteamNameWidgetComp->SetCachedMaxDrawDistance(GS_Rendering::STEAM_NAME_WIDGET_CULL_DISTANCE);
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BlurMat(TEXT("/Game/VFX/MI_AbscureDebuff"));
 	if (BlurMat.Succeeded())
@@ -126,40 +128,55 @@ void AGS_Player::BeginPlay()
 	BlurMID = UMaterialInstanceDynamic::Create(PostProcessMat, this);
 	PostProcessComponent->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, BlurMID));
 
-	// 카메라 위치에 오디오 리스너 설정 (모든 클라이언트에서)
-	SetupCameraAudioListener();
-
-	// 로컬 플레이어만 추가 오디오 설정
+	// 로컬 플레이어 관리 (오디오 리스너 및 설정)
 	if (IsLocalPlayer())
 	{
-		// 자체 AkComponent의 Occlusion도 비활성화
+		// 로컬 플레이어만 카메라 리스너 활성화
+		SetupCameraAudioListener();
+
+		// 자체 AkComponent의 Occlusion은 비활성화 (자가 차폐 방지)
 		if (IsValid(AkComponent))
 		{
-			// Transform 검증
-			const FVector Location = GetActorLocation();
-			const FRotator Rotation = GetActorRotation();
+			AkComponent->OcclusionRefreshInterval = 0.0f;
+		}
+	}
+	else
+	{
+		// 다른 플레이어(리모트)의 소리는 벽에 의해 감쇠되도록 설정
+		if (IsValid(AkComponent))
+		{
+			AkComponent->OcclusionRefreshInterval = 0.2f;
+		}
 
-			if (UGS_AudioComponentBase::IsTransformValid(Location, Rotation))
+		// 다른 플레이어의 귀(Listener)는 내 화면에서 소리를 들으면 안 됨.
+		// Wwise의 전역 리스너 목록에서 이 컴포넌트를 확실히 제거해야 혼선이 발생하지 않음.
+		if (IsValid(CameraAudioListenerComponent))
+		{
+			if (FAkAudioDevice* AudioDevice = FAkAudioDevice::Get())
 			{
-				AkComponent->OcclusionRefreshInterval = 0.0f;
+				// 이 캐릭터가 '내'가 아니면, 이 캐릭터의 귀는 전역 목록에서 즉시 삭제
+				AudioDevice->RemoveDefaultListener(CameraAudioListenerComponent);
 			}
+
+			CameraAudioListenerComponent->Stop();
+			CameraAudioListenerComponent->SetComponentTickEnabled(false);
+			CameraAudioListenerComponent->Deactivate();
+			CameraAudioListenerComponent->UnregisterComponent();
+
+			UE_LOG(LogTemp, Log, TEXT("[AGS_Player] Successfully removed Wwise Listener for remote player: %s"), *GetName());
 		}
 	}
 
-	// === Skeletal Mesh Distance Culling 설정 (클라이언트만, Local Player 제외) ===
+	// === Skeletal Mesh Distance Culling 설정 ===
+	// 다른 플레이어(시커)는 몬스터보다 중요하므로 더 먼 거리에서 컬링
 	if (!IsRunningDedicatedServer() && GetMesh() && !IsLocalPlayer())
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
-		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
-		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
 
-		MeshComp->SetCullDistance(CullDistance);
-		MeshComp->SetCachedMaxDrawDistance(CullDistance);
+		MeshComp->SetCullDistance(GS_Rendering::PLAYER_CULL_DISTANCE);
+		MeshComp->SetCachedMaxDrawDistance(GS_Rendering::PLAYER_CULL_DISTANCE);
 		MeshComp->bAllowCullDistanceVolume = true;
 		MeshComp->SetBoundsScale(GS_Rendering::DEFAULT_BOUNDS_SCALE);
-		MeshComp->MinLodModel = MinLOD;
-
-		UE_LOG(LogTemp, Log, TEXT("[Player:%s] Rendering Optimization - Cull Distance: %.1f (Local Player excluded)"), *GetName(), CullDistance);
 	}
 
 	// === 그림자 컬링 초기 설정 (클라이언트만, Local Player 제외) ===
@@ -178,40 +195,13 @@ void AGS_Player::Tick(float DeltaSeconds)
 		ObscureTimeline.TickTimeline(DeltaSeconds);
 	}
 
-	// steam widget rotate with distance culling (only for non-server)
+	// 스팀 위젯 회전 업데이트 (컬링은 WidgetComp의 TickComponent에서 처리)
 	if (IsValid(SteamNameWidgetComp) && GetNetMode() != NM_DedicatedServer)
 	{
-		// 로컬 플레이어 본인의 네임태그는 항상 숨김
-		if (IsLocallyControlled())
+		// 위젯이 보이는 경우에만 회전 업데이트 (성능 최적화)
+		if (SteamNameWidgetComp->IsVisible())
 		{
-			if (SteamNameWidgetComp->IsVisible())
-			{
-				SteamNameWidgetComp->SetVisibility(false);
-			}
-			return;
-		}
-
-		// 다른 플레이어 거리 기반 컬링
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-		{
-			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
-			{
-				float DistSq = FVector::DistSquared(CameraManager->GetCameraLocation(), GetActorLocation());
-
-				// 30m (3000 units) 기준으로 컬링 (9,000,000 DistSq)
-				bool bInRange = (DistSq < 9000000.f);
-
-				if (SteamNameWidgetComp->IsVisible() != bInRange)
-				{
-					SteamNameWidgetComp->SetVisibility(bInRange);
-				}
-
-				// 범위 내에 있을 때만 회전 업데이트
-				if (bInRange)
-				{
-					UpdateSteamNameWidgetRotation();
-				}
-			}
+			UpdateSteamNameWidgetRotation();
 		}
 	}
 }

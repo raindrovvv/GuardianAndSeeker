@@ -10,8 +10,10 @@ struct FGS_DamageEvent : public FDamageEvent
 	GENERATED_BODY()
 public:
 	FGS_DamageEvent()
-		: HitReactType(EHitReactType::DamageOnly)
-	{}
-	
+	    : HitReactType(EHitReactType::DamageOnly)
+	{
+	}
+
 	EHitReactType HitReactType;
+	bool bSuppressCameraEffects = false;
 };

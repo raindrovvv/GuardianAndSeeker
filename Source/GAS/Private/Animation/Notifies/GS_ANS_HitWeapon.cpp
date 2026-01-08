@@ -2,24 +2,22 @@
 
 
 #include "Animation/Notifies/GS_ANS_HitWeapon.h"
-#include "Character/Player/Monster/GS_Monster.h"
-#include "Weapon/Equipable/GS_WeaponSword.h"
+#include "Character/GS_Character.h"
+#include "Weapon/Equipable/GS_WeaponEquipable.h"
 
 void UGS_ANS_HitWeapon::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration)
 {
-	AActor* Owner = MeshComp->GetOwner();
-	if (!Owner)
-	{
+	if (!MeshComp || !MeshComp->GetOwner())
 		return;
-	}
-	
-	if (AGS_Monster* Monster = Cast<AGS_Monster>(MeshComp->GetOwner()))
+
+	if (AGS_Character* Character = Cast<AGS_Character>(MeshComp->GetOwner()))
 	{
-		if (AGS_WeaponSword* Weapon = Cast<AGS_WeaponSword>(Monster->GetWeaponByIndex(0)))
+		if (Character->HasAuthority())
 		{
-			if (Monster->HasAuthority())
+			// 첫 번째 무기를 소환된 ChildActor에서 가져와서 AGS_WeaponEquipable로 캐스팅
+			if (AGS_WeaponEquipable* Weapon = Cast<AGS_WeaponEquipable>(Character->GetWeaponByIndex(0)))
 			{
-				Weapon->EnableHit();
+				Weapon->ServerEnableHit();
 			}
 		}
 	}
@@ -27,19 +25,16 @@ void UGS_ANS_HitWeapon::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSeque
 
 void UGS_ANS_HitWeapon::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
 {
-	AActor* Owner = MeshComp->GetOwner();
-	if (!Owner)
-	{
+	if (!MeshComp || !MeshComp->GetOwner())
 		return;
-	}
-	
-	if (AGS_Monster* Monster = Cast<AGS_Monster>(MeshComp->GetOwner()))
+
+	if (AGS_Character* Character = Cast<AGS_Character>(MeshComp->GetOwner()))
 	{
-		if (AGS_WeaponSword* Weapon = Cast<AGS_WeaponSword>(Monster->GetWeaponByIndex(0)))
+		if (Character->HasAuthority())
 		{
-			if (Monster->HasAuthority())
+			if (AGS_WeaponEquipable* Weapon = Cast<AGS_WeaponEquipable>(Character->GetWeaponByIndex(0)))
 			{
-				Weapon->DisableHit();
+				Weapon->ServerDisableHit();
 			}
 		}
 	}

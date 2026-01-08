@@ -12,11 +12,11 @@
 UENUM(BlueprintType)
 enum class EShieldHitTargetType : uint8
 {
-	Guardian		UMETA(DisplayName = "Guardian"),
-	DungeonMonster	UMETA(DisplayName = "DungeonMonster"),
-	Seeker			UMETA(DisplayName = "Seeker"),
-	Structure		UMETA(DisplayName = "Structure"),
-	Other			UMETA(DisplayName = "Other")
+	Guardian UMETA(DisplayName = "Guardian"),
+	DungeonMonster UMETA(DisplayName = "DungeonMonster"),
+	Seeker UMETA(DisplayName = "Seeker"),
+	Structure UMETA(DisplayName = "Structure"),
+	Other UMETA(DisplayName = "Other")
 };
 
 UCLASS()
@@ -34,38 +34,35 @@ public:
 	// 공격용 콜리전 이벤트
 	UFUNCTION()
 	void OnAttackHit(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult
-	);
+	    UPrimitiveComponent* OverlappedComponent,
+	    AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp,
+	    int32 OtherBodyIndex,
+	    bool bFromSweep,
+	    const FHitResult& SweepResult);
 
 	// 방어용 콜리전 이벤트
 	UFUNCTION()
 	void OnDefenseHit(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult
-	);
+	    UPrimitiveComponent* OverlappedComponent,
+	    AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp,
+	    int32 OtherBodyIndex,
+	    bool bFromSweep,
+	    const FHitResult& SweepResult);
 
 	// 방어용 콜리전 종료 이벤트
 	UFUNCTION()
 	void OnDefenseEndOverlap(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex
-	);
+	    UPrimitiveComponent* OverlappedComponent,
+	    AActor* OtherActor,
+	    UPrimitiveComponent* OtherComp,
+	    int32 OtherBodyIndex);
 
 	// 공격용 콜리전 제어
 	UFUNCTION()
 	void EnableAttackHit();
-	
+
 	UFUNCTION()
 	void DisableAttackHit();
 
@@ -77,7 +74,7 @@ public:
 	// 방어용 콜리전 제어
 	UFUNCTION()
 	void EnableDefenseHit();
-	
+
 	UFUNCTION()
 	void DisableDefenseHit();
 
@@ -92,16 +89,11 @@ public:
 	void PlayDefenseEffects(AActor* Attacker, const FHitResult& HitResult);
 
 	// 기존 호환성을 위한 함수들 (공격용으로 리다이렉트)
-	UFUNCTION()
-	void EnableHit() { EnableAttackHit(); }
-	
-	UFUNCTION()
-	void DisableHit() { DisableAttackHit(); }
+	virtual void EnableHit() override;
+	virtual void DisableHit() override;
 
-	UFUNCTION(Server, Reliable)
-	void ServerEnableHit();
-	UFUNCTION(Server, Reliable)
-	void ServerDisableHit();
+	virtual void ServerEnableHit_Implementation() override;
+	virtual void ServerDisableHit_Implementation() override;
 
 	// 히트 사운드 에셋들
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
@@ -148,12 +140,12 @@ protected:
 
 	FTimerHandle DefenseTimerHandle;
 	void OnDefenseTimer();
-	
+
 	// Called when the game starts or when spawned
 	virtual void PostInitializeComponents() override;
-	
+
 	virtual void BeginPlay() override;
-	
+
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// 공격용 콜리전
@@ -166,12 +158,8 @@ protected:
 	virtual void PlayHitVFX(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	virtual void PlayGuardSuccessVFX(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	virtual void PlayGuardSuccessSound(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
+	virtual class UBoxComponent* GetHitBox() const override;
 
-	// RTS 모드 지원을 위한 리스너 위치 가져오기
-	bool GetListenerLocation(FVector& OutLocation) const;
-	
-	// RTS 모드 감지
-	bool IsRTSMode() const;
 
 	// 특화 헬퍼 함수
 	void DisableAllCollisions();
@@ -187,8 +175,6 @@ protected:
 	bool Multicast_PlayHitVFX_Validate(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 	void Multicast_PlayHitVFX_Implementation(EShieldHitTargetType TargetType, const FHitResult& SweepResult);
 
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlaySpecialHitVFX(class UNiagaraSystem* VFXToPlay, const FHitResult& HitResult);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayGuardSuccessVFX(EShieldHitTargetType TargetType, const FHitResult& SweepResult);

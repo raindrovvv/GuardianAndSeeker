@@ -32,8 +32,11 @@ enum class ERTSCommandSoundType : uint8
 /**
  * 오디오 컴포넌트의 공통 기능을 제공하는 베이스 클래스
  * 몬스터와 시커 오디오 컴포넌트가 상속받아 사용
+ * 
+ * Abstract: 이 클래스는 직접 인스턴스화할 수 없으며, 자식 클래스를 통해서만 사용
+ * HideCategories: BaseAudioComponent 카테고리를 에디터에서 숨김 (자식 클래스에서 설정)
  */
-UCLASS(ClassGroup = (Audio), BlueprintType)
+UCLASS(Abstract, ClassGroup = (Audio), BlueprintType, HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_AudioComponentBase : public UActorComponent
 {
 	GENERATED_BODY()
@@ -41,14 +44,14 @@ class GAS_API UGS_AudioComponentBase : public UActorComponent
 public:
 	UGS_AudioComponentBase();
 
-	// RTPC 포인터 (UAkRtpc* 기반 통일)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	// RTPC 포인터
+	UPROPERTY()
 	UAkRtpc* DistanceToPlayerRTPC = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	UPROPERTY()
 	UAkRtpc* AttenuationModeRTPC = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	UPROPERTY()
 	UAkRtpc* OcclusionDisableRTPC = nullptr;
 
 protected:
@@ -168,6 +171,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Audio|Validation")
 	bool SafeUpdateAkComponentTransform(UAkComponent* AkComp, const FVector& NewLocation, const FRotator& NewRotation);
 
+	/** 오클루전 디버그 라인 그리기 (콘솔 명령어 GS.Audio.ShowOcclusionRay 1 로 활성화) */
+	static void DrawOcclusionDebug(const UObject* WorldContextObject, const FVector& SoundLocation, const FVector& ListenerLocation);
+
 	/** 죽음 사운드 로컬 재생 (하위 클래스에서 오버라이드) */
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	virtual void PlayDeathSoundLocal();
@@ -239,15 +245,15 @@ protected:
 	AGS_RoomBase* FindRoomAtLocation(const FVector& Location) const;
 
 	// ==========================
-	// 공통 사운드 에셋
+	// 공통 사운드 에셋 (자식 클래스에서 설정)
 	// ==========================
 
-	/** 죽음 사운드 */
-	UPROPERTY(EditAnywhere, Category = "Audio|Common")
+	/** 죽음 사운드 - 자식 클래스(MonsterAudioComponent, SeekerAudioComponent 등)에서 설정됨 */
+	UPROPERTY()
 	TObjectPtr<class UAkAudioEvent> DeathSound;
 
-	/** RTS 모드 죽음 사운드 (필요한 경우) */
-	UPROPERTY(EditAnywhere, Category = "Audio|Common")
+	/** RTS 모드 죽음 사운드 - 자식 클래스에서 설정됨 */
+	UPROPERTY()
 	TObjectPtr<class UAkAudioEvent> RTS_DeathSound;
 
 	// ==========================

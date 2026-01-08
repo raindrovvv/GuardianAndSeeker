@@ -7,17 +7,17 @@
 					<PropertyList>
 						<Property Name="Highpass" Type="int16">
 							<ValueList>
-								<Value>2</Value>
+								<Value>5</Value>
 							</ValueList>
 						</Property>
 						<Property Name="Lowpass" Type="int16">
 							<ValueList>
-								<Value>2</Value>
+								<Value>5</Value>
 							</ValueList>
 						</Property>
 						<Property Name="Volume" Type="Real64">
 							<ValueList>
-								<Value>-3.7</Value>
+								<Value>-4</Value>
 							</ValueList>
 						</Property>
 					</PropertyList>
@@ -115,8 +115,99 @@
 											</RTPC>
 										</Local>
 									</Reference>
+									<Reference>
+										<Local>
+											<RTPC Name="" ID="{1AAB2BA3-DCD8-4401-8C74-9081FF67D741}" ShortID="1057746499">
+												<PropertyList>
+													<Property Name="PropertyName" Type="string" Value="OutputBusVolume"/>
+												</PropertyList>
+												<ReferenceList>
+													<Reference Name="ControlInput">
+														<ObjectRef Name="Impact_Focus" ID="{6C53ECAE-8B41-4B29-ACE2-F8C30A1CFE5B}" WorkUnitID="{FDFB093B-59E2-4879-BF96-CF460645B40F}"/>
+													</Reference>
+													<Reference Name="Curve">
+														<Custom>
+															<Curve Name="" ID="{3C966878-4FF8-492D-8F44-88772B114ABF}">
+																<PropertyList>
+																	<Property Name="Flags" Type="int32" Value="3"/>
+																</PropertyList>
+																<PointList>
+																	<Point>
+																		<XPos>0</XPos>
+																		<YPos>-200</YPos>
+																		<Flags>5</Flags>
+																		<SegmentShape>Exp2</SegmentShape>
+																	</Point>
+																	<Point>
+																		<XPos>1</XPos>
+																		<YPos>1E-05</YPos>
+																		<Flags>37</Flags>
+																	</Point>
+																</PointList>
+															</Curve>
+														</Custom>
+													</Reference>
+												</ReferenceList>
+											</RTPC>
+										</Local>
+									</Reference>
 								</ObjectList>
 							</ObjectLists>
+						</Bus>
+						<Bus Name="SFX" ID="{AD4E9B4F-B141-4279-A6CC-B57D91AE0278}">
+							<PropertyList>
+								<Property Name="3DSpatialization" Type="int16" Value="2"/>
+								<Property Name="EnableDiffraction" Type="bool" Value="True"/>
+								<Property Name="ListenerRelativeRouting" Type="bool" Value="True"/>
+								<Property Name="OutputBusHighpass" Type="int16">
+									<ValueList>
+										<Value>1</Value>
+									</ValueList>
+								</Property>
+								<Property Name="OutputBusLowpass" Type="int16">
+									<ValueList>
+										<Value>1</Value>
+									</ValueList>
+								</Property>
+								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
+								<Property Name="Volume" Type="Real64">
+									<ValueList>
+										<Value>-1</Value>
+									</ValueList>
+								</Property>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Attenuation">
+									<ObjectRef Name="BaseAttenuation" ID="{B72E6503-4AD5-4DB3-8853-15727BF9AC4E}" WorkUnitID="{884F5FC8-7442-4A32-8FB6-CA9454D5D66C}"/>
+								</Reference>
+							</ReferenceList>
+						</Bus>
+						<Bus Name="UI_Sound" ID="{836D4A21-90EA-4615-922B-077674E0F320}">
+							<PropertyList>
+								<Property Name="3DSpatialization" Type="int16" Value="2"/>
+								<Property Name="EnableDiffraction" Type="bool" Value="True"/>
+								<Property Name="OutputBusHighpass" Type="int16">
+									<ValueList>
+										<Value>2</Value>
+									</ValueList>
+								</Property>
+								<Property Name="OutputBusLowpass" Type="int16">
+									<ValueList>
+										<Value>4</Value>
+									</ValueList>
+								</Property>
+								<Property Name="OutputBusVolume" Type="Real64">
+									<ValueList>
+										<Value>-1</Value>
+									</ValueList>
+								</Property>
+								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Attenuation">
+									<ObjectRef Name="BaseAttenuation" ID="{B72E6503-4AD5-4DB3-8853-15727BF9AC4E}" WorkUnitID="{884F5FC8-7442-4A32-8FB6-CA9454D5D66C}"/>
+								</Reference>
+							</ReferenceList>
 						</Bus>
 					</ChildrenList>
 					<ObjectLists>

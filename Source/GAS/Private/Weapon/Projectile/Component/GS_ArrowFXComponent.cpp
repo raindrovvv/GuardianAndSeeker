@@ -1,12 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Weapon/Projectile/Component/GS_ArrowFXComponent.h"
+#include "Engine/World.h"
 #include "Character/GS_Character.h"
 #include "NiagaraFunctionLibrary.h"
-#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "AkGameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Rendering/GS_RenderingConstants.h"
+
 
 UGS_ArrowFXComponent::UGS_ArrowFXComponent()
 {
@@ -86,11 +88,22 @@ void UGS_ArrowFXComponent::PlayHitVFX(ETargetType TargetType, const FHitResult& 
 	}
 }
 
-void UGS_ArrowFXComponent::PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType)
+void UGS_ArrowFXComponent::PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType, AActor* HitActor)
 {
 	if (OwnerActor && OwnerActor->HasAuthority())
 	{
-		Multicast_PlayHitSound(TargetType, SweepResult, ArrowType);
+		// RPC 스로틀링: 짧은 시간 내에 여러 번의 RPC가 발생하는 것을 방지
+		if (UWorld* World = GetWorld())
+		{
+			float Now = World->GetTimeSeconds();
+			if (Now - LastHitSoundRPCTime < HitSoundThrottle)
+			{
+				return;
+			}
+			LastHitSoundRPCTime = Now;
+		}
+
+		Multicast_PlayHitSound(TargetType, SweepResult, ArrowType, HitActor);
 	}
 }
 
@@ -109,18 +122,21 @@ void UGS_ArrowFXComponent::Multicast_StartArrowTrailVFX_Implementation(EArrowTyp
 	}
 
 	// VFX 거리 기반 컬링 (트레일 VFX)
-	UWorld* World = GetWorld();
-	if (World)
+	if (GetWorld())
 	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
-			FVector CameraLoc;
-			FRotator CameraRot;
-			PC->GetPlayerViewPoint(CameraLoc, CameraRot);
-			float DistSq = FVector::DistSquared(CameraLoc, GetOwner()->GetActorLocation());
-			if (DistSq > FMath::Square(5000.0f)) // 50m
+			if (APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
 			{
-				return;
+				const FVector CameraLoc = CameraManager->GetCameraLocation();
+				float DistSq = FVector::DistSquared(CameraLoc, GetOwner()->GetActorLocation());
+
+				// 전역 렌더링 상수 사용
+				const float MaxDistSq = FMath::Square(GS_Rendering::VFX_DISABLE_DISTANCE);
+				if (DistSq > MaxDistSq)
+				{
+					return;
+				}
 			}
 		}
 	}
@@ -192,17 +208,19 @@ void UGS_ArrowFXComponent::Multicast_StopArrowTrailVFX_Implementation()
 void UGS_ArrowFXComponent::Multicast_PlayHitVFX_Implementation(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType)
 {
 	// VFX 거리 기반 컬링
-	UWorld* World = GetWorld();
-	if (!World)
+	if (!GetWorld())
 		return;
 
-	if (APlayerController* PC = World->GetFirstPlayerController())
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
 		FVector CameraLoc;
 		FRotator CameraRot;
 		PC->GetPlayerViewPoint(CameraLoc, CameraRot);
 		float DistSq = FVector::DistSquared(CameraLoc, SweepResult.ImpactPoint);
-		if (DistSq > FMath::Square(6000.0f)) // 60m
+
+		// 전역 렌더링 상수 사용
+		const float MaxDistSq = FMath::Square(GS_Rendering::VFX_DISABLE_DISTANCE);
+		if (DistSq > MaxDistSq)
 		{
 			return;
 		}
@@ -244,11 +262,11 @@ void UGS_ArrowFXComponent::Multicast_PlayHitVFX_Implementation(ETargetType Targe
 	}
 
 	// VFX 재생
-	if (VFXToPlay && World)
+	if (VFXToPlay && GetWorld())
 	{
 		// 히트 포인트에서 VFX 재생
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		    World,
+		    GetWorld(),
 		    VFXToPlay,
 		    SweepResult.ImpactPoint,
 		    SweepResult.ImpactNormal.Rotation(), // 히트 표면의 법선 방향으로 VFX 회전
@@ -261,7 +279,7 @@ void UGS_ArrowFXComponent::Multicast_PlayHitVFX_Implementation(ETargetType Targe
 	}
 }
 
-void UGS_ArrowFXComponent::Multicast_PlayHitSound_Implementation(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType)
+void UGS_ArrowFXComponent::Multicast_PlayHitSound_Implementation(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType, AActor* HitActor)
 {
 	UAkAudioEvent* SoundEventToPlay = nullptr;
 
@@ -284,14 +302,36 @@ void UGS_ArrowFXComponent::Multicast_PlayHitSound_Implementation(ETargetType Tar
 		break;
 	}
 
-	// Wwise 사운드 재생
-	UWorld* World = GetWorld();
-	if (SoundEventToPlay && World)
+	// Wwise 사운드 재생 (글로벌 팝핑 방지를 위해 대상 액터 기반으로 재생)
+	// 사운드 재생
+	if (SoundEventToPlay && GetWorld())
 	{
-		UAkGameplayStatics::PostEventAtLocation(
-		    SoundEventToPlay,
-		    SweepResult.ImpactPoint,
-		    FRotator::ZeroRotator,
-		    World);
+		// [최적화] 사운드 거리 기반 컬링
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			FVector CameraLoc;
+			FRotator CameraRot;
+			PC->GetPlayerViewPoint(CameraLoc, CameraRot);
+			float DistSq = FVector::DistSquared(CameraLoc, SweepResult.ImpactPoint);
+
+			// 투사체 히트 사운드는 가시성 거리까지 허용 (전역 상수 60m 사용)
+			if (DistSq > FMath::Square(GS_Rendering::VFX_DISABLE_DISTANCE))
+			{
+				return;
+			}
+		}
+
+		// 우선순위: 1. 직접 맞은 액터, 2. 화살 소유자 (폴백)
+		AActor* SoundOwner = HitActor ? HitActor : OwnerActor;
+
+		if (SoundOwner)
+		{
+			UAkGameplayStatics::PostEvent(SoundEventToPlay, SoundOwner, 0, FOnAkPostEventCallback(), false);
+		}
+		else
+		{
+			// 폴백: 액터가 전혀 없으면 위치 기반 재생
+			UAkGameplayStatics::PostEventAtLocation(SoundEventToPlay, SweepResult.ImpactPoint, FRotator::ZeroRotator, GetWorld());
+		}
 	}
 }

@@ -8,6 +8,13 @@
 #include "AkGameplayStatics.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/GS_AudioComponentBase.h"
+#include "Rendering/GS_RenderingConstants.h"
+#include "NiagaraComponent.h"
+#include "Components/LightComponent.h"
+#include "SignificanceManager.h"
+#include "Engine/World.h"
+#include "Misc/App.h"
+
 
 AGS_Door::AGS_Door()
 {
@@ -26,6 +33,8 @@ AGS_Door::AGS_Door()
 	DoorFrameMeshComp->SetCollisionObjectType(ECC_WorldStatic);
 	DoorFrameMeshComp->SetCollisionResponseToAllChannels(ECR_Block);
 	DoorFrameMeshComp->SetupAttachment(RootComponent);
+	DoorFrameMeshComp->SetCastShadow(true); // 빛 누수 방지를 위해 그림자 필수
+	DoorFrameMeshComp->bUseAsOccluder = true; // 문 프레임은 강력한 차단벽
 	DoorFrameMeshComp->PrimaryComponentTick.bCanEverTick = false;
 	DoorFrameMeshComp->PrimaryComponentTick.bStartWithTickEnabled = false;
 	DoorFrameMeshComp->PrimaryComponentTick.bAllowTickOnDedicatedServer = false;
@@ -37,6 +46,8 @@ AGS_Door::AGS_Door()
 	DoorMeshComp->SetupAttachment(DoorFrameMeshComp);
 	// 문이 닫혀있어도 AI가 경로를 찾을 수 있도록 DoorMeshComp가 NavMesh에 영향을 주지 않도록 설정
 	DoorMeshComp->SetCanEverAffectNavigation(false);
+	DoorMeshComp->SetCastShadow(true); // 문이 닫혔을 때 빛을 차단해야 함
+	DoorMeshComp->bUseAsOccluder = true; // 문 메시 자체가 차단벽 역할 수행
 	DoorMeshComp->PrimaryComponentTick.bCanEverTick = false;
 	DoorMeshComp->PrimaryComponentTick.bStartWithTickEnabled = false;
 	DoorMeshComp->PrimaryComponentTick.bAllowTickOnDedicatedServer = false;
@@ -71,12 +82,37 @@ void AGS_Door::BeginPlay()
 
 	InitDoor();
 	TriggerBoxComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_Door::OnTriggerBeginOverlap);
+
+	// === Culling 설정 (클라이언트만) ===
+	if (!IsRunningDedicatedServer())
+	{
+		ApplyDistanceCulling();
+		RegisterSignificanceManager();
+
+		// 그림자 및 가시성 컬링 타이머 (중요도 시스템에 의해 관리됨)
+		float RandomVariance = FMath::RandRange(0.0f, 0.5f);
+		GetWorld()->GetTimerManager().SetTimer(ShadowCullingTimerHandle, this, &AGS_Door::UpdateCulling, 0.5f, true, RandomVariance);
+
+		// 초기 1회 즉시 실행
+		CacheOptimizedComponents();
+		UpdateCulling();
+	}
 }
 
 void AGS_Door::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Significance Manager 해제
+	if (!IsRunningDedicatedServer() && GetWorld())
+	{
+		if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
+		{
+			SM->UnregisterObject(this);
+		}
+	}
+
 	// 타이머 정리 (레벨 전환 안정성)
 	SafeClearTimer(DoorCloseTimerHandle);
+	SafeClearTimer(ShadowCullingTimerHandle);
 
 	// 델리게이트 해제 (객체 파괴 시 안정성)
 	if (TriggerBoxComp)
@@ -102,8 +138,8 @@ void AGS_Door::OnConstruction(const FTransform& Transform)
 }
 
 void AGS_Door::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	bool bFromSweep, const FHitResult& SweepResult)
+                                     UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+                                     bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!OtherActor || OtherActor == this)
 	{
@@ -122,7 +158,6 @@ void AGS_Door::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor
 		bIsOpen = true;
 		Server_DoorOpen(Character);
 	}
-	
 }
 
 
@@ -154,7 +189,7 @@ void AGS_Door::CheckForPlayerInTrigger()
 	TriggerBoxComp->GetOverlappingActors(OverlappingActors, AGS_Character::StaticClass());
 
 	if (OverlappingActors.Num() > 0)
-		//오버랩 되는 엑터가 있으면 타이머 초기화
+	//오버랩 되는 엑터가 있으면 타이머 초기화
 	{
 		if (IsWorldContextValid())
 		{
@@ -511,8 +546,250 @@ bool AGS_Door::IsWorldContextValid() const
 {
 	UWorld* World = GetWorld();
 	return World &&
-		World->IsValidLowLevel() &&
-		!World->bIsTearingDown &&
-		IsValid(World) &&
-		IsValid(this);
+	       World->IsValidLowLevel() &&
+	       !World->bIsTearingDown &&
+	       IsValid(World) &&
+	       IsValid(this);
+}
+
+void AGS_Door::ApplyDistanceCulling()
+{
+	if (!FApp::CanEverRender())
+		return;
+
+	const float DoorCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+	const int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
+
+	TArray<UActorComponent*> AllComponents;
+	GetComponents(AllComponents, true);
+
+	for (UActorComponent* Comp : AllComponents)
+	{
+		UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(Comp);
+		if (!PrimComp || !IsValid(PrimComp))
+			continue;
+
+		if (PrimComp == TriggerBoxComp)
+			continue;
+		if (PrimComp->ComponentTags.Contains("IgnoreCulling"))
+			continue;
+
+		PrimComp->bNeverDistanceCull = false;
+		PrimComp->SetCullDistance(DoorCullDistance);
+		PrimComp->SetCachedMaxDrawDistance(DoorCullDistance);
+		PrimComp->bAllowCullDistanceVolume = true;
+
+		if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(PrimComp))
+		{
+			MeshComp->MinLOD = MinLOD;
+		}
+
+		PrimComp->MarkRenderStateDirty();
+	}
+}
+
+void AGS_Door::CacheOptimizedComponents()
+{
+	CachedPrimitiveComponents.Empty();
+	CachedLightComponents.Empty();
+	CachedNiagaraComponents.Empty();
+
+	TArray<UActorComponent*> AllComponents;
+	GetComponents(AllComponents, true);
+
+	for (UActorComponent* Comp : AllComponents)
+	{
+		if (!IsValid(Comp))
+			continue;
+
+		if (Comp->ComponentTags.Contains("IgnoreCulling"))
+			continue;
+
+		if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(Comp))
+		{
+			// TriggerBox 제외
+			if (PrimComp != TriggerBoxComp)
+			{
+				CachedPrimitiveComponents.Add(PrimComp);
+			}
+		}
+		else if (ULightComponent* LightComp = Cast<ULightComponent>(Comp))
+		{
+			CachedLightComponents.Add(LightComp);
+		}
+		else if (UNiagaraComponent* NiagaraComp = Cast<UNiagaraComponent>(Comp))
+		{
+			CachedNiagaraComponents.Add(NiagaraComp);
+		}
+	}
+}
+
+void AGS_Door::UpdateCulling()
+{
+	if (IsRunningDedicatedServer())
+		return;
+
+	UWorld* World = GetWorld();
+	if (!World)
+		return;
+
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC || !PC->PlayerCameraManager)
+		return;
+
+	FVector CameraLoc = PC->PlayerCameraManager->GetCameraLocation();
+	float DistSq = FVector::DistSquared(GetActorLocation(), CameraLoc);
+
+	const float DoorCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+
+	// 거리 제곱 임계값 캐싱 (1.21 = 1.1^2, 10% 여유치)
+	const float CullDistSqThreshold = (DoorCullDistance * DoorCullDistance) * 1.21f;
+
+	// 나나이트 대응 수동 가시성 제어
+	bool bShouldBeVisible = DistSq < CullDistSqThreshold;
+
+	const bool bIsRTSMode = GS_Rendering::IsRTSMode(this);
+
+	// === Primitive 컴포넌트 처리 ===
+	for (TObjectPtr<UPrimitiveComponent> PrimComp : CachedPrimitiveComponents)
+	{
+		if (!PrimComp || !IsValid(PrimComp))
+			continue;
+
+		// 액터 위치가 아닌 개별 컴포넌트 위치 기준으로 거리 계산
+		const float CompDistSq = FVector::DistSquared(PrimComp->GetComponentLocation(), CameraLoc);
+		bool bCompShouldBeVisible = CompDistSq < CullDistSqThreshold;
+
+		// 태그 기반 가시성 판단
+		if (bCompShouldBeVisible)
+		{
+			if (PrimComp->ComponentTags.Contains(FName("Hidden")) ||
+			    (bIsRTSMode && PrimComp->ComponentTags.Contains(FName("RTS"))))
+			{
+				bCompShouldBeVisible = false;
+			}
+		}
+
+		if (PrimComp->GetVisibleFlag() != bCompShouldBeVisible)
+		{
+			PrimComp->SetVisibility(bCompShouldBeVisible);
+		}
+
+		if (bCompShouldBeVisible)
+		{
+			GS_Rendering::UpdateShadowCulling(this, PrimComp);
+		}
+	}
+
+	// === Light 컴포넌트 처리 ===
+	for (TObjectPtr<ULightComponent> LightComp : CachedLightComponents)
+	{
+		if (!LightComp || !IsValid(LightComp))
+			continue;
+
+		// 태그 기반 가시성 판단
+		bool bLightShouldBeVisible = bShouldBeVisible;
+		if (bLightShouldBeVisible)
+		{
+			if (LightComp->ComponentTags.Contains(FName("Hidden")) ||
+			    (bIsRTSMode && LightComp->ComponentTags.Contains(FName("RTS"))))
+			{
+				bLightShouldBeVisible = false;
+			}
+		}
+
+		if (LightComp->GetVisibleFlag() != bLightShouldBeVisible)
+		{
+			LightComp->SetVisibility(bLightShouldBeVisible);
+		}
+
+		// 그림자 누수 방지 로직
+		if (bLightShouldBeVisible)
+		{
+			bool bNearby = DistSq < (GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE * GS_Rendering::DYNAMIC_SHADOW_DISABLE_DISTANCE);
+			if (LightComp->CastShadows != bNearby)
+			{
+				LightComp->SetCastShadows(bNearby);
+			}
+		}
+	}
+
+	// === Niagara 컴포넌트 처리 ===
+	for (TObjectPtr<UNiagaraComponent> NiagaraComp : CachedNiagaraComponents)
+	{
+		if (!NiagaraComp || !IsValid(NiagaraComp))
+			continue;
+
+		// 태그 기반 가시성 판단
+		bool bVfxShouldBeVisible = bShouldBeVisible;
+		if (bVfxShouldBeVisible)
+		{
+			if (NiagaraComp->ComponentTags.Contains(FName("Hidden")) ||
+			    (bIsRTSMode && NiagaraComp->ComponentTags.Contains(FName("RTS"))))
+			{
+				bVfxShouldBeVisible = false;
+			}
+		}
+
+		if (NiagaraComp->GetVisibleFlag() != bVfxShouldBeVisible)
+		{
+			NiagaraComp->SetVisibility(bVfxShouldBeVisible);
+		}
+	}
+
+	// === 오클루전 디버그 라인 그리기 ===
+	if (bShouldBeVisible && IsValid(DoorAkComponent))
+	{
+		if (PC && PC->PlayerCameraManager)
+		{
+			FVector ListenerLoc = PC->PlayerCameraManager->GetCameraLocation();
+			UGS_AudioComponentBase::DrawOcclusionDebug(this, DoorAkComponent->GetComponentLocation(), ListenerLoc);
+		}
+	}
+}
+
+void AGS_Door::RegisterSignificanceManager()
+{
+	if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
+	{
+		TWeakObjectPtr<AGS_Door> WeakThis(this);
+		SM->RegisterObject(
+		    this, "Door",
+		    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint) -> float
+		    {
+			    if (AGS_Door* StrongThis = WeakThis.Get())
+				    return StrongThis->CalculateSignificance(Viewpoint);
+			    return 0.0f;
+		    },
+		    USignificanceManager::EPostSignificanceType::Sequential,
+		    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo, float OldValue, float NewValue, bool bExternal)
+		    {
+			    if (AGS_Door* StrongThis = WeakThis.Get())
+				    StrongThis->OnSignificanceChanged(NewValue);
+		    });
+	}
+}
+
+float AGS_Door::CalculateSignificance(const FTransform& Viewpoint)
+{
+	float DistSq = FVector::DistSquared(GetActorLocation(), Viewpoint.GetLocation());
+	const float FinalCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+
+	// 컬링 거리의 1.2배를 기준으로 0.1~1.0 사이 점수 계산
+	float MaxDistSq = FMath::Square(FinalCullDistance * 1.2f);
+	return FMath::Clamp(1.0f - (DistSq / MaxDistSq), 0.1f, 1.0f);
+}
+
+void AGS_Door::OnSignificanceChanged(float NewSignificance)
+{
+	CurrentSignificance = NewSignificance;
+
+	// 중요도에 따라 타이머 주기 동적 변경 (0.1s ~ 1.0s)
+	float NewInterval = GS_Rendering::GetAdaptiveTimerInterval(NewSignificance);
+
+	if (GetWorld())
+	{
+		float RemainingTime = GetWorld()->GetTimerManager().GetTimerRemaining(ShadowCullingTimerHandle);
+		GetWorld()->GetTimerManager().SetTimer(ShadowCullingTimerHandle, this, &AGS_Door::UpdateCulling, NewInterval, true, FMath::Max(0.01f, RemainingTime));
+	}
 }

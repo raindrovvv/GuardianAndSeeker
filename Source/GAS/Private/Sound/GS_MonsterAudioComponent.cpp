@@ -36,7 +36,7 @@ void UGS_MonsterAudioComponent::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 void UGS_MonsterAudioComponent::OnRep_CurrentAudioState()
 {
-	if (OwnerMonster && GetWorld() && GetWorld()->IsNetMode(NM_Client))
+	if (OwnerMonster && IsValid(GetWorld()) && GetWorld()->IsNetMode(NM_Client))
 	{
 		UpdateSoundTimer();
 	}
@@ -73,7 +73,7 @@ void UGS_MonsterAudioComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	if (IdleSoundTimer.IsValid())
 	{
 		UWorld* World = GetWorld();
-		if (World && World->IsValidLowLevel() && !World->bIsTearingDown)
+		if (IsValid(World) && !World->bIsTearingDown)
 		{
 			World->GetTimerManager().ClearTimer(IdleSoundTimer);
 		}
@@ -83,7 +83,7 @@ void UGS_MonsterAudioComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	if (CombatSoundTimer.IsValid())
 	{
 		UWorld* World = GetWorld();
-		if (World && World->IsValidLowLevel() && !World->bIsTearingDown)
+		if (IsValid(World) && !World->bIsTearingDown)
 		{
 			World->GetTimerManager().ClearTimer(CombatSoundTimer);
 		}
@@ -360,8 +360,13 @@ void UGS_MonsterAudioComponent::Multicast_PlaySwingSound_Implementation()
 	// 통합 체크 및 Distance Scaling 설정
 	if (!PrepareMulticastSound(OwnerMonster, false))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[MonsterAudio] SwingSound BLOCKED by PrepareMulticastSound - Monster: %s"),
+		       OwnerMonster ? *OwnerMonster->GetName() : TEXT("nullptr"));
 		return;
 	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[MonsterAudio] SwingSound PASSED PrepareMulticastSound - Monster: %s"),
+	       OwnerMonster ? *OwnerMonster->GetName() : TEXT("nullptr"));
 
 	// 로컬 쿨다운 체크
 	const float CurrentTime = GetWorld()->GetTimeSeconds();

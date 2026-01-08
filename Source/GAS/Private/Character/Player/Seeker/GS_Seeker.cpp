@@ -8,6 +8,7 @@
 #include "Components/PostProcessComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Camera/CameraComponent.h"
+#include "Weapon/Equipable/GS_WeaponEquipable.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Controller.h"
 #include "Engine/World.h"
@@ -132,6 +133,9 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	CombatTrigger->SetSphereRadius(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS);
 	CombatTrigger->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	CombatTrigger->SetGenerateOverlapEvents(true);
+	// 함정 화살/함정 채널은 무시 (불필요한 오버랩 이벤트 방지)
+	CombatTrigger->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Ignore); // Projectile 채널
+	CombatTrigger->SetCollisionResponseToChannel(ECC_GameTraceChannel4, ECR_Ignore); // Trap 채널
 
 	// 델리게이트 바인딩 (생성자에서 수행)
 	CombatTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGS_Seeker::OnCombatTriggerBeginOverlap);
@@ -547,6 +551,15 @@ void AGS_Seeker::StateReset()
 	if (this->GetSkillComp())
 	{
 		this->GetSkillComp()->ResetAllowedSkillsMask();
+	}
+
+	// 무기 히트박스 강제 비활성화 (공격 중 피격/상태 리셋 시 콜리전 잔류 방지)
+	if (Weapon)
+	{
+		if (AGS_WeaponEquipable* WeaponActor = Cast<AGS_WeaponEquipable>(Weapon->GetChildActor()))
+		{
+			WeaponActor->ForceDisableHit();
+		}
 	}
 }
 
@@ -1036,11 +1049,8 @@ void AGS_Seeker::AddCombatEnemy(AGS_Character* Enemy)
 		// 사망 시 목록에서 제거하기 위한 델리게이트 바인딩
 		Enemy->OnDeathDelegate.AddUniqueDynamic(this, &AGS_Seeker::HandleEnemyDeath);
 
-		// 적이 몬스터인 경우 추가 로직 (기존 음악 시스템 유지)
-		if (NearbyEnemies.Num() == 1)
-		{
-			StartCombatMusic();
-		}
+		// 적이 몬스터인 경우 추가 로직 (상태 업데이트)
+		UpdateCombatMusicState();
 	}
 }
 
@@ -1059,10 +1069,8 @@ void AGS_Seeker::RemoveCombatEnemy(AGS_Character* Enemy)
 		}
 	}
 
-	if (NearbyEnemies.Num() == 0)
-	{
-		StopCombatMusic();
-	}
+	// 리스트가 변경되었으므로 상태 업데이트
+	UpdateCombatMusicState();
 }
 
 void AGS_Seeker::ClearNearbyEnemies()
@@ -1075,20 +1083,34 @@ void AGS_Seeker::ClearNearbyEnemies()
 		}
 	}
 	NearbyEnemies.Reset();
+
+	// 모든 적이 제거되었으므로 음악 정지
+	UpdateCombatMusicState();
 }
 
 void AGS_Seeker::HandleEnemyDeath()
 {
-	// 유효하지 않은(죽은) 대상을 배열에서 정리
-	for (int32 i = NearbyEnemies.Num() - 1; i >= 0; --i)
+	// 상태 업데이트 (유효하지 않거나 죽은 리스너 정리 포함)
+	UpdateCombatMusicState();
+}
+
+void AGS_Seeker::UpdateCombatMusicState()
+{
+	if (!IsLocallyControlled())
 	{
-		if (!NearbyEnemies[i].IsValid() || NearbyEnemies[i]->IsDead())
-		{
-			NearbyEnemies.RemoveAt(i);
-		}
+		return;
 	}
 
-	if (NearbyEnemies.Num() == 0)
+	// 1. 무효하거나 죽은 적 제거 (Cleanup)
+	NearbyEnemies.RemoveAll([](const TWeakObjectPtr<AGS_Character>& E)
+	                        { return !E.IsValid() || E->IsDead(); });
+
+	// 2. 현재 상태에 따라 시작/중지 결정
+	if (NearbyEnemies.Num() > 0)
+	{
+		StartCombatMusic();
+	}
+	else
 	{
 		StopCombatMusic();
 	}
@@ -1205,6 +1227,16 @@ void AGS_Seeker::OnDeath()
 
 	// Death 사운드는 부모 클래스(GS_Character::OnDeath)에서 통합 처리됨
 	Super::OnDeath();
+
+	// 사망 시 무기 히트박스 비활성화
+	if (Weapon)
+	{
+		if (AGS_WeaponEquipable* WeaponActor = Cast<AGS_WeaponEquipable>(Weapon->GetChildActor()))
+		{
+			WeaponActor->DisableHit();
+			WeaponActor->ServerDisableHit();
+		}
+	}
 
 	ClientRPCStopCombatMusic();
 	ClearNearbyEnemies();

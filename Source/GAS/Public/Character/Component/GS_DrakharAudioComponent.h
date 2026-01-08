@@ -12,7 +12,7 @@ class AGS_Drakhar;
  * 드라카르(가디언) 전용 오디오 컴포넌트
  * GS_AudioComponentBase를 상속받아 공통 기능 활용
  */
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_DrakharAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()

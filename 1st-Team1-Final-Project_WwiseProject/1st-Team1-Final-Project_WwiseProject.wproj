@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<WwiseDocument Type="Project" SchemaVersion="123" WwiseVersion="v2024.1.4" WwiseBuild="8780">
+<WwiseDocument Type="Project" SchemaVersion="123" WwiseVersion="v2024.1.9" WwiseBuild="8920">
 	<ProjectInfo>
 		<Project Name="1st-Team1-Final-Project_WwiseProject" ID="{FD8E5CBE-14B1-4AA6-85FD-4808F9861E65}">
 			<Platforms>
@@ -21,12 +21,12 @@
 				</Property>
 				<Property Name="ExternalSourcesOutputPath" Type="string">
 					<ValueList>
-						<Value Platform="Windows">GeneratedSoundBanks\Windows\</Value>
-						<Value Platform="Mac">GeneratedSoundBanks\Mac\</Value>
+						<Value Platform="Windows">GeneratedSoundBanks\Windows</Value>
+						<Value Platform="Mac">GeneratedSoundBanks\Mac</Value>
 					</ValueList>
 				</Property>
 				<Property Name="LicenseKey" Type="string" Value="PHByb2plY3QgaWQ9IjIwNTk3IiBtYXNrPSJWUE1VNjkzNSIgZW5jPSIwIj48bGljZW5zZSBpZD0iMSIgbmFtZT0iV3dpc2UiIHR5cGU9IjEiIHBsYXRmb3Jtcz0iMTAiIGV4cGlyZXM9IjIwMjYtMDctMzEiICAvPjxsaWNlbnNlIGlkPSIyMSIgbmFtZT0iTWFpbnRlbmFuY2UiIHR5cGU9IjEiIHBsYXRmb3Jtcz0iMTAiIGV4cGlyZXM9IjIwMjYtMDctMzEiICAvPjxsaWNlbnNlIGlkPSI3MCIgbmFtZT0iSW5kaWUgTGljZW5zZSIgdHlwZT0iMSIgcGxhdGZvcm1zPSIxMCIgZXhwaXJlcz0iMjAyNi0wNy0zMSIgIC8+PC9wcm9qZWN0Pg==|ci6/fj0tuRfmRZ3z133RPNFzD/vodhOMCYOZNykqIkZoRwLbMUaovQ3nz9JzdYVbMjoUGirA5s8juTsKnK0/5CR9P9NdUsMn2mtwmFEsYzpgbsOF4HL4/ffHiHEY5KxA6LLX0XCTWatiQW7TC1y6IN/7EUNdUyeorX1bOTVF0wP+D7SGyVPX9dTuQarFPikhYoQhO4dvBZnaTHfi8BVG9Q68A8Yf5kqNL+E159noL3LBVqWeVBg0LYPEuiV8jzw8P87TodEHvHArMFHSPLGIzknBAySzLTpNNaiiC2dZ8+TuLUONHQuowo5PKESLXUbGbPKOxiQ2fE9tE/ZwFf31qA=="/>
-				<Property Name="SoundBankHeaderFilePath" Type="string" Value="GeneratedSoundBanks\"/>
+				<Property Name="SoundBankHeaderFilePath" Type="string" Value="GeneratedSoundBanks"/>
 				<Property Name="SoundBankPaths" Type="string">
 					<ValueList>
 						<Value Platform="Windows">GeneratedSoundBanks\Windows\</Value>
@@ -59,6 +59,10 @@
 				</Property>
 				<Property Name="WwiseVersionWhenCreated" Type="string" Value="Branch=wwise_v2024.1.4|Build=8780|VersionName=v2024.1.4|Config=Release"/>
 			</PropertyList>
+			<MiscSettings>
+				<MiscSettingEntry Name="Cache"><![CDATA[.cache]]></MiscSettingEntry>
+				<MiscSettingEntry Name="Originals"><![CDATA[Originals]]></MiscSettingEntry>
+			</MiscSettings>
 			<SharedValues>
 				<SharedPropertyList ClassName="AudioFileSource" PluginType="0" CompanyID="1" PluginID="0">
 					<PropertyList>
@@ -10617,6 +10621,30 @@
 						</Property>
 					</PropertyList>
 				</SharedPropertyList>
+				<SharedPropertyList ClassName="Remote System" PluginType="7" CompanyID="0" PluginID="182">
+					<PropertyList>
+						<Property Name="BypassEffect" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="Color" Type="int16">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+						<Property Name="Inclusion" Type="bool">
+							<ValueList>
+								<Value>True</Value>
+							</ValueList>
+						</Property>
+						<Property Name="OverrideColor" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+					</PropertyList>
+				</SharedPropertyList>
 				<SharedPropertyList ClassName="Mastering Suite" PluginType="3" CompanyID="0" PluginID="186">
 					<PropertyList>
 						<Property Name="Color" Type="int16">
@@ -11442,7 +11470,7 @@
 									</Point>
 									<Point>
 										<XPos>100</XPos>
-										<YPos>-200</YPos>
+										<YPos>-12</YPos>
 										<Flags>37</Flags>
 									</Point>
 								</PointList>
@@ -11463,7 +11491,7 @@
 									</Point>
 									<Point>
 										<XPos>100</XPos>
-										<YPos>100</YPos>
+										<YPos>80</YPos>
 										<Flags>37</Flags>
 									</Point>
 								</PointList>

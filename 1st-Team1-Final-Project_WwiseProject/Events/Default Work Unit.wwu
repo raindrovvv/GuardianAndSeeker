@@ -2721,6 +2721,61 @@
 								</Event>
 							</ChildrenList>
 						</Folder>
+						<Event Name="EV_Layer_Reverb" ID="{4860FB26-B004-4A49-B3F6-9A24470AE61D}">
+							<ChildrenList>
+								<Action Name="" ID="{1655B86D-C1C8-4712-A235-03BE5A9A9CC6}" ShortID="901194987">
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="SFX_Layer_Reverb" ID="{9F296DEE-53E9-4938-9BC3-5F457C151E4A}" WorkUnitID="{B98F67B3-ECA3-4E0B-9B7B-3AB8F39F683B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="EV_Layer_Armor" ID="{0AC7325E-B7AF-4CE5-85F8-E738A37B3E45}">
+							<ChildrenList>
+								<Action Name="" ID="{9F7EE248-E35E-4FC6-879C-6FE34DDFE318}" ShortID="191562532">
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="SFX_Layer_Armor" ID="{2B75F423-CDAE-405D-A036-4E64AF6C726C}" WorkUnitID="{B98F67B3-ECA3-4E0B-9B7B-3AB8F39F683B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="EV_Layer_Flesh" ID="{14DA1E37-690E-4033-9D22-BD6CA91ECA90}">
+							<ChildrenList>
+								<Action Name="" ID="{565E078B-FDEB-424F-9026-2E139ED5869B}" ShortID="601752677">
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="SFX_Layer_Flesh" ID="{2CBEBA39-2A04-4839-8D71-1690B21705C1}" WorkUnitID="{B98F67B3-ECA3-4E0B-9B7B-3AB8F39F683B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="EV_Layer_Flesh_Arrow" ID="{041F7193-EA9B-4B7A-BC46-E995B280FC5D}">
+							<ChildrenList>
+								<Action Name="" ID="{6EC49AF4-9D52-417D-956F-C86B2F272D09}" ShortID="6685930">
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="SFX_Layer_Flesh_Arrow" ID="{9D035272-6F73-4863-8D81-5B445FF04C39}" WorkUnitID="{B98F67B3-ECA3-4E0B-9B7B-3AB8F39F683B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="EV_Layer_Reverb_Arrow" ID="{D24785AD-B47D-41EB-A795-52711A431EDA}">
+							<ChildrenList>
+								<Action Name="" ID="{3BB884EF-43BE-45DB-8446-97298B4480DA}" ShortID="498940987">
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="SFX_Layer_ArrowImpact" ID="{62701E0E-F5FE-451B-8554-9F2EBF93BFC2}" WorkUnitID="{B98F67B3-ECA3-4E0B-9B7B-3AB8F39F683B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
 					</ChildrenList>
 				</Folder>
 			</ChildrenList>

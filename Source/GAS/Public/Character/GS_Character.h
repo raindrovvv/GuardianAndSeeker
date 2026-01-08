@@ -15,6 +15,7 @@ class UGS_SkillComp;
 class UGS_DebuffComp;
 class UGS_HitReactComp;
 class UGS_CameraShakeComponent;
+class UGS_AudioMixingComponent;
 class UGS_HPTextWidgetComp;
 class UGS_PlayerInfoWidget;
 class UGS_HPText;
@@ -248,6 +249,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "State")
 	bool IsInvincible() const { return bIsInvincible; }
 
+	/** 가드/방어 중인지 여부 (자식 클래스에서 오버라이드) */
+	UFUNCTION(BlueprintCallable, Category = "State")
+	virtual bool IsDefending() const { return false; }
+
+	/** 
+	 * 공격 성공 시 추가적인 특수 효과(VFX, 사운드 등)를 처리합니다.
+	 * @param ComboIndex 현재 콤보 인덱스
+	 * @param HitResult 타격 정보
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) {}
+
 	void SetInvincible(bool bEnable);
 
 	// VFX 거리 기반 컬링 (성능 최적화)
@@ -265,13 +278,25 @@ public:
 	/** 현재 중요도 값 반환 */
 	FORCEINLINE float GetSignificance() const { return CurrentSignificance; }
 
+	/** 캐릭터의 타격 재질 타입 (사운드 레이어 분기용) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character|Sound")
+	EImpactMaterialType ImpactMaterialType = EImpactMaterialType::Flesh;
+
+	virtual EImpactMaterialType GetImpactMaterialType() const { return ImpactMaterialType; }
+
 	/** 현재 누적된 카메라 낙아웃 거리 */
 	float CurrentCameraKnockback = 0.0f;
 
 	/** 카메라 낙아웃 효과 적용 */
 	void ApplyCameraKnockback(float IntensityMultiplier = 1.0f);
 
+	/** 모든 무기가 공유하여 사용할 사운드 믹싱(Ducking) 타이머 핸들 */
+	FORCEINLINE FTimerHandle& GetAudioFocusTimerHandle() { return AudioFocusTimerHandle; }
+
 protected:
+	/** 모든 무기가 공유하여 사용할 사운드 믹싱(Ducking) 타이머 핸들 */
+	FTimerHandle AudioFocusTimerHandle;
+
 	/** 현재 중요도 상태 저장 (0.0 ~ 1.0) */
 	float CurrentSignificance = 1.0f;
 
@@ -294,9 +319,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_StatComp> StatComp;
 
-	/** 공통 오디오 컴포넌트 변수 (Seeker/Monster/Drakhar 오디오 컴포넌트가 여기 할당됨) */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	/** 공통 오디오 컴포넌트 변수 (내부 로직용으로만 사용, 에디터 노출은 자식 클래스에서 타입별로 수행) */
+	UPROPERTY()
 	TObjectPtr<class UGS_AudioComponentBase> BaseAudioComponent;
+
+	/** 발소리, 피격음 등 레이어드 사운드 제어를 위한 믹싱 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<class UGS_AudioMixingComponent> AudioMixingComponent;
 
 	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TArray<FWeaponSlot> WeaponSlots;
