@@ -127,7 +127,7 @@ void UpdateShadowCulling(const AActor* Actor, USceneComponent* MeshComp)
 	APlayerController* PC = World->GetFirstPlayerController();
 	if (PC && PC->PlayerCameraManager)
 	{
-		float DistSq = FVector::DistSquared(Actor->GetActorLocation(), PC->PlayerCameraManager->GetCameraLocation());
+		float DistSq = FVector::DistSquared(MeshComp->GetComponentLocation(), PC->PlayerCameraManager->GetCameraLocation());
 
 		// 1. 전체 그림자 활성화 여부 (SHADOW_DISABLE_DISTANCE - 80m)
 		bool bCastAnyShadow = DistSq < (SHADOW_DISABLE_DISTANCE * SHADOW_DISABLE_DISTANCE);
