@@ -68,9 +68,9 @@ public:
 
 	//함정 활성화
 	UFUNCTION()
-	void OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	                              UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	                              bool bFromSweep, const FHitResult& SweepResult);
+	virtual void OnActivSCompBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	                                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	                                      bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(Server, Reliable)
 	void Server_ActivateTrap(AActor* TargetActor);
@@ -240,6 +240,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 
+	/** 함정 크기에 따른 최적 컬링 거리 계산 */
+	float GetTrapCullDistance() const;
+
 private:
 	void RefreshTrapAudioSetup(bool bForceFindComponent = false);
 	void AttachTrapAkComponentToAnchor();
@@ -250,11 +253,35 @@ private:
 	/** Distance Culling 적용 */
 	void ApplyDistanceCulling();
 
-	/** 함정 크기에 따른 최적 컬링 거리 계산 */
-	float GetTrapCullDistance() const;
+	/** Significance Manager 등록 */
+	void RegisterSignificanceManager();
+
+	/** 중요도 계산 (거리 기반) */
+	virtual float CalculateSignificance(const FTransform& Viewpoint);
+
+	/** 중요도 변경 시 호출 */
+	virtual void OnSignificanceChanged(float NewSignificance);
+
+	/** 현재 중요도 단계 */
+	float CurrentSignificance = 1.0f;
 
 	/** 그림자 컬링을 위한 타이머 */
 	FTimerHandle ShadowCullingTimerHandle;
+
+	/** 컬링 대상이 되는 Primitive 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UPrimitiveComponent>> CachedPrimitiveComponents;
+
+	/** 컬링 대상이 되는 Light 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class ULightComponent>> CachedLightComponents;
+
+	/** 컬링 대상이 되는 Niagara 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UNiagaraComponent>> CachedNiagaraComponents;
+
+	/** 컴포넌트 캐싱 초기화 */
+	void CacheOptimizedComponents();
 
 	/** 그림자 컬링 상태 업데이트 */
 	void UpdateShadowCulling();
