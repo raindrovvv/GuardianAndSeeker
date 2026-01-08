@@ -60,6 +60,7 @@ Event	ID	Name			Wwise Object Path	Notes
 	1225088094	EV_ChanAggroSkill			\Default Work Unit\Player\Seeker\Chan\EV_ChanAggroSkill	
 	1229688631	Props_StoneDooor_Open			\Default Work Unit\Props\Props_TPS\StoneDoor\Props_StoneDooor_Open	
 	1277181590	UI_ButtonSFX_Disable			\Default Work Unit\UI_SOUND\UI_ButtonSFX_Disable	
+	1281724167	EV_Layer_Reverb_Arrow			\Default Work Unit\Weapon\EV_Layer_Reverb_Arrow	
 	1315079743	EV_MeleeAttack_Sword			\Default Work Unit\Weapon\Weapon_TPS\EV_MeleeAttack_Sword	
 	1329946508	EV_UI_Mon_IronFang_Attack			\Default Work Unit\Monster\RTS_UISound\EV_UI_Mon_IronFang_Attack	
 	1354167801	EV_AresDashSkill_RTS			\Default Work Unit\Player\Seeker\Ares\RTS\EV_AresDashSkill_RTS	
@@ -67,6 +68,7 @@ Event	ID	Name			Wwise Object Path	Notes
 	1369219461	EV_PotionSippin_End			\Default Work Unit\Player\Seeker\EV_PotionSippin_End	
 	1375475246	EV_ArrowHit_UI			\Default Work Unit\UI_SOUND\EV_ArrowHit_UI	
 	1388264480	EV_Drakhar_DraconicFury			\Default Work Unit\Player\Guardian\EV_Drakhar_DraconicFury	
+	1394868403	EV_Layer_Flesh_Arrow			\Default Work Unit\Weapon\EV_Layer_Flesh_Arrow	
 	1439088316	Amb_Wind			\Default Work Unit\AmbientSound\Amb_Wind	
 	1442935897	EV_Chan_Attack_Stop			\Default Work Unit\Player\Seeker\Chan\EV_Chan_Attack_Stop	
 	1465062411	Props_CrystalWallTrap_RTS			\Default Work Unit\Props\Props_RTS\CrystalWall\Props_CrystalWallTrap_RTS	
@@ -105,6 +107,7 @@ Event	ID	Name			Wwise Object Path	Notes
 	2240580818	Props_MineTick			\Default Work Unit\Props\Props_TPS\Mine\Props_MineTick	
 	2265501116	Props_SwingBlade			\Default Work Unit\Props\Props_TPS\SwingBlade\Props_SwingBlade	
 	2275982960	EV_AresUltimateLoop_Stop_RTS			\Default Work Unit\Player\Seeker\Ares\RTS\EV_AresUltimateLoop_Stop_RTS	
+	2278532238	EV_Layer_Armor			\Default Work Unit\Weapon\EV_Layer_Armor	
 	2287030620	EV_Mon_ShadowFang_Hurt			\Default Work Unit\Monster\ShadowFang\EV_Mon_ShadowFang_Hurt	
 	2294527141	Props_CrystalSaw			\Default Work Unit\Props\Props_TPS\CrystalSaw\Props_CrystalSaw	
 	2315860249	EV_Chan_Guard			\Default Work Unit\Player\Seeker\Chan\EV_Chan_Guard	
@@ -196,6 +199,7 @@ Event	ID	Name			Wwise Object Path	Notes
 	3802947327	Voice_Chan_Attack_RTS			\Default Work Unit\Player\Seeker\Chan\RTS\Voice_Chan_Attack_RTS	
 	3809794982	EV_Drakhar_FeverMode_ING_Play			\Default Work Unit\Player\Guardian\EV_Drakhar_FeverMode_ING_Play	
 	3834184178	EV_ArrowImpact_Stone			\Default Work Unit\Weapon\Projectile\EV_ArrowImpact_Stone	
+	3836163797	EV_Layer_Flesh			\Default Work Unit\Weapon\EV_Layer_Flesh	
 	3843110162	Props_MineFuse_RTS			\Default Work Unit\Props\Props_RTS\Mine\Props_MineFuse_RTS	
 	3860373373	EV_CombatPlay			\Default Work Unit\StateSound\EV_CombatPlay	
 	3890138214	EV_Mon_NeedleFang_RTS_Death			\Default Work Unit\Monster\NeedleFang\EV_Mon_NeedleFang_RTS_Death	
@@ -222,6 +226,7 @@ Event	ID	Name			Wwise Object Path	Notes
 	4201754107	EV_Ares_Attack_03			\Default Work Unit\Player\Seeker\Ares\EV_Ares_Attack_03	
 	4201754108	EV_Ares_Attack_04			\Default Work Unit\Player\Seeker\Ares\EV_Ares_Attack_04	
 	4228377510	EV_Mon_NeedleFang_Idle			\Default Work Unit\Monster\NeedleFang\EV_Mon_NeedleFang_Idle	
+	4284811841	EV_Layer_Reverb			\Default Work Unit\Weapon\EV_Layer_Reverb	
 
 Switch Group	ID	Name			Wwise Object Path	Notes
 	2385628198	FootSteps			\Default Work Unit\FootSteps	
@@ -305,6 +310,7 @@ Effect plug-ins	ID	Name	Type				Notes
 	708217263	Special_Effect_1 (Custom)	Wwise Flanger			
 	731769718	Special_Effect_1 (Custom)	Wwise Flanger			
 	785424419	Pitch Shifter (Custom)	Wwise Pitch Shifter			
+	786399954	Pitch Shifter (Custom)	Wwise Pitch Shifter			
 	789618774	Special_Effect_1 (Custom)	Wwise Flanger			
 	801810835	Octave_Up (Custom)	Wwise Pitch Shifter			
 	818568435	Special_Effect_1 (Custom)	Wwise Flanger			
@@ -376,6 +382,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	120891545	AresGrowl0	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\A0\{A0AC067B-197D-5090-1082-69D927549123}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_AresUltimateLoop_RTS\AresGrowl\AresGrowl0		529294
 	120977185	SFX_Mine_Fuse	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\88\{88435514-F2F0-912A-25E3-079873B98238}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\Mine\SFX_Mine_Fuse		84548
 	121917343	Merci_Dont04	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C5\{C5B87615-7A55-4059-BA7E-95EFE1009266}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Merci\Voice_Merci_ArrowZero\Merci_Dont04		67624
+	128532901	SFX_Weapon_Impact_Metal_03	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\22\{22DC8DBF-2CC8-CDFF-A08B-4C5CDB14C857}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Armor\SFX_Layer_Armor_01\SFX_Weapon_Impact_Metal_03		126372
 	134763393	Impact_smash_destroy	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\1E\{1EE4A4AD-A9DE-E6CD-E9F2-EC4229993EF0}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\EV_ChanAimingSkill_Slam\Slam2\CrashSound\Impact_smash_destroy		210504
 	140100063	StoneImpact0	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\AB\{ABA0C817-56D3-60BE-6DFA-537B3CC5A084}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\StoneDoor\SFX_StoneDooor_Close\StoneImpact0		180292
 	140776273	SFX_StoneTrap1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\9C\{9C72A51B-EEC1-08E5-7496-A09B68A3ABCA}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_RTS\StoneDoor\SFX_StoneDooor_Open_RTS\SFX_StoneTrap1		285076
@@ -386,6 +393,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	149223123	NeedleFang_DeathSound1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\F0\{F0A7392E-4B83-2302-BD35-B2ECC2384A48}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\NeedleFang\SFX_Mon_NeedleFang_Death\NeedleFang_DeathSound1		110312
 	154079928	FX_MagicShot__impact_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\16\{1652033A-9975-7025-1F1D-A68461FD0F19}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\NeedleFang\SFX_Mon_NeedleFang_Attack_Swing\FX_MagicShot__impact_01		358820
 	157399992	SFX_Mine_Tick	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\3C\{3CC037AE-4F16-5DA5-A599-EAD0A0BD74D1}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\Mine\SFX_Mine_Tick		16988
+	162322990	SFX_Layer_ArrowImpact	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\98\{980C1F4E-0864-6458-CABC-1FEBCA97EDC9}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Projectile\SFX_Layer_ArrowImpact		177956
 	163672082	screeching_alert_reverse_squeal	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\80\{8005F5BD-2577-E55D-88FD-5EE71A92ABDC}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_IronFang_RTS_Attack\screeching_alert_reverse_squeal		156232
 	165801011	Drakhar_Outch2	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\BD\{BDF57CB6-218C-852B-81B2-2CBCDE9ECA97}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\Voice_Drakhar_Hit\Drakhar_Outch2		133196
 	171728611	Undead_Vocal_Hurt_2	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\55\{557DCF35-0D64-B103-C2CF-49E94B327CF2}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\ShadowFang\SFX_Mon_ShadowFang_Hurt\Undead_Vocal_Hurt_2		214708
@@ -406,12 +414,14 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	223150580	SFX_SmallClaw_Idle1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\2A\{2A5119AE-25F2-360D-62BD-BAE2113B4F4F}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_ShadowFang_RTS\SFX_SmallClaw_Idle1		163264
 	223413545	MonsterSnarlGrowl1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\39\{3904409D-71D1-AB20-F48A-8D01663764A7}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\SmallClaw\SFX_Mon_SmallClaw_Idle\MonsterSnarlGrowl1		112988
 	230669099	RockFall	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\B3\{B3524936-4133-8CDB-B086-99CDD9927869}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_RTS\StoneDoor\SFX_StoneDooor_Open_RTS\RockFall		269540
+	231394349	SFX_Weapon__Bullet_Flesh	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\D5\{D53934EE-0395-249E-625F-9191DAC5B48B}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh_Arrow\SFX_Layer_Flesh_02\SFX_Weapon__Bullet_Flesh		80920
 	232330686	Stone_Accent	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\8F\{8FA2708F-3217-65DD-82E4-55EE7EABBF32}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_DraconicFury_Impact\Stone_Accent		191464
 	234128836	Voice_ChanDie_RTS	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E4\{E4D7EBA9-15B8-F2D6-3C60-F89FE4D7DC5E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\Voice_ChanDie_RTS		314656
 	243067112	Combat_axe_impact	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\DA\{DA6C4040-D6D4-C83D-80E7-06F25821F369}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_ChanAimingSkill_Slam_RTS\Slam2\Combat_axe_impact		423428
 	243265281	Drakhar_Outch3	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\3F\{3FDBDDB0-2787-73B5-7029-D6618B34C33A}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\Voice_Drakhar_Hit\Drakhar_Outch3		127192
 	245240366	SFX_Lava1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\CC\{CCC44E05-8543-52D6-124F-F6CD377C4DA1}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\Lava\SFX_Lava\SFX_Lava1		2037828
 	246210322	FlameMovementHeavy	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\77\{77AF4E19-1068-61F3-43F7-6D636534580F}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\SFX_FlameShot\FlameMovementHeavy		1232128
+	255044406	SFX_Weapon_Impact_Metal_02	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C5\{C54FD3D3-E943-B044-E81D-A2EDD130C91F}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Armor\SFX_Layer_Armor_02\SFX_Weapon_Impact_Metal_02		165628
 	255360718	FootstepsConcrete4	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E4\{E4362B59-0A9A-4535-8495-A5FD31975BB3}.wem		\Actor-Mixer Hierarchy\Default Work Unit\FootSteps\Stone\FootstepsConcrete4		64264
 	258681612	Merci_SFX	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\1E\{1EAFA9F9-472E-A6B9-8DF0-765528FE695C}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\Voice_MerciUltimate_RTS\Merci_SFX		99204
 	259888318	AresGrowl	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\8A\{8A474FBA-B766-7FB7-7D59-ED8CF723C908}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Ares\EV_AresUltimateEnd\AresGrowl		108908
@@ -425,7 +435,11 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	289001169	AxeSwing_Hit_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\9F\{9FC642A9-62A6-AB86-D1BF-599D1D64B2AD}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_RTS\SwingBlade\SFX_SwingBlade_Hit_RTS\AxeSwing_Hit_01		53108
 	289982079	SFX_Fire_Burn	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\2F\{2F125835-1030-34FF-FAD9-AD9B96460D8C}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\SFX_Fire_Burn		244156
 	290212776	FootstepMetal1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\75\{75146B4D-D3B8-FE8C-826A-F925D569090E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\FootSteps\Metal\FootstepMetal1		67692
+	291164056	SFX_Weapon_Impact_Metal_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\42\{420306F6-F371-8167-3CEA-B803C4E2B8C6}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Armor\SFX_Layer_Armor_01\SFX_Weapon_Impact_Metal_01		104792
+	292553550	SFX_Weapon__Flesh_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\22\{220EA430-3B33-1ADC-3187-23BB48A86E38}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh\SFX_Layer_Flesh_01\SFX_Weapon__Flesh_01		58348
 	298182177	ESM_Undead_Vocal_Groan_Painful	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\A5\{A5FB4F91-7AD9-B2EC-ED47-0E801A684825}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\ShadowFang\SFX_Mon_ShadowFang_Death\ESM_Undead_Vocal_Groan_Painful		245176
+	301074610	SFX_Weapon__Bullet_Flesh	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\F1\{F1FFF5EC-1DB9-B13B-8A8E-A91772CFB933}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh_Arrow\SFX_Layer_Flesh_01\SFX_Weapon__Bullet_Flesh		92668
+	303273141	SFX_Weapon_Swing_Blood_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\CF\{CFCA772E-84E3-3FB0-BB7F-E906058D82BA}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh\SFX_Layer_Flesh_01\SFX_Weapon_Swing_Blood_01		124508
 	303740880	DrakharAttack01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\9D\{9D592BC7-6226-7CC6-8DE3-F16A210A4DE5}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_Drakhar_DraconicFury\DrakharAttack01		77564
 	307021949	MonsterSnarl	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\BE\{BE15E685-367D-01F5-C87C-EB0DC9D41931}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_ShadowFang_RTS\MonsterSnarl		438344
 	312008108	Voice_Drakhar_Death	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\D0\{D0B270ED-DC05-3EBA-DADD-035F29DFC710}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\Voice_Drakhar_Death		357908
@@ -439,6 +453,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	356621308	StoneTouch_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\41\{4109AD0C-C71A-906E-9167-FDDCFB4B1CD2}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_RTS\StoneDoor\SFX_StoneDooor_Open_RTS\StoneTouch_01		83200
 	360458544	SFX_BoosFootStep_Lava3	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\61\{6194B5E4-1132-BF6B-A294-9E766F410DB7}.wem		\Actor-Mixer Hierarchy\Default Work Unit\BossFootSteps\Lava\SFX_BoosFootStep_Lava3		71912
 	363053273	SFX_NeedleFangShot_By_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\B4\{B47B7F61-27A5-548B-E2FB-73203E6BE75E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Projectile\SFX_NeedleFangShot_By\SFX_NeedleFangShot_By_01		211132
+	364012693	SFX_Weapon__Flesh_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\9D\{9D278F0F-481B-DA5B-2C19-69D9205FE6E7}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh_Arrow\SFX_Layer_Flesh_01\SFX_Weapon__Flesh_01		53256
 	369007659	Props_TorchFlicker	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E9\{E93E11AF-4684-5D00-A49D-01E8163638B9}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\Props_TorchFlicker		15893968
 	369405294	AttackVoice1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\22\{229A5453-4A62-EF27-EAA1-F84C2AEC156F}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\Voice_ChanAttack_RTS\AttackVoice1		45068
 	372981139	Merci_Jump1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\F7\{F7117DF6-ED74-986B-09C2-FBB104D7A9E6}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\Voice_MerciJump_RTS\Merci_Jump1		28760
@@ -479,6 +494,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	485972195	Undead_Monster_Fat	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\85\{85F5361E-770E-B89D-F182-881B12B372B6}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_UI_Sound\SFX_UI_Mon_IronFang\Undead_Monster_Fat		141268
 	486460487	ZombieBiteCrunch_BW_13291	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\79\{79A4FD3A-3122-C36C-24BB-716EBF92F523}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_SmallClaw_Attack_Swing_RTS\ZombieBiteCrunch_BW_13291		68692
 	486626407	Combat_axe_impact	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\29\{29B20E2C-E5AF-A148-D5D4-E69807B9855B}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\EV_ChanAimingSkill_Slam\Slam1\Combat_axe_impact		423428
+	490811630	SFX_Pickup_Metal_Armor	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\38\{3843A819-28FB-6CDB-4007-8CDDF324968C}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Armor\SFX_Layer_Armor_01\SFX_Pickup_Metal_Armor		111660
 	492757837	SFX_CrystalSaw0	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\97\{97FF4AD0-66F2-F626-D04C-AF09016675E3}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\CrystalSaw\SFX_CrystalSaw_Hit\SFX_CrystalSaw0		121564
 	493684920	SmallClawAttack	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C0\{C003E7E3-B32C-C2EC-6719-7D707D672B60}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_UI_Sound\SFX_UI_Mon_SmallClaw_Attack\SmallClawAttack		189204
 	501379443	SmallClawAttack_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\D1\{D1D6ED81-48FB-62D9-7111-33F0571DA697}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_SmallClaw_RTS_Attack\SmallClawAttack_01		309924
@@ -509,6 +525,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	586361417	WingsFlap	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\F1\{F1A9F3D2-8E0C-8334-BE5B-0693418DA719}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_Drakhar_Flying\WingsFlap		2115012
 	587485477	PortalSFX	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\46\{462133C6-E584-21AF-E4CB-1A99D480874B}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\SFX_Portal\PortalSFX		4070912
 	588618539	ESM_Dragon_Vocal_I_Am_Fire_I_Am_Death	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\60\{609E8860-35DF-020B-4A9C-6857350771B1}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_Drakhar_DraconicFury\ESM_Dragon_Vocal_I_Am_Fire_I_Am_Death		435828
+	589356108	SFX_Weapon_Swing_Blood_02	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\48\{488E324D-F4EE-257A-D152-E4FFDBCF73ED}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh\SFX_Layer_Flesh_02\SFX_Weapon_Swing_Blood_02		113812
 	589741947	StoneRumble	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\DF\{DFC3222A-AD2F-A2AC-137C-AD0688F8C01A}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\CystalWall\SFX_CystalCeilTrap_Warning\StoneRumble		238976
 	595941273	FX_Texture_One_Shot	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\D9\{D916BA6B-7DBC-2E15-BC16-8012A9D27838}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\SFX_Portal\FX_Texture_One_Shot		5796336
 	597476044	Combat_axe_impact_02	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C2\{C24F7E09-68EF-7F5B-2B26-0E6DFDC40E52}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\SFX_Shield_Guard\Combat_axe_impact_02		302288
@@ -539,6 +556,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	699157515	Ares_attack1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\85\{85416B79-40F2-5B76-CFD4-5F8E2829E641}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_AresAttackSound_2_RTS\Ares_attack1		264692
 	703596636	Merci_SFX1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\42\{422DB44F-6889-E5DD-9FDF-60F21B5FC21E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\Voice_MerciUltimate_RTS\Merci_SFX1		134484
 	707112177	NeedleFnag_Hurt_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C2\{C2372EDC-5E11-DC0C-8B2E-3CEF9D3640D9}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\NeedleFang\SFX_Mon_NeedleFang_Hurt\NeedleFnag_Hurt_01		71450
+	709560453	SFX_Weapon_Swing_Blood_01	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\50\{50B2886D-76D9-4AA7-EA9D-8689A4A0EF97}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh_Arrow\SFX_Layer_Flesh_01\SFX_Weapon_Swing_Blood_01		115960
 	709751505	ESM_MG3_fx_foley_smash_rocks_pickaxe_02a	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E0\{E007062D-DA5F-24DE-09F4-2D33963CBA78}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\FloorCrystalSpike\SFX_FloorCrystalSpikeTrap_Warning\ESM_MG3_fx_foley_smash_rocks_pickaxe_02a		76072
 	710539305	SFX_Arrow_By	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\93\{938EAB4F-10DB-5C33-A4D5-73AC0EEDFD2E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Projectile\SFX_Arrow_By		133176
 	712535045	Wings_rise_heavy	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\23\{2332E624-E46D-8D0B-3B4D-29258514080E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_DrakharWingDash\Wings_rise_heavy		244476
@@ -566,11 +584,13 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	810864320	Undead_Vocal_Hurt_Throaty_Rah	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\BD\{BD3AE8AA-6BA5-8124-4732-95AD7BCF0892}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\RTS_MonsterSound\SFX_Mon_ShadowFang_RTS\Undead_Vocal_Hurt_Throaty_Rah		148428
 	811340583	GlassBreakWine_SFXB_2343	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\73\{736825A3-09E2-796D-E1C9-BC7BB2FC84C4}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Props\Props_TPS\CystalWall\SFX_CrystalTrap_Hit\GlassBreakWine_SFXB_2343		254624
 	812504196	Hit05	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\30\{30374D3B-D8E4-543A-1A53-D7BA0C608A32}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Weapon_TPS\SFX_MeleeHit\Hit05		94056
+	817742841	Ares_attack1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\3E\{3E6CC38D-75C7-469F-D272-7BF89749DE7E}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Weapon_TPS\SFX_AttackSwingSound\Ares_attack1		123292
 	823687105	ESM_Stone_Slide_1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\89\{89D5D328-0A14-64B4-F88E-A6C2D6757BA6}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\SFX_MarkingSound\ESM_Stone_Slide_1		116124
 	829138029	SFX_Breath	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\B6\{B61D6875-C1DD-D875-DD2E-4985D0B3B6E3}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Merci\SFX_MerciSick\SFX_Breath		237080
 	829321492	SFX_Sick	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\BA\{BA48F7C2-D46B-FF4C-E6A0-C9E691A87A03}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\SFX_ChanSick\SFX_Sick		384684
 	831514700	FireFlamesHeavy	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\7D\{7DA4EE92-EDFF-9FB7-AB84-EB0346DD872B}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Guardian\EV_Drakhar_FeverMode_Ing\FireFlamesHeavy		4589856
 	833357717	Steel_fence	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\3C\{3C49C795-4C46-FF7C-B85B-6D4407D2F086}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\EV_ChanAimingSkill_Slam\Slam2\Steel_fence		32420
+	836239170	FNF_ME_sfx_combat_dagger_slash_quick	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\54\{5480E433-407C-A1CC-F999-DCDEC6B91551}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Reverb\FNF_ME_sfx_combat_dagger_slash_quick		94344
 	840959053	Chan_attack3	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\C3\{C3810BE4-78FE-D448-EA7C-C3644FB95139}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_ChanAttackSound_RTS\Chan_attack3		140684
 	841603142	SFX_SmallClaw_Idle1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\29\{29513531-6E23-187E-5C29-F82F3CFD3963}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\IronFang\SFX_Mon_IronFang_Idle\SFX_SmallClaw_Idle1		98236
 	842637062	Hit02	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E7\{E7874B4D-029F-157B-4D55-A3B2475CB6BF}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Weapon_RTS\SFX_MeleeHit_RTS\Hit02		72420
@@ -635,6 +655,7 @@ In Memory Audio	ID	Name	Audio source file		Wwise Object Path	Notes	Data Size
 	1043203085	ZombieBiteCrunch_BW_13301	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\E1\{E177E033-B16D-3AD3-AC10-F4580B2764BF}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Monster\SmallClaw\SFX_Mon_SmallClaw_Attack_Swing\ZombieBiteCrunch_BW_13301		88264
 	1047394447	AresFinalAttackSound1	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\29\{292263AC-C45A-24AB-C6E6-77512BF125E0}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_AresFinalAttackSound_RTS\AresFinalAttackSound1		247312
 	1052175375	PE-Whoosh_BW_03	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\60\{6029D1F2-A022-AD76-DFBD-3F7F26416E45}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\Projectile\EV_Drakhar_Projectile\PE-Whoosh_BW_03		279988
+	1052927025	SFX_Weapon__Flesh_02	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\26\{26561A48-2BEC-329A-41A4-81CF9B3330A9}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Weapon\SFX_Layer_Flesh_Arrow\SFX_Layer_Flesh_02\SFX_Weapon__Flesh_02		105252
 	1053975739	Metal_heavy_impact	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\7F\{7F07AD8E-AB0C-CE34-FD5C-765668E7BCE7}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\EV_ChanAimingSkill_Slam\Slam2\Metal_heavy_impact		103264
 	1054283662	Steel_fence	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\BB\{BBA79A5D-B032-3F8C-26C0-D6B550B3F42B}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\RTS_SeekerSound\EV_ChanAggroSkill_RTS\Chan_GetOverHere\Steel_fence		61620
 	1067684571	Combat_axe_impact	F:\Unreal Project\GuardianAndSeeker\1st-Team1-Final-Project_WwiseProject\.cache\18\{188A7BA9-FDFA-492B-20B9-45B3F95A490F}.wem		\Actor-Mixer Hierarchy\Default Work Unit\Seeker\Chan\EV_ChanAimingSkill_Slam\Slam2\Combat_axe_impact		419244
