@@ -59,6 +59,13 @@ struct FSeekerAudioConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0"))
 	float MaxAudioDistance = 1500.0f; // 이 거리 밖에서는 아예 사운드 이벤트 발생 안함
 
+	// 피격 사운드 빈도 설정
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0", DisplayName = "Hurt Sound Cooldown"))
+	float HurtSoundCooldown = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0", ClampMax = "1.0", DisplayName = "Hurt Sound Probability"))
+	float HurtSoundProbability = 0.8f; // 1.0f = 항상 재생, 0.5f = 50% 확률, 0.0f = 항상 재생하지 않음
+
 	FSeekerAudioConfig()
 	{
 		HurtSound = nullptr;
@@ -68,7 +75,7 @@ struct FSeekerAudioConfig
 	}
 };
 
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_SeekerAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
@@ -522,6 +529,9 @@ private:
 
 	// 서버에서 클라이언트로 사운드 동기화
 	TMap<ESeekerAudioState, float> LocalLastSoundPlayTimes;
+
+	// 피격 사운드 전용 마지막 재생 시간 (초기화 시 0.0f)
+	float LastHurtSoundPlayTime = 0.0f;
 
 	UPROPERTY(Transient)
 	TMap<ESeekerAudioState, float> ServerLastBroadcastTime;

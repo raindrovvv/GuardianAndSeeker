@@ -12,6 +12,16 @@
 #include "AkAudioEvent.h"
 #include "AkGameplayStatics.h"
 #include "Engine/OverlapResult.h"
+#include "Rendering/GS_RenderingConstants.h"
+#include "DrawDebugHelpers.h"
+
+static TAutoConsoleVariable<int32> CVarShowOcclusionRay(
+    TEXT("GS.Audio.ShowOcclusionRay"),
+    0,
+    TEXT("오디오 오클루전 레이를 화면에 표시합니다.\n")
+        TEXT("0: 비활성화\n")
+            TEXT("1: 활성화 (몬스터, 함정, 문의 오클루전 상태 시각화)"),
+    ECVF_Cheat);
 
 
 UGS_AudioComponentBase::UGS_AudioComponentBase()
@@ -229,14 +239,24 @@ bool UGS_AudioComponentBase::IsRTSMode() const
 		return false;
 	}
 
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!LocalPC)
+	// 로컬 플레이어의 컨트롤러를 찾아야 함 (GetPlayerController(0)는 멀티플레이어에서 로컬이 아닐 수 있음)
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
-		return false;
+		APlayerController* PC = Iterator->Get();
+		if (PC && PC->IsLocalController())
+		{
+			return Cast<AGS_RTSController>(PC) != nullptr;
+		}
 	}
 
-	bool bIsRTS = Cast<AGS_RTSController>(LocalPC) != nullptr;
-	return bIsRTS;
+	// Fallback: 로컬 컨트롤러를 찾지 못한 경우
+	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (LocalPC)
+	{
+		return Cast<AGS_RTSController>(LocalPC) != nullptr;
+	}
+
+	return false;
 }
 
 bool UGS_AudioComponentBase::GetListenerLocation(FVector& OutLocation) const
@@ -1086,14 +1106,21 @@ void UGS_AudioComponentBase::SafeClearTimer(FTimerHandle& TimerHandle)
 
 bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool& OutIsRTSMode, FVector& OutListenerLocation, bool bSkipViewFrustumCheck) const
 {
-	// 1. 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	// 1. World 유효성 체크 (서버 안정성 강화)
+	UWorld* World = GetWorld();
+	if (!World || !IsWorldContextValid())
 	{
 		return false;
 	}
 
-	// 2. Owner 및 World 유효성 체크 (서버 안정성 강화)
-	if (!SourceActor || !IsValid(SourceActor) || !GetWorld() || !IsWorldContextValid())
+	// 2. 데디케이티드 서버에서는 오디오 처리 불필요
+	if (World->GetNetMode() == NM_DedicatedServer)
+	{
+		return false;
+	}
+
+	// 3. Owner 유효성 체크
+	if (!SourceActor || !IsValid(SourceActor))
 	{
 		return false;
 	}
@@ -1130,6 +1157,16 @@ bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool&
 	}
 
 	// 6. 모드별 거리/시야각 체크
+	// 로컬 플레이어가 아닌 캐릭터는 거리 제한을 엄격하게 적용
+	bool bIsLocallyControlled = false;
+	if (APawn* SourcePawn = Cast<APawn>(SourceActor))
+	{
+		bIsLocallyControlled = SourcePawn->IsLocallyControlled();
+	}
+
+	// 로컬 플레이어가 아닌 경우 거리 제한 (40m)
+	const float NonLocalMaxDistance = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+
 	if (OutIsRTSMode)
 	{
 		// RTS 모드: ViewFrustum 체크 (화면에 보이는지 확인)
@@ -1137,11 +1174,19 @@ bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool&
 		{
 			return false;
 		}
+
+		// [추가] RTS 모드에서도 비로컬 캐릭터는 거리 체크 적용 (비현실적 원거리 사운드 방지)
+		if (!bIsLocallyControlled && DistanceToListener > NonLocalMaxDistance)
+		{
+			return false;
+		}
 	}
 	else
 	{
 		// TPS 모드: 거리 기반 체크
-		if (DistanceToListener > MaxDistance)
+		// 로컬 플레이어는 기본 MaxDistance, 타인은 더 짧은 거리 적용
+		float EffectiveMaxDistance = bIsLocallyControlled ? MaxDistance : FMath::Min(MaxDistance, NonLocalMaxDistance);
+		if (DistanceToListener > EffectiveMaxDistance)
 		{
 			return false;
 		}
@@ -1290,7 +1335,8 @@ bool UGS_AudioComponentBase::AreRoomsConnected(AGS_RoomBase* Room1, AGS_RoomBase
 
 AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location) const
 {
-	if (!GetWorld())
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return nullptr;
 	}
@@ -1300,7 +1346,7 @@ AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location
 	FCollisionObjectQueryParams ObjectQueryParams(ECollisionChannel::ECC_WorldStatic);
 
 	// Location 지점에서 1.0f 반경의 구체로 오버랩되는 액터를 찾음.
-	if (GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams, FCollisionShape::MakeSphere(1.0f)))
+	if (World->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams, FCollisionShape::MakeSphere(1.0f)))
 	{
 		for (const FOverlapResult& Overlap : Overlaps)
 		{
@@ -1316,4 +1362,34 @@ AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location
 	}
 
 	return nullptr;
+}
+
+void UGS_AudioComponentBase::DrawOcclusionDebug(const UObject* WorldContextObject, const FVector& SoundLocation, const FVector& ListenerLocation)
+{
+	if (CVarShowOcclusionRay.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
+
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	if (!World)
+	{
+		return;
+	}
+
+	// 실제 장애물 체크 수행 (Wwise가 오클루전 계산 시 사용하는 ECC_Visibility 채널 사용)
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Cast<AActor>(WorldContextObject)); // 자기 자신 무시
+
+	bool bIsOccluded = World->LineTraceSingleByChannel(HitResult, SoundLocation, ListenerLocation, ECC_Visibility, Params);
+
+	FColor LineColor = bIsOccluded ? FColor::Red : FColor::Green;
+	float Thickness = bIsOccluded ? 1.0f : 1.0f;
+
+	// 선 그리기 (1초 동안 유지하여 업데이트 간격 메움)
+	DrawDebugLine(World, SoundLocation, ListenerLocation, LineColor, false, 1.0f, 0, Thickness);
+
+	// 시작점(소리 발생지)에 작은 구체 표시
+	DrawDebugSphere(World, SoundLocation, 15.0f, 8, LineColor, false, 1.0f, 0, Thickness);
 }

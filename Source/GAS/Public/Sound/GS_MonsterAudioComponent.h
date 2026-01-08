@@ -72,7 +72,7 @@ struct FMonsterAudioConfig
 	}
 };
 
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_MonsterAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
