@@ -43,3 +43,5 @@ Plugins/GameLiftPlugin/
 Content/Player/TEST/BP_SJEGM.uasset
 
 .clang-format
+
+Directory.Build.props
