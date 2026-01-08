@@ -42,7 +42,7 @@ public:
 	// ===============
 	// 찬 전용 공격 시스템
 	// ===============
-	
+
 	// 찬 전용 공격 VFX
 	UPROPERTY(EditDefaultsOnly, Category = "Chan|VFX|Attack", meta = (DisplayName = "4번째 공격 타격 VFX"))
 	class UNiagaraSystem* FinalAttackHitVFX;
@@ -50,7 +50,7 @@ public:
 	// ===============
 	// 찬 전용 스킬 시스템
 	// ===============
-	
+
 	// 찬 전용 방패 슬램 스킬 범위 표시
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_DrawSkillRange(FVector InLocation, float InRadius, FColor InColor, float InLifetime);
@@ -59,6 +59,8 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_OnAttackHit(int32 ComboIndex);
 
+	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) override;
+
 	// 찬 전용 궁극기 충돌 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chan|UltimateSkill", meta = (DisplayName = "궁극기 충돌 컴포넌트"))
 	UCapsuleComponent* UltimateCollision;
@@ -66,13 +68,13 @@ public:
 	// 찬 전용 궁극기 오버랩 처리 Knockback Collision (KCY)
 	UFUNCTION()
 	void OnUltimateOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	                       UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	                       bool bFromSweep, const FHitResult& SweepResult);
 
 	// ===============
 	// 찬 전용 UI 시스템
 	// ===============
-	
+
 	// 찬 전용 방패 들기 스킬 UI 위젯
 	void SetChanAimingSkillBarWidget(UGS_ChanAimingSkillBar* Widget) { ChanAimingSkillBarWidget = Widget; }
 
@@ -101,6 +103,8 @@ public:
 	// 방어 상태 변경 함수
 	UFUNCTION(BlueprintCallable, Category = "Chan|Defense")
 	void SetDefending(bool bDefending);
+
+	virtual bool IsDefending() const override { return bIsDefending; }
 
 	// =============
 	// 스테미나 관리

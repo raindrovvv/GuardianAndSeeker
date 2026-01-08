@@ -185,10 +185,10 @@ void AGS_Monster::BeginPlay()
 		}
 	}
 
-	// AkComponent Occlusion 비활성화
+	// AkComponent Occlusion 활성화 (벽에 의한 소리 감쇠)
 	if (IsValid(AkComponent))
 	{
-		AkComponent->OcclusionRefreshInterval = 0.0f;
+		AkComponent->OcclusionRefreshInterval = 0.2f;
 	}
 
 	// Register to GameState and Subsystem for optimization
@@ -227,8 +227,6 @@ void AGS_Monster::BeginPlay()
 
 		// 캡슐 그림자로 원거리 최적화 (이동 방향만 인지되도록)
 		MeshComp->SetCastCapsuleDirectShadow(true);
-
-		UE_LOG(LogTemp, Log, TEXT("[Monster:%s] Rendering Optimization - Cull Distance: %.1f"), *GetName(), CullDistance);
 	}
 
 	// === Animation Optimization (Server) ===
@@ -719,72 +717,42 @@ float AGS_Monster::CalculateSignificance(const FTransform& Viewpoint)
 	if (IsDead())
 		return 0.0f;
 
-	float Score = 0.1f;
-	FVector ActorLoc = GetActorLocation();
-	FVector ViewLoc = Viewpoint.GetLocation();
-	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
+	// 1. 부모 클래스의 기본 거리 기반 중요도 계산 (CharacterType 준수)
+	float Score = Super::CalculateSignificance(Viewpoint);
 
-	// === 전투 상태 체크: HP가 낮거나 AI 타겟이 있으면 중요도 강제 상승 ===
-	bool bIsInCombat = false;
-
-	// HP가 감소했으면 전투 중으로 간주 (99% 임계값)
-	if (StatComp)
+	// 2. 거리가 너무 멀어 이미 컬링 대상(Score가 매우 낮음)이라면 부스트 스킵
+	if (Score < 0.1f)
 	{
-		float HealthRatio = StatComp->GetCurrentHealth() / StatComp->GetMaxHealth();
-		if (HealthRatio < 0.99f)
-		{
-			bIsInCombat = true;
-		}
+		return Score;
 	}
 
-	// AI가 타겟을 추적 중이면 전투 중으로 간주
-	if (AGS_AIController* AIController = Cast<AGS_AIController>(GetController()))
+	// 3. 전투 및 이동 상태 체크 (중요도 보정을 위함)
+	bool bIsInCombat = false;
+	if (StatComp && StatComp->GetCurrentHealth() / StatComp->GetMaxHealth() < 0.99f)
 	{
-		if (UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent())
+		bIsInCombat = true;
+	}
+
+	if (!bIsInCombat)
+	{
+		if (AGS_AIController* AIController = Cast<AGS_AIController>(GetController()))
 		{
-			if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) != nullptr)
+			if (UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent())
 			{
-				bIsInCombat = true;
+				if (Blackboard->GetValueAsObject(AGS_AIController::TargetActorKey) != nullptr)
+				{
+					bIsInCombat = true;
+				}
 			}
 		}
 	}
 
-	// === 이동 상태 체크: 이동 중이면 중요도 상승 ===
-	bool bIsMoving = GetVelocity().SizeSquared() > 100.0f; // 10cm/s 이상
+	bool bIsMoving = GetVelocity().SizeSquared() > 100.0f;
 
-	// 가디언(RTS) 시점
-	if (GS_Rendering::IsRTSMode(this))
-	{
-		// 선택된 유닛은 최상위 중요도
-		if (bIsSelected)
-			return 1.0f;
-
-		// 화면 컬링 거리 (RTS 배율 적용) 내에 있는지 확인
-		float MaxCullDist = GS_Rendering::CalculateCullDistance(
-		    this, GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE);
-		float MaxCullDistSq = FMath::Square(MaxCullDist);
-
-		if (DistSq < MaxCullDistSq)
-		{
-			Score = 0.8f; // 화면 근처 유닛
-		}
-		else
-		{
-			Score = 0.2f; // 먼 유닛
-		}
-	}
-	// 시커(TPS) 시점
-	else
-	{
-		// 30m 거리 기준으로 점수 선형 감쇠
-		float CombatRangeSq = FMath::Square(3000.0f);
-		Score = FMath::Clamp(1.0f - (DistSq / CombatRangeSq), 0.1f, 1.0f);
-	}
-
-	// === 전투 중이거나 이동 중이면 중요도 보장 (부모의 NetUpdateFrequency 60Hz 유도) ===
+	// 4. 전투 중이거나 이동 중이면 네트워크 업데이트 등을 위해 중요도 보장
 	if (bIsInCombat || bIsMoving)
 	{
-		Score = FMath::Max(Score, 0.85f); // 0.8 초과 → 부모의 OnSignificanceChanged에서 60Hz 설정
+		Score = FMath::Max(Score, 0.85f);
 	}
 
 	return Score;
@@ -875,8 +843,23 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 
 void AGS_Monster::UpdateShadowCulling()
 {
-	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	// 1. 부모 클래스의 하이브리드 컬링(직접 거리 체크) 로직 수행
+	Super::UpdateShadowCulling();
+
+	// 2. [디버그] 오클루전 디버그 라인 그리기
+	// GS.Audio.ShowOcclusionRay 1 명령어 활성화 시 표시됨
+	if (!IsRunningDedicatedServer() && IsValid(AkComponent))
 	{
-		GS_Rendering::UpdateShadowCulling(this, MeshComp);
+		FVector ListenerLoc;
+		// 몬스터의 오디오 컴포넌트를 통해 리스너(플레이어/카메라) 위치 획득
+		if (UGS_AudioComponentBase* AudioComp = FindComponentByClass<UGS_AudioComponentBase>())
+		{
+			if (AudioComp->GetListenerLocation(ListenerLoc))
+			{
+				// UAkComponent::IsOccluded()는 존재하지 않으므로 제거
+				// DrawOcclusionDebug 내부에서 직접 LineTrace를 수행하여 색상을 결정함
+				UGS_AudioComponentBase::DrawOcclusionDebug(this, GetActorLocation(), ListenerLoc);
+			}
+		}
 	}
 }

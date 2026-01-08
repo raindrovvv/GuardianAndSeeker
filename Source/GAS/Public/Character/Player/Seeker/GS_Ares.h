@@ -18,7 +18,7 @@ class GAS_API AGS_Ares : public AGS_Seeker
 public:
 	// Sets default values for this character's properties
 	AGS_Ares();
-	
+
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -37,7 +37,7 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "VFX|Attack")
 	class UNiagaraSystem* FinalAttackHitVFX; // 4번째 공격 추가 VFX
-	
+
 	// 사운드 중첩 방지를 위한 현재 재생 중인 사운드 ID
 	UPROPERTY()
 	int32 CurrentSoundPlayingID = -1;
@@ -50,6 +50,8 @@ public:
 
 	// Damage handling with audio feedback
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) override;
 
 	// 아레스 대시 스킬 카메라 복원
 	UFUNCTION(NetMulticast, Reliable)

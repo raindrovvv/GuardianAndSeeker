@@ -77,10 +77,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboAttackSound_Implementation()
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlaySoundEvent(OwnerDrakhar->ComboAttackSoundEvent, OwnerDrakhar->GetActorLocation());
@@ -118,10 +130,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayDashSkillSound_Implementation()
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	if (bDashSkillSoundPlayed)
@@ -163,10 +187,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayEarthquakeSkillSound_Implementatio
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlaySoundEvent(OwnerDrakhar->EarthquakeSkillSoundEvent, OwnerDrakhar->GetActorLocation());
@@ -190,10 +226,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicFurySkillSound_Implementat
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	if (bDraconicFurySoundPlayed)
@@ -204,14 +252,17 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicFurySkillSound_Implementat
 	PlaySoundEvent(OwnerDrakhar->DraconicFurySkillSoundEvent, OwnerDrakhar->GetActorLocation());
 	bDraconicFurySoundPlayed = true;
 
-	// 타이머 설정 (PrepareMulticastSound가 World 검증을 완료했으므로 안전)
+	// 타이머 설정
 	UWorld* World = GetWorld();
-	World->GetTimerManager().SetTimer(
-	    DraconicFurySoundCooldownTimer,
-	    this,
-	    &UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown,
-	    DraconicFurySoundCooldown,
-	    false);
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(
+		    DraconicFurySoundCooldownTimer,
+		    this,
+		    &UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown,
+		    DraconicFurySoundCooldown,
+		    false);
+	}
 }
 
 void UGS_DrakharAudioComponent::PlayDraconicProjectileSound(const FVector& Location)
@@ -232,10 +283,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicProjectileSound_Implementa
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlaySoundEvent(OwnerDrakhar->DraconicProjectileSoundEvent, Location);
@@ -259,10 +322,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayAttackHitSound_Implementation()
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	if (!OwnerDrakhar->AttackHitSoundEvent)
@@ -323,10 +398,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStartSound_Implementation
 		}
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlayFeverModeStartSoundLocal();
@@ -358,10 +445,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeEndSound_Implementation()
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlayFeverModeEndSoundLocal();
@@ -425,10 +524,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStateSound_Implementation
 		}
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	PlayFeverModeStateSoundLocal();
@@ -465,10 +576,22 @@ void UGS_DrakharAudioComponent::Multicast_StopFeverModeStateSound_Implementation
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (Stop은 거리 체크 불필요, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	StopFeverModeStateSoundLocal();
@@ -564,10 +687,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboFinisherSound_Implementation(
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	if (!OwnerDrakhar->ComboFinisherSoundEvent)
@@ -625,10 +760,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayLandingSound_Implementation()
 		return;
 	}
 
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
-	if (!PrepareMulticastSound(OwnerDrakhar, true))
+	// 소리의 주인이 로컬 플레이어인지 확인
+	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
+
+	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
+	if (!bIsLocalPlayer)
 	{
-		return;
+		// 통합 체크 및 Distance Scaling 설정
+		if (!PrepareMulticastSound(OwnerDrakhar, true))
+		{
+			return;
+		}
+	}
+	else
+	{
+		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
+		SetDistanceScaling(IsRTSMode());
 	}
 
 	if (!OwnerDrakhar->LandingSoundEvent)

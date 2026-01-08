@@ -23,7 +23,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMonsterAttacked, AGS_Monster*,
                                              AttackedUnit, FVector,
                                              AttackLocation);
 
-UCLASS()
+UCLASS(HideCategories = ("BaseAudioComponent"))
 class GAS_API AGS_Monster : public AGS_Character
 {
 	GENERATED_BODY()

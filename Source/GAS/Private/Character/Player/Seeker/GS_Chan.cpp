@@ -7,6 +7,7 @@
 #include "Character/Component/GS_StatComp.h"
 #include "Weapon/Equipable/GS_WeaponAxe.h"
 #include "Weapon/Equipable/GS_WeaponShield.h"
+#include "Weapon/GS_Weapon.h"
 #include "Net/UnrealNetwork.h"
 #include "UI/Character/GS_ChanAimingSkillBar.h"
 #include "Animation/Character/GS_SeekerAnimInstance.h"
@@ -188,6 +189,25 @@ void AGS_Chan::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
 			{
 				// 일반 공격 성공 쉐이크
 				Client_PlayAttackSuccessShake(AttackerPC);
+			}
+		}
+	}
+}
+
+void AGS_Chan::OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult)
+{
+	// 3번째(방패), 4번째(강공격) 공격일 경우 추가 효과(사운드, 카메라 쉐이크 등) 처리
+	if (ComboIndex == 3 || ComboIndex == 4)
+	{
+		// 추가 타격 처리 (사운드, 카메라 쉐이크, 히트스탑 포함)
+		Multicast_OnAttackHit(ComboIndex);
+
+		// 4번째 공격일 경우에만 전용 특수 VFX(강화 타격) 재생
+		if (ComboIndex == 4 && FinalAttackHitVFX)
+		{
+			if (AGS_Weapon* CurrentWeapon = GetWeaponByIndex(0))
+			{
+				CurrentWeapon->Multicast_PlaySpecialHitVFX(FinalAttackHitVFX, HitResult);
 			}
 		}
 	}

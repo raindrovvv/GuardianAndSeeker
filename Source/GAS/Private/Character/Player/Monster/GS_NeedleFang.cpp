@@ -23,14 +23,14 @@ void AGS_NeedleFang::BeginPlay()
 void AGS_NeedleFang::ApplyStiffness()
 {
 	Super::ApplyStiffness();
-	
+
 	bIsStunned = true;
 }
 
 void AGS_NeedleFang::EndStiffness()
 {
 	Super::EndStiffness();
-	
+
 	bIsStunned = false;
 }
 
@@ -38,32 +38,34 @@ void AGS_NeedleFang::Server_SpawnProjectile_Implementation()
 {
 	if (bIsStunned)
 	{
-		return; 
+		return;
 	}
-	
-	FVector SpawnLocation;
-	FRotator SpawnRotation;
-	
+
+	FVector SpawnLocation = GetActorLocation();
+	FRotator SpawnRotation = GetActorRotation();
+
 	AGS_WeaponWand* EquippedWeapon = Cast<AGS_WeaponWand>(GetWeaponByIndex(0));
-	if (EquippedWeapon && EquippedWeapon->GetWeaponMesh()) 
+	if (EquippedWeapon && EquippedWeapon->GetWeaponMesh())
 	{
-		SpawnLocation = EquippedWeapon->GetWeaponMesh()->GetSocketLocation(TEXT("ProjectileSpawnSocket")) + FVector(0, 0, 50);
+		SpawnLocation = EquippedWeapon->GetWeaponMesh()->GetSocketLocation(TEXT("ProjectileSpawnSocket"));
+		// 발사 방향으로 약간 앞으로 밀어서 스폰 (겹침 방지)
+		SpawnLocation += GetActorForwardVector() * 80.0f;
 	}
 
 	AGS_AIController* AIController = Cast<AGS_AIController>(GetController());
 	AGS_Character* TargetActor = nullptr;
 	if (AIController && AIController->GetBlackboardComponent())
 	{
-		TargetActor = Cast<AGS_Character>(AIController->GetBlackboardComponent()->GetValueAsObject(AGS_AIController::TargetActorKey)); 
+		TargetActor = Cast<AGS_Character>(AIController->GetBlackboardComponent()->GetValueAsObject(AGS_AIController::TargetActorKey));
 	}
 
 	if (TargetActor)
 	{
 		FVector MonsterForwardVector = GetActorForwardVector();
 		FVector DirectionToTarget = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
-		
+
 		float DotProduct = FVector::DotProduct(MonsterForwardVector, DirectionToTarget);
-		const float HalfAngleRadians = FMath::DegreesToRadians(5.0f); 
+		const float HalfAngleRadians = FMath::DegreesToRadians(5.0f);
 		const float CosineThreshold = FMath::Cos(HalfAngleRadians);
 		if (DotProduct >= CosineThreshold)
 		{
@@ -78,19 +80,18 @@ void AGS_NeedleFang::Server_SpawnProjectile_Implementation()
 	{
 		SpawnRotation = GetActorRotation();
 	}
-	
-	if (ProjectileClass) 
+
+	if (ProjectileClass)
 	{
 		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this; 
+		SpawnParams.Owner = this;
 		SpawnParams.Instigator = GetInstigator();
-		
+
 		AGS_NeedleFangProjectile* SpawnedProjectile = GetWorld()->SpawnActor<AGS_NeedleFangProjectile>(
-		   ProjectileClass,
-		   SpawnLocation,
-		   SpawnRotation,
-		   SpawnParams
-		);
+		    ProjectileClass,
+		    SpawnLocation,
+		    SpawnRotation,
+		    SpawnParams);
 	}
 }
 

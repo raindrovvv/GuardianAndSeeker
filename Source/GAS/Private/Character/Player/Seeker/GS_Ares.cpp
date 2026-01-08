@@ -12,6 +12,7 @@
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Skill/Seeker/Ares/GS_AresMovingSkill.h"
 #include "Components/CapsuleComponent.h"
+#include "Weapon/GS_Weapon.h"
 
 
 // Sets default values
@@ -155,6 +156,26 @@ void AGS_Ares::Multicast_RestoreDashCameraZoom_Implementation()
 		if (MovingSkill)
 		{
 			MovingSkill->RestoreCameraZoom(true);
+		}
+	}
+}
+
+void AGS_Ares::OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult)
+{
+	// 4번째 콤보 공격(피니셔)일 때 추가 효과 재생
+	if (ComboIndex == 4)
+	{
+		// 추가 타격 사운드 (히트스탑 등 포함)
+		Multicast_OnAttackHit(ComboIndex);
+
+		// 추가 타격 VFX 재생 (서버에서 호출하면 무기의 Multicast_PlaySpecialHitVFX를 통해 동기화됨)
+		if (FinalAttackHitVFX)
+		{
+			// 현재 장착된 무기를 가져와서 일반화된 특수 타격 VFX 재생 호출
+			if (AGS_Weapon* CurrentWeapon = GetWeaponByIndex(0))
+			{
+				CurrentWeapon->Multicast_PlaySpecialHitVFX(FinalAttackHitVFX, HitResult);
+			}
 		}
 	}
 }
