@@ -14,6 +14,7 @@
 #include "Engine/OverlapResult.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "DrawDebugHelpers.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 static TAutoConsoleVariable<int32> CVarShowOcclusionRay(
     TEXT("GS.Audio.ShowOcclusionRay"),
@@ -88,7 +89,11 @@ void UGS_AudioComponentBase::BeginPlay()
 
 	// Seamless Travel 대응: World가 완전히 준비될 때까지 대기 후 초기화
 	// 즉시 초기화 시도
-	if (!InitializeAudioSystem())
+	if (InitializeAudioSystem())
+	{
+		PreloadCommonSounds();
+	}
+	else
 	{
 		// 실패 시 다음 프레임에 재시도 (Seamless Travel 중일 가능성)
 		if (UWorld* World = GetWorld())
@@ -137,12 +142,31 @@ void UGS_AudioComponentBase::PlayDeathSoundLocal()
 	// 죽음 사운드 재생 전 활성 사운드 정리 (몬스터/시커 공통 로직 유지)
 	StopAllActiveSounds();
 
-	// 모드별 사운드 선택 (폴백 포함)
-	UAkAudioEvent* SoundToPlay = SelectSoundEventByMode(DeathSound.Get(), RTS_DeathSound.Get());
+	// 단일 사운드 사용 (동적 스케일링 적용)
+	UAkAudioEvent* SoundToPlay = CachedDeathSound ? CachedDeathSound.Get() : UGS_AssetLoader::SyncLoadAsset(DeathSound);
 
 	if (SoundToPlay)
 	{
 		PostEventWithCallback(SoundToPlay, GetOwner());
+	}
+}
+
+void UGS_AudioComponentBase::PreloadCommonSounds()
+{
+	if (IsRunningDedicatedServer())
+	{
+		return;
+	}
+
+	if (!DeathSound.IsNull())
+	{
+		TWeakObjectPtr<UGS_AudioComponentBase> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadAsset<UAkAudioEvent>(DeathSound, [WeakThis](UAkAudioEvent* LoadedAsset)
+		                                               {
+			if (UGS_AudioComponentBase* Strong = WeakThis.Get())
+			{
+				Strong->CachedDeathSound = LoadedAsset;
+			} });
 	}
 }
 
@@ -827,42 +851,28 @@ void UGS_AudioComponentBase::SetDistanceScaling(bool bIsRTS)
 		return;
 	}
 
-	// 통일된 RTPC 시스템 사용
-	// GetDistanceScalingForMode는 RTSDistanceScaling(2.0f) 또는 TPSDistanceScaling(1.0f) 값을 반환
-	// SetUnifiedRTPCValue는 0-1 범위를 기대하므로, 0-2 범위를 0-1로 정규화
+	// 1. 모드별 거리 배율 및 오클루전 설정값 계산
 	const float ScalingValue = GetDistanceScalingForMode(bIsRTS);
-	const float NormalizedScaling = ScalingValue / 2.0f; // 0-2 범위를 0-1로 정규화 (1.0f → 0.5f, 2.0f → 1.0f)
-	SetUnifiedRTPCValue(AttenuationModeRTPC, NormalizedScaling);
-
-	// RTS 모드에서는 오클루전/오브스트럭션 비활성화
 	const float OcclusionValue = bIsRTS ? 1.0f : 0.0f; // 1.0f = 비활성화, 0.0f = 활성화
-	SetUnifiedRTPCValue(OcclusionDisableRTPC, OcclusionValue); // 이미 0-1 범위
 
-	// RTS 모드에서는 AkComponent의 내장 오클루전 기능을 직접 비활성화!
+	// 2. Wwise 컴포넌트 설정 업데이트
 	UAkComponent* AkComp = GetOrCreateAkComponent();
 	if (IsValid(AkComp))
 	{
-		// Owner 및 Transform 검증
-		AActor* Owner = GetOwner();
-		if (!Owner || !IsValid(Owner))
-		{
-			return;
-		}
+		// Wwise 내장 Attenuation Scaling Factor 적용 (가청 반경 조절)
+		AkComp->SetAttenuationScalingFactor(ScalingValue);
 
-		const FVector Location = Owner->GetActorLocation();
-		const FRotator Rotation = Owner->GetActorRotation();
-
-		if (IsTransformValid(Location, Rotation))
-		{
-			// OcclusionRefreshInterval을 0으로 설정하면 오클루전 계산이 비활성화!
-			// TPS 모드에서는 0.2초마다 계산하도록 재활성화!
-			AkComp->OcclusionRefreshInterval = bIsRTS ? 0.0f : 0.2f;
-		}
-		else
-		{
-			// Invalid Transform - silently skip
-		}
+		// RTS 모드에서는 오클루전 계산 주기 최적화 (비활성화)
+		AkComp->OcclusionRefreshInterval = bIsRTS ? 0.0f : 0.2f;
 	}
+
+	// 3. Wwise RTPC 업데이트 (디자이너의 커스텀 믹싱용으로 유지)
+	SetUnifiedRTPCValue(OcclusionDisableRTPC, OcclusionValue);
+
+	// RTSDistanceScaling 또는 TPSDistanceScaling을 0-1 범위로 정규화
+	// RTSDistanceScaling이 최대값이므로 이를 기준으로 정규화
+	const float NormalizedScaling = FMath::Clamp(ScalingValue / RTSDistanceScaling, 0.0f, 1.0f);
+	SetUnifiedRTPCValue(AttenuationModeRTPC, NormalizedScaling);
 }
 
 UAkComponent* UGS_AudioComponentBase::GetOrCreateAkComponent()
@@ -953,7 +963,7 @@ void UGS_AudioComponentBase::SetUnifiedRTPCValue(UAkRtpc* RTPC, float Normalized
 {
 	if (!RTPC)
 	{
-		// 한 번만 경고하고 스킵 (스팸 방지)
+		// 한 번만 경고하고 스팸 방지
 		static TSet<FString> WarnedActors;
 		FString ActorName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown");
 
@@ -1175,8 +1185,10 @@ bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool&
 			return false;
 		}
 
-		// [추가] RTS 모드에서도 비로컬 캐릭터는 거리 체크 적용 (비현실적 원거리 사운드 방지)
-		if (!bIsLocallyControlled && DistanceToListener > NonLocalMaxDistance)
+		// RTS 모드에서도 비로컬 캐릭터는 거리 체크 적용
+		// RTS 시야가 넓으므로 렌더링 배율(2.5x)을 적용하여 사운드 가청 범위 확대
+		const float ScaledRTSMaxDistance = NonLocalMaxDistance * GS_Rendering::RTS_CULL_DISTANCE_SCALE;
+		if (!bIsLocallyControlled && DistanceToListener > ScaledRTSMaxDistance)
 		{
 			return false;
 		}
@@ -1225,18 +1237,6 @@ bool UGS_AudioComponentBase::PrepareMulticastSound(AActor* SourceActor, bool bSk
 	return true;
 }
 
-UAkAudioEvent* UGS_AudioComponentBase::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound, bool bUseRTSMode) const
-{
-	const bool bRTS = bUseRTSMode || IsRTSMode();
-
-	if (bRTS)
-	{
-		// RTS 사운드가 있으면 사용, 없으면 TPS 사운드로 폴백
-		return RTSSound ? RTSSound : TPSSound;
-	}
-
-	return TPSSound;
-}
 
 bool UGS_AudioComponentBase::ShouldSkipListenServerRPC() const
 {

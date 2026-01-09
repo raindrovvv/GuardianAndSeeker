@@ -98,12 +98,11 @@ void AGS_DrakharProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 
 		// 멤버 함수를 사용한 타이머 설정
 		World->GetTimerManager().SetTimer(
-			DestroyTimerHandle,
-			this,
-			&AGS_DrakharProjectile::DelayedDestroy,
-			0.1f, // 0.1초 딜레이로 이펙트 완료 보장
-			false
-		);
+		    DestroyTimerHandle,
+		    this,
+		    &AGS_DrakharProjectile::DelayedDestroy,
+		    0.1f, // 0.1초 딜레이로 이펙트 완료 보장
+		    false);
 	}
 	else
 	{
@@ -177,12 +176,10 @@ void AGS_DrakharProjectile::NotifyOwnerOfImpact(const FHitResult& Hit, bool bHit
 	OwnerDrakhar->HandleDraconicProjectileImpact(ImpactLocation, ImpactNormal, bHitCharacter);
 }
 
-void AGS_DrakharProjectile::SetIndicatorVFX(UNiagaraSystem* InIndicatorVFX, float InIndicatorRadius)
+void AGS_DrakharProjectile::SetIndicatorVFX(TSoftObjectPtr<UNiagaraSystem> InIndicatorVFX, float InIndicatorRadius)
 {
 	IndicatorVFX = InIndicatorVFX;
 	IndicatorRadius = InIndicatorRadius;
-
-	// VFX 설정 완료
 
 	// 서버에서만 VFX가 설정되면 즉시 인디케이터 생성
 	// 클라이언트는 OnRep_IndicatorVFX에서 생성
@@ -195,7 +192,7 @@ void AGS_DrakharProjectile::SetIndicatorVFX(UNiagaraSystem* InIndicatorVFX, floa
 void AGS_DrakharProjectile::OnRep_IndicatorVFX()
 {
 	// 레벨 전환 중에는 VFX 생성하지 않음
-	if (!IsWorldContextValid() || !IndicatorVFX)
+	if (!IsWorldContextValid() || IndicatorVFX.IsNull())
 	{
 		return;
 	}
@@ -334,14 +331,14 @@ bool AGS_DrakharProjectile::FindGroundLocation(const FVector& TraceStartPoint, F
 
 	// 실패 시 Fallback 위치 사용
 	OutGroundLocation = FVector(TraceStartPoint.X, TraceStartPoint.Y, FallbackGroundZPosition);
-	return false; 
+	return false;
 }
 
 // === 인디케이터 나이아가라 컴포넌트 생성 및 설정 (성능 최적화) ===
 void AGS_DrakharProjectile::CreateAndConfigureIndicator(const FVector& Location)
 {
 	UWorld* World = GetWorld();
-	if (!World || !IndicatorVFX || !IsWorldContextValid())
+	if (!World || IndicatorVFX.IsNull() || !IsWorldContextValid())
 	{
 		return;
 	}
@@ -371,15 +368,15 @@ void AGS_DrakharProjectile::CreateAndConfigureIndicator(const FVector& Location)
 
 	// 나이아가라 시스템 생성 (초기 비활성화 상태)
 	IndicatorComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		World,
-		IndicatorVFX,
-		Location,
-		FRotator::ZeroRotator,
-		FVector(1.0f, 1.0f, 1.0f),
-		true,  // bAutoDestroy
-		false, // bAutoActivate - 반짝거림 방지
-		ENCPoolMethod::None,
-		true   // bPreCullCheck
+	    World,
+	    IndicatorVFX.Get(),
+	    Location,
+	    FRotator::ZeroRotator,
+	    FVector(1.0f, 1.0f, 1.0f),
+	    true, // bAutoDestroy
+	    false, // bAutoActivate - 반짝거림 방지
+	    ENCPoolMethod::None,
+	    true // bPreCullCheck
 	);
 
 	if (!IndicatorComponent)
@@ -426,12 +423,11 @@ void AGS_DrakharProjectile::ScheduleIndicatorActivation()
 
 	// 멤버 함수를 사용한 타이머 설정
 	World->GetTimerManager().SetTimer(
-		IndicatorActivateTimerHandle,
-		this,
-		&AGS_DrakharProjectile::ActivateIndicator,
-		IndicatorActivationDelay,
-		false
-	);
+	    IndicatorActivateTimerHandle,
+	    this,
+	    &AGS_DrakharProjectile::ActivateIndicator,
+	    IndicatorActivationDelay,
+	    false);
 }
 
 // === 지면에 인디케이터 생성 ===
@@ -499,12 +495,11 @@ void AGS_DrakharProjectile::CleanupIndicator()
 
 			// 멤버 함수를 사용한 타이머 설정
 			World->GetTimerManager().SetTimer(
-				IndicatorCleanupTimerHandle,
-				this,
-				&AGS_DrakharProjectile::CleanupIndicatorComponent,
-				0.1f, // 0.1초 후 정리
-				false
-			);
+			    IndicatorCleanupTimerHandle,
+			    this,
+			    &AGS_DrakharProjectile::CleanupIndicatorComponent,
+			    0.1f, // 0.1초 후 정리
+			    false);
 		}
 		else
 		{
@@ -542,10 +537,10 @@ bool AGS_DrakharProjectile::IsWorldContextValid() const
 {
 	UWorld* World = GetWorld();
 	return World &&
-		   World->IsValidLowLevel() &&
-		   !World->bIsTearingDown &&
-		   IsValid(World) &&
-		   IsValid(this);
+	       World->IsValidLowLevel() &&
+	       !World->bIsTearingDown &&
+	       IsValid(World) &&
+	       IsValid(this);
 }
 
 // === 투사체 파괴 함수 (이펙트 완료 보장) ===

@@ -12,9 +12,9 @@ class UNiagaraSystem;
 UENUM(BlueprintType)
 enum class ETrapPlacement : uint8
 {
-    Floor      UMETA(DisplayName = "Floor"),
-    Wall       UMETA(DisplayName = "Wall"),
-    Ceiling    UMETA(DisplayName = "Ceiling")
+	Floor UMETA(DisplayName = "Floor"),
+	Wall UMETA(DisplayName = "Wall"),
+	Ceiling UMETA(DisplayName = "Ceiling")
 };
 
 
@@ -22,26 +22,26 @@ enum class ETrapPlacement : uint8
 USTRUCT(BlueprintType)
 struct FTrapEffect
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    float Damage = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Damage = 0.f;
 
-    //stun
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool bStun = false;
+	//stun
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bStun = false;
 
-    //slow
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool bSlow = false;
+	//slow
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bSlow = false;
 
-    //Burn
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool bBurn = false;
+	//Burn
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bBurn = false;
 
-    //Lava
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool bLava = false;
+	//Lava
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bLava = false;
 };
 
 USTRUCT(BlueprintType)
@@ -59,42 +59,25 @@ struct FTrapData : public FTableRowBase
 	FTrapEffect Effect;
 
 	// ===================
-	// Audio Events - TPS Mode
+	// Audio Events (TPS/RTS Unified)
 	// ===================
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|TPS")
-	UAkAudioEvent* ActivationSound_TPS = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	TSoftObjectPtr<UAkAudioEvent> ActivationSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|TPS")
-	UAkAudioEvent* AlertSound_TPS = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	TSoftObjectPtr<UAkAudioEvent> AlertSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|TPS")
-	UAkAudioEvent* HitSound_TPS = nullptr;  // 함정 히트 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	TSoftObjectPtr<UAkAudioEvent> HitSound; // 함정 히트 사운드
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|TPS")
-	UAkAudioEvent* DeactivationSound_TPS = nullptr;
-
-	// ===================
-	// Audio Events - RTS Mode
-	// ===================
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|RTS")
-	UAkAudioEvent* ActivationSound_RTS = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|RTS")
-	UAkAudioEvent* AlertSound_RTS = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|RTS")
-	UAkAudioEvent* HitSound_RTS = nullptr;  // 함정 히트 사운드
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|RTS")
-	UAkAudioEvent* DeactivationSound_RTS = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	TSoftObjectPtr<UAkAudioEvent> DeactivationSound;
 
 	// ===================
 	// VFX Systems
 	// ===================
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	UNiagaraSystem* TrapHitBloodEffect = nullptr;  // 함정 타격 시 혈흔 이펙트
-
+	TSoftObjectPtr<UNiagaraSystem> TrapHitBloodEffect; // 함정 타격 시 혈흔 이펙트
 };

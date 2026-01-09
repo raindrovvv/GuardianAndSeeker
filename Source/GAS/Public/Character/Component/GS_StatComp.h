@@ -86,9 +86,9 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	float Defense;
 	UPROPERTY(EditDefaultsOnly)
-	float Agility;
+	float Agility; // 민첩
 	UPROPERTY(EditDefaultsOnly)
-	float AttackSpeed;
+	float AttackSpeed; // 공격속도
 
 	UFUNCTION()
 	void OnDamageMontageEnded(UAnimMontage* Montage, bool bInterrupted);

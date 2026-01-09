@@ -379,6 +379,8 @@ public:
 	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 protected:
+	void Internal_SetSeekerGait(EGait Gait);
+
 	// 빈사 경고음 재생 제어용
 	int32 LastDyingWarningSecond = -1;
 

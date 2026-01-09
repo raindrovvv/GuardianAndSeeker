@@ -81,7 +81,7 @@ void AGS_TrigTrapBase::CallTrapAlertSound(AActor* TargetActor)
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.AlertSound_TPS, TrapData.AlertSound_RTS);
+	UAkAudioEvent* SoundEvent = TrapData.AlertSound.Get();
 	if (SoundEvent)
 	{
 		Multicast_PlayTrapAlertSound(TargetActor);
@@ -111,12 +111,15 @@ void AGS_TrigTrapBase::Multicast_PlayTrapAlertSound_Implementation(AActor* Targe
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.AlertSound_TPS, TrapData.AlertSound_RTS);
+	const bool bIsRTS = IsRTSMode();
+	UAkAudioEvent* SoundEvent = TrapData.AlertSound.Get();
 	if (SoundEvent)
 	{
 		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
 		if (IsValid(TrapAkComponent))
 		{
+			// 동적 거리 감쇠 설정 (Wwise Attenuation Scaling Factor)
+			TrapAkComponent->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
 			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
 		}
 		else

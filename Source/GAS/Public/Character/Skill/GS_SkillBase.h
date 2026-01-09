@@ -158,6 +158,29 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UNiagaraSystem> CachedLoopVFX;
 
+	// 프리로드된 오디오 캐시
+	// (명시적 캐싱 변수를 두어 메모리에서 해제되지 않도록 보장)
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSkillStartSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSkillEndSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSkillLoopSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSkillLoopStopSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedWallCollisionSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedMonsterCollisionSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedGuardianCollisionSound;
+
 	// 프리로드된 애니메이션 몽타주 캐시 (메모리 최적화를 위한 로드된 에셋 저장)
 	UPROPERTY()
 	TArray<TObjectPtr<UAnimMontage>> CachedAnimMontages;

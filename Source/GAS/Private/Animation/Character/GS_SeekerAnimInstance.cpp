@@ -13,12 +13,25 @@
 
 UGS_SeekerAnimInstance::UGS_SeekerAnimInstance()
 {
-	ChooserInputObj = nullptr;
+	ChooserInputObj = CreateDefaultSubobject<UGS_ChooserInputObj>(TEXT("ChooserInputObj"));
 }
 
 void UGS_SeekerAnimInstance::NativeInitializeAnimation()
 {
-	Super::NativeInitializeAnimation();
+	// Ensure ChooserInputObj is valid (should be created in constructor, but backup for old assets)
+	if (!ChooserInputObj)
+	{
+		ChooserInputObj = NewObject<UGS_ChooserInputObj>(this);
+	}
+
+	if (ChooserInputObj)
+	{
+		ChooserInputObj->MovementState = EMovementState::Idle;
+		ChooserInputObj->RotationMode = ERotationMode::OrientToMovement;
+		ChooserInputObj->Gait = EGait::Run;
+		ChooserInputObj->LastGait = EGait::Run;
+	}
+
 	AGS_Seeker* OwnerPawn = Cast<AGS_Seeker>(TryGetPawnOwner());
 	if (OwnerPawn)
 	{
@@ -31,14 +44,24 @@ void UGS_SeekerAnimInstance::NativeInitializeAnimation()
 		}
 	}
 
-	ChooserInputObj = NewObject<UGS_ChooserInputObj>(this);
-	ChooserInputObj->MovementState = EMovementState::Idle;
-	ChooserInputObj->RotationMode = ERotationMode::OrientToMovement;
-	ChooserInputObj->Gait = EGait::Run;
+	Super::NativeInitializeAnimation();
 }
 
 void UGS_SeekerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
+	// Ensure ChooserInputObj is valid (Lazy initialization for safety)
+	if (!ChooserInputObj)
+	{
+		ChooserInputObj = NewObject<UGS_ChooserInputObj>(this);
+		if (ChooserInputObj)
+		{
+			ChooserInputObj->MovementState = EMovementState::Idle;
+			ChooserInputObj->RotationMode = ERotationMode::OrientToMovement;
+			ChooserInputObj->Gait = EGait::Run;
+			ChooserInputObj->LastGait = EGait::Run;
+		}
+	}
+
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	if (OwnerCharacter)
 	{
@@ -55,6 +78,17 @@ void UGS_SeekerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		// Cache Aim Offset values for thread-safe access
 		CachedAOValue = Get_AOValue_Internal();
 		bCachedEnableAO = Enable_AO_Internal();
+
+		// Gait 전환 타이머 업데이트
+		if (bIsTransitioningGait)
+		{
+			GaitTransitionTimer -= DeltaSeconds;
+			if (GaitTransitionTimer <= 0.0f)
+			{
+				bIsTransitioningGait = false;
+				GaitTransitionTimer = 0.0f;
+			}
+		}
 	}
 }
 
@@ -127,8 +161,18 @@ void UGS_SeekerAnimInstance::UpdateState_Implementation()
 		ChooserInputObj->MovementState = EMovementState::Idle;
 	}
 
-	// Set Gait State
-	LastGait = ChooserInputObj->Gait;
+	// Set Gait State with Transition Safety
+	ChooserInputObj->LastGait = ChooserInputObj->Gait;
+
+	// Gait 변경 감지 및 전환 안전장치
+	if (LastGait != ChooserInputObj->Gait)
+	{
+		// Gait 전환 시작
+		bIsTransitioningGait = true;
+		GaitTransitionTimer = GaitTransitionDelay;
+
+		LastGait = ChooserInputObj->Gait;
+	}
 }
 
 bool UGS_SeekerAnimInstance::GetMustTurnInPlace()

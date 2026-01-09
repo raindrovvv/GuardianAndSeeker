@@ -44,6 +44,13 @@ public:
 	UFUNCTION()
 	void SetMustTurnInPlace(bool MustTurn);
 
+	/** Gait 전환 중인지 확인 (블루프린트에서 사용 가능) */
+	UFUNCTION(BlueprintPure, Category = "Animation|State")
+	bool IsTransitioningGait() const
+	{
+		return bIsTransitioningGait;
+	}
+
 	// Offset Root Bone
 	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "OffsetRootBone")
 	float GetOffsetRootTranslationHalfLife();
@@ -82,7 +89,7 @@ public:
 	uint8 CurMontageSlot = 0;
 
 	// Chooser
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Motion Matching")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced, Category = "Motion Matching")
 	TObjectPtr<UGS_ChooserInputObj> ChooserInputObj;
 
 protected:
@@ -98,6 +105,16 @@ protected:
 	ERotationMode LastRotationMode;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
 	EGait LastGait;
+
+	/** Gait 전환 중인지 확인 */
+	UPROPERTY(BlueprintReadOnly, Category = "StateValue")
+	bool bIsTransitioningGait = false;
+
+	/** Gait 전환 타이머 */
+	float GaitTransitionTimer = 0.0f;
+
+	/** Gait 전환 대기 시간 (초) - 애니메이션 전환 안정화 */
+	static constexpr float GaitTransitionDelay = 0.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OffsetRootBone")
 	bool bUseOffsetRootBone = false;

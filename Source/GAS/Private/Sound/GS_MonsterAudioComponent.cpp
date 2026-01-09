@@ -12,6 +12,7 @@
 #include "AkAudioEvent.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "AI/RTS/GS_RTSController.h"
 
 UGS_MonsterAudioComponent::UGS_MonsterAudioComponent()
@@ -53,18 +54,17 @@ void UGS_MonsterAudioComponent::BeginPlay()
 		return;
 	}
 
-	// 통일된 RTPC 시스템으로 초기화
+	// 통합 체크 및 Distance Scaling 설정
 	InitializeAudioRTPCs();
+
+	// 에셋 프리로딩 시작
+	PreloadMonsterAssets();
 
 	if (GetOwner()->HasAuthority())
 	{
 		StartSoundTimer();
 	}
 	PreviousAudioState = CurrentAudioState;
-
-	// 베이스 클래스의 공통 죽음 사운드 포인터 설정
-	DeathSound = AudioConfig.DeathSound;
-	RTS_DeathSound = AudioConfig.RTS_DeathSound;
 }
 
 void UGS_MonsterAudioComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -360,13 +360,8 @@ void UGS_MonsterAudioComponent::Multicast_PlaySwingSound_Implementation()
 	// 통합 체크 및 Distance Scaling 설정
 	if (!PrepareMulticastSound(OwnerMonster, false))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MonsterAudio] SwingSound BLOCKED by PrepareMulticastSound - Monster: %s"),
-		       OwnerMonster ? *OwnerMonster->GetName() : TEXT("nullptr"));
 		return;
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[MonsterAudio] SwingSound PASSED PrepareMulticastSound - Monster: %s"),
-	       OwnerMonster ? *OwnerMonster->GetName() : TEXT("nullptr"));
 
 	// 로컬 쿨다운 체크
 	const float CurrentTime = GetWorld()->GetTimeSeconds();
@@ -376,8 +371,8 @@ void UGS_MonsterAudioComponent::Multicast_PlaySwingSound_Implementation()
 	}
 	LocalLastSwingPlayTime = CurrentTime;
 
-	// 모드별 사운드 선택 및 재생
-	UAkAudioEvent* SoundToPlay = SelectSoundEventByMode(SwingSound, RTS_SwingSound);
+	UAkAudioEvent* SoundToPlay = CachedSwingSound ? CachedSwingSound.Get() : UGS_AssetLoader::SyncLoadAsset(AudioConfig.SwingSound);
+
 	if (SoundToPlay)
 	{
 		AkPlayingID SwingPlayingID = UAkGameplayStatics::PostEvent(SoundToPlay, OwnerMonster, 0, FOnAkPostEventCallback());
@@ -435,17 +430,17 @@ void UGS_MonsterAudioComponent::PlayRTSCommandSound(ERTSCommandSoundType Command
 	switch (CommandType)
 	{
 	case ERTSCommandSoundType::Selection:
-		SoundToPlay = SelectionClickSound;
+		SoundToPlay = CachedSelectionClickSound ? CachedSelectionClickSound.Get() : UGS_AssetLoader::SyncLoadAsset(AudioConfig.SelectionClickSound);
 		break;
 	case ERTSCommandSoundType::Move:
-		SoundToPlay = RTSMoveCommandSound;
+		SoundToPlay = CachedRTSMoveCommandSound ? CachedRTSMoveCommandSound.Get() : UGS_AssetLoader::SyncLoadAsset(AudioConfig.RTSMoveCommandSound);
 		break;
 	case ERTSCommandSoundType::Attack:
-		SoundToPlay = RTSAttackCommandSound ? RTSAttackCommandSound : RTSMoveCommandSound;
+		SoundToPlay = CachedRTSAttackCommandSound ? CachedRTSAttackCommandSound.Get() : UGS_AssetLoader::SyncLoadAsset(AudioConfig.RTSAttackCommandSound);
 		break;
 	case ERTSCommandSoundType::Death:
-		// Death 커맨드는 RTS_DeathSound 사용 (AudioConfig에서)
-		SoundToPlay = AudioConfig.RTS_DeathSound;
+		// Death 커맨드도 단일 에셋 사용
+		SoundToPlay = CachedDeathSound ? CachedDeathSound.Get() : UGS_AssetLoader::SyncLoadAsset(DeathSound);
 		break;
 	}
 
@@ -453,6 +448,48 @@ void UGS_MonsterAudioComponent::PlayRTSCommandSound(ERTSCommandSoundType Command
 	{
 		AkPlayingID CommandPlayingID = UAkGameplayStatics::PostEvent(SoundToPlay, GetOwner(), 0, FOnAkPostEventCallback());
 		RegisterPlayingID(CommandPlayingID);
+	}
+}
+
+void UGS_MonsterAudioComponent::PreloadMonsterAssets()
+{
+	TArray<FSoftObjectPath> AssetsToLoad;
+
+	// 몬스터 사운드 에셋 수집
+	if (!AudioConfig.IdleSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.IdleSound.ToSoftObjectPath());
+	if (!AudioConfig.CombatSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.CombatSound.ToSoftObjectPath());
+	if (!AudioConfig.HurtSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.HurtSound.ToSoftObjectPath());
+	if (!DeathSound.IsNull())
+		AssetsToLoad.Add(DeathSound.ToSoftObjectPath());
+	if (!AudioConfig.SwingSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.SwingSound.ToSoftObjectPath());
+	if (!AudioConfig.SelectionClickSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.SelectionClickSound.ToSoftObjectPath());
+	if (!AudioConfig.RTSMoveCommandSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.RTSMoveCommandSound.ToSoftObjectPath());
+	if (!AudioConfig.RTSAttackCommandSound.IsNull())
+		AssetsToLoad.Add(AudioConfig.RTSAttackCommandSound.ToSoftObjectPath());
+
+	if (AssetsToLoad.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_MonsterAudioComponent> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
+		                                         {
+			if (UGS_MonsterAudioComponent* Strong = WeakThis.Get())
+			{
+				// 캐싱 (GC 방지)
+				Strong->CachedIdleSound = Strong->AudioConfig.IdleSound.Get();
+				Strong->CachedCombatSound = Strong->AudioConfig.CombatSound.Get();
+				Strong->CachedHurtSound = Strong->AudioConfig.HurtSound.Get();
+				Strong->CachedDeathSound = Strong->DeathSound.Get();
+				Strong->CachedSwingSound = Strong->AudioConfig.SwingSound.Get();
+				Strong->CachedSelectionClickSound = Strong->AudioConfig.SelectionClickSound.Get();
+				Strong->CachedRTSMoveCommandSound = Strong->AudioConfig.RTSMoveCommandSound.Get();
+				Strong->CachedRTSAttackCommandSound = Strong->AudioConfig.RTSAttackCommandSound.Get();
+			} });
 	}
 }
 
@@ -506,19 +543,35 @@ UAkAudioEvent* UGS_MonsterAudioComponent::GetSoundEvent(EMonsterAudioState Sound
 {
 	const bool bRTS = IsRTSMode();
 
+	UAkAudioEvent* SoundToPlay = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> SoundSoftPtr;
+	TObjectPtr<UAkAudioEvent> CachedSound;
+
 	switch (SoundType)
 	{
 	case EMonsterAudioState::Idle:
-		return bRTS ? nullptr : AudioConfig.IdleSound;
+		if (bRTS)
+			return nullptr; // RTS 모드에서는 유닛의 Idle 소리 생략
+		SoundSoftPtr = AudioConfig.IdleSound;
+		CachedSound = CachedIdleSound;
+		break;
 	case EMonsterAudioState::Combat:
-		return bRTS && AudioConfig.RTS_CombatSound ? AudioConfig.RTS_CombatSound : AudioConfig.CombatSound;
+		SoundSoftPtr = AudioConfig.CombatSound;
+		CachedSound = CachedCombatSound;
+		break;
 	case EMonsterAudioState::Hurt:
-		return bRTS && AudioConfig.RTS_HurtSound ? AudioConfig.RTS_HurtSound : AudioConfig.HurtSound;
+		SoundSoftPtr = AudioConfig.HurtSound;
+		CachedSound = CachedHurtSound;
+		break;
 	case EMonsterAudioState::Death:
-		return bRTS && AudioConfig.RTS_DeathSound ? AudioConfig.RTS_DeathSound : AudioConfig.DeathSound;
+		SoundSoftPtr = DeathSound;
+		CachedSound = CachedDeathSound;
+		break;
 	default:
 		return nullptr;
 	}
+
+	return CachedSound ? CachedSound.Get() : UGS_AssetLoader::SyncLoadAsset(SoundSoftPtr);
 }
 
 float UGS_MonsterAudioComponent::GetMaxAudioDistance() const

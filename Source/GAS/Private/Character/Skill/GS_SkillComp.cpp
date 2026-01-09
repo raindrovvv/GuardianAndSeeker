@@ -234,13 +234,8 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 	Skill->Cooltime = Info.Cooltime;
 	Skill->Damage = Info.Damage;
 
-	// TArray<UAnimMontage*>를 TArray<TSoftObjectPtr<UAnimMontage>>로 변환
-	Skill->SkillAnimMontages.Empty();
-	for (UAnimMontage* Montage : Info.Montages)
-	{
-		Skill->SkillAnimMontages.Add(TSoftObjectPtr<UAnimMontage>(Montage));
-	}
-
+	// Soft Reference 할당 (데이터 테이블에서 이미 SoftPtr 임)
+	Skill->SkillAnimMontages = Info.Montages;
 	Skill->SkillImage = Info.Image;
 
 

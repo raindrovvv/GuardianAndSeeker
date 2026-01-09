@@ -52,6 +52,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, CAtegory = "StateValue")
 	EGait Gait;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
+	EGait LastGait;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
 	ERotationMode RotationMode;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Control")

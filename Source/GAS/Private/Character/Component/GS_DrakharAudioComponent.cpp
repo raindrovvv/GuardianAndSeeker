@@ -5,6 +5,7 @@
 #include "AkComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "AkAudioDevice.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 UGS_DrakharAudioComponent::UGS_DrakharAudioComponent()
 {
@@ -21,7 +22,10 @@ void UGS_DrakharAudioComponent::BeginPlay()
 	OwnerDrakhar = Cast<AGS_Drakhar>(GetOwner());
 	if (OwnerDrakhar)
 	{
-		// 베이스 클래스의 공통 죽음 사운드 포인터 설정
+		// 에셋 프리로딩 시작
+		PreloadDrakharAssets();
+
+		// 베이스 클래스의 공통 죽음 사운드 포인터 설정 (동적 스케일링이 적용되므로 TPS 에셋 하나면 충분)
 		DeathSound = OwnerDrakhar->DeathSoundEvent;
 	}
 }
@@ -83,7 +87,6 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboAttackSound_Implementation()
 	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -91,11 +94,15 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboAttackSound_Implementation()
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	PlaySoundEvent(OwnerDrakhar->ComboAttackSoundEvent, OwnerDrakhar->GetActorLocation());
+	UAkAudioEvent* SoundToPlay = CachedComboAttackSound ? CachedComboAttackSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->ComboAttackSoundEvent);
+
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
 }
 
 void UGS_DrakharAudioComponent::PlayDashSkillSound()
@@ -133,10 +140,8 @@ void UGS_DrakharAudioComponent::Multicast_PlayDashSkillSound_Implementation()
 	// 소리의 주인이 로컬 플레이어인지 확인
 	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
 
-	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -144,28 +149,22 @@ void UGS_DrakharAudioComponent::Multicast_PlayDashSkillSound_Implementation()
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	if (bDashSkillSoundPlayed)
-	{
-		return;
-	}
+	UAkAudioEvent* SoundToPlay = CachedDashSkillSound ? CachedDashSkillSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->DashSkillSoundEvent);
 
-	PlaySoundEvent(OwnerDrakhar->DashSkillSoundEvent, OwnerDrakhar->GetActorLocation());
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
 	bDashSkillSoundPlayed = true;
 
-	// 클라이언트에서도 로컬 중복 재생 방지를 위해 타이머 설정
+	// 클라이언트 타이머 설정
 	UWorld* World = GetWorld();
 	if (World)
 	{
-		World->GetTimerManager().SetTimer(
-		    DashSkillSoundCooldownTimer,
-		    this,
-		    &UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown,
-		    DashSkillSoundCooldown,
-		    false);
+		World->GetTimerManager().SetTimer(DashSkillSoundCooldownTimer, this, &UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown, DashSkillSoundCooldown, false);
 	}
 }
 
@@ -187,13 +186,10 @@ void UGS_DrakharAudioComponent::Multicast_PlayEarthquakeSkillSound_Implementatio
 		return;
 	}
 
-	// 소리의 주인이 로컬 플레이어인지 확인
 	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
 
-	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -201,11 +197,15 @@ void UGS_DrakharAudioComponent::Multicast_PlayEarthquakeSkillSound_Implementatio
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	PlaySoundEvent(OwnerDrakhar->EarthquakeSkillSoundEvent, OwnerDrakhar->GetActorLocation());
+	UAkAudioEvent* SoundToPlay = CachedEarthquakeSkillSound ? CachedEarthquakeSkillSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->EarthquakeSkillSoundEvent);
+
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
 }
 
 void UGS_DrakharAudioComponent::PlayDraconicFurySkillSound()
@@ -226,13 +226,10 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicFurySkillSound_Implementat
 		return;
 	}
 
-	// 소리의 주인이 로컬 플레이어인지 확인
 	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
 
-	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -240,28 +237,21 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicFurySkillSound_Implementat
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	if (bDraconicFurySoundPlayed)
-	{
-		return;
-	}
+	UAkAudioEvent* SoundToPlay = CachedDraconicFurySkillSound ? CachedDraconicFurySkillSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->DraconicFurySkillSoundEvent);
 
-	PlaySoundEvent(OwnerDrakhar->DraconicFurySkillSoundEvent, OwnerDrakhar->GetActorLocation());
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
 	bDraconicFurySoundPlayed = true;
 
-	// 타이머 설정
 	UWorld* World = GetWorld();
 	if (World)
 	{
-		World->GetTimerManager().SetTimer(
-		    DraconicFurySoundCooldownTimer,
-		    this,
-		    &UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown,
-		    DraconicFurySoundCooldown,
-		    false);
+		World->GetTimerManager().SetTimer(DraconicFurySoundCooldownTimer, this, &UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown, DraconicFurySoundCooldown, false);
 	}
 }
 
@@ -301,7 +291,8 @@ void UGS_DrakharAudioComponent::Multicast_PlayDraconicProjectileSound_Implementa
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	PlaySoundEvent(OwnerDrakhar->DraconicProjectileSoundEvent, Location);
+	UAkAudioEvent* SoundToPlay = CachedDraconicProjectileSound ? CachedDraconicProjectileSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->DraconicProjectileSoundEvent);
+	PlaySoundEvent(SoundToPlay, Location);
 }
 
 void UGS_DrakharAudioComponent::PlayAttackHitSound()
@@ -340,12 +331,13 @@ void UGS_DrakharAudioComponent::Multicast_PlayAttackHitSound_Implementation()
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	if (!OwnerDrakhar->AttackHitSoundEvent)
+	UAkAudioEvent* SoundToPlay = CachedAttackHitSound ? CachedAttackHitSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->AttackHitSoundEvent);
+	if (!SoundToPlay)
 	{
 		return;
 	}
 
-	PlaySoundEvent(OwnerDrakhar->AttackHitSoundEvent, OwnerDrakhar->GetActorLocation());
+	PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
 }
 
 void UGS_DrakharAudioComponent::PlayFeverModeStartSound(bool bForcePlay)
@@ -421,10 +413,13 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStartSound_Implementation
 
 void UGS_DrakharAudioComponent::PlayFeverModeStartSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStartSoundEvent)
+	UAkAudioEvent* SoundToPlay = CachedFeverModeStartSound ? CachedFeverModeStartSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->FeverModeStartSoundEvent);
+	if (!OwnerDrakhar || !SoundToPlay)
+	{
 		return;
+	}
 
-	PlaySoundEvent(OwnerDrakhar->FeverModeStartSoundEvent, OwnerDrakhar->GetActorLocation());
+	PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
 }
 
 void UGS_DrakharAudioComponent::PlayFeverModeEndSound()
@@ -468,10 +463,13 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeEndSound_Implementation()
 
 void UGS_DrakharAudioComponent::PlayFeverModeEndSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeEndSoundEvent)
+	UAkAudioEvent* SoundToPlay = CachedFeverModeEndSound ? CachedFeverModeEndSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->FeverModeEndSoundEvent);
+	if (!OwnerDrakhar || !SoundToPlay)
+	{
 		return;
+	}
 
-	PlaySoundEvent(OwnerDrakhar->FeverModeEndSoundEvent, OwnerDrakhar->GetActorLocation());
+	PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
 }
 
 void UGS_DrakharAudioComponent::PlayFeverModeStateSound(bool bForcePlay)
@@ -547,12 +545,13 @@ void UGS_DrakharAudioComponent::Multicast_PlayFeverModeStateSound_Implementation
 
 void UGS_DrakharAudioComponent::PlayFeverModeStateSoundLocal()
 {
-	if (!OwnerDrakhar || !OwnerDrakhar->FeverModeStateSoundEvent || !IsAudioSystemValid())
+	UAkAudioEvent* SoundToPlay = CachedFeverModeStateSound ? CachedFeverModeStateSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->FeverModeStateSoundEvent);
+	if (!OwnerDrakhar || !SoundToPlay || !IsAudioSystemValid())
 		return;
 
 	// 피버모드 스테이트 사운드 재생 및 Playing ID 저장
 	FeverModeStateSoundPlayingID = UAkGameplayStatics::PostEvent(
-	    OwnerDrakhar->FeverModeStateSoundEvent,
+	    SoundToPlay,
 	    OwnerDrakhar,
 	    0,
 	    FOnAkPostEventCallback());
@@ -616,7 +615,6 @@ void UGS_DrakharAudioComponent::StopFeverModeStateSoundLocal()
 // 로컬 전용 Hurt 사운드 재생 (RPC 없음 - RepNotify에서 호출)
 void UGS_DrakharAudioComponent::PlayHurtSoundLocal()
 {
-	// 통합 체크 및 Distance Scaling 설정 (보스는 항상 재생, bSkipViewFrustumCheck = true)
 	if (!PrepareMulticastSound(OwnerDrakhar, true))
 	{
 		return;
@@ -627,17 +625,19 @@ void UGS_DrakharAudioComponent::PlayHurtSoundLocal()
 		return;
 	}
 
-	PlaySoundEvent(OwnerDrakhar->HurtSoundEvent, OwnerDrakhar->GetActorLocation());
+	UAkAudioEvent* SoundToPlay = CachedHurtSound ? CachedHurtSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->HurtSoundEvent);
+
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
 	bHurtSoundPlayed = true;
 
-	// 타이머 설정 (PrepareMulticastSound가 World 검증을 완료했으므로 안전)
 	UWorld* World = GetWorld();
-	World->GetTimerManager().SetTimer(
-	    HurtSoundCooldownTimer,
-	    this,
-	    &UGS_DrakharAudioComponent::ResetHurtSoundCooldown,
-	    HurtSoundCooldown,
-	    false);
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(HurtSoundCooldownTimer, this, &UGS_DrakharAudioComponent::ResetHurtSoundCooldown, HurtSoundCooldown, false);
+	}
 }
 
 
@@ -662,7 +662,10 @@ void UGS_DrakharAudioComponent::PlayDraconicProjectileImpactSoundLocal(const FVe
 		return;
 	}
 
-	UAkAudioEvent* SoundToPlay = bHitCharacter ? OwnerDrakhar->DraconicProjectileExplosionSoundEvent : OwnerDrakhar->DraconicProjectileImpactSoundEvent;
+	UAkAudioEvent* ImpactSound = CachedDraconicProjectileImpactSound ? CachedDraconicProjectileImpactSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->DraconicProjectileImpactSoundEvent);
+	UAkAudioEvent* ExplosionSound = CachedDraconicProjectileExplosionSound ? CachedDraconicProjectileExplosionSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->DraconicProjectileExplosionSoundEvent);
+
+	UAkAudioEvent* SoundToPlay = bHitCharacter ? ExplosionSound : ImpactSound;
 	if (SoundToPlay)
 	{
 		PlaySoundEvent(SoundToPlay, ImpactLocation);
@@ -687,13 +690,10 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboFinisherSound_Implementation(
 		return;
 	}
 
-	// 소리의 주인이 로컬 플레이어인지 확인
 	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
 
-	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -701,27 +701,24 @@ void UGS_DrakharAudioComponent::Multicast_PlayComboFinisherSound_Implementation(
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	if (!OwnerDrakhar->ComboFinisherSoundEvent)
-	{
-		return;
-	}
+	UAkAudioEvent* SoundToPlay = CachedComboFinisherSound ? CachedComboFinisherSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->ComboFinisherSoundEvent);
 
-	UAkGameplayStatics::PostEvent(
-	    OwnerDrakhar->ComboFinisherSoundEvent,
-	    OwnerDrakhar,
-	    0,
-	    FOnAkPostEventCallback());
+	if (SoundToPlay)
+	{
+		UAkGameplayStatics::PostEvent(SoundToPlay, OwnerDrakhar, 0, FOnAkPostEventCallback());
+	}
 }
 
 // === 타이머 콜백 함수 구현 ===
 void UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown()
 {
 	if (!IsValid(this))
+	{
 		return;
+	}
 
 	bDraconicFurySoundPlayed = false;
 }
@@ -729,7 +726,9 @@ void UGS_DrakharAudioComponent::ResetDraconicFurySoundCooldown()
 void UGS_DrakharAudioComponent::ResetHurtSoundCooldown()
 {
 	if (!IsValid(this))
+	{
 		return;
+	}
 
 	bHurtSoundPlayed = false;
 }
@@ -748,7 +747,9 @@ void UGS_DrakharAudioComponent::PlayLandingSound()
 void UGS_DrakharAudioComponent::ResetDashSkillSoundCooldown()
 {
 	if (!IsValid(this))
+	{
 		return;
+	}
 
 	bDashSkillSoundPlayed = false;
 }
@@ -760,13 +761,10 @@ void UGS_DrakharAudioComponent::Multicast_PlayLandingSound_Implementation()
 		return;
 	}
 
-	// 소리의 주인이 로컬 플레이어인지 확인
 	const bool bIsLocalPlayer = (OwnerDrakhar && OwnerDrakhar->IsLocallyControlled());
 
-	// 로컬 플레이어가 아닌 경우에만 거리/시야각 체크
 	if (!bIsLocalPlayer)
 	{
-		// 통합 체크 및 Distance Scaling 설정
 		if (!PrepareMulticastSound(OwnerDrakhar, true))
 		{
 			return;
@@ -774,16 +772,118 @@ void UGS_DrakharAudioComponent::Multicast_PlayLandingSound_Implementation()
 	}
 	else
 	{
-		// 로컬 플레이어이므로 거리 체크 스킵, Distance Scaling만 설정
 		SetDistanceScaling(IsRTSMode());
 	}
 
-	if (!OwnerDrakhar->LandingSoundEvent)
+	UAkAudioEvent* SoundToPlay = CachedLandingSound ? CachedLandingSound.Get() : UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->LandingSoundEvent);
+
+	if (SoundToPlay)
+	{
+		PlaySoundEvent(SoundToPlay, OwnerDrakhar->GetActorLocation());
+	}
+}
+
+void UGS_DrakharAudioComponent::PreloadDrakharAssets()
+{
+	if (!OwnerDrakhar)
 	{
 		return;
 	}
 
-	PlaySoundEvent(OwnerDrakhar->LandingSoundEvent, OwnerDrakhar->GetActorLocation());
+	TArray<FSoftObjectPath> AssetsToLoad;
+
+	// 모든 Drakhar 사운드 에셋 수집
+	if (!OwnerDrakhar->ComboAttackSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->ComboAttackSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DashSkillSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DashSkillSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->EarthquakeSkillSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->EarthquakeSkillSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DraconicFurySkillSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DraconicFurySkillSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DraconicProjectileSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DraconicProjectileSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DraconicProjectileImpactSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DraconicProjectileImpactSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DraconicProjectileExplosionSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DraconicProjectileExplosionSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->AttackHitSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->AttackHitSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->ComboFinisherSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->ComboFinisherSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->FeverModeStartSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->FeverModeStartSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->FeverModeEndSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->FeverModeEndSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->FeverModeStateSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->FeverModeStateSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->HurtSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->HurtSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->DeathSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->DeathSoundEvent.ToSoftObjectPath());
+	}
+	if (!OwnerDrakhar->LandingSoundEvent.IsNull())
+	{
+		AssetsToLoad.Add(OwnerDrakhar->LandingSoundEvent.ToSoftObjectPath());
+	}
+
+	if (AssetsToLoad.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_DrakharAudioComponent> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
+		                                         {
+			if (UGS_DrakharAudioComponent* Strong = WeakThis.Get())
+			{
+				if (!Strong->OwnerDrakhar)
+				{
+					return;
+				}
+
+				// 캐싱 (GC 방지)
+				Strong->CachedComboAttackSound = Strong->OwnerDrakhar->ComboAttackSoundEvent.Get();
+				Strong->CachedDashSkillSound = Strong->OwnerDrakhar->DashSkillSoundEvent.Get();
+				Strong->CachedEarthquakeSkillSound = Strong->OwnerDrakhar->EarthquakeSkillSoundEvent.Get();
+				Strong->CachedDraconicFurySkillSound = Strong->OwnerDrakhar->DraconicFurySkillSoundEvent.Get();
+				Strong->CachedDraconicProjectileSound = Strong->OwnerDrakhar->DraconicProjectileSoundEvent.Get();
+				Strong->CachedDraconicProjectileImpactSound = Strong->OwnerDrakhar->DraconicProjectileImpactSoundEvent.Get();
+				Strong->CachedDraconicProjectileExplosionSound = Strong->OwnerDrakhar->DraconicProjectileExplosionSoundEvent.Get();
+				Strong->CachedAttackHitSound = Strong->OwnerDrakhar->AttackHitSoundEvent.Get();
+				Strong->CachedComboFinisherSound = Strong->OwnerDrakhar->ComboFinisherSoundEvent.Get();
+				Strong->CachedFeverModeStartSound = Strong->OwnerDrakhar->FeverModeStartSoundEvent.Get();
+				Strong->CachedFeverModeEndSound = Strong->OwnerDrakhar->FeverModeEndSoundEvent.Get();
+				Strong->CachedFeverModeStateSound = Strong->OwnerDrakhar->FeverModeStateSoundEvent.Get();
+				Strong->CachedHurtSound = Strong->OwnerDrakhar->HurtSoundEvent.Get();
+				Strong->CachedDeathSound = Strong->OwnerDrakhar->DeathSoundEvent.Get();
+				Strong->CachedLandingSound = Strong->OwnerDrakhar->LandingSoundEvent.Get();
+			} });
+	}
 }
 
 // === Wwise 헬퍼 함수 구현 ===
