@@ -460,7 +460,10 @@ void AGS_Seeker::Internal_SetSeekerGait(EGait Gait)
 
 	if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
-		SeekerAnim->ChooserInputObj->Gait = SeekerGait;
+		if (SeekerAnim->ChooserInputObj)
+		{
+			SeekerAnim->ChooserInputObj->Gait = SeekerGait;
+		}
 	}
 
 	switch (Gait)
