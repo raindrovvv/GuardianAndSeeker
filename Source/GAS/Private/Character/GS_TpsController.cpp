@@ -212,7 +212,7 @@ void AGS_TpsController::GetLifetimeReplicatedProps(TArray<class FLifetimePropert
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGS_TpsController, ControlValues);
-	DOREPLIFETIME(AGS_TpsController, MoveInputValue);
+	DOREPLIFETIME_CONDITION(AGS_TpsController, MoveInputValue, COND_OwnerOnly);
 	DOREPLIFETIME(AGS_TpsController, bIsAutoMoving);
 	DOREPLIFETIME(AGS_TpsController, bIsHoldingReviveKey);
 }

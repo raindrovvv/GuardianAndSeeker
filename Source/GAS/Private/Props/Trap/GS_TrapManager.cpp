@@ -84,5 +84,5 @@ void AGS_TrapManager::UnregisterTrap(AGS_TrapBase* Trap)
 void AGS_TrapManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AGS_TrapManager, RegisteredTraps);
+	// RegisteredTraps는 TWeakObjectPtr이므로 복제 불가 - 복제 제거됨
 }

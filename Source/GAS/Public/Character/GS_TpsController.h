@@ -111,7 +111,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Control")
 	FVector2D MoveInputValue;
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable)
 	void Server_CacheMoveInputValue(FVector2D InputValue);
 
 	UFUNCTION(BlueprintCallable)
