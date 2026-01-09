@@ -366,6 +366,16 @@ void UGS_GameInstance::GSHostSession(int32 MaxPlayers, FName SessionCustomName, 
 		return;
 	}
 
+	// 기존에 남아있을지 모르는 동일 이름의 세션 파괴 (Ghost Session 방지)
+	FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(SessionCustomName);
+	if (ExistingSession)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UGS_GameInstance::HostSession - Session %s already exists. Destroying it before creating a new one."), *SessionCustomName.ToString());
+		SessionInterface->DestroySession(SessionCustomName);
+		// 참고: DestroySession은 비동기이지만, 대부분의 서브시스템은 다음 CreateSession 호출 시 내부적으로 상태를 덮어쓰거나
+		// 파괴 완료 후 생성을 시도하도록 유도합니다.
+	}
+
 	HostSessionSettings = MakeShareable(new FOnlineSessionSettings());
 	HostSessionSettings->NumPublicConnections = MaxPlayers; // 최대 플레이어 수
 	HostSessionSettings->NumPrivateConnections = 0; //MaxPlayers - HostSessionSettings->NumPublicConnections;
@@ -514,7 +524,8 @@ void UGS_GameInstance::OnFindSessionsComplete(bool bWasSuccessful)
 		UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::OnFindSessionsComplete - Found %d sessions."), SessionSearchSettings->SearchResults.Num());
 		if (SessionSearchSettings->SearchResults.Num() > 0)
 		{
-			bool bFoundSuitableSession = false;
+			TArray<FOnlineSessionSearchResult> SuitableSessions;
+
 			for (const FOnlineSessionSearchResult& SearchResult : SessionSearchSettings->SearchResults)
 			{
 				if (SearchResult.IsValid() && SearchResult.Session.SessionSettings.bIsDedicated && SearchResult.Session.NumOpenPublicConnections > 0)
@@ -522,33 +533,28 @@ void UGS_GameInstance::OnFindSessionsComplete(bool bWasSuccessful)
 					FString CustomKeyCheck;
 					bool bCustomKeyFound = SearchResult.Session.SessionSettings.Get(SEARCH_KEYWORDS, CustomKeyCheck);
 
-					UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::OnFindSessionsComplete - Checking SessionID: %s, OwningUser: %s, OpenPublic: %d, CustomKeyFound: %s, CustomKeyValue: %s"),
-					       *SearchResult.GetSessionIdStr(),
-					       *SearchResult.Session.OwningUserName,
-					       SearchResult.Session.NumOpenPublicConnections,
-					       bCustomKeyFound ? TEXT("true") : TEXT("false"),
-					       bCustomKeyFound ? *CustomKeyCheck : TEXT("N/A"));
-
 					if (bCustomKeyFound && CustomKeyCheck == TEXT("IINGSSpartaFinal"))
 					{
-						UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::OnFindSessionsComplete - YOUR DEDICATED session with matching custom key found! Attempting to join."));
-
-						SessionToJoin = SearchResult;
-						GSJoinSession(PC, SearchResult);
-						bFoundSuitableSession = true;
-						return;
+						SuitableSessions.Add(SearchResult);
 					}
 				}
-				else
-				{
-					UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::OnFindSessionsComplete - Session %s is NOT suitable (IsValid: %s, IsDedicated: %s, OpenPublicSlots: %d)."),
-					       *SearchResult.GetSessionIdStr(),
-					       SearchResult.IsValid() ? TEXT("true") : TEXT("false"),
-					       SearchResult.IsValid() && SearchResult.Session.SessionSettings.bIsDedicated ? TEXT("true") : TEXT("false"),
-					       SearchResult.IsValid() ? SearchResult.Session.NumOpenPublicConnections : -1);
-				}
 			}
-			if (!bFoundSuitableSession)
+
+			if (SuitableSessions.Num() > 0)
+			{
+				// 핑(Ping) 기준으로 오름차순 정렬 (가장 낮은 핑이 0번 인덱스로)
+				SuitableSessions.Sort([](const FOnlineSessionSearchResult& A, const FOnlineSessionSearchResult& B)
+				                      { return A.PingInMs < B.PingInMs; });
+
+				const FOnlineSessionSearchResult& BestSession = SuitableSessions[0];
+				UE_LOG(LogTemp, Log, TEXT("UGS_GameInstance::OnFindSessionsComplete - Found %d suitable sessions. Joining best session (ID: %s, Ping: %dms)"),
+				       SuitableSessions.Num(), *BestSession.GetSessionIdStr(), BestSession.PingInMs);
+
+				SessionToJoin = BestSession;
+				GSJoinSession(PC, BestSession);
+				return;
+			}
+			else
 			{
 				UE_LOG(LogTemp, Warning, TEXT("UGS_GameInstance::OnFindSessionsComplete - No suitable DEDICATED sessions found after filtering all %d results."), SessionSearchSettings->SearchResults.Num());
 				PlayerSearchingSession = nullptr;

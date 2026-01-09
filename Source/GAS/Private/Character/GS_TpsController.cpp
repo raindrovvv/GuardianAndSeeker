@@ -54,7 +54,20 @@ void AGS_TpsController::Move(const FInputActionValue& InputValue)
 {
 	const FVector2D InputAxisVector = InputValue.Get<FVector2D>();
 	LastRotatorInMoving = GetControlRotation();
-	Server_CacheMoveInputValue(InputAxisVector);
+
+	// Throttling 로직: 입력값이 유의미하게 변했거나, 일정 시간이 지났을 경우에만 서버 전송
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	const bool bValueSignificantChange = FVector2D::Distance(InputAxisVector, LastSentMoveInputValue) > MoveInputSendThreshold;
+	const bool bIntervalPassed = (CurrentTime - LastMoveInputSentTime) > MoveInputMinSendInterval;
+	const bool bIsStopping = InputAxisVector.IsNearlyZero() && !LastSentMoveInputValue.IsNearlyZero();
+
+	if (bValueSignificantChange || bIntervalPassed || bIsStopping)
+	{
+		Server_CacheMoveInputValue(InputAxisVector);
+		LastSentMoveInputValue = InputAxisVector;
+		LastMoveInputSentTime = CurrentTime;
+	}
+
 	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
 	{
 		// 자동 이동 시 좌우 이동 (KCY)
