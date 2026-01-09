@@ -20705,7 +20705,7 @@
 										</Property>
 										<Property Name="Volume" Type="Real64">
 											<ValueList>
-												<Value>-8</Value>
+												<Value>-6</Value>
 											</ValueList>
 											<ModifierList>
 												<ModifierInfo>
@@ -22062,11 +22062,13 @@
 								</Sound>
 								<Sound Name="SFX_ArrowChange" ID="{41E0BC3C-C294-49E2-AE15-CF2D9C1AA381}" ShortID="567212950">
 									<PropertyList>
+										<Property Name="EnableAttenuation" Type="bool" Value="False"/>
 										<Property Name="Highpass" Type="int16">
 											<ValueList>
 												<Value>5</Value>
 											</ValueList>
 										</Property>
+										<Property Name="ListenerRelativeRouting" Type="bool" Value="False"/>
 										<Property Name="Lowpass" Type="int16">
 											<ValueList>
 												<Value>5</Value>
@@ -22074,7 +22076,7 @@
 										</Property>
 										<Property Name="MakeUpGain" Type="Real64">
 											<ValueList>
-												<Value>-6</Value>
+												<Value>-3</Value>
 											</ValueList>
 											<ModifierList>
 												<ModifierInfo>
@@ -22102,7 +22104,7 @@
 										</Property>
 										<Property Name="Volume" Type="Real64">
 											<ValueList>
-												<Value>-9</Value>
+												<Value>-6</Value>
 											</ValueList>
 											<ModifierList>
 												<ModifierInfo>
@@ -22535,17 +22537,12 @@
 										<Property Name="EnableAttenuation" Type="bool" Value="False"/>
 										<Property Name="Highpass" Type="int16">
 											<ValueList>
-												<Value>4</Value>
+												<Value>5</Value>
 											</ValueList>
 										</Property>
 										<Property Name="Lowpass" Type="int16">
 											<ValueList>
-												<Value>6</Value>
-											</ValueList>
-										</Property>
-										<Property Name="MakeUpGain" Type="Real64">
-											<ValueList>
-												<Value>-3</Value>
+												<Value>5</Value>
 											</ValueList>
 										</Property>
 										<Property Name="Pitch" Type="int32">
@@ -22554,9 +22551,6 @@
 											</ValueList>
 										</Property>
 										<Property Name="Volume" Type="Real64">
-											<ValueList>
-												<Value>-3</Value>
-											</ValueList>
 											<ModifierList>
 												<ModifierInfo>
 													<Modifier Name="" ID="{DBCFB8E8-7839-49CD-AFF4-143F0C284828}">
@@ -44609,7 +44603,7 @@
 										</Property>
 										<Property Name="MakeUpGain" Type="Real64">
 											<ValueList>
-												<Value>-4</Value>
+												<Value>-6</Value>
 											</ValueList>
 										</Property>
 										<Property Name="Pitch" Type="int32">
@@ -44626,7 +44620,7 @@
 										</Property>
 										<Property Name="Volume" Type="Real64">
 											<ValueList>
-												<Value>-4</Value>
+												<Value>-6</Value>
 											</ValueList>
 											<ModifierList>
 												<ModifierInfo>
