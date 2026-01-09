@@ -419,7 +419,7 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 		{
 			float DistSqToSeeker = FVector::DistSquared(GetActorLocation(), LocalPawn->GetActorLocation());
 			// 일정 거리 내에 있으면 보이도록 설정 (시커 거리 안전망)
-			bIsInRange = (DistSqToSeeker < TPS_SEEKER_PROXIMITY_RADIUS_SQ);
+			bIsInRange = (DistSqToSeeker < FMath::Square(GS_Rendering::TPS_HP_WIDGET_VISIBLE_DISTANCE));
 
 			const float CombatTriggerRadiusSq = FMath::Square(GS_Rendering::DEFAULT_COMBAT_TRIGGER_RADIUS * 1.1f);
 			if (DistSqToSeeker > CombatTriggerRadiusSq)

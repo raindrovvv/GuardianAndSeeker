@@ -41,21 +41,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
 	FVector AudioAnchorRelativeLocation = FVector(0.0f, 0.0f, 120.0f);
 
-	/** 문 열림 사운드 (TPS 모드용) */
+	/** 문 열림 사운드 (TPS/RTS Unified) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* OpenSound_TPS;
+	TSoftObjectPtr<UAkAudioEvent> OpenSound;
 
-	/** 문 열림 사운드 (RTS 모드용) */
+	/** 문 닫힘 사운드 (TPS/RTS Unified) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* OpenSound_RTS;
-
-	/** 문 닫힘 사운드 (TPS 모드용) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* CloseSound_TPS;
-
-	/** 문 닫힘 사운드 (RTS 모드용) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* CloseSound_RTS;
+	TSoftObjectPtr<UAkAudioEvent> CloseSound;
 
 	/** 문 사운드 최대 거리 (기본값: 3000.0f = 30m) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
@@ -118,9 +110,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Door|Audio")
 	bool IsRTSMode() const;
 
-	/** 모드에 맞는 사운드 이벤트 선택 */
-	UFUNCTION(BlueprintPure, Category = "Door|Audio")
-	UAkAudioEvent* SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const;
 
 	/** 문 사운드 재생 최적화를 위한 거리/시야 체크 */
 	UFUNCTION(BlueprintPure, Category = "Door|Audio")

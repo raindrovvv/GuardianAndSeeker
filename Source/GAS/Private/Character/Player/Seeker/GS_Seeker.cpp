@@ -447,7 +447,7 @@ bool AGS_Seeker::GetDrawState()
 	return SeekerState.IsDraw;
 }
 
-void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
+void AGS_Seeker::Internal_SetSeekerGait(EGait Gait)
 {
 	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
 	if (bIsInDyingState && Gait != EGait::Crawl)
@@ -480,36 +480,14 @@ void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
 	}
 }
 
+void AGS_Seeker::Server_SetSeekerGait_Implementation(EGait Gait)
+{
+	Internal_SetSeekerGait(Gait);
+}
+
 void AGS_Seeker::SetSeekerGait(EGait Gait)
 {
-	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
-	if (bIsInDyingState && Gait != EGait::Crawl)
-	{
-		return;
-	}
-
-	LastSeekerGait = SeekerGait;
-	SeekerGait = Gait;
-	if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
-	{
-		SeekerAnim->ChooserInputObj->Gait = SeekerGait;
-	}
-
-	switch (Gait)
-	{
-	case EGait::Walk:
-		SetCharacterSpeed(GAIT_SPEED_WALK);
-		break;
-	case EGait::Run:
-		SetCharacterSpeed(GAIT_SPEED_RUN);
-		break;
-	case EGait::Sprint:
-		SetCharacterSpeed(GAIT_SPEED_SPRINT);
-		break;
-	case EGait::Crawl:
-		SetCharacterSpeed(GAIT_SPEED_CRAWL); // 빈사 상태 기어다니기 - 매우 느린 속도
-		break;
-	}
+	Internal_SetSeekerGait(Gait);
 }
 
 EGait AGS_Seeker::GetSeekerGait()

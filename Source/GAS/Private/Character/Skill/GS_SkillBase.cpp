@@ -169,6 +169,40 @@ void UGS_SkillBase::PreloadSkillAssets()
 		}
 	}
 
+	// 데이터 테이블에서 스킬 오디오 정보 가져와 프리로드 리스트에 추가
+	const FSkillInfo* Info = GetCurrentSkillInfo();
+	if (Info)
+	{
+		if (!Info->SkillStartSound.IsNull())
+			AssetsToLoad.Add(Info->SkillStartSound.ToSoftObjectPath());
+		if (!Info->SkillEndSound.IsNull())
+			AssetsToLoad.Add(Info->SkillEndSound.ToSoftObjectPath());
+		if (!Info->SkillLoopSound.IsNull())
+			AssetsToLoad.Add(Info->SkillLoopSound.ToSoftObjectPath());
+		if (!Info->SkillLoopStopSound.IsNull())
+			AssetsToLoad.Add(Info->SkillLoopStopSound.ToSoftObjectPath());
+		if (!Info->RTSSkillStartSound.IsNull())
+			AssetsToLoad.Add(Info->RTSSkillStartSound.ToSoftObjectPath());
+		if (!Info->RTSSkillEndSound.IsNull())
+			AssetsToLoad.Add(Info->RTSSkillEndSound.ToSoftObjectPath());
+		if (!Info->RTSSkillLoopSound.IsNull())
+			AssetsToLoad.Add(Info->RTSSkillLoopSound.ToSoftObjectPath());
+		if (!Info->RTSSkillLoopStopSound.IsNull())
+			AssetsToLoad.Add(Info->RTSSkillLoopStopSound.ToSoftObjectPath());
+		if (!Info->WallCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->WallCollisionSound.ToSoftObjectPath());
+		if (!Info->MonsterCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->MonsterCollisionSound.ToSoftObjectPath());
+		if (!Info->GuardianCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->GuardianCollisionSound.ToSoftObjectPath());
+		if (!Info->RTSWallCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->RTSWallCollisionSound.ToSoftObjectPath());
+		if (!Info->RTSMonsterCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->RTSMonsterCollisionSound.ToSoftObjectPath());
+		if (!Info->RTSGuardianCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->RTSGuardianCollisionSound.ToSoftObjectPath());
+	}
+
 	if (AssetsToLoad.Num() > 0)
 	{
 		// TWeakObjectPtr로 캡처하여 UObject 파괴 후 람다 호출 시 안전성 확보
@@ -190,6 +224,25 @@ void UGS_SkillBase::PreloadSkillAssets()
 				for (int32 i = 0; i < Strong->SkillAnimMontages.Num(); ++i)
 				{
 					Strong->CachedAnimMontages[i] = Strong->SkillAnimMontages[i].Get();
+				}
+
+				// 오디오 캐싱
+				if (const FSkillInfo* InfoPtr = Strong->GetCurrentSkillInfo())
+				{
+					Strong->CachedSkillStartSound = InfoPtr->SkillStartSound.Get();
+					Strong->CachedSkillEndSound = InfoPtr->SkillEndSound.Get();
+					Strong->CachedSkillLoopSound = InfoPtr->SkillLoopSound.Get();
+					Strong->CachedSkillLoopStopSound = InfoPtr->SkillLoopStopSound.Get();
+					Strong->CachedRTSSkillStartSound = InfoPtr->RTSSkillStartSound.Get();
+					Strong->CachedRTSSkillEndSound = InfoPtr->RTSSkillEndSound.Get();
+					Strong->CachedRTSSkillLoopSound = InfoPtr->RTSSkillLoopSound.Get();
+					Strong->CachedRTSSkillLoopStopSound = InfoPtr->RTSSkillLoopStopSound.Get();
+					Strong->CachedWallCollisionSound = InfoPtr->WallCollisionSound.Get();
+					Strong->CachedMonsterCollisionSound = InfoPtr->MonsterCollisionSound.Get();
+					Strong->CachedGuardianCollisionSound = InfoPtr->GuardianCollisionSound.Get();
+					Strong->CachedRTSWallCollisionSound = InfoPtr->RTSWallCollisionSound.Get();
+					Strong->CachedRTSMonsterCollisionSound = InfoPtr->RTSMonsterCollisionSound.Get();
+					Strong->CachedRTSGuardianCollisionSound = InfoPtr->RTSGuardianCollisionSound.Get();
 				}
 			} });
 	}

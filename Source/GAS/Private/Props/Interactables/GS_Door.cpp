@@ -241,11 +241,6 @@ bool AGS_Door::IsRTSMode() const
 	return LocalPC->IsA<AGS_RTSController>();
 }
 
-UAkAudioEvent* AGS_Door::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const
-{
-	const bool bRTS = IsRTSMode();
-	return bRTS ? RTSSound : TPSSound;
-}
 
 bool AGS_Door::ShouldPlayDoorSoundAtLocation(const FVector& DoorLocation) const
 {
@@ -341,8 +336,7 @@ void AGS_Door::PlayOpenSound()
 		return;
 	}
 
-	const bool bIsRTS = IsRTSMode();
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(OpenSound_TPS, OpenSound_RTS);
+	UAkAudioEvent* SoundEvent = UGS_AssetLoader::SyncLoadAsset(OpenSound);
 
 	if (SoundEvent)
 	{
@@ -357,7 +351,7 @@ void AGS_Door::PlayCloseSound()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(CloseSound_TPS, CloseSound_RTS);
+	UAkAudioEvent* SoundEvent = UGS_AssetLoader::SyncLoadAsset(CloseSound);
 	if (SoundEvent)
 	{
 		Multicast_PlayCloseSound();
@@ -386,15 +380,15 @@ void AGS_Door::Multicast_PlayOpenSound_Implementation()
 	}
 
 	const bool bIsRTS = IsRTSMode();
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(OpenSound_TPS, OpenSound_RTS);
+	UAkAudioEvent* SoundEvent = UGS_AssetLoader::SyncLoadAsset(OpenSound);
 
 	if (SoundEvent)
 	{
 		// DoorAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
 		if (IsValid(DoorAkComponent))
 		{
-			const FVector AkComponentLoc = DoorAkComponent->GetComponentLocation();
-			const FVector ActorLoc = GetActorLocation();
+			// 동적 거리 감쇠 설정 (Wwise Attenuation Scaling Factor)
+			DoorAkComponent->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
 			const AkPlayingID PlayingID = DoorAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
 		}
 		else
@@ -424,12 +418,15 @@ void AGS_Door::Multicast_PlayCloseSound_Implementation()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(CloseSound_TPS, CloseSound_RTS);
+	const bool bIsRTS = IsRTSMode();
+	UAkAudioEvent* SoundEvent = UGS_AssetLoader::SyncLoadAsset(CloseSound);
 	if (SoundEvent)
 	{
 		// DoorAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
 		if (IsValid(DoorAkComponent))
 		{
+			// 동적 거리 감쇠 설정 (Wwise Attenuation Scaling Factor)
+			DoorAkComponent->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
 			DoorAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
 		}
 		else

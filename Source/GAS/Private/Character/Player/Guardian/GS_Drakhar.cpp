@@ -1269,9 +1269,10 @@ void AGS_Drakhar::MulticastPlayFeverModeEndEffects_Implementation()
 		}
 
 		// 피버 모드 종료 사운드 재생
-		if (FeverModeEndSoundEvent)
+		UAkAudioEvent* EndSound = FeverModeEndSoundEvent.Get();
+		if (EndSound)
 		{
-			UAkGameplayStatics::PostEvent(FeverModeEndSoundEvent, this, 0, FOnAkPostEventCallback());
+			UAkGameplayStatics::PostEvent(EndSound, this, 0, FOnAkPostEventCallback());
 		}
 	}
 
@@ -1534,7 +1535,8 @@ void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, 
 {
 	if (ShouldPlayVFXAtLocation(HitLocation))
 	{
-		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+		UNiagaraSystem* BloodVFX = BloodEffectSystem.Get();
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodVFX, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
 	}
 }
 

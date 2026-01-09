@@ -25,6 +25,10 @@
 #include "Components/CapsuleComponent.h"
 #include "SignificanceManager.h"
 #include "Misc/App.h"
+#include "System/Utility/GS_AssetLoader.h"
+#include "NiagaraFunctionLibrary.h"
+#include "AkGameplayStatics.h"
+#include "Character/Player/GS_Player.h"
 
 AGS_TrapBase::AGS_TrapBase()
 {
@@ -453,17 +457,44 @@ void AGS_TrapBase::Multicast_DisableOptimizedCollision_Implementation()
 //함정 데미지
 void AGS_TrapBase::LoadTrapData()
 {
-	// 중복 로드 방지 (OnConstruction + BeginPlay 모두에서 호출됨)
-	if (bTrapDataLoaded)
+	if (bTrapDataLoaded || TrapID.IsNone() || !TrapDataTable)
 		return;
 
-	if (!TrapDataTable)
-		return;
-	FTrapData* FoundTrapData = TrapDataTable->FindRow<FTrapData>(TrapID, TEXT("LoadTrapData"));
-	if (FoundTrapData)
+	const FTrapData* Data = TrapDataTable->FindRow<FTrapData>(TrapID, TEXT(""));
+	if (Data)
 	{
-		TrapData = *FoundTrapData;
+		TrapData = *Data;
 		bTrapDataLoaded = true;
+
+		// 비동기 에셋 로딩 및 캐싱
+		TArray<FSoftObjectPath> AssetsToLoad;
+		if (!TrapData.ActivationSound.IsNull())
+			AssetsToLoad.Add(TrapData.ActivationSound.ToSoftObjectPath());
+		if (!TrapData.AlertSound.IsNull())
+			AssetsToLoad.Add(TrapData.AlertSound.ToSoftObjectPath());
+		if (!TrapData.HitSound.IsNull())
+			AssetsToLoad.Add(TrapData.HitSound.ToSoftObjectPath());
+		if (!TrapData.DeactivationSound.IsNull())
+			AssetsToLoad.Add(TrapData.DeactivationSound.ToSoftObjectPath());
+		if (!TrapData.TrapHitBloodEffect.IsNull())
+			AssetsToLoad.Add(TrapData.TrapHitBloodEffect.ToSoftObjectPath());
+
+		if (AssetsToLoad.Num() > 0)
+		{
+			TWeakObjectPtr<AGS_TrapBase> WeakThis(this);
+			UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
+			                                         {
+				if (AGS_TrapBase* Strong = WeakThis.Get())
+				{
+					// 캐싱 (GC 방지)
+					Strong->CachedActivationSound = Strong->TrapData.ActivationSound.Get();
+					Strong->CachedAlertSound = Strong->TrapData.AlertSound.Get();
+					Strong->CachedHitSound = Strong->TrapData.HitSound.Get();
+					Strong->CachedDeactivationSound = Strong->TrapData.DeactivationSound.Get();
+
+					Strong->CachedTrapHitBloodEffect = Strong->TrapData.TrapHitBloodEffect.Get();
+				} });
+		}
 	}
 	else
 	{
@@ -658,11 +689,9 @@ void AGS_TrapBase::CustomTrapEffect_Implementation(AActor* TargetActor)
 
 void AGS_TrapBase::Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLocation)
 {
-	// VFX 거리 기반 컬링 (Dedicated Server 체크)
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
+	// 거리/시야 체크 (오디오와 동일한 로직 활용)
+	if (!ShouldPlayTrapSoundAtLocation(HitLocation))
 		return;
-	}
 
 	// 발동 쿨다운 체크
 	const double CurrentTime = GetWorld()->GetTimeSeconds();
@@ -688,11 +717,16 @@ void AGS_TrapBase::Multicast_PlayTrapHitBloodEffect_Implementation(FVector HitLo
 		}
 	}
 
-	// 함정 데이터에서 혈흔 이펙트 가져오기 (개별 함정에서 오버라이드 가능)
-	UNiagaraSystem* BloodEffectToUse = TrapData.TrapHitBloodEffect;
+	UNiagaraSystem* BloodVFX = CachedTrapHitBloodEffect.Get();
+	if (!BloodVFX)
+	{
+		BloodVFX = UGS_AssetLoader::SyncLoadAsset(TrapData.TrapHitBloodEffect);
+	}
 
-	// 혈흔 이펙트 재생
-	UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectToUse, HitLocation, FRotator::ZeroRotator, 1.0f);
+	if (BloodVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), BloodVFX, HitLocation, FRotator::ZeroRotator, FVector(1.0f));
+	}
 }
 
 //플레이어가 안에 있는 경우 밀쳐내는 함수
@@ -910,11 +944,6 @@ bool AGS_TrapBase::IsRTSMode() const
 	return Cast<AGS_RTSController>(LocalPC) != nullptr;
 }
 
-UAkAudioEvent* AGS_TrapBase::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const
-{
-	const bool bRTS = IsRTSMode();
-	return bRTS ? RTSSound : TPSSound;
-}
 
 bool AGS_TrapBase::ShouldPlayTrapSoundAtLocation(const FVector& TrapLocation) const
 {
@@ -1069,11 +1098,7 @@ void AGS_TrapBase::PlayActivationSound()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
-	if (SoundEvent)
-	{
-		Multicast_PlayTrapSound(ETrapSoundType::Activation);
-	}
+	Multicast_PlayTrapSound(ETrapSoundType::Activation);
 }
 
 void AGS_TrapBase::PlayDeactivationSound()
@@ -1083,11 +1108,7 @@ void AGS_TrapBase::PlayDeactivationSound()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
-	if (SoundEvent)
-	{
-		Multicast_PlayTrapSound(ETrapSoundType::Deactivation);
-	}
+	Multicast_PlayTrapSound(ETrapSoundType::Deactivation);
 }
 
 void AGS_TrapBase::PlayHitSound()
@@ -1097,11 +1118,7 @@ void AGS_TrapBase::PlayHitSound()
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
-	if (SoundEvent)
-	{
-		Multicast_PlayTrapSound(ETrapSoundType::Hit);
-	}
+	Multicast_PlayTrapSound(ETrapSoundType::Hit);
 }
 
 void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundType)
@@ -1112,7 +1129,7 @@ void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundTy
 		return;
 	}
 
-	// Actor 유효성 체크 (서버 안정성)
+	// Actor 유효성 체크
 	if (!IsValid(this))
 	{
 		return;
@@ -1124,40 +1141,45 @@ void AGS_TrapBase::Multicast_PlayTrapSound_Implementation(ETrapSoundType SoundTy
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = nullptr;
-	FString DebugSoundName;
+	TSoftObjectPtr<UAkAudioEvent> SoundSoftPtr;
+	TObjectPtr<UAkAudioEvent> CachedSound;
+
+	bool bIsRTS = IsRTSMode();
 
 	switch (SoundType)
 	{
 	case ETrapSoundType::Activation:
-		SoundEvent = SelectSoundEventByMode(TrapData.ActivationSound_TPS, TrapData.ActivationSound_RTS);
-		DebugSoundName = TEXT("Activation");
+		SoundSoftPtr = TrapData.ActivationSound;
+		CachedSound = CachedActivationSound;
 		break;
 	case ETrapSoundType::Deactivation:
-		SoundEvent = SelectSoundEventByMode(TrapData.DeactivationSound_TPS, TrapData.DeactivationSound_RTS);
-		DebugSoundName = TEXT("Deactivation");
+		SoundSoftPtr = TrapData.DeactivationSound;
+		CachedSound = CachedDeactivationSound;
 		break;
 	case ETrapSoundType::Hit:
-		SoundEvent = SelectSoundEventByMode(TrapData.HitSound_TPS, TrapData.HitSound_RTS);
-		DebugSoundName = TEXT("Hit");
+		SoundSoftPtr = TrapData.HitSound;
+		CachedSound = CachedHitSound;
 		break;
 	}
 
-	if (SoundEvent)
+	UAkAudioEvent* SoundToPlay = CachedSound ? CachedSound.Get() : UGS_AssetLoader::SyncLoadAsset(SoundSoftPtr);
+
+	if (SoundToPlay)
 	{
-		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
+		// TrapAkComponent가 있으면 해당 컴포넌트(위치)에서 재생, 없으면 현재 위치에서 재생
 		if (IsValid(TrapAkComponent))
 		{
-			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
+			// RTS 모드에 따른 Attenuation Scaling 적용
+			TrapAkComponent->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
+
+			TrapAkComponent->PostAkEvent(SoundToPlay, 0, FOnAkPostEventCallback());
 		}
 		else
 		{
-			UAkGameplayStatics::PostEvent(SoundEvent, this, 0, FOnAkPostEventCallback());
+			// PostEvent(this)를 사용할 경우 내부적으로 AkComponent를 찾거나 생성하므로 스케일링 적용이 어려울 수 있음.
+			// 하지만 TrapAkComponent를 사용하는 것이 권장되는 패턴임.
+			UAkGameplayStatics::PostEvent(SoundToPlay, this, 0, FOnAkPostEventCallback());
 		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TrapBase] %s SoundEvent is None for %s."), *DebugSoundName, *GetName());
 	}
 }
 

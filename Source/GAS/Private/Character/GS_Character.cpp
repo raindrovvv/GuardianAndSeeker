@@ -303,6 +303,12 @@ float AGS_Character::TakeDamage(float DamageAmount,
 
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent,
 	                                       EventInstigator, DamageCauser);
+
+	if (!StatComp)
+	{
+		return 0.0f;
+	}
+
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
 	OnDamageStart();
@@ -610,7 +616,7 @@ AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
 
 void AGS_Character::SetCharacterSpeed(float InRatio)
 {
-	if (InRatio >= 0.4f &&
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
 	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
@@ -636,7 +642,7 @@ bool AGS_Character::IsDead() const
 
 void AGS_Character::Server_SetCharacterSpeed_Implementation(float InRatio)
 {
-	if (InRatio >= 0.8f &&
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
 	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),

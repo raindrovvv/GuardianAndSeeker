@@ -104,7 +104,8 @@ void UGS_DrakharVFXComponent::OnFlyStart()
 		return;
 	}
 
-	if (OwnerDrakhar->FlyingDustVFX && !IsValid(ActiveFlyingDustVFXComponent))
+	UNiagaraSystem* FlyingDustVFX = OwnerDrakhar->FlyingDustVFX.Get();
+	if (FlyingDustVFX && !IsValid(ActiveFlyingDustVFXComponent))
 	{
 		FVector Location = OwnerDrakhar->GetActorLocation() - FVector(0, 0, OwnerDrakhar->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 
@@ -114,7 +115,7 @@ void UGS_DrakharVFXComponent::OnFlyStart()
 			return;
 		}
 
-		ActiveFlyingDustVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->FlyingDustVFX, Location);
+		ActiveFlyingDustVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), FlyingDustVFX, Location);
 		if (ActiveFlyingDustVFXComponent)
 		{
 			ActiveFlyingDustVFXComponent->SetAutoDestroy(false);
@@ -196,7 +197,7 @@ void UGS_DrakharVFXComponent::StartWingRushVFX()
 		ActiveWingRushVFXComponent = nullptr;
 	}
 
-	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverWingRushRibbonVFX : OwnerDrakhar->WingRushRibbonVFX;
+	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverWingRushRibbonVFX.Get() : OwnerDrakhar->WingRushRibbonVFX.Get();
 	if (!VFXToSpawn)
 		return;
 
@@ -259,7 +260,7 @@ void UGS_DrakharVFXComponent::StartDustVFX()
 		ActiveDustVFXComponent = nullptr;
 	}
 
-	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverDustVFX : OwnerDrakhar->DustVFX;
+	UNiagaraSystem* VFXToSpawn = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverDustVFX.Get() : OwnerDrakhar->DustVFX.Get();
 	if (!VFXToSpawn)
 		return;
 
@@ -322,17 +323,18 @@ void UGS_DrakharVFXComponent::StartGroundCrackVFX()
 		ActiveGroundCrackVFXComponent = nullptr;
 	}
 
-	if (!OwnerDrakhar->GroundCrackVFX)
+	UNiagaraSystem* GroundCrackVFX = OwnerDrakhar->GroundCrackVFX.Get();
+	if (!GroundCrackVFX)
 		return;
 
 	if (EarthquakeVFXSpawnPoint && IsValid(EarthquakeVFXSpawnPoint))
 	{
-		ActiveGroundCrackVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(OwnerDrakhar->GroundCrackVFX, EarthquakeVFXSpawnPoint, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
+		ActiveGroundCrackVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(GroundCrackVFX, EarthquakeVFXSpawnPoint, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
 	}
 	else
 	{
 		FVector SpawnLocation = OwnerDrakhar->GetActorLocation() + FVector(0.f, 0.f, -90.f);
-		ActiveGroundCrackVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->GroundCrackVFX, SpawnLocation, OwnerDrakhar->GetActorRotation(), FVector(1.0f, 1.0f, 1.0f), true);
+		ActiveGroundCrackVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), GroundCrackVFX, SpawnLocation, OwnerDrakhar->GetActorRotation(), FVector(1.0f, 1.0f, 1.0f), true);
 	}
 
 	if (ActiveGroundCrackVFXComponent)
@@ -378,17 +380,18 @@ void UGS_DrakharVFXComponent::StartDustCloudVFX()
 		ActiveDustCloudVFXComponent = nullptr;
 	}
 
-	if (!OwnerDrakhar->DustCloudVFX)
+	UNiagaraSystem* DustCloudVFX = OwnerDrakhar->DustCloudVFX.Get();
+	if (!DustCloudVFX)
 		return;
 
 	if (EarthquakeVFXSpawnPoint && IsValid(EarthquakeVFXSpawnPoint))
 	{
-		ActiveDustCloudVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(OwnerDrakhar->DustCloudVFX, EarthquakeVFXSpawnPoint, NAME_None, FVector(0.f, 0.f, 50.f), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
+		ActiveDustCloudVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(DustCloudVFX, EarthquakeVFXSpawnPoint, NAME_None, FVector(0.f, 0.f, 50.f), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
 	}
 	else
 	{
 		FVector SpawnLocation = OwnerDrakhar->GetActorLocation() + FVector(0.f, 0.f, -40.f);
-		ActiveDustCloudVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->DustCloudVFX, SpawnLocation, OwnerDrakhar->GetActorRotation(), FVector(1.5f, 1.5f, 1.5f), true);
+		ActiveDustCloudVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), DustCloudVFX, SpawnLocation, OwnerDrakhar->GetActorRotation(), FVector(1.5f, 1.5f, 1.5f), true);
 	}
 
 	if (ActiveDustCloudVFXComponent)
@@ -438,7 +441,7 @@ void UGS_DrakharVFXComponent::PlayAttackHitVFX(FVector ImpactPoint)
 		return;
 	}
 
-	UNiagaraSystem* VFXToPlay = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverAttackHitVFX : OwnerDrakhar->NormalAttackHitVFX;
+	UNiagaraSystem* VFXToPlay = OwnerDrakhar->GetIsFeverMode() ? OwnerDrakhar->FeverAttackHitVFX.Get() : OwnerDrakhar->NormalAttackHitVFX.Get();
 	if (VFXToPlay)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), VFXToPlay, ImpactPoint);
@@ -456,9 +459,10 @@ void UGS_DrakharVFXComponent::PlayEarthquakeImpactVFX(const FVector& ImpactLocat
 		return;
 	}
 
-	if (OwnerDrakhar && OwnerDrakhar->EarthquakeImpactVFX && GetWorld())
+	UNiagaraSystem* EarthquakeImpactVFX = OwnerDrakhar ? OwnerDrakhar->EarthquakeImpactVFX.Get() : nullptr;
+	if (EarthquakeImpactVFX && GetWorld())
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->EarthquakeImpactVFX, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true, true, ENCPoolMethod::AutoRelease, true);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), EarthquakeImpactVFX, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true, true, ENCPoolMethod::AutoRelease, true);
 	}
 }
 
@@ -473,9 +477,10 @@ void UGS_DrakharVFXComponent::PlayFeverEarthquakeImpactVFX(const FVector& Impact
 		return;
 	}
 
-	if (OwnerDrakhar && OwnerDrakhar->FeverEarthquakeImpactVFX && GetWorld())
+	UNiagaraSystem* FeverEarthquakeImpactVFX = OwnerDrakhar ? OwnerDrakhar->FeverEarthquakeImpactVFX.Get() : nullptr;
+	if (FeverEarthquakeImpactVFX && GetWorld())
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), OwnerDrakhar->FeverEarthquakeImpactVFX, ImpactLocation, FRotator::ZeroRotator, FVector(1.5f), true, true, ENCPoolMethod::AutoRelease, true);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), FeverEarthquakeImpactVFX, ImpactLocation, FRotator::ZeroRotator, FVector(1.5f), true, true, ENCPoolMethod::AutoRelease, true);
 	}
 }
 
@@ -492,12 +497,12 @@ void UGS_DrakharVFXComponent::HandleDraconicProjectileImpact(const FVector& Impa
 	if (bHitCharacter)
 	{
 		// 캐릭터 히트 시 폭발 VFX
-		VFXToPlay = bIsFeverMode ? OwnerDrakhar->FeverDraconicProjectileExplosionVFX : OwnerDrakhar->DraconicProjectileExplosionVFX;
+		VFXToPlay = bIsFeverMode ? OwnerDrakhar->FeverDraconicProjectileExplosionVFX.Get() : OwnerDrakhar->DraconicProjectileExplosionVFX.Get();
 	}
 	else
 	{
 		// 일반 임팩트 VFX
-		VFXToPlay = bIsFeverMode ? OwnerDrakhar->FeverDraconicProjectileImpactVFX : OwnerDrakhar->DraconicProjectileImpactVFX;
+		VFXToPlay = bIsFeverMode ? OwnerDrakhar->FeverDraconicProjectileImpactVFX.Get() : OwnerDrakhar->DraconicProjectileImpactVFX.Get();
 	}
 
 	if (VFXToPlay && GetWorld())
@@ -565,7 +570,8 @@ void UGS_DrakharVFXComponent::OnFeverModeChanged(bool bIsFeverMode)
 	{
 		if (bIsFeverMode)
 		{
-			FootManagerComponent->OverrideFootDustEffect(OwnerDrakhar->FeverFootstepVFX);
+			UNiagaraSystem* FootstepVFX = OwnerDrakhar->FeverFootstepVFX.IsValid() ? UGS_AssetLoader::SyncLoadAsset(OwnerDrakhar->FeverFootstepVFX) : nullptr;
+			FootManagerComponent->OverrideFootDustEffect(FootstepVFX);
 		}
 		else
 		{
@@ -584,7 +590,7 @@ void UGS_DrakharVFXComponent::OnFeverModeChanged(bool bIsFeverMode)
 
 	if (OwnerDrakhar && OwnerDrakhar->HasAuthority() && !bIsFeverMode)
 	{
-		if (IsValid(ActiveDustVFXComponent) && ActiveDustVFXComponent->GetAsset() == OwnerDrakhar->FeverDustVFX)
+		if (IsValid(ActiveDustVFXComponent) && ActiveDustVFXComponent->GetAsset() == OwnerDrakhar->FeverDustVFX.Get())
 		{
 			StopDustVFX();
 		}

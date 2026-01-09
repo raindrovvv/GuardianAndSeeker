@@ -50,10 +50,10 @@ struct GAS_API FSkillInfo
 	float Damage = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<UAnimMontage*> Montages;
+	TArray<TSoftObjectPtr<UAnimMontage>> Montages;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UTexture2D* Image = nullptr;
+	TSoftObjectPtr<UTexture2D> Image = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSkillAllow> AllowSkillList;
@@ -67,68 +67,68 @@ struct GAS_API FSkillInfo
 
 	// 스킬 사운드 이벤트들
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillStartSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> SkillStartSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillEndSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> SkillEndSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillLoopSound = nullptr; // 스킬 가동 중 루프 사운드 (궁극기용)
+	TSoftObjectPtr<UAkAudioEvent> SkillLoopSound; // 스킬 가동 중 루프 사운드 (궁극기용)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-	UAkAudioEvent* SkillLoopStopSound = nullptr; // 스킬 루프 사운드 정지 이벤트 (궁극기용)
+	TSoftObjectPtr<UAkAudioEvent> SkillLoopStopSound; // 스킬 루프 사운드 정지 이벤트 (궁극기용)
 
 	// RTS 모드 전용 스킬 사운드 (존재하지 않으면 TPS 사운드로 폴백)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	UAkAudioEvent* RTSSkillStartSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSSkillStartSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	UAkAudioEvent* RTSSkillEndSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSSkillEndSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	UAkAudioEvent* RTSSkillLoopSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSSkillLoopSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	UAkAudioEvent* RTSSkillLoopStopSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSSkillLoopStopSound;
 
 	// 충돌별 특수 사운드 (주로 궁극기 스킬용)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* WallCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> WallCollisionSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* MonsterCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> MonsterCollisionSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
-	UAkAudioEvent* GuardianCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> GuardianCollisionSound;
 
 	// RTS 모드 전용 충돌 사운드 (존재하지 않으면 TPS 사운드로 폴백)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	UAkAudioEvent* RTSWallCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSWallCollisionSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	UAkAudioEvent* RTSMonsterCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSMonsterCollisionSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	UAkAudioEvent* RTSGuardianCollisionSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> RTSGuardianCollisionSound;
 
 	// 스킬 VFX 이벤트들
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillCastVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillCastVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillRangeVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillRangeVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillImpactVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillEnvImpactVFX; // 환경(벽, 바닥) 충돌용 VFX
+	TSoftObjectPtr<UNiagaraSystem> SkillEnvImpactVFX; // 환경(벽, 바닥) 충돌용 VFX
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillEndVFX;
+	TSoftObjectPtr<UNiagaraSystem> SkillEndVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
-	TObjectPtr<UNiagaraSystem> SkillLoopVFX; // 스킬 지속 중 루프 VFX (궁극기 아우라 등)
+	TSoftObjectPtr<UNiagaraSystem> SkillLoopVFX; // 스킬 지속 중 루프 VFX (궁극기 아우라 등)
 
 	// VFX 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")

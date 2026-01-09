@@ -63,6 +63,8 @@ class GAS_API AGS_Character : public ACharacter, public IGenericTeamAgentInterfa
 	GENERATED_BODY()
 
 public:
+	static constexpr float SLOW_DEBUFF_SPEED_THRESHOLD = 0.4f;
+
 	AGS_Character(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void BeginPlay() override;

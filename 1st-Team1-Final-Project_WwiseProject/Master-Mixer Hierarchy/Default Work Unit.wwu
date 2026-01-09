@@ -34,6 +34,11 @@
 										<Value>-1</Value>
 									</ValueList>
 								</Property>
+								<Property Name="OutputBusVolume" Type="Real64">
+									<ValueList>
+										<Value>-6</Value>
+									</ValueList>
+								</Property>
 								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
 							</PropertyList>
 							<ObjectLists>
@@ -57,6 +62,11 @@
 								<Property Name="BusVolume" Type="Real64">
 									<ValueList>
 										<Value>1</Value>
+									</ValueList>
+								</Property>
+								<Property Name="OutputBusVolume" Type="Real64">
+									<ValueList>
+										<Value>-6</Value>
 									</ValueList>
 								</Property>
 								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
@@ -169,10 +179,15 @@
 										<Value>1</Value>
 									</ValueList>
 								</Property>
+								<Property Name="OutputBusVolume" Type="Real64">
+									<ValueList>
+										<Value>-3</Value>
+									</ValueList>
+								</Property>
 								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
 								<Property Name="Volume" Type="Real64">
 									<ValueList>
-										<Value>-1</Value>
+										<Value>-3</Value>
 									</ValueList>
 								</Property>
 							</PropertyList>

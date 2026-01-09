@@ -10,7 +10,7 @@
 								<Value>False</Value>
 							</ValueList>
 						</Property>
-						<Property Name="RadiusMax" Type="Real64" Value="1200"/>
+						<Property Name="RadiusMax" Type="Real64" Value="2000"/>
 					</PropertyList>
 					<ObjectLists>
 						<ObjectList Name="RTPC">
@@ -66,18 +66,18 @@
 											<SegmentShape>Exp3</SegmentShape>
 										</Point>
 										<Point>
-											<XPos>1069.68305142857</XPos>
-											<YPos>-1.12434</YPos>
+											<XPos>1739.70164444444</XPos>
+											<YPos>-1.18006</YPos>
 											<Flags>0</Flags>
 										</Point>
 										<Point>
-											<XPos>1135.73163428571</XPos>
-											<YPos>-1.83617</YPos>
+											<XPos>1875.64467777778</XPos>
+											<YPos>-1.85629</YPos>
 											<Flags>0</Flags>
 											<SegmentShape>Exp2</SegmentShape>
 										</Point>
 										<Point>
-											<XPos>1200</XPos>
+											<XPos>2000</XPos>
 											<YPos>-200</YPos>
 											<Flags>37</Flags>
 										</Point>

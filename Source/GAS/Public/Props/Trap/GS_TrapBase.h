@@ -92,10 +92,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Trap|Audio")
 	bool IsRTSMode() const;
 
-	/** 모드에 맞는 사운드 이벤트 선택 */
-	UFUNCTION(BlueprintPure, Category = "Trap|Audio")
-	UAkAudioEvent* SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const;
-
 	/** 함정 사운드 재생 최적화를 위한 거리/시야 체크 */
 	UFUNCTION(BlueprintPure, Category = "Trap|Audio")
 	bool ShouldPlayTrapSoundAtLocation(const FVector& TrapLocation) const;
@@ -285,4 +281,23 @@ private:
 
 	/** 그림자 컬링 상태 업데이트 */
 	void UpdateShadowCulling();
+
+	// ===================
+	// Audio Caching
+	// ===================
+protected:
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedActivationSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedAlertSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedHitSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDeactivationSound;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedTrapHitBloodEffect;
 };

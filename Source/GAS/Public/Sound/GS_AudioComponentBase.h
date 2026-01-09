@@ -74,7 +74,7 @@ public:
 	static constexpr float TPSMaxDistance = 2000.0f; // TPS 모드 최대 거리 (20m)
 
 	// Distance Scaling 설정 상수 (개선된 RTS/TPS 구분)
-	static constexpr float RTSDistanceScaling = 2.0f; // RTS 모드 (200% = 400m)
+	static constexpr float RTSDistanceScaling = 10.0f; // RTS 모드 (1000% = 200m)
 	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20m)
 
 	// 기타 상수들
@@ -178,6 +178,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	virtual void PlayDeathSoundLocal();
 
+	/** 오디오 에셋 프리로딩 (동적 스케일링 준비) */
+	void PreloadCommonSounds();
+
 	// ===================
 	// 공통 인터페이스
 	// ===================
@@ -248,13 +251,14 @@ protected:
 	// 공통 사운드 에셋 (자식 클래스에서 설정)
 	// ==========================
 
-	/** 죽음 사운드 - 자식 클래스(MonsterAudioComponent, SeekerAudioComponent 등)에서 설정됨 */
-	UPROPERTY()
-	TObjectPtr<class UAkAudioEvent> DeathSound;
+	/** 죽음 사운드 (TPS/RTS 통합 에셋) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events", meta = (DisplayName = "Death Sound"))
+	TSoftObjectPtr<class UAkAudioEvent> DeathSound;
 
-	/** RTS 모드 죽음 사운드 - 자식 클래스에서 설정됨 */
+protected:
+	/** 캐시된 죽음 사운드 (프리로드용) */
 	UPROPERTY()
-	TObjectPtr<class UAkAudioEvent> RTS_DeathSound;
+	TObjectPtr<UAkAudioEvent> CachedDeathSound;
 
 	// ==========================
 	// Multicast RPC 최적화 헬퍼
@@ -281,16 +285,6 @@ protected:
 	 * @return 사운드를 재생해야 하면 true
 	 */
 	bool PrepareMulticastSound(AActor* SourceActor, bool bSkipViewFrustumCheck = false);
-
-	/**
-	 * 모드별 사운드 이벤트 선택 (TPS/RTS 자동 폴백)
-	 *
-	 * @param TPSSound TPS 모드 사운드
-	 * @param RTSSound RTS 모드 사운드
-	 * @param bUseRTSMode 강제로 RTS 모드 사용 (기본값은 자동 감지)
-	 * @return 선택된 사운드 이벤트 (RTS가 없으면 TPS로 폴백)
-	 */
-	UAkAudioEvent* SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound, bool bUseRTSMode = false) const;
 
 	/**
 	 * 리슨 서버 RPC 중복 실행 방지 체크
