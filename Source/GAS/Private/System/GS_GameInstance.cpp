@@ -39,7 +39,7 @@ void UGS_GameInstance::Init()
 
 	if (GEngine)
 	{
-		GEngine->OnNetworkFailure().AddUObject(this, &UGS_GameInstance::HandleNetworkFailure);
+		OnNetworkFailureDelegateHandle = GEngine->OnNetworkFailure().AddUObject(this, &UGS_GameInstance::HandleNetworkFailure);
 	}
 
 	IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
@@ -312,7 +312,26 @@ void UGS_GameInstance::Shutdown()
 			SessionInterface->ClearOnSessionUserInviteAcceptedDelegate_Handle(OnSessionUserInviteAcceptedDelegateHandle);
 			OnSessionUserInviteAcceptedDelegateHandle.Reset();
 		}
+		if (OnDestroySessionCompleteDelegateHandleForCleanup.IsValid())
+		{
+			SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(OnDestroySessionCompleteDelegateHandleForCleanup);
+			OnDestroySessionCompleteDelegateHandleForCleanup.Reset();
+		}
+		if (LeaveSessionCompleteDelegateHandle.IsValid())
+		{
+			SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(LeaveSessionCompleteDelegateHandle);
+			LeaveSessionCompleteDelegateHandle.Reset();
+		}
 	}
+
+	OnPlayerCountChanged.RemoveDynamic(this, &UGS_GameInstance::HandlePlayerCountChanged);
+
+	if (GEngine && OnNetworkFailureDelegateHandle.IsValid())
+	{
+		GEngine->OnNetworkFailure().Remove(OnNetworkFailureDelegateHandle);
+		OnNetworkFailureDelegateHandle.Reset();
+	}
+
 	Super::Shutdown();
 }
 
