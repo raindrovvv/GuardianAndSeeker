@@ -74,7 +74,7 @@ public:
 	static constexpr float TPSMaxDistance = 2000.0f; // TPS 모드 최대 거리 (20m)
 
 	// Distance Scaling 설정 상수 (개선된 RTS/TPS 구분)
-	static constexpr float RTSDistanceScaling = 10.0f; // RTS 모드 (1000% = 200m)
+	static constexpr float RTSDistanceScaling = 12.0f; // RTS 모드 (1200% = 240m)
 	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20m)
 
 	// 기타 상수들

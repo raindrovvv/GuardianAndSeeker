@@ -181,26 +181,12 @@ void UGS_SkillBase::PreloadSkillAssets()
 			AssetsToLoad.Add(Info->SkillLoopSound.ToSoftObjectPath());
 		if (!Info->SkillLoopStopSound.IsNull())
 			AssetsToLoad.Add(Info->SkillLoopStopSound.ToSoftObjectPath());
-		if (!Info->RTSSkillStartSound.IsNull())
-			AssetsToLoad.Add(Info->RTSSkillStartSound.ToSoftObjectPath());
-		if (!Info->RTSSkillEndSound.IsNull())
-			AssetsToLoad.Add(Info->RTSSkillEndSound.ToSoftObjectPath());
-		if (!Info->RTSSkillLoopSound.IsNull())
-			AssetsToLoad.Add(Info->RTSSkillLoopSound.ToSoftObjectPath());
-		if (!Info->RTSSkillLoopStopSound.IsNull())
-			AssetsToLoad.Add(Info->RTSSkillLoopStopSound.ToSoftObjectPath());
 		if (!Info->WallCollisionSound.IsNull())
 			AssetsToLoad.Add(Info->WallCollisionSound.ToSoftObjectPath());
 		if (!Info->MonsterCollisionSound.IsNull())
 			AssetsToLoad.Add(Info->MonsterCollisionSound.ToSoftObjectPath());
 		if (!Info->GuardianCollisionSound.IsNull())
 			AssetsToLoad.Add(Info->GuardianCollisionSound.ToSoftObjectPath());
-		if (!Info->RTSWallCollisionSound.IsNull())
-			AssetsToLoad.Add(Info->RTSWallCollisionSound.ToSoftObjectPath());
-		if (!Info->RTSMonsterCollisionSound.IsNull())
-			AssetsToLoad.Add(Info->RTSMonsterCollisionSound.ToSoftObjectPath());
-		if (!Info->RTSGuardianCollisionSound.IsNull())
-			AssetsToLoad.Add(Info->RTSGuardianCollisionSound.ToSoftObjectPath());
 	}
 
 	if (AssetsToLoad.Num() > 0)
@@ -233,16 +219,9 @@ void UGS_SkillBase::PreloadSkillAssets()
 					Strong->CachedSkillEndSound = InfoPtr->SkillEndSound.Get();
 					Strong->CachedSkillLoopSound = InfoPtr->SkillLoopSound.Get();
 					Strong->CachedSkillLoopStopSound = InfoPtr->SkillLoopStopSound.Get();
-					Strong->CachedRTSSkillStartSound = InfoPtr->RTSSkillStartSound.Get();
-					Strong->CachedRTSSkillEndSound = InfoPtr->RTSSkillEndSound.Get();
-					Strong->CachedRTSSkillLoopSound = InfoPtr->RTSSkillLoopSound.Get();
-					Strong->CachedRTSSkillLoopStopSound = InfoPtr->RTSSkillLoopStopSound.Get();
 					Strong->CachedWallCollisionSound = InfoPtr->WallCollisionSound.Get();
 					Strong->CachedMonsterCollisionSound = InfoPtr->MonsterCollisionSound.Get();
 					Strong->CachedGuardianCollisionSound = InfoPtr->GuardianCollisionSound.Get();
-					Strong->CachedRTSWallCollisionSound = InfoPtr->RTSWallCollisionSound.Get();
-					Strong->CachedRTSMonsterCollisionSound = InfoPtr->RTSMonsterCollisionSound.Get();
-					Strong->CachedRTSGuardianCollisionSound = InfoPtr->RTSGuardianCollisionSound.Get();
 				}
 			} });
 	}

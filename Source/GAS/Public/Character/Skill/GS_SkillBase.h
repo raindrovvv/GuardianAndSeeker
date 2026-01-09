@@ -173,18 +173,6 @@ protected:
 	TObjectPtr<UAkAudioEvent> CachedSkillLoopStopSound;
 
 	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSSkillStartSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSSkillEndSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSSkillLoopSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSSkillLoopStopSound;
-
-	UPROPERTY()
 	TObjectPtr<UAkAudioEvent> CachedWallCollisionSound;
 
 	UPROPERTY()
@@ -192,15 +180,6 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UAkAudioEvent> CachedGuardianCollisionSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSWallCollisionSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSMonsterCollisionSound;
-
-	UPROPERTY()
-	TObjectPtr<UAkAudioEvent> CachedRTSGuardianCollisionSound;
 
 	// 프리로드된 애니메이션 몽타주 캐시 (메모리 최적화를 위한 로드된 에셋 저장)
 	UPROPERTY()

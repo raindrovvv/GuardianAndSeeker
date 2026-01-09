@@ -712,10 +712,8 @@ void UGS_SeekerAudioComponent::PlaySkillSoundFromDataTable(ESkillSlot SkillSlot,
 		return;
 	}
 
-	const bool bRTS = IsRTSMode();
-	// RTS 우선 선택, 없으면 TPS 사운드로 폴백
-	UAkAudioEvent* StartSound = bRTS && !SkillInfo->RTSSkillStartSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSSkillStartSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillStartSound);
-	UAkAudioEvent* EndSound = bRTS && !SkillInfo->RTSSkillEndSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSSkillEndSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillEndSound);
+	UAkAudioEvent* StartSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillStartSound);
+	UAkAudioEvent* EndSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillEndSound);
 
 	// 스킬 시작/종료 사운드 재생 (모드별 선택)
 	PlaySkillSoundFromSkillInfo(bIsSkillStart, StartSound, EndSound);
@@ -729,8 +727,7 @@ void UGS_SeekerAudioComponent::PlaySkillLoopSoundFromDataTable(ESkillSlot SkillS
 		return;
 	}
 
-	const bool bRTS = IsRTSMode();
-	UAkAudioEvent* LoopSound = bRTS && !SkillInfo->RTSSkillLoopSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSSkillLoopSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillLoopSound);
+	UAkAudioEvent* LoopSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillLoopSound);
 
 	// 루프 사운드 재생 (모드별 선택)
 	AkPlayingID LoopPlayingID = UAkGameplayStatics::PostEvent(LoopSound, GetOwner(), 0, FOnAkPostEventCallback());
@@ -745,8 +742,7 @@ void UGS_SeekerAudioComponent::StopSkillLoopSoundFromDataTable(ESkillSlot SkillS
 		return;
 	}
 
-	const bool bRTS = IsRTSMode();
-	UAkAudioEvent* LoopStopSound = bRTS && !SkillInfo->RTSSkillLoopStopSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSSkillLoopStopSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillLoopStopSound);
+	UAkAudioEvent* LoopStopSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->SkillLoopStopSound);
 
 	// 루프 사운드 정지 (모드별 선택)
 	AkPlayingID StopPlayingID = UAkGameplayStatics::PostEvent(LoopStopSound, GetOwner(), 0, FOnAkPostEventCallback());
@@ -761,19 +757,18 @@ void UGS_SeekerAudioComponent::PlaySkillCollisionSoundFromDataTable(ESkillSlot S
 		return;
 	}
 
-	const bool bRTS = IsRTSMode();
-	// 충돌 타입에 따른 사운드 선택 (RTS 우선)
+	// 충돌 타입에 따른 사운드 선택
 	UAkAudioEvent* CollisionSound = nullptr;
 	switch (CollisionType)
 	{
 	case 0: // 벽 충돌
-		CollisionSound = bRTS && !SkillInfo->RTSWallCollisionSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSWallCollisionSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->WallCollisionSound);
+		CollisionSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->WallCollisionSound);
 		break;
 	case 1: // 몬스터 충돌
-		CollisionSound = bRTS && !SkillInfo->RTSMonsterCollisionSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSMonsterCollisionSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->MonsterCollisionSound);
+		CollisionSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->MonsterCollisionSound);
 		break;
 	case 2: // 가디언 충돌
-		CollisionSound = bRTS && !SkillInfo->RTSGuardianCollisionSound.IsNull() ? UGS_AssetLoader::SyncLoadAsset(SkillInfo->RTSGuardianCollisionSound) : UGS_AssetLoader::SyncLoadAsset(SkillInfo->GuardianCollisionSound);
+		CollisionSound = UGS_AssetLoader::SyncLoadAsset(SkillInfo->GuardianCollisionSound);
 		break;
 	default:
 		return;

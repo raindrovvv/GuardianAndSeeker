@@ -78,19 +78,6 @@ struct GAS_API FSkillInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 	TSoftObjectPtr<UAkAudioEvent> SkillLoopStopSound; // 스킬 루프 사운드 정지 이벤트 (궁극기용)
 
-	// RTS 모드 전용 스킬 사운드 (존재하지 않으면 TPS 사운드로 폴백)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSSkillStartSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSSkillEndSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSSkillLoopSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSSkillLoopStopSound;
-
 	// 충돌별 특수 사운드 (주로 궁극기 스킬용)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
 	TSoftObjectPtr<UAkAudioEvent> WallCollisionSound;
@@ -101,15 +88,6 @@ struct GAS_API FSkillInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision")
 	TSoftObjectPtr<UAkAudioEvent> GuardianCollisionSound;
 
-	// RTS 모드 전용 충돌 사운드 (존재하지 않으면 TPS 사운드로 폴백)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSWallCollisionSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSMonsterCollisionSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound|Collision|RTS")
-	TSoftObjectPtr<UAkAudioEvent> RTSGuardianCollisionSound;
 
 	// 스킬 VFX 이벤트들
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
