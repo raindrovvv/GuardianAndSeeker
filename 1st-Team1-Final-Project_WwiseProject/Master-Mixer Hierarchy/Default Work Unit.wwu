@@ -88,6 +88,13 @@
 							</ObjectLists>
 						</AuxBus>
 						<Bus Name="Music" ID="{9367FD4B-9CA5-4723-B0A7-DB75934DCD2F}">
+							<PropertyList>
+								<Property Name="Volume" Type="Real64">
+									<ValueList>
+										<Value>-4</Value>
+									</ValueList>
+								</Property>
+							</PropertyList>
 							<ObjectLists>
 								<ObjectList Name="RTPC">
 									<Reference>
@@ -171,23 +178,23 @@
 								<Property Name="ListenerRelativeRouting" Type="bool" Value="True"/>
 								<Property Name="OutputBusHighpass" Type="int16">
 									<ValueList>
-										<Value>1</Value>
+										<Value>2</Value>
 									</ValueList>
 								</Property>
 								<Property Name="OutputBusLowpass" Type="int16">
 									<ValueList>
-										<Value>1</Value>
+										<Value>2</Value>
 									</ValueList>
 								</Property>
 								<Property Name="OutputBusVolume" Type="Real64">
 									<ValueList>
-										<Value>-3</Value>
+										<Value>-2</Value>
 									</ValueList>
 								</Property>
 								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
 								<Property Name="Volume" Type="Real64">
 									<ValueList>
-										<Value>-3</Value>
+										<Value>-2</Value>
 									</ValueList>
 								</Property>
 							</PropertyList>
@@ -199,8 +206,7 @@
 						</Bus>
 						<Bus Name="UI_Sound" ID="{836D4A21-90EA-4615-922B-077674E0F320}">
 							<PropertyList>
-								<Property Name="3DSpatialization" Type="int16" Value="2"/>
-								<Property Name="EnableDiffraction" Type="bool" Value="True"/>
+								<Property Name="EnableAttenuation" Type="bool" Value="False"/>
 								<Property Name="OutputBusHighpass" Type="int16">
 									<ValueList>
 										<Value>2</Value>
@@ -218,11 +224,7 @@
 								</Property>
 								<Property Name="UseGameAuxSends" Type="bool" Value="True"/>
 							</PropertyList>
-							<ReferenceList>
-								<Reference Name="Attenuation">
-									<ObjectRef Name="BaseAttenuation" ID="{B72E6503-4AD5-4DB3-8853-15727BF9AC4E}" WorkUnitID="{884F5FC8-7442-4A32-8FB6-CA9454D5D66C}"/>
-								</Reference>
-							</ReferenceList>
+							<ReferenceList/>
 						</Bus>
 					</ChildrenList>
 					<ObjectLists>

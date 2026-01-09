@@ -10,7 +10,7 @@
     "Type": "User",
     "GUID": "{950C1703-E2FF-4ADA-A9A2-8A07DCE3D0E8}",
     "Language": "SFX",
-    "Hash": "{1F05CF00-EC99-D0D5-19AD-F6F59ACA84AA}",
+    "Hash": "{523F8279-F28F-72F0-2433-2CD13A252A86}",
     "ObjectPath": "\\SoundBanks\\Default Work Unit\\Main",
     "ShortName": "Main",
     "Path": "Main.bnk",
@@ -549,7 +549,7 @@
       "Streaming": "false",
       "Location": "Memory",
       "ShortName": "SFX_Arrow_Realse.wav",
-      "CachePath": "F2/{F2AC1F01-6CC9-3F13-3C6E-69B220C26D52}.wem"
+      "CachePath": "FD/{FD851055-7989-DD51-FABA-0503EDA401F0}.wem"
      },
      {
       "Id": "222843135",
@@ -629,7 +629,7 @@
       "Streaming": "false",
       "Location": "Memory",
       "ShortName": "FlameMovementHeavy_SFXB.651.wav",
-      "CachePath": "9C/{9C9D9EC2-7C82-8755-287E-7118D8A16448}.wem"
+      "CachePath": "5A/{5ABD7B11-87CC-BC02-4B3C-1F82227D6DB6}.wem"
      },
      {
       "Id": "255044406",
@@ -1109,7 +1109,7 @@
       "Streaming": "false",
       "Location": "Memory",
       "ShortName": "ESM_GB_fx_foley_one_shot_firebrst_inflammation_light_02_burn_fire_flame.wav",
-      "CachePath": "BD/{BD3F863D-9134-E99D-9CB8-3C4398B9D8AA}.wem"
+      "CachePath": "63/{63884CF9-F6AE-D863-B2FB-A04E6DFBA1B1}.wem"
      },
      {
       "Id": "459021620",
@@ -3615,7 +3615,7 @@
       "Name": "EV_ArrowImpact_Body",
       "ObjectPath": "\\Events\\Default Work Unit\\Weapon\\Projectile\\EV_ArrowImpact_Body",
       "GUID": "{630AD5C5-AB82-4AFB-81AE-098F89BAEBAD}",
-      "MaxAttenuation": "1000",
+      "MaxAttenuation": "1800",
       "DurationType": "OneShot",
       "DurationMin": "0.30958745",
       "DurationMax": "0.32799646",
@@ -3630,7 +3630,7 @@
       "Name": "EV_ArrowImpact_Stone",
       "ObjectPath": "\\Events\\Default Work Unit\\Weapon\\Projectile\\EV_ArrowImpact_Stone",
       "GUID": "{C0E4251E-79CC-43B2-94E9-0D9F95C47B45}",
-      "MaxAttenuation": "1000",
+      "MaxAttenuation": "1800",
       "DurationType": "OneShot",
       "DurationMin": "0.54591566",
       "DurationMax": "0.6770234",
@@ -4428,7 +4428,7 @@
       "Name": "EV_Layer_Flesh_Arrow",
       "ObjectPath": "\\Events\\Default Work Unit\\Weapon\\EV_Layer_Flesh_Arrow",
       "GUID": "{041F7193-EA9B-4B7A-BC46-E995B280FC5D}",
-      "MaxAttenuation": "2000",
+      "MaxAttenuation": "1800",
       "DurationType": "OneShot",
       "DurationMin": "0.53108424",
       "DurationMax": "0.8265289",
@@ -4477,7 +4477,7 @@
       "Name": "EV_Layer_Reverb_Arrow",
       "ObjectPath": "\\Events\\Default Work Unit\\Weapon\\EV_Layer_Reverb_Arrow",
       "GUID": "{D24785AD-B47D-41EB-A795-52711A431EDA}",
-      "MaxAttenuation": "1000",
+      "MaxAttenuation": "1800",
       "DurationType": "OneShot",
       "DurationMin": "0.95169026",
       "DurationMax": "1.0082808",
@@ -5304,7 +5304,7 @@
       "Name": "EV_NeedleFang_Shot",
       "ObjectPath": "\\Events\\Default Work Unit\\Weapon\\Projectile\\EV_NeedleFang_Shot",
       "GUID": "{D5FB5933-2F9E-4265-BBF0-828FF4BF9D19}",
-      "MaxAttenuation": "1000",
+      "MaxAttenuation": "1800",
       "DurationType": "OneShot",
       "DurationMin": "1.3405589",
       "DurationMax": "1.6036302",
@@ -5642,7 +5642,7 @@
       "Name": "FootSteps",
       "ObjectPath": "\\Events\\Default Work Unit\\FootSteps",
       "GUID": "{ACB43239-CB8C-41BC-9AC2-2E9257233BFE}",
-      "MaxAttenuation": "1800",
+      "MaxAttenuation": "1600",
       "DurationType": "OneShot",
       "DurationMin": "0.14552888",
       "DurationMax": "1.204451",
@@ -6799,6 +6799,6 @@
     ]
    }
   ],
-  "FileHash": "{CFD96797-EA25-D834-68B2-72C4814E4348}"
+  "FileHash": "{EBD194F9-3234-B0FC-22DC-808D77DB0994}"
  }
 }
