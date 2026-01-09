@@ -56,6 +56,11 @@ UGS_FootManagerComponent::UGS_FootManagerComponent()
 	LastFootstepTime = 0.0f;
 	LastFootstepLocation = FVector::ZeroVector;
 
+	// Initialize tracking variables
+	PrevLeftFootLocation = FVector::ZeroVector;
+	PrevRightFootLocation = FVector::ZeroVector;
+	LastDetectedFoot = EFootStep::RightFoot;
+
 	// Initialize decal properties
 	FootDecalSize = FVector(13.0f, 13.0f, 13.0f);
 	FootDecalLifeSpan = 10.0f;
@@ -80,7 +85,7 @@ UGS_FootManagerComponent::UGS_FootManagerComponent()
 	WaterBubbleEffect = nullptr;
 	WaterMistEffect = nullptr;
 
-	// Set default switch group name
+	// Set default switch group name - Wwise 프로젝트의 Switch Group 이름과 일치해야 함
 	SwitchGroupName = TEXT("FootSteps");
 
 	// Initialize surface switch values
@@ -312,9 +317,6 @@ EFootStep UGS_FootManagerComponent::DetectActiveFootstep()
 	}
 
 	// Method 2: Velocity-based detection (fallback)
-	static FVector PrevLeftFootLocation = LeftFootLocation;
-	static FVector PrevRightFootLocation = RightFootLocation;
-
 	const FVector LeftFootVelocity = LeftFootLocation - PrevLeftFootLocation;
 	const FVector RightFootVelocity = RightFootLocation - PrevRightFootLocation;
 
@@ -325,9 +327,6 @@ EFootStep UGS_FootManagerComponent::DetectActiveFootstep()
 	// The foot with lower velocity is more likely to be in contact with ground
 	const float LeftFootSpeed = LeftFootVelocity.Size();
 	const float RightFootSpeed = RightFootVelocity.Size();
-
-	// Method 3: Alternating fallback
-	static EFootStep LastDetectedFoot = EFootStep::RightFoot;
 
 	if (FMath::Abs(LeftFootSpeed - RightFootSpeed) < 0.5f)
 	{
@@ -365,7 +364,7 @@ bool UGS_FootManagerComponent::PerformFootTrace(EFootStep Foot, FHitResult& OutH
 	// Setup optimized trace parameters
 	FCollisionQueryParams TraceParams(FName("FootTrace"), false, GetOwner());
 	TraceParams.bReturnPhysicalMaterial = true;
-	TraceParams.bTraceComplex = false; // 성능 최적화: Simple collision 사용
+	TraceParams.bTraceComplex = false; // 트레이스 복잡도를 줄여 성능 최적화
 
 	// 성능 최적화: 불필요한 오브젝트 제외
 	TraceParams.AddIgnoredActor(GetOwner()); // 자기 자신 제외

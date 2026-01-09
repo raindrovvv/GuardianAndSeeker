@@ -23,8 +23,8 @@ class UMaterialInterface;
 UENUM(BlueprintType)
 enum class EFootStep : uint8
 {
-	LeftFoot	UMETA(DisplayName = "Left Foot"),
-	RightFoot	UMETA(DisplayName = "Right Foot")
+	LeftFoot UMETA(DisplayName = "Left Foot"),
+	RightFoot UMETA(DisplayName = "Right Foot")
 };
 
 /**
@@ -33,16 +33,16 @@ enum class EFootStep : uint8
 UENUM(BlueprintType)
 enum class EFootDetectionMethod : uint8
 {
-	VelocityBased	UMETA(DisplayName = "Velocity Based"),
-	HeightBased		UMETA(DisplayName = "Height Based"),
-	Alternating		UMETA(DisplayName = "Alternating")
+	VelocityBased UMETA(DisplayName = "Velocity Based"),
+	HeightBased UMETA(DisplayName = "Height Based"),
+	Alternating UMETA(DisplayName = "Alternating")
 };
 
 /**
  * 발걸음 시스템을 관리하는 컴포넌트
  * 라인 트레이스, 데칼 스폰, 사운드 재생, VFX 효과를 통합 관리
  */
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_FootManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -220,7 +220,7 @@ protected:
 
 	/** 발소리가 재생되었을 때 호출되는 델리게이트 */
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnFootSoundPlayedDelegate, EPhysicalSurface, Surface, FVector, Location);
-	
+
 	UPROPERTY(BlueprintAssignable, Category = "Footstep|Events")
 	FOnFootSoundPlayedDelegate OnFootSoundPlayed;
 
@@ -245,6 +245,11 @@ protected:
 
 	/** 마지막 발자국 위치 */
 	FVector LastFootstepLocation;
+
+	/** 발 감지용 이전 위치 데이터 (다중 인스턴스 지원을 위해 멤버 변수화) */
+	FVector PrevLeftFootLocation;
+	FVector PrevRightFootLocation;
+	EFootStep LastDetectedFoot;
 
 private:
 	// ======== Private Functions ========
@@ -317,4 +322,4 @@ private:
 
 	/** 오른발 소켓 이름 */
 	static const FName RightFootSocketName;
-}; 
+};
