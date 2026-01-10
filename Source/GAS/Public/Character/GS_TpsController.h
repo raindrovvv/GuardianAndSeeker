@@ -111,7 +111,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Control")
 	FVector2D MoveInputValue;
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable)
 	void Server_CacheMoveInputValue(FVector2D InputValue);
 
 	UFUNCTION(BlueprintCallable)
@@ -269,6 +269,12 @@ private:
 	UPROPERTY()
 	UGS_InteractionWidget* InteractionWidget;
 
+
+	/** 이동 입력 Throttling 관련 변수 */
+	FVector2D LastSentMoveInputValue = FVector2D::ZeroVector;
+	float LastMoveInputSentTime = 0.0f;
+	const float MoveInputSendThreshold = 0.05f; // 최소 변화량 임계값
+	const float MoveInputMinSendInterval = 0.033f; // 최소 전송 간격 (약 30fps)
 
 	void AutoMoveTick();
 	void ApplyChargeCameraSettings(bool bCharging);

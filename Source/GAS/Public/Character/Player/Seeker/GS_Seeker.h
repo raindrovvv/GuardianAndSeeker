@@ -212,6 +212,9 @@ public:
 	UPROPERTY(Replicated)
 	int32 CurrentComboIndex;
 
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	int32 GetCurrentComboIndex() const { return CurrentComboIndex; }
+
 	UPROPERTY(Replicated)
 	bool CanAcceptComboInput = true;
 

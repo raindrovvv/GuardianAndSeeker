@@ -40,13 +40,13 @@ constexpr float TRAP_MEDIUM_CULL_DISTANCE = 3500.0f;
 constexpr float TRAP_LARGE_CULL_DISTANCE = 4500.0f;
 
 /** 방 모듈 컬링 거리 - Draw Call 최적화를 위해 축소 */
-constexpr float ROOM_CULL_DISTANCE = 7000.0f;
+constexpr float ROOM_CULL_DISTANCE = 8500.0f;
 
 /** 폴리지 컬링 거리 (15m) - Nanite 미지원으로 인한 공격적 컬링 */
 constexpr float FOLIAGE_CULL_DISTANCE = 1500.0f;
 
 /** 라이트 컬링 거리 (20m) - 던전 조명 유지 */
-constexpr float LIGHT_CULL_DISTANCE = 2000.0f;
+constexpr float LIGHT_CULL_DISTANCE = 1800.0f;
 
 /** 무기 컬링 거리 (30m) */
 constexpr float WEAPON_CULL_DISTANCE = 3000.0f;

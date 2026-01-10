@@ -107,6 +107,12 @@ void UGS_SkillBase::InterruptSkill()
 	{
 		Seeker->StateReset();
 		Seeker->SetSeekerGait(EGait::Run);
+
+		// Ensure skill mask is reset after interruption to allow next skill usage
+		if (Seeker->GetSkillComp())
+		{
+			Seeker->GetSkillComp()->ResetAllowedSkillsMask();
+		}
 	}
 }
 

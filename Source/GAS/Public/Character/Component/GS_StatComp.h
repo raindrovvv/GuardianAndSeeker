@@ -78,7 +78,7 @@ protected:
 private:
 	//stat
 	UPROPERTY(VisibleAnywhere)
-	float MaxHealth = 99999.f;
+	float MaxHealth = 1000.f;
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth)
 	float CurrentHealth;
 	UPROPERTY(EditDefaultsOnly)

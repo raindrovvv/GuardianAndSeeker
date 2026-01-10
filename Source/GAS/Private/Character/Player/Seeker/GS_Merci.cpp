@@ -159,10 +159,8 @@ void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 	// 가장 먼저 활 시위를 당길 수 있는 상황인지를 판단
 	if (!GetSkillComp()->IsSkillAllowed(ESkillSlot::Combo))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, IsSkillAllowed == false"));
 		return;
 	}
-
 
 	// DrawBow 가 Client 외에 Server 에서 호출될 일이 있나? Client 에서 해당 함수가 호출되었다면 이미 쥐에서 Return 으로 막히는 거 아닌가?
 	if (!GetDrawState())
@@ -276,19 +274,10 @@ void AGS_Merci::PlayDrawMontage(UAnimMontage* DrawMontage)
 {
 	if (GetMesh() && DrawMontage)
 	{
-		float Duration = GetMesh()->GetAnimInstance()->Montage_Play(DrawMontage);
-		if (Duration > 0.0f)
+		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Montage_Play called, duration: %f"), Duration);
+			AnimInst->Montage_Play(DrawMontage);
 		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Duration<=0.0f"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Mesh null or DrawMontage null"));
 	}
 }
 
@@ -296,7 +285,6 @@ void AGS_Merci::Multicast_StopDrawMontage_Implementation()
 {
 	if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Multicast_StopDrawMontage"));
 		GetMesh()->GetAnimInstance()->Montage_Stop(0.2f); // BlendOut 0.2초
 	}
 }
@@ -514,20 +502,24 @@ void AGS_Merci::Multicast_DrawDebugLine_Implementation(FVector Start, FVector En
 
 void AGS_Merci::OnDrawMontageEnded()
 {
-	bIsFullyDrawn = true; // 활 완전히 당김 상태 설정
-	SetAimState(true);
-	SetDrawState(false);
-	UE_LOG(LogTemp, Warning, TEXT("OnDrawMontageEnded in server"));
-	/*// 서버로 전달
+	// AnimNotify triggered on client - send to server for authority
 	if (!HasAuthority())
 	{
 		Server_NotifyDrawMontageEnded();
-	}*/
+	}
+	else
+	{
+		// Server authority: AnimNotify triggered on server (Multicast montage plays on server too)
+		bIsFullyDrawn = true;
+		SetAimState(true);
+		SetDrawState(false);
+	}
 }
 
 void AGS_Merci::Server_NotifyDrawMontageEnded_Implementation()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Server_NotifyDrawMontageEnded"));
+	// Server authority: Set the aim state to allow arrow release
+	bIsFullyDrawn = true;
 	SetAimState(true);
 	SetDrawState(false);
 }

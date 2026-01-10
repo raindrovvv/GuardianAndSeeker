@@ -23,6 +23,16 @@ void UGS_OnlineGameSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UGS_OnlineGameSubsystem::Deinitialize()
 {
+	if (SessionInterface.IsValid())
+	{
+		// 모든 로컬 유저 포트(0~3)에 대해 이 객체에 바인딩된 친구 세션 찾기 델리게이트 해제
+		for (int32 i = 0; i < 4; ++i)
+		{
+			SessionInterface->ClearOnFindFriendSessionCompleteDelegates(i, this);
+		}
+		SessionInterface->ClearOnJoinSessionCompleteDelegates(this);
+	}
+
 	Super::Deinitialize();
 }
 
@@ -68,7 +78,20 @@ void UGS_OnlineGameSubsystem::JoinFriend(const FString& FriendIdStr)
 	}
 	const TSharedRef<const FUniqueNetId> LocalPlayerNetId = LocalPlayerNetIdPtr.ToSharedRef();
 
-	FriendToJoinId = OnlineSubsystem->GetIdentityInterface()->CreateUniquePlayerId(FriendIdStr);
+	if (!OnlineSubsystem)
+	{
+		OnJoinFailure.Broadcast(TEXT("Online Subsystem을 찾을 수 없습니다."));
+		return;
+	}
+
+	IOnlineIdentityPtr IdentityInterface = OnlineSubsystem->GetIdentityInterface();
+	if (!IdentityInterface.IsValid())
+	{
+		OnJoinFailure.Broadcast(TEXT("Identity Interface를 사용할 수 없습니다. (Steam/EOS 설정 확인 필요)"));
+		return;
+	}
+
+	FriendToJoinId = IdentityInterface->CreateUniquePlayerId(FriendIdStr);
 	if (!FriendToJoinId.IsValid())
 	{
 		OnJoinFailure.Broadcast(TEXT("유효하지 않은 친구 ID입니다."));

@@ -30,7 +30,6 @@ void UGS_SeekerSkillBase::ApplyEffectToDungeonMonster(AGS_Monster* Target)
 
 void UGS_SeekerSkillBase::ExecuteSkillEffect()
 {
-
 }
 
 FName UGS_SeekerSkillBase::CalRollDirection()
@@ -39,31 +38,40 @@ FName UGS_SeekerSkillBase::CalRollDirection()
 
 	if (AGS_Seeker* OwnerPlayer = Cast<AGS_Seeker>(OwnerCharacter))
 	{
-		const FVector2D MoveInputValue = (Cast<AGS_TpsController>(OwnerPlayer->GetController()))->MoveInputValue;
-		if (MoveInputValue.X > 0)
+		AGS_TpsController* TPSController = Cast<AGS_TpsController>(OwnerPlayer->GetController());
+		if (TPSController)
 		{
-			RollDirection += TEXT("F");
-		}
-		else if (MoveInputValue.X < 0)
-		{
-			RollDirection += TEXT("B");
-		}
-		else
-		{
-			RollDirection += TEXT("0");
-		}
+			const FVector2D MoveInputValue = TPSController->MoveInputValue;
+			if (MoveInputValue.X > 0)
+			{
+				RollDirection += TEXT("F");
+			}
+			else if (MoveInputValue.X < 0)
+			{
+				RollDirection += TEXT("B");
+			}
+			else
+			{
+				RollDirection += TEXT("0");
+			}
 
-		if (MoveInputValue.Y > 0)
-		{
-			RollDirection += TEXT("R");
-		}
-		else if (MoveInputValue.Y < 0)
-		{
-			RollDirection += TEXT("L");
+			if (MoveInputValue.Y > 0)
+			{
+				RollDirection += TEXT("R");
+			}
+			else if (MoveInputValue.Y < 0)
+			{
+				RollDirection += TEXT("L");
+			}
+			else
+			{
+				RollDirection += TEXT("0");
+			}
 		}
 		else
 		{
-			RollDirection += TEXT("0");
+			// For AI or other controller types, default to Forward
+			RollDirection = TEXT("F0");
 		}
 	}
 	return FName(*RollDirection);

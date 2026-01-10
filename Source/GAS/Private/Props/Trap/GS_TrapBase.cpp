@@ -109,6 +109,15 @@ void AGS_TrapBase::BeginPlay()
 	{
 		if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
 		{
+			// AI Climbing Fix: Disable stepping up on trap components
+			Prim->CanCharacterStepUpOn = ECB_No;
+
+			// Prevent traps (especially flat ones) from having NavMesh on top
+			if (Prim != ActivateSphereComp)
+			{
+				Prim->SetCanEverAffectNavigation(false);
+			}
+
 			if (Prim->ComponentHasTag("OptimizedCollision"))
 			{
 				if (IsValid(Prim))
@@ -618,19 +627,19 @@ void AGS_TrapBase::HandleTrapDamage(AActor* OtherActor)
 		//Slow
 		if (Effect.bSlow)
 		{
-			DebuffComp->ApplyDebuff(EDebuffType::Slow, nullptr);
+			DebuffComp->ApplyDebuff(EDebuffType::Slow, this);
 		}
 
 		//Burn
 		if (Effect.bBurn)
 		{
-			DebuffComp->ApplyDebuff(EDebuffType::Burn, nullptr);
+			DebuffComp->ApplyDebuff(EDebuffType::Burn, this);
 		}
 
 		//Lava
 		if (Effect.bLava)
 		{
-			DebuffComp->ApplyDebuff(EDebuffType::Lava, nullptr);
+			DebuffComp->ApplyDebuff(EDebuffType::Lava, this);
 		}
 	}
 

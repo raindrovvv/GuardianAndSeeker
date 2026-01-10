@@ -375,10 +375,12 @@ void UGS_ChanUltimateSkill::StartCharge()
 	// 속도 조절
 	OwnerCharacter->Server_SetCharacterSpeed(3.0f);
 
-	// 자동 이동 시작
-	AGS_TpsController* Controller = Cast<AGS_TpsController>(OwnerCharacter->GetController());
-	Controller->SetMoveControlValue(true, true);
-	Controller->StartAutoMoveForward();
+	// 자동 이동 시작 (TPS 컨트롤러인 경우에만)
+	if (AGS_TpsController* Controller = Cast<AGS_TpsController>(OwnerCharacter->GetController()))
+	{
+		Controller->SetMoveControlValue(true, true);
+		Controller->StartAutoMoveForward();
+	}
 
 	if (CachedChanOwner.IsValid())
 	{
