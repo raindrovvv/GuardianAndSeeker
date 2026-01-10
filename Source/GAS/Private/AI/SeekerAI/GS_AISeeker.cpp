@@ -28,7 +28,6 @@ void AGS_AISeeker::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Only spawn on server
 	if (HasAuthority())
 	{
 		SpawnSeeker();
@@ -37,12 +36,27 @@ void AGS_AISeeker::BeginPlay()
 
 void AGS_AISeeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// Clean up spawned seeker
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		TimerManager.ClearTimer(AresDashTimer);
+		TimerManager.ClearTimer(MerciMovingSkillTimer);
+		TimerManager.ClearTimer(ChanShieldTimer);
+	}
+
+	if (SpawnedSeeker)
+	{
+		SpawnedSeeker->OnDeathDelegate.RemoveAll(this);
+	}
+
 	if (SpawnedSeeker && HasAuthority())
 	{
 		SpawnedSeeker->Destroy();
 		SpawnedSeeker = nullptr;
 	}
+
+	CachedSkillComp = nullptr;
+	CachedStatComp = nullptr;
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -62,14 +76,12 @@ void AGS_AISeeker::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	// Update visual representation when seeker type changes in editor
 	FName PropertyName = (PropertyChangedEvent.Property != nullptr)
 	                         ? PropertyChangedEvent.Property->GetFName()
 	                         : NAME_None;
 
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(AGS_AISeeker, SeekerType))
 	{
-		// Could update editor visualization here
 	}
 }
 #endif
@@ -95,7 +107,6 @@ void AGS_AISeeker::SpawnSeeker()
 
 	FVector SpawnLocation = GetActorLocation();
 
-	// Project to navigation mesh to ensure safe spawn
 	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	if (NavSystem)
 	{
@@ -106,7 +117,6 @@ void AGS_AISeeker::SpawnSeeker()
 		}
 	}
 
-	// Spawn at this actor's location (or safe location if found)
 	SpawnedSeeker = World->SpawnActor<AGS_Seeker>(
 	    SeekerClass,
 	    SpawnLocation,
@@ -115,18 +125,13 @@ void AGS_AISeeker::SpawnSeeker()
 
 	if (SpawnedSeeker)
 	{
-		// Bind death event
 		SpawnedSeeker->OnDeathDelegate.AddDynamic(this, &AGS_AISeeker::HandleSeekerDeath);
-
-		// Setup AI Controller
 		SetupAIController();
 
-		// Broadcast spawn event
-		OnSeekerSpawned.Broadcast(SpawnedSeeker);
+		CachedSkillComp = SpawnedSeeker->FindComponentByClass<UGS_SkillComp>();
+		CachedStatComp = SpawnedSeeker->GetStatComp();
 
-		UE_LOG(LogTemp, Log, TEXT("AGS_AISeeker: Spawned %s at %s"),
-		       *SpawnedSeeker->GetName(),
-		       *GetActorLocation().ToString());
+		OnSeekerSpawned.Broadcast(SpawnedSeeker);
 	}
 	else
 	{
@@ -147,7 +152,6 @@ void AGS_AISeeker::SetupAIController()
 		return;
 	}
 
-	// Spawn AI Controller
 	FActorSpawnParameters ControllerSpawnParams;
 	ControllerSpawnParams.Owner = this;
 
@@ -159,14 +163,11 @@ void AGS_AISeeker::SetupAIController()
 
 	if (SeekerController)
 	{
-		// Configure controller
 		SeekerController->HealThreshold = HealThreshold;
 
-		// Adjust range based on Seeker type
 		float FinalRange = AttackRange;
 		if (SeekerType == ESeekerAIType::Merci)
 		{
-			// Ranged: Always ensure a minimum viable range for Merci to prevent sticking to melee
 			if (FinalRange < 1000.0f)
 			{
 				FinalRange = 1200.0f;
@@ -174,19 +175,15 @@ void AGS_AISeeker::SetupAIController()
 		}
 		else
 		{
-			// Melee (Ares/Chan): Ensure reasonable melee attack range
 			if (FinalRange < 250.0f)
 			{
-				FinalRange = 350.0f; // 3.5m - comfortable melee range
+				FinalRange = 350.0f;
 			}
 		}
 		SeekerController->AttackRange = FinalRange;
 		SeekerController->TrapDetectionRadius = TrapDetectionRadius;
 
-		// Possess the seeker
 		SeekerController->Possess(SpawnedSeeker);
-
-		UE_LOG(LogTemp, Log, TEXT("AGS_AISeeker: AI Controller setup complete (Range: %.0f)"), FinalRange);
 	}
 }
 
@@ -231,20 +228,12 @@ AGS_SeekerAIController* AGS_AISeeker::GetSeekerAIController() const
 
 UGS_SkillComp* AGS_AISeeker::GetSkillComp() const
 {
-	if (SpawnedSeeker)
-	{
-		return SpawnedSeeker->FindComponentByClass<UGS_SkillComp>();
-	}
-	return nullptr;
+	return CachedSkillComp;
 }
 
 UGS_StatComp* AGS_AISeeker::GetStatComp() const
 {
-	if (SpawnedSeeker)
-	{
-		return SpawnedSeeker->GetStatComp();
-	}
-	return nullptr;
+	return CachedStatComp;
 }
 
 void AGS_AISeeker::PerformAttack()
@@ -330,9 +319,6 @@ void AGS_AISeeker::PerformSkill(int32 SkillIndex)
 	ESkillSlot SkillSlot = static_cast<ESkillSlot>(SkillIndex);
 	int32 SlotInt = static_cast<int32>(SkillSlot);
 
-	// Try to activate skill (server will check if it can be used)
-	UE_LOG(LogTemp, Log, TEXT("[AI] PerformSkill: Slot %d for %s"), SlotInt, *SpawnedSeeker->GetName());
-
 	SkillComp->Server_TryActivateSkill(SkillSlot);
 
 	// Special handling for Ares Dash (press and hold)
@@ -357,7 +343,6 @@ void AGS_AISeeker::ExecuteAresDash()
 {
 	if (UGS_SkillComp* SkillComp = GetSkillComp())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI Ares] Executing Dash Command"));
 		SkillComp->Server_TrySkillCommand(ESkillSlot::Moving);
 	}
 }
@@ -366,7 +351,6 @@ void AGS_AISeeker::StopChanShield()
 {
 	if (UGS_SkillComp* SkillComp = GetSkillComp())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI Chan] Dropping Shield"));
 		SkillComp->Server_TryDeactiveSkill(ESkillSlot::Ready);
 	}
 }
@@ -375,7 +359,6 @@ void AGS_AISeeker::ExecuteMerciMovingSkill()
 {
 	if (UGS_SkillComp* SkillComp = GetSkillComp())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI Merci] Executing Fog Arrow Release"));
 		SkillComp->Server_TrySkillCommand(ESkillSlot::Moving);
 	}
 }
@@ -397,7 +380,6 @@ void AGS_AISeeker::SwitchToRandomSpecialArrow()
 	// 50/50 chance between Axe and Child if available
 	int32 TargetType = (FMath::RandRange(0, 1) == 0) ? 1 : 2; // Axe=1, Child=2
 	Merci->Server_ChangeArrowType(TargetType);
-	UE_LOG(LogTemp, Log, TEXT("[AI Merci] Switched Arrow Type"));
 }
 
 void AGS_AISeeker::ResetToNormalArrow()
@@ -427,32 +409,51 @@ void AGS_AISeeker::PerformHeal()
 
 void AGS_AISeeker::PerformRoll(FVector Direction)
 {
+	// Server authority check
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	if (!SpawnedSeeker || SpawnedSeeker->IsDead())
 	{
 		return;
 	}
 
-	// Set movement direction and trigger roll
+	if (Direction.IsNearlyZero())
+	{
+		Direction = -SpawnedSeeker->GetActorForwardVector(); // Default: backward
+	}
 	Direction.Normalize();
 
-	// Option 1+3: Check if there's a monster in the roll direction and adjust if needed
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
 	FVector StartLoc = SpawnedSeeker->GetActorLocation();
 
-	// Use SphereTrace for reliable continuous detection from start to end
-	auto IsDirectionBlockedByMonster = [this, StartLoc](const FVector& Dir) -> bool
+	TWeakObjectPtr<AGS_AISeeker> WeakThis(this);
+	TWeakObjectPtr<AGS_Seeker> WeakSeeker(SpawnedSeeker);
+	auto IsDirectionBlockedByMonster = [WeakThis, WeakSeeker, StartLoc, World](const FVector& Dir) -> bool
 	{
+		if (!WeakThis.IsValid() || !WeakSeeker.IsValid() || !World)
+		{
+			return false;
+		}
+
 		FVector EndLoc = StartLoc + Dir * 400.0f; // Roll distance
 
 		FHitResult HitResult;
 		TArray<AActor*> ActorsToIgnore;
-		ActorsToIgnore.Add(SpawnedSeeker);
+		ActorsToIgnore.Add(WeakSeeker.Get());
 
 		TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 		ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
 
-		// Sweep a sphere from start to end to catch monsters even if they are very close
 		bool bHit = UKismetSystemLibrary::SphereTraceSingleForObjects(
-		    GetWorld(),
+		    World,
 		    StartLoc,
 		    EndLoc,
 		    80.0f, // Radius matching character capsule roughly
@@ -477,7 +478,6 @@ void AGS_AISeeker::PerformRoll(FVector Direction)
 
 	if (IsDirectionBlockedByMonster(Direction))
 	{
-		// Monster detected in roll path - try alternative directions
 		const float AlternateAngles[] = {45.0f, -45.0f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f};
 		bool bFoundSafePath = false;
 
@@ -487,30 +487,24 @@ void AGS_AISeeker::PerformRoll(FVector Direction)
 
 			if (!IsDirectionBlockedByMonster(AltDirection))
 			{
-				// Found a safe direction
 				Direction = AltDirection;
 				bFoundSafePath = true;
-				UE_LOG(LogTemp, Warning, TEXT("[AISeeker] Roll direction adjusted by %.0f degrees to avoid monster"), Angle);
 				break;
 			}
 		}
 
-		// If no safe direction found, prefer 180 degrees (backward) to avoid monster completely
 		if (!bFoundSafePath)
 		{
-			Direction = Direction * -1.0f; // Reverse direction
-			UE_LOG(LogTemp, Warning, TEXT("[AISeeker] All directions blocked, rolling backward"));
+			Direction = Direction * -1.0f;
 		}
 	}
 
 	UGS_SkillComp* SkillComp = GetSkillComp();
 	if (SkillComp)
 	{
-		// Face the roll direction
 		FRotator RollRotation = Direction.Rotation();
 		SpawnedSeeker->SetActorRotation(RollRotation);
 
-		// Activate roll skill (server will check if it can be used)
 		SkillComp->Server_TryActivateSkill(ESkillSlot::Rolling);
 	}
 }
@@ -522,21 +516,18 @@ void AGS_AISeeker::StopAllActions()
 		return;
 	}
 
-	// Stop current montages and reset state
 	SpawnedSeeker->StateReset();
 	if (UAnimInstance* AnimInstance = SpawnedSeeker->GetMesh()->GetAnimInstance())
 	{
 		AnimInstance->StopAllMontages(0.2f);
 	}
 
-	// Reset skills
 	if (UGS_SkillComp* SkillComp = GetSkillComp())
 	{
 		SkillComp->SkillsInterrupt();
 		SkillComp->ResetAllowedSkillsMask();
 	}
 
-	// Stop movement
 	if (SeekerController)
 	{
 		SeekerController->StopMovement();
@@ -570,7 +561,6 @@ bool AGS_AISeeker::CanUseSkill(int32 SkillIndex) const
 		ESkillSlot Slot = static_cast<ESkillSlot>(SkillIndex);
 		if (UGS_SkillBase* Skill = SkillComp->GetSkillFromSkillMap(Slot))
 		{
-			// Check if skill is allowed in current state and not on cooldown
 			return SkillComp->IsSkillAllowed(Slot) && Skill->CanActive();
 		}
 	}
@@ -579,15 +569,12 @@ bool AGS_AISeeker::CanUseSkill(int32 SkillIndex) const
 
 bool AGS_AISeeker::CanHeal() const
 {
-	// Check if heal skill is available
 	return CanUseSkill(static_cast<int32>(ESkillSlot::HealPotion));
 }
 
 void AGS_AISeeker::NotifyGoalReached()
 {
 	OnReachedGoal.Broadcast();
-
-	UE_LOG(LogTemp, Log, TEXT("AGS_AISeeker: Goal reached!"));
 }
 
 void AGS_AISeeker::DrawDebugInfo() const
@@ -606,7 +593,6 @@ void AGS_AISeeker::DrawDebugInfo() const
 
 	FVector Location = SpawnedSeeker->GetActorLocation();
 
-	// Draw seeker type text
 	FString TypeText;
 	switch (SeekerType)
 	{
@@ -621,16 +607,11 @@ void AGS_AISeeker::DrawDebugInfo() const
 		break;
 	}
 
-	// Draw health
 	FString HealthText = FString::Printf(TEXT("HP: %.1f%%"), GetHealthPercent() * 100.0f);
 
 	DrawDebugString(World, Location + FVector(0, 0, 150), TypeText, nullptr, FColor::Cyan, 0.0f, true);
 	DrawDebugString(World, Location + FVector(0, 0, 130), HealthText, nullptr, FColor::Green, 0.0f, true);
-
-	// Draw detection radius
 	DrawDebugSphere(World, Location, TrapDetectionRadius, 16, FColor::Yellow, false, 0.0f, 0, 1.0f);
-
-	// Draw attack range
 	DrawDebugSphere(World, Location, AttackRange, 16, FColor::Red, false, 0.0f, 0, 1.0f);
 #endif
 }

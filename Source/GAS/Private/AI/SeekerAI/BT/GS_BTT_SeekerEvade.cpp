@@ -247,11 +247,7 @@ FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLo
 			return NearbyTraps.Num() == 0;
 		};
 
-		// Determine dynamic evade distance
 		float currentEvadeDist = EvadeDistance;
-		AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetWorld()->GetFirstPlayerController()->GetPawn()); // Fallback if needed, but better use Seeker ref
-		// Since we don't have Seeker easily here, we'll use a conservative distance increase if we detect a ranged AI
-		// Better: the distance is passed via property, but we can nudge it.
 
 		FVector TestLocation = CurrentLocation + AwayDirection * currentEvadeDist;
 		FNavLocation NavLocation;

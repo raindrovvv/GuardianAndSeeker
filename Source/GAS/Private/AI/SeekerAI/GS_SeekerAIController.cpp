@@ -80,14 +80,14 @@ void AGS_SeekerAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	UE_LOG(LogTemp, Error, TEXT("[SeekerAIController::OnPossess] InPawn: %s (Class: %s)"),
+	UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::OnPossess] InPawn: %s (Class: %s)"),
 	       InPawn ? *InPawn->GetName() : TEXT("NULL"),
 	       InPawn ? *InPawn->GetClass()->GetName() : TEXT("NULL"));
 
 	if (InPawn)
 	{
 		AActor* PawnOwner = InPawn->GetOwner();
-		UE_LOG(LogTemp, Error, TEXT("[SeekerAIController::OnPossess] InPawn Owner: %s (Class: %s)"),
+		UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::OnPossess] InPawn Owner: %s (Class: %s)"),
 		       PawnOwner ? *PawnOwner->GetName() : TEXT("NULL"),
 		       PawnOwner ? *PawnOwner->GetClass()->GetName() : TEXT("NULL"));
 	}
@@ -145,6 +145,11 @@ void AGS_SeekerAIController::OnPossess(APawn* InPawn)
 
 void AGS_SeekerAIController::OnUnPossess()
 {
+	if (UAIPerceptionComponent* PerceptionComp = GetPerceptionComponent())
+	{
+		PerceptionComp->OnTargetPerceptionUpdated.RemoveAll(this);
+	}
+
 	Super::OnUnPossess();
 }
 
@@ -152,21 +157,23 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Stuck detection for trap forests/corners
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
 	APawn* ControlledPawn = GetPawn();
 	AGS_Seeker* Seeker = Cast<AGS_Seeker>(ControlledPawn);
 	if (ControlledPawn)
 	{
 		float DistanceMoved = FVector::Dist(ControlledPawn->GetActorLocation(), LastPosition);
 
-		// If barely moved (threshold 5.0 units)
 		bool bOnDangerousTrap = DetectNearbyTraps() != nullptr;
-		float StuckThreshold = bOnDangerousTrap ? 1.0f : 3.0f; // More aggressive escape if on/near trap
+		float StuckThreshold = bOnDangerousTrap ? 1.0f : 3.0f;
 
-		// Only count as stationary if we are actually TRYING to move
 		bool bIsTryingToMove = GetMoveStatus() == EPathFollowingStatus::Moving;
 
-		// If it's a ranged character (Merci), being stationary while aiming/drawing is normal
 		if (Seeker)
 		{
 			if (Seeker->GetAimState() || Seeker->GetDrawState())
@@ -194,7 +201,7 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 			EvasionSuppressionTimer = 5.0f;
 
 			// Try to find a safe spot to "jostle" the AI out of the corner
-			UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+			UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 			if (NavSystem)
 			{
 				FNavLocation RandomSafeSpot;
@@ -306,7 +313,7 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 			FCollisionQueryParams CollisionParams;
 			CollisionParams.AddIgnoredActor(ControlledPawn);
 			FCollisionShape Sphere = FCollisionShape::MakeSphere(180.0f);
-			if (GetWorld() && GetWorld()->OverlapMultiByChannel(Overlaps, ControlledPawn->GetActorLocation(), FQuat::Identity, ECC_Pawn, Sphere, CollisionParams))
+			if (World->OverlapMultiByChannel(Overlaps, ControlledPawn->GetActorLocation(), FQuat::Identity, ECC_Pawn, Sphere, CollisionParams))
 			{
 				bool bShouldStopForMonster = false;
 				for (const FOverlapResult& Overlap : Overlaps)
@@ -835,8 +842,15 @@ void AGS_SeekerAIController::MarkLocationVisited(const FVector& Location)
 		VisitedLocations.RemoveAt(0);
 	}
 
+	// Cache world reference
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
 	// Implement exploration markers - same mechanism as player decal system
-	float CurrentTime = GetWorld()->GetTimeSeconds();
+	float CurrentTime = World->GetTimeSeconds();
 	if (CurrentTime - LastMarkerPlaceTime >= MarkerCooldown)
 	{
 		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetPawn()))
@@ -862,7 +876,7 @@ void AGS_SeekerAIController::MarkLocationVisited(const FVector& Location)
 				FCollisionQueryParams TraceParams;
 				TraceParams.AddIgnoredActor(Seeker);
 
-				if (GetWorld()->LineTraceSingleByChannel(FloorHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams))
+				if (World->LineTraceSingleByChannel(FloorHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams))
 				{
 					MarkerLocation = FloorHit.Location;
 				}

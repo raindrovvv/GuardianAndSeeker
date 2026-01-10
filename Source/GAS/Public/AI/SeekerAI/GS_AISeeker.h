@@ -165,6 +165,12 @@ private:
 	UPROPERTY()
 	AGS_SeekerAIController* SeekerController;
 
+	UPROPERTY()
+	UGS_SkillComp* CachedSkillComp;
+
+	UPROPERTY()
+	UGS_StatComp* CachedStatComp;
+
 	void SpawnSeeker();
 	void SetupAIController();
 	TSubclassOf<AGS_Seeker> GetSeekerClassByType() const;
