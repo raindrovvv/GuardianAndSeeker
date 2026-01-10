@@ -71,7 +71,10 @@ void UGS_DebuffComp::ApplyDebuff(EDebuffType Type, AActor* Attacker)
 	if (Existing)
 	{
 		Existing->StartTime = GetWorld()->GetTimeSeconds(); // 시작 시간 재저장
-		RefreshDebuffTimer(Existing, Row->Duration);
+
+		// Safety cap for duration
+		float FinalDuration = FMath::Min(Row->Duration, 30.0f);
+		RefreshDebuffTimer(Existing, FinalDuration);
 		UpdateReplicatedDebuffList(); // 복제 정보 갱신
 
 
@@ -88,7 +91,10 @@ void UGS_DebuffComp::ApplyDebuff(EDebuffType Type, AActor* Attacker)
 	if (!NewDebuff)
 		return;
 
-	NewDebuff->Initialize(Cast<AGS_Character>(GetOwner()), Attacker, Row->Duration, Row->Priority, Row->Damage, Row->DamageInterval, Type);
+	// Safety cap for duration (prevent infinite paralysis from 99999.0f values)
+	float FinalDuration = FMath::Min(Row->Duration, 30.0f);
+
+	NewDebuff->Initialize(Cast<AGS_Character>(GetOwner()), Attacker, FinalDuration, Row->Priority, Row->Damage, Row->DamageInterval, Type);
 	NewDebuff->StartTime = GetWorld()->GetTimeSeconds();
 
 	// 우선순위와 관련 없다면

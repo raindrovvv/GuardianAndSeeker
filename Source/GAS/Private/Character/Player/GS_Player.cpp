@@ -386,7 +386,16 @@ void AGS_Player::OnDeath()
 void AGS_Player::Multicast_SetCollisionResponseToChannel_Implementation(ECollisionChannel Channel,
                                                                         ECollisionResponse NewResponse)
 {
-	GetCapsuleComponent()->SetCollisionResponseToChannel(Channel, NewResponse);
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionResponseToChannel(Channel, NewResponse);
+	}
+
+	// Also update mesh collision to prevent stuck issues during roll
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetCollisionResponseToChannel(Channel, NewResponse);
+	}
 }
 
 void AGS_Player::SetSkillInputControl(bool CanLeftClick, bool CanRightClick, bool CanRollClick, bool CanCtrlClick)

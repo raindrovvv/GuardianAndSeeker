@@ -577,7 +577,7 @@ void AGS_RTSController::OnLeftMousePressed()
 	switch (CurrentCommand)
 	{
 	case ERTSCommand::Move:
-		if (bHit)
+		if (!UnitSelection.IsEmpty() && bHit)
 		{
 			SpawnCommandDecal(ERTSCommand::Move, Hit.Location);
 
@@ -593,7 +593,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		else
 		{
-			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			// 허공 클릭 또는 선택 유닛 없음: 불가능 사운드 재생 및 명령 취소
 			if (CommandCancelSound)
 			{
 				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
@@ -605,7 +605,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		break;
 	case ERTSCommand::Attack:
-		if (bHit)
+		if (!UnitSelection.IsEmpty() && bHit)
 		{
 			ShowAttackCursor();
 
@@ -631,7 +631,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		else
 		{
-			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			// 허공 클릭 또는 선택 유닛 없음: 불가능 사운드 재생 및 명령 취소
 			if (CommandCancelSound)
 			{
 				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
@@ -681,6 +681,11 @@ void AGS_RTSController::OnLeftMousePressed()
 
 void AGS_RTSController::OnLeftMouseReleased()
 {
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		return;
+	}
+
 	if (bShiftDown || bCtrlDown)
 	{
 		return;
@@ -718,6 +723,12 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 		}
 
 		UpdateCursorForEdgeScroll();
+		return;
+	}
+
+	// 선택된 유닛이 없으면 무시 (서버 Validate 킥 방지)
+	if (UnitSelection.IsEmpty())
+	{
 		return;
 	}
 

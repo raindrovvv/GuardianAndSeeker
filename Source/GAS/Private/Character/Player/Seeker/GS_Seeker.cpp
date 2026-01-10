@@ -45,6 +45,7 @@
 #include "UI/Character/GS_SteamNameWidgetComp.h"
 #include "Props/Item/EmberChest/GS_EmberChest.h"
 #include "Character/Skill/Seeker/GS_HealSkill.h"
+#include "AI/SeekerAI/GS_SeekerAIController.h"
 #include "System/Utility/GS_AssetLoader.h"
 
 // Sets default values
@@ -413,6 +414,8 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AGS_Seeker::SetAimState(bool IsAim)
 {
+	UE_LOG(LogTemp, Error, TEXT("[SetAimState] %s - IsAim: %d -> %d (HasAuthority=%d)"),
+	       *GetName(), SeekerState.IsAim, IsAim, HasAuthority());
 	SeekerState.IsAim = IsAim;
 
 	// 시커 오디오 컴포넌트에 조준 상태 변경 알림
@@ -2011,13 +2014,17 @@ bool AGS_Seeker::IsReviverValid(const AGS_Seeker* Reviver) const
 		return false;
 	}
 
-	const AGS_TpsController* ReviverController = Cast<AGS_TpsController>(Reviver->GetController());
-	if (!ReviverController)
+	if (const AGS_TpsController* ReviverController = Cast<AGS_TpsController>(Reviver->GetController()))
 	{
-		return false;
+		return ReviverController->IsHoldingReviveKey();
 	}
 
-	return ReviverController->IsHoldingReviveKey();
+	if (const AGS_SeekerAIController* AIController = Cast<AGS_SeekerAIController>(Reviver->GetController()))
+	{
+		return AIController->IsHoldingReviveKey();
+	}
+
+	return false;
 }
 
 void AGS_Seeker::OnRep_IsInDyingState()
