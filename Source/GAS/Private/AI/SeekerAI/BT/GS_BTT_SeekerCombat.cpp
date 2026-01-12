@@ -240,47 +240,14 @@ void UGS_BTT_SeekerCombat::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* No
 
 		if (bInAction || (TimeSinceLastAttack >= EffectiveCooldown))
 		{
-			bool bSkillUsed = false;
-
-			// Try to use skills (Skip if Merci is drawing bow)
-			bool bCanUseSkillsThisTick = bUseSkillsWhenAvailable && (!bIsRanged || !Seeker->GetDrawState() || Seeker->GetAimState());
-
-			if (bCanUseSkillsThisTick && AISeeker && FMath::FRand() < SkillUsageChance)
+			// 🟢 AI Skills & Attacks are now intelligently handled by AISeeker wrapper
+			if (AISeeker)
 			{
-				TArray<int32> PreferredSlots;
-				ESeekerAIType Type = AISeeker->GetSeekerType();
-				if (Type == ESeekerAIType::Ares)
-				{
-					// Ares: Combo → Ultimate → Aiming → Dash (aggressive melee fighter)
-					// Prioritize combo for consistent damage, ult for burst, dash for mobility
-					PreferredSlots = {5, 3, 2, 1, 4, 0};
-				}
-				else if (Type == ESeekerAIType::Chan)
-				{
-					// Chan: Ultimate → Combo → Shield → Moving (tank/support hybrid)
-					// Shield raised to 3rd priority for survivability
-					PreferredSlots = {3, 5, 0, 1, 4, 2};
-				}
-				else
-				{
-					// Merci: Ultimate → Fog → Multi → Combo (ranged damage dealer)
-					PreferredSlots = {3, 1, 2, 5, 4, 0};
-				}
-
-				for (int32 SlotIdx : PreferredSlots)
-				{
-					if (AISeeker->CanUseSkill(SlotIdx))
-					{
-						AISeeker->PerformSkill(SlotIdx);
-						LastAttackTime = CurrentCombatTime;
-						bSkillUsed = true;
-						return;
-					}
-				}
+				// decision logic moved to PerformAttack and GetOptimalCombo
 			}
 
 			// Basic attack
-			if (!bSkillUsed)
+			if (bHasLOS)
 			{
 				if (bHasLOS)
 				{

@@ -11,13 +11,12 @@
 #include "Props/Trap/GS_TrapBase.h"
 #include "NavigationSystem.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "AI/GS_AIConstants.h"
 
 UGS_BTT_SeekerEvade::UGS_BTT_SeekerEvade()
 {
 	NodeName = "Seeker Evade";
 	bNotifyTick = true;
-
-	// Default blackboard key setup
 	TrapLocationKey.SelectedKeyName = AGS_SeekerAIController::NearbyTrapKey;
 }
 
@@ -25,8 +24,8 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::ExecuteTask(UBehaviorTreeComponent& Own
 {
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 
-	// Global Evasion Cooldown: prevent AI from thrashering between evasion and goal movement
-	// This helps AI bypass "trap forests" by focusing on the goal if a dodge was recently done.
+	// 전역 회피 쿨다운: 회피와 목표 이동 사이의 잦은 전환 방지
+	// "트랩" 지역에서 최근 회피 후 목표에 집중할 수 있게 함
 	if (CurrentTime - LastEvadeTaskFinishTime < GlobalEvadeCooldown)
 	{
 		return EBTNodeResult::Failed;
@@ -54,7 +53,7 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::ExecuteTask(UBehaviorTreeComponent& Own
 		return EBTNodeResult::Failed;
 	}
 
-	// Prevent evasion if already performing an action (e.g. rolling)
+	// 이미 액션 수행 중이면 회피 방지 (구르기 등)
 	if (UAnimInstance* AnimInstance = Seeker->GetMesh()->GetAnimInstance())
 	{
 		if (AnimInstance->Montage_IsPlaying(nullptr))
@@ -63,38 +62,29 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::ExecuteTask(UBehaviorTreeComponent& Own
 		}
 	}
 
-	// Get nearby trap from blackboard
+	// 블랙보드에서 근처 트랩 가져오기
 	UObject* TrapObject = Blackboard->GetValueAsObject(TrapLocationKey.SelectedKeyName);
 	AGS_TrapBase* NearbyTrap = Cast<AGS_TrapBase>(TrapObject);
 
 	if (!NearbyTrap)
 	{
-		// No trap threat - no need to evade
+		// 트랩 위협 없음 - 회피 불필요
 		AIController->ClearNearbyTrap();
 		return EBTNodeResult::Succeeded;
 	}
 
-	// Probabilistic evasion (70% chance to notice and evade)
-	if (FMath::FRand() > 0.7f)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker ignored trap threat (luck)"));
-		AIController->ClearNearbyTrap();
-		return EBTNodeResult::Succeeded;
-	}
-
-	// Calculate safe direction away from trap
+	// 트랩으로부터 안전한 방향 계산
 	FVector SafeDirection = CalculateSafeEvadeDirection(NearbyTrap->GetActorLocation(), Seeker->GetActorLocation());
 
 	if (SafeDirection.IsNearlyZero())
 	{
-		// If no truly safe spot found (away from other traps), just ignore this one
-		// This prevents "shaking" between multiple traps in a cluster
-		UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker could not find a safe evade spot, skipping evasion."));
+		// 안전한 지점을 찾지 못함 - 회피 건너뛰기
+		// 트랩 밀집 지역에서 떨림 현상 방지
 		AIController->ClearNearbyTrap();
 		return EBTNodeResult::Succeeded;
 	}
 
-	// Check if we should use roll for evasion
+	// 구르기로 회피할지 확인
 	CurrentTime = GetWorld()->GetTimeSeconds();
 	bool bCanRoll = (CurrentTime - LastRollTime >= RollCooldown);
 
@@ -102,32 +92,30 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::ExecuteTask(UBehaviorTreeComponent& Own
 
 	if (bPreferRollOverWalk && bCanRoll)
 	{
-		// Try to use roll skill
+		// 구르기 스킬 사용 시도
 		if (AISeeker && AISeeker->CanUseSkill(static_cast<int32>(ESkillSlot::Rolling)))
 		{
 			AISeeker->PerformRoll(SafeDirection);
 			LastRollTime = CurrentTime;
-			UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker rolling to evade trap"));
 			return EBTNodeResult::InProgress;
 		}
 	}
 
-	// Try evasion skill if available
+	// 회피 스킬 사용 가능 시 시도
 	if (bUseEvadeSkillIfAvailable && AISeeker)
 	{
-		// Try MovingSkill (E skill) for repositioning
+		// 이동 스킬(E 스킬)로 재배치 시도
 		if (AISeeker->CanUseSkill(static_cast<int32>(ESkillSlot::Moving)))
 		{
 			AISeeker->PerformSkill(static_cast<int32>(ESkillSlot::Moving));
-			UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker using skill to evade trap"));
 			return EBTNodeResult::InProgress;
 		}
 	}
 
-	// Fallback: walk away from trap
-	FVector EvadeLocation = Seeker->GetActorLocation() + SafeDirection * (EvadeDistance * 0.5f); // Reduced default distance for smoothness
+	// 대체 방안: 트랩에서 걸어서 멀어지기
+	FVector EvadeLocation = Seeker->GetActorLocation() + SafeDirection * (EvadeDistance * 0.5f);
 
-	// Project to navigation mesh
+	// 네비메시에 투영
 	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (NavSystem)
 	{
@@ -138,19 +126,18 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::ExecuteTask(UBehaviorTreeComponent& Own
 		}
 	}
 
-	// Check if already at a safe distance (reduced threshold for non-blocking feel)
-	if (FVector::Dist(Seeker->GetActorLocation(), EvadeLocation) < 30.0f)
+	// 이미 안전 거리에 있으면 완료
+	if (FVector::Dist(Seeker->GetActorLocation(), EvadeLocation) < GS_AI::EVADE_ARRIVAL_THRESHOLD)
 	{
 		return EBTNodeResult::Succeeded;
 	}
 
-	// Use bUsePathfinding=false for tiny adjustments to avoid clearing the global goal path
-	// Use a large acceptance radius so it finishes the "dodge" quickly
-	FAIRequestID MoveResult = AIController->MoveToLocation(EvadeLocation, 40.0f, true, true, false, false);
+	// 작은 조정은 경로탐색 없이 이동하여 전역 목표 경로 보존
+	// 큰 허용 반경으로 빠르고 부드럽게 회피 완료
+	FAIRequestID MoveResult = AIController->MoveToLocation(EvadeLocation, GS_AI::EVADE_ACCEPTANCE_RADIUS, true, true, false, false);
 
 	if (MoveResult.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker making small dodge adjustment"));
 		return EBTNodeResult::InProgress;
 	}
 
@@ -162,11 +149,10 @@ void UGS_BTT_SeekerEvade::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 	FGS_BTTEvadeMemory* MyMemory = reinterpret_cast<FGS_BTTEvadeMemory*>(NodeMemory);
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 
-	// Timeout fallback: don't stay in evade state forever (e.g. 2.0s max)
-	if (CurrentTime - MyMemory->StartTime > 2.0f)
+	// 타임아웃 폴백: 회피 상태 무한 유지 방지
+	if (CurrentTime - MyMemory->StartTime > GS_AI::EVADE_TASK_TIMEOUT)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI] Seeker evade task timed out, finishing..."));
-		LastEvadeTaskFinishTime = CurrentTime; // Set cooldown
+		LastEvadeTaskFinishTime = CurrentTime;
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
 	}
@@ -178,16 +164,41 @@ void UGS_BTT_SeekerEvade::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 		return;
 	}
 
-	// Check if we're still near a trap
+	// 구르기 스킬 완료 여부 확인
+	if (APawn* Pawn = AIController->GetPawn())
+	{
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Pawn))
+		{
+			if (UGS_SkillComp* SkillComp = Seeker->GetSkillComp())
+			{
+				// 구르기 상태가 아니면 완료된 것
+				if (!SkillComp->IsSkillActive(ESkillSlot::Rolling))
+				{
+					// 몽타주 재생 중이 아니면 완료 처리
+					if (UAnimInstance* AnimInstance = Seeker->GetMesh()->GetAnimInstance())
+					{
+						if (!AnimInstance->Montage_IsPlaying(nullptr))
+						{
+							LastEvadeTaskFinishTime = CurrentTime;
+							FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+							return;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 여전히 트랩 근처인지 확인
 	if (!AIController->ShouldEvade())
 	{
 		AIController->StopMovement();
-		LastEvadeTaskFinishTime = CurrentTime; // Set cooldown
+		LastEvadeTaskFinishTime = CurrentTime;
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
 	}
 
-	// Check movement status
+	// 이동 상태 확인
 	UPathFollowingComponent* PFC = AIController->GetPathFollowingComponent();
 	if (PFC)
 	{
@@ -195,14 +206,9 @@ void UGS_BTT_SeekerEvade::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 		if (Status == EPathFollowingStatus::Type::Idle ||
 		    Status == EPathFollowingStatus::Type::Paused)
 		{
-			// Movement complete
-			LastEvadeTaskFinishTime = CurrentTime; // Set cooldown
+			// 이동 완료
+			LastEvadeTaskFinishTime = CurrentTime;
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
-		}
-		// If path is blocked or aborted on the move-to level
-		else if (Status == EPathFollowingStatus::Type::Waiting)
-		{
-			// Could be stuck, let it finish or wait for next tick
 		}
 	}
 }
@@ -218,22 +224,23 @@ EBTNodeResult::Type UGS_BTT_SeekerEvade::AbortTask(UBehaviorTreeComponent& Owner
 
 FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLocation, const FVector& CurrentLocation) const
 {
-	// Base direction: away from threat
+	// 기본 방향: 위협으로부터 반대 방향
 	FVector AwayDirection = CurrentLocation - ThreatLocation;
 	AwayDirection.Z = 0.0f;
 
 	if (AwayDirection.IsNearlyZero())
 	{
-		// If at same location, pick random direction
+		// 같은 위치면 랜덤 방향 선택
 		AwayDirection = FVector(FMath::FRand() - 0.5f, FMath::FRand() - 0.5f, 0.0f);
 	}
 
 	AwayDirection.Normalize();
 
-	// Check if base direction is blocked
+	// 기본 방향이 막혀있는지 확인
 	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (NavSystem)
 	{
+		// 해당 위치가 모든 트랩으로부터 안전한지 확인하는 람다
 		auto IsLocationSafeFromAllTraps = [this](const FVector& Loc) -> bool
 		{
 			TArray<AActor*> NearbyTraps;
@@ -241,7 +248,7 @@ FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLo
 			ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_WorldDynamic));
 
 			UKismetSystemLibrary::SphereOverlapActors(
-			    GetWorld(), Loc, 150.0f, // Safety radius from other traps
+			    GetWorld(), Loc, GS_AI::MONSTER_OVERLAP_RADIUS,
 			    ObjectTypes, AGS_TrapBase::StaticClass(), TArray<AActor*>(), NearbyTraps);
 
 			return NearbyTraps.Num() == 0;
@@ -252,7 +259,7 @@ FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLo
 		FVector TestLocation = CurrentLocation + AwayDirection * currentEvadeDist;
 		FNavLocation NavLocation;
 
-		// Use a generous extent to find valid navmesh
+		// 네비메시 투영 시도
 		if (NavSystem->ProjectPointToNavigation(TestLocation, NavLocation, FVector(200.f, 200.f, 200.f)))
 		{
 			if (IsLocationSafeFromAllTraps(NavLocation.Location))
@@ -261,8 +268,11 @@ FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLo
 			}
 		}
 
-		// Try alternate directions (rotate 45, 90, 135 degrees)
+		// 대체 방향 시도 (45, 90, 135도 회전)
 		const float RotationAngles[] = {45.0f, -45.0f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f};
+
+		FVector BestDirection = FVector::ZeroVector;
+		int32 MinTrapCount = INT32_MAX;
 
 		for (float Angle : RotationAngles)
 		{
@@ -271,21 +281,44 @@ FVector UGS_BTT_SeekerEvade::CalculateSafeEvadeDirection(const FVector& ThreatLo
 
 			if (NavSystem->ProjectPointToNavigation(TestLocation, NavLocation, FVector(200.f, 200.f, 200.f)))
 			{
-				if (IsLocationSafeFromAllTraps(NavLocation.Location))
+				// 해당 위치 근처 트랩 개수 확인
+				TArray<AActor*> NearbyTraps;
+				TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+				ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_WorldDynamic));
+
+				UKismetSystemLibrary::SphereOverlapActors(
+				    GetWorld(), NavLocation.Location, 150.0f,
+				    ObjectTypes, AGS_TrapBase::StaticClass(), TArray<AActor*>(), NearbyTraps);
+
+				// 트랩이 적은 방향 우선
+				if (NearbyTraps.Num() < MinTrapCount)
 				{
-					return RotatedDirection;
+					MinTrapCount = NearbyTraps.Num();
+					BestDirection = RotatedDirection;
+
+					// 완전히 안전한 방향을 찾으면 즉시 사용
+					if (MinTrapCount == 0)
+					{
+						return BestDirection;
+					}
 				}
 			}
 		}
+
+		// "덜 위험한" 방향을 찾았으면 사용
+		if (!BestDirection.IsNearlyZero())
+		{
+			return BestDirection;
+		}
 	}
 
-	// If no truly safe spot found, return ZeroVector to bypass evasion
-	// (procedure with goal movement is better than jittering between traps)
-	return FVector::ZeroVector;
+	// 폴백: 완벽한 지점이 없어도 즉각적인 위협에서 벗어나기
+	// 트랩에 둘러싸여도 제자리에 멈추지 않도록 함
+	return AwayDirection;
 }
 
 FString UGS_BTT_SeekerEvade::GetStaticDescription() const
 {
-	return FString::Printf(TEXT("Evade Traps\nDistance: %.0f\nRoll Cooldown: %.1fs\nPrefer Roll: %s"),
-	                       EvadeDistance, RollCooldown, bPreferRollOverWalk ? TEXT("Yes") : TEXT("No"));
+	return FString::Printf(TEXT("트랩 회피\n거리: %.0f\n구르기 쿨다운: %.1fs\n구르기 우선: %s"),
+	                       EvadeDistance, RollCooldown, bPreferRollOverWalk ? TEXT("예") : TEXT("아니오"));
 }

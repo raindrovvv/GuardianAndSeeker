@@ -218,6 +218,42 @@ public:
 	}
 
 	/**
+	 * Soft Class Pointer를 동기로 로드 (주의: 게임 프리즈 가능)
+	 *
+	 * @param SoftClassPtr 로드할 소프트 클래스 포인터
+	 * @return 로드된 클래스 (실패 시 nullptr)
+	 */
+	template <typename T>
+	static TSubclassOf<T> SyncLoadClass(const TSoftClassPtr<T>& SoftClassPtr)
+	{
+		if (SoftClassPtr.IsNull())
+		{
+			return nullptr;
+		}
+
+		// 이미 로드된 경우
+		if (UClass* LoadedClass = SoftClassPtr.Get())
+		{
+			return TSubclassOf<T>(LoadedClass);
+		}
+
+		// 동기 로드 (블로킹)
+		FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
+		Streamable.RequestSyncLoad(SoftClassPtr.ToSoftObjectPath());
+
+		return TSubclassOf<T>(SoftClassPtr.Get());
+	}
+
+	/**
+	 * Soft Class Pointer를 동기로 로드 (SyncLoadAsset 별칭)
+	 */
+	template <typename T>
+	static TSubclassOf<T> SyncLoadAsset(const TSoftClassPtr<T>& SoftClassPtr)
+	{
+		return SyncLoadClass(SoftClassPtr);
+	}
+
+	/**
 	 * 블루프린트에서 호출 가능한 비동기 로드 함수
 	 *
 	 * @param SoftObjectPath 로드할 에셋 경로

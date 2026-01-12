@@ -29,48 +29,48 @@ public:
 	UGS_RTSSkillBase();
 
 	// 스킬 정보 Getter
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	FText GetSkillName() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	FText GetSkillDescription() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	UTexture2D* GetSkillIcon() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetAetherCost() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetCooldownTime() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	ERTSSkillTargetType GetTargetType() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetSkillRange() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetEffectRadius() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetSkillPower() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetEffectDuration() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	UNiagaraSystem* GetActivationVFX() const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	class UAkAudioEvent* GetCastSound() const;
 
 	// 스킬 발동 가능 여부 체크
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	virtual bool CanActivate(UGS_RTSSkillComponent* SkillComponent) const;
 
 	// 스킬 발동
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation);
 
 	// VFX/SFX 재생 (멀티캐스트에서 호출)
@@ -79,8 +79,11 @@ public:
 	// 스킬 초기화 (컴포넌트에서 호출)
 	virtual void Initialize(UGS_RTSSkillComponent* OwnerComponent);
 
+	// 에셋 비동기 프리로드
+	virtual void PreloadAssets();
+
 	// 단축키 인덱스 (0-3 = 1-4키)
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	int32 GetSkillSlotIndex() const { return SkillSlotIndex; }
 
 	void SetSkillSlotIndex(int32 Index) { SkillSlotIndex = Index; }
@@ -94,8 +97,18 @@ protected:
 	TWeakObjectPtr<UGS_RTSSkillComponent> OwnerSkillComponent;
 
 	// 스킬 데이터 에셋
-	UPROPERTY(BlueprintReadOnly, Category="RTS|Skill", meta=(AllowPrivateAccess="true"))
+	UPROPERTY(BlueprintReadOnly, Category = "RTS|Skill", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGS_RTSSkillData> SkillData;
+
+	// 캐싱된 에셋들 (히치 방지)
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedActivationVFX;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedCastSound_TPS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedCastSound_RTS;
 
 	int32 SkillSlotIndex;
 
@@ -108,13 +121,13 @@ protected:
 	class UAkAudioEvent* SelectSoundEvent(class UAkAudioEvent* TPSSound, class UAkAudioEvent* RTSSound) const;
 
 	// 블루프린트에서 오버라이드 가능한 이벤트
-	UFUNCTION(BlueprintImplementableEvent, Category="RTS|Skill", meta=(DisplayName="On Skill Activated"))
+	UFUNCTION(BlueprintImplementableEvent, Category = "RTS|Skill", meta = (DisplayName = "On Skill Activated"))
 	void BP_OnSkillActivated(const FVector& TargetLocation);
 
 	// VFX/SFX 재생 헬퍼
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void PlaySkillVFX(UNiagaraSystem* NiagaraSystem, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void PlaySkillSound(class UAkAudioEvent* Sound, const FVector& Location);
 };

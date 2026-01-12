@@ -16,7 +16,7 @@ UGS_RTSSkillComponent::UGS_RTSSkillComponent()
 	MaxAether = 100.f;
 	InitialAether = 100.f;
 	CurrentAether = 100.f;
-	AetherRegenRate = 2.f;  // 초당 2 회복
+	AetherRegenRate = 2.f; // 초당 2 회복
 
 	// 타겟팅 모드 초기화
 	bIsInTargetingMode = false;
@@ -63,13 +63,13 @@ void UGS_RTSSkillComponent::UpdateCooldowns(float DeltaTime)
 		{
 			bAnySkillOnCooldown = true;
 			CooldownRemaining[i] = FMath::Max(0.f, CooldownRemaining[i] - DeltaTime);
-			
+
 			// Delta 체크: 0.1초 이상 변화가 있거나, 쿨다운이 끝난 경우에만 브로드캐스트 (UI 부하 감소)
 			if (FMath::Abs(CooldownRemaining[i] - LastBroadcastCooldown[i]) >= 0.1f || CooldownRemaining[i] == 0.f)
 			{
 				UGS_RTSSkillBase* Skill = Skills.IsValidIndex(i) ? Skills[i] : nullptr;
 				const float MaxCooldown = Skill ? Skill->GetCooldownTime() : 0.f;
-				
+
 				OnSkillCooldownChanged.Broadcast(i, CooldownRemaining[i], MaxCooldown);
 				LastBroadcastCooldown[i] = CooldownRemaining[i];
 			}
@@ -139,6 +139,7 @@ void UGS_RTSSkillComponent::InitializeSkills()
 		NewSkill->SetSkillData(SkillData);
 		NewSkill->Initialize(this);
 		NewSkill->SetSkillSlotIndex(i);
+		NewSkill->PreloadAssets(); // 에셋 비동기 로딩 시작
 		Skills[i] = NewSkill;
 	}
 
@@ -157,12 +158,11 @@ void UGS_RTSSkillComponent::StartAetherRegen()
 	if (AetherRegenRate > 0.f)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
-			AetherRegenTimer,
-			this,
-			&UGS_RTSSkillComponent::RegenAether,
-			0.5f,  // 0.5초마다 회복
-			true
-		);
+		    AetherRegenTimer,
+		    this,
+		    &UGS_RTSSkillComponent::RegenAether,
+		    0.5f, // 0.5초마다 회복
+		    true);
 	}
 }
 
@@ -170,7 +170,7 @@ void UGS_RTSSkillComponent::RegenAether()
 {
 	if (CurrentAether < MaxAether)
 	{
-		float RegenAmount = AetherRegenRate * 0.5f;  // 0.5초 간격이므로 절반
+		float RegenAmount = AetherRegenRate * 0.5f; // 0.5초 간격이므로 절반
 		AddAether(RegenAmount);
 	}
 }
@@ -400,7 +400,7 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 	{
 		CooldownRemaining[SkillIndex] = 0.f;
 		LastBroadcastCooldown[SkillIndex] = 0.f;
-		
+
 		UGS_RTSSkillBase* Skill = GetSkill(SkillIndex);
 		if (Skill)
 		{
@@ -416,11 +416,11 @@ void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
 		UGS_RTSSkillBase* Skill = Skills[i];
 		if (Skill)
 		{
-			UE_LOG(LogTemp, Log, TEXT("Skill %d: %s - Cost: %.0f, CD: %.1f/%.1f"), 
-				i, *Skill->GetSkillName().ToString(), 
-				Skill->GetAetherCost(),
-				GetSkillCooldownRemaining(i),
-				Skill->GetCooldownTime());
+			UE_LOG(LogTemp, Log, TEXT("Skill %d: %s - Cost: %.0f, CD: %.1f/%.1f"),
+			       i, *Skill->GetSkillName().ToString(),
+			       Skill->GetAetherCost(),
+			       GetSkillCooldownRemaining(i),
+			       Skill->GetCooldownTime());
 		}
 	}
 }

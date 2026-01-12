@@ -21,9 +21,35 @@ public:
 	UGS_RTSSkill_FireballStrike();
 
 	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
+	virtual void PreloadAssets() override;
 
 protected:
 	const UGS_RTSSkillData_Fireball* GetFireballData() const;
+
+	// 캐싱된 에셋들
+	UPROPERTY()
+	TSubclassOf<AActor> CachedProjectileClass;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> CachedWarningDecalMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedTrailVFX;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedExplosionVFX;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedFallSound_TPS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedFallSound_RTS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedExplosionSound_TPS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedExplosionSound_RTS;
 
 private:
 	// 경고 표시 후 불덩이 생성
