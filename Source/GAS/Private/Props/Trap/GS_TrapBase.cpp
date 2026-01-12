@@ -142,6 +142,15 @@ void AGS_TrapBase::BeginPlay()
 	DamageBoxComp->OnComponentHit.AddDynamic(this, &AGS_TrapBase::OnDamageBoxHit);
 	ActivateSphereComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrapBase::OnActivSCompBeginOverlap);
 
+	// Register with ActorRegistrySubsystem
+	if (UWorld* World = GetWorld())
+	{
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->RegisterTrap(this);
+		}
+	}
+
 	// === Static Mesh Distance Culling 설정 (클라이언트만) ===
 	if (!IsRunningDedicatedServer())
 	{
@@ -186,9 +195,15 @@ void AGS_TrapBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		DamageBoxComp->OnComponentHit.RemoveAll(this);
 	}
 
-	if (ActivateSphereComp)
+	ActivateSphereComp->OnComponentBeginOverlap.RemoveAll(this);
+
+	// Unregister from ActorRegistrySubsystem
+	if (UWorld* World = GetWorld())
 	{
-		ActivateSphereComp->OnComponentBeginOverlap.RemoveAll(this);
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		{
+			Registry->UnregisterTrap(this);
+		}
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -221,6 +236,30 @@ void AGS_TrapBase::OnConstruction(const FTransform& Transform)
 	if (FApp::CanEverRender())
 	{
 		ApplyDistanceCulling();
+
+#if WITH_EDITOR
+		// === 맵 체크 경고 해결을 위한 자동 보정 로직 ===
+		TArray<UStaticMeshComponent*> MeshComps;
+		GetComponents<UStaticMeshComponent>(MeshComps);
+		for (UStaticMeshComponent* Mesh : MeshComps)
+		{
+			if (Mesh)
+			{
+				// 1. BoundsScale이 1보다 크면 퍼포먼스 경고가 발생하므로 1.0으로 강제 수정
+				if (Mesh->BoundsScale > 1.0f)
+				{
+					Mesh->SetBoundsScale(1.0f);
+				}
+
+				// 2. Static Mesh가 할당되지 않은 경우 에디터 로그로 알림
+				if (Mesh->GetStaticMesh() == nullptr)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[MapCheck Fix] %s의 메쉬 컴포넌트(%s)에 StaticMesh가 할당되지 않았습니다!"),
+					       *GetName(), *Mesh->GetName());
+				}
+			}
+		}
+#endif
 	}
 }
 
