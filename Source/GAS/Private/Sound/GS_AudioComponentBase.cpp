@@ -326,9 +326,27 @@ bool UGS_AudioComponentBase::GetListenerTransform(FVector& OutLocation, FRotator
 	{
 		FVector CameraLocation;
 		FRotator CameraRotation;
+
 		if (GetActualCameraTransform(CameraLocation, CameraRotation))
 		{
-			OutLocation = CameraLocation;
+			// === RTS Listener Ground Projection ===
+			// 리스너를 카메라 위치가 아닌, 카메라가 바라보는 지면(Z=0)에 배치하여
+			// 거리 감쇠가 수평 이동에 따라 자연스럽게 반응하도록 개선
+			FVector CamForward = CameraRotation.Vector();
+
+			if (CamForward.Z < -0.1f) // 아래를 바라보고 있을 때만 투영
+			{
+				float t = -CameraLocation.Z / CamForward.Z;
+				OutLocation = CameraLocation + CamForward * t;
+
+				// 지면에서 약간 띄워줌 (0에 너무 붙어있으면 묻힐 수 있음)
+				OutLocation.Z = 100.0f;
+			}
+			else
+			{
+				OutLocation = CameraLocation;
+			}
+
 			OutRotation = CameraRotation;
 			return true;
 		}
@@ -430,12 +448,24 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 		return true; // 카메라 정보를 얻을 수 없으면, 안전하게 true 반환
 	}
 
+	// RTS 모드에서는 카메라 높이에 관계없이 지면상의 거리를 기준으로 컬링을 수행합니다.
+	// CameraLocation은 하늘에 떠있으므로, 실제 감쇠 기준점인 ListenerLocation(지면 투영)을 사용합니다.
+	FVector ListenerLocation;
+	float DistanceToListener = 0.0f;
+	if (GetListenerLocation(ListenerLocation))
+	{
+		DistanceToListener = FVector::Dist(ListenerLocation, SourceLocation);
+	}
+	else
+	{
+		DistanceToListener = FVector::Dist(CameraLocation, SourceLocation);
+	}
+
 	const FVector DirectionToSource = (SourceLocation - CameraLocation).GetSafeNormal();
 	const FVector CameraForwardVector = CameraRotation.Vector();
-	const float Distance = FVector::Dist(CameraLocation, SourceLocation);
 
-	// 1. 근접 체크: 매우 가까우면 항상 들리도록 처리
-	if (Distance <= 800.0f) // 8미터
+	// 1. 근접 체크: 지면 리스너와 매우 가까우면(8미터) 화면 밖이라도 항상 들리도록 처리
+	if (DistanceToListener <= 800.0f)
 	{
 		return true;
 	}
@@ -453,7 +483,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 			if (IsInSameRoom(ViewTarget->GetActorLocation(), SourceLocation))
 			{
 				// 같은 방 시스템 내에 있다면, 제한된 거리로 허용
-				if (Distance <= 2000.0f) // 카메라 뒤쪽: 20미터
+				// 카메라 뒤쪽이더라도 지면상의 거리가 15미터 이내면 들리도록 설정
+				if (DistanceToListener <= 1500.0f)
 				{
 					return true;
 				}
@@ -473,8 +504,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 			GEngine->GameViewport->GetViewportSize(ViewportSize);
 
 			// 뷰포트 경계 내에 있는지 확인 (약간의 여유분 포함)
-			// 화면 가장자리의 소리도 들을 수 있도록 마진 설정
-			const float Margin = 200.0f; // 200픽셀 여유 (화면 밖의 가까운 소리도 포함)
+			// RTS 모드에서는 화면 밖 소리를 더 엄격하게 제한 (200px -> 80px)
+			const float Margin = 80.0f;
 			if (ScreenPosition.X >= -Margin && ScreenPosition.X <= ViewportSize.X + Margin &&
 			    ScreenPosition.Y >= -Margin && ScreenPosition.Y <= ViewportSize.Y + Margin)
 			{
@@ -496,7 +527,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 		if (IsInSameRoom(ViewTarget->GetActorLocation(), SourceLocation))
 		{
 			// 같은 방 시스템 내에 있다면, 더 먼 거리의 소리도 허용
-			if (Distance <= 3000.0f) // 같은/연결된 방일 경우 30미터
+			// RTS 모드에서는 화면 밖 가청 범위를 지면 거리 기준 25미터로 설정
+			if (DistanceToListener <= 2500.0f)
 			{
 				return true;
 			}
@@ -580,10 +612,16 @@ bool UGS_AudioComponentBase::GetActualCameraTransform(FVector& OutLocation, FRot
 
 		if (RTSCameraActor && IsValid(RTSCameraActor))
 		{
-			if (IsTransformValid(RTSCameraActor->GetActorLocation(), RTSCameraActor->GetActorRotation()))
+			// RTSCameraActor의 루트 위치가 아닌, 실제 카메라 컴포넌트의 위치와 회전을 가져옵니다.
+			// 이를 통해 스프링암에 의한 오프셋과 실제 카메라 기울기(Pitch)가 반영된 Projection이 가능해집니다.
+			UCameraComponent* CamComp = RTSCameraActor->GetCameraComponent();
+			FVector CamLocation = CamComp ? CamComp->GetComponentLocation() : RTSCameraActor->GetActorLocation();
+			FRotator CamRotation = CamComp ? CamComp->GetComponentRotation() : RTSCameraActor->GetActorRotation();
+
+			if (IsTransformValid(CamLocation, CamRotation))
 			{
-				CachedCameraLocation = RTSCameraActor->GetActorLocation();
-				CachedCameraRotation = RTSCameraActor->GetActorRotation();
+				CachedCameraLocation = CamLocation;
+				CachedCameraRotation = CamRotation;
 				LastCameraLocationUpdateTime = CurrentTime;
 				OutLocation = CachedCameraLocation;
 				OutRotation = CachedCameraRotation;
@@ -808,7 +846,10 @@ void UGS_AudioComponentBase::UpdateDistanceRTPC()
 			if (ShouldUpdateRTPC(DistanceToListener, CurrentTime))
 			{
 				// 거리를 0-1 범위로 정규화하여 통일된 RTPC 시스템 사용
-				const float MaxDistance = GetMaxAudioDistance();
+				// RTS 모드에서는 Distance Scaling이 적용되므로, 정규화 시에도 이를 반영하여
+				// Wwise Attenuation과 RTPC 값이 동기화되도록 함
+				const float ModeScaling = GetDistanceScalingForMode(bCurrentRTSMode);
+				const float MaxDistance = GetMaxAudioDistance() * ModeScaling;
 				const float NormalizedDistance = MaxDistance > 0.0f ? FMath::Clamp(DistanceToListener / MaxDistance, 0.0f, 1.0f) : 0.0f;
 
 				SetUnifiedRTPCValue(DistanceToPlayerRTPC, NormalizedDistance);
@@ -1311,9 +1352,18 @@ bool UGS_AudioComponentBase::IsInSameRoom(const FVector& Pos1, const FVector& Po
 		return true;
 	}
 
-	// 어느 한쪽이라도 방이 아닌 야외 공간에 있다면 소리가 들리도록 함
+	// 어느 한쪽이라도 방이 아닌 야외 공간에 있다면 처리
 	if (!Room1 || !Room2)
 	{
+		// RTS 모드일 때는 야외 공간이라도 실시간 화면 중심 가시성 체크가 더 중요하므로
+		// 여기서 true를 반환하면 화면 밖 멀리 있는 야외 소리도 다 들리게 됨.
+		// 따라서 RTS 모드 여부를 체크하여 더 보수적으로 판단.
+		if (IsRTSMode())
+		{
+			// 둘 다 야외 공간인 경우에만 기본 true, 그 외(하나만 야외)는 False로 오클루전 유도
+			return (!Room1 && !Room2);
+		}
+
 		return true;
 	}
 
