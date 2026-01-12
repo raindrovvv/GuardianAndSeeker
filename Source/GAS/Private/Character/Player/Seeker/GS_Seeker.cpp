@@ -186,6 +186,11 @@ void AGS_Seeker::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 초기 Gait 상태 (속도 및 애니메이션) 강제 동기화
+	EGait InitialGait = SeekerGait;
+	SeekerGait = (InitialGait == EGait::Walk) ? EGait::Run : EGait::Walk; // 강제 호출을 위해 임시 변경
+	Internal_SetSeekerGait(InitialGait);
+
 	// CombatTrigger 오버랩 이벤트 바인딩 (중복 바인딩 방지)
 	if (CombatTrigger)
 	{
@@ -271,6 +276,13 @@ void AGS_Seeker::BeginPlay()
 	// 주변 감지(상자 등) 및 저빈도 업데이트용 타이머 시작 (0.1초/10Hz)
 	// 이 타이머는 블루프린트의 OnPeripheralSensorUpdate 이벤트를 호출합니다.
 	GetWorldTimerManager().SetTimer(PeripheralSensorTimerHandle, this, &AGS_Seeker::UpdatePeripheralSensor, 0.1f, true);
+
+	// HP 위젯 가시성 업데이트 타이머 (몬스터와 동일한 방식)
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		float RandomVariance = FMath::RandRange(0.0f, 0.1f);
+		GetWorldTimerManager().SetTimer(HPWidgetVisibilityTimerHandle, this, &AGS_Seeker::UpdateHPWidgetVisibility, 0.1f, true, RandomVariance);
+	}
 }
 
 void AGS_Seeker::PawnClientRestart()
@@ -392,11 +404,11 @@ void AGS_Seeker::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 
-	// 빈사/구조 관련 타이머 정리
 	SafeClearTimer(ReviveDecayTimerHandle);
 	SafeClearTimer(DyingUpdateTimerHandle);
 	SafeClearTimer(PeripheralSensorTimerHandle);
 	SafeClearTimer(AttackSoundResetTimerHandle);
+	SafeClearTimer(HPWidgetVisibilityTimerHandle);
 
 	// 포스트 프로세스 비활성화
 	// Unregister from Subsystem
@@ -452,6 +464,12 @@ bool AGS_Seeker::GetDrawState()
 
 void AGS_Seeker::Internal_SetSeekerGait(EGait Gait)
 {
+	// 현재 Gait와 같으면 무시
+	if (SeekerGait == Gait)
+	{
+		return;
+	}
+
 	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
 	if (bIsInDyingState && Gait != EGait::Crawl)
 	{
@@ -559,7 +577,7 @@ void AGS_Seeker::InitializeCameraManager()
 		// Low Health: 컴포넌트 초기화 (Get() 사용 - BeginPlay에서 비동기 로드됨)
 		if (LowHealthEffectComp && !LowHealthEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = LowHealthEffectMaterial.Get();
+			UMaterialInterface* LoadedMaterial = UGS_AssetLoader::SyncLoadAsset(LowHealthEffectMaterial);
 			if (LoadedMaterial)
 			{
 				LowHealthEffectComp->InitializeForOwner(this, LowHealthPostProcessComp, LoadedMaterial);
@@ -569,7 +587,7 @@ void AGS_Seeker::InitializeCameraManager()
 		// Detection: 컴포넌트 초기화 (Get() 사용)
 		if (DetectionEffectComp && !DetectionEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = DetectionEffectMaterial.Get();
+			UMaterialInterface* LoadedMaterial = UGS_AssetLoader::SyncLoadAsset(DetectionEffectMaterial);
 			if (LoadedMaterial)
 			{
 				DetectionEffectComp->InitializeForOwner(this, DetectionPostProcessComp, LoadedMaterial);
@@ -579,7 +597,7 @@ void AGS_Seeker::InitializeCameraManager()
 		// Dying: PostProcess 초기화 (Get() 사용)
 		if (DyingPostProcessComp && !DyingEffectMaterial.IsNull())
 		{
-			UMaterialInterface* LoadedMaterial = DyingEffectMaterial.Get();
+			UMaterialInterface* LoadedMaterial = UGS_AssetLoader::SyncLoadAsset(DyingEffectMaterial);
 			if (LoadedMaterial)
 			{
 				DyingDynamicMaterial = UMaterialInstanceDynamic::Create(LoadedMaterial, this);
@@ -683,7 +701,9 @@ void AGS_Seeker::Server_OnComboAttack_Implementation()
 		return;
 	}
 
-	if (!CanAcceptComboInput) // Handler 에서도 검사하고 있었는데 서버에서도 검사한다. 이중검사가 필요한가?
+	if (!CanAcceptComboInput)
+	// Handler 에서도 검사하고 있었는데 서버에서도 검사한다. 이중검사가 필요한가?
+	// → 클라이언트에서 즉각적인 반응을 위해 한 번, 서버에서 정확한 판정과 보안을 위해 다시 검사하는 것은 네트워킹의 정석.
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, CanAcceptComboInput == false"));
 		return;
@@ -2249,5 +2269,75 @@ void AGS_Seeker::HandleHitReactEnd(UAnimMontage* Montage, bool bInterrupted)
 				    ESeekerMontageSlot::UpperBody);
 			}
 		}
+	}
+}
+void AGS_Seeker::UpdateHPWidgetVisibility()
+{
+	// Significance 체크: 중요도가 너무 낮으면 UI 가시성 연산 스킵 (성능 최적화)
+	if (GetSignificance() < GS_Rendering::SIGNIFICANCE_THRESHOLD_UI_SKIP)
+	{
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible())
+		{
+			HPTextWidgetComp->SetVisibility(false);
+		}
+		if (IsValid(SteamNameWidgetComp) && SteamNameWidgetComp->IsVisible())
+		{
+			SteamNameWidgetComp->SetVisibility(false);
+		}
+		return;
+	}
+
+	// 로컬 플레이어 본인이면 모든 위젯 숨김 (HUD가 대신함)
+	if (IsLocallyControlled())
+	{
+		if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible())
+		{
+			HPTextWidgetComp->SetVisibility(false);
+		}
+		if (IsValid(SteamNameWidgetComp) && SteamNameWidgetComp->IsVisible())
+		{
+			SteamNameWidgetComp->SetVisibility(false);
+		}
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	bool bIsVisible = false;
+	bool bIsRTSMode = GS_Rendering::IsRTSMode(this);
+
+	if (bIsRTSMode)
+	{
+		// RTS 모드 (가디언 시점): 시커는 적이므로 거리 기반으로 머리 위 HP 바 표시
+		float MaxCullDist = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+		float DistSq = FVector::DistSquared(PC->PlayerCameraManager->GetCameraLocation(), GetActorLocation());
+		bIsVisible = (DistSq < FMath::Square(MaxCullDist));
+	}
+	else
+	{
+		// TPS 모드 (시커 시점): 아군 시커의 머리 위 HP 바는 보이지 않아야 함 (HUD에서 확인)
+		bIsVisible = false;
+	}
+
+	// 가시성 업데이트 (HP 위젯)
+	if (IsValid(HPTextWidgetComp) && HPTextWidgetComp->IsVisible() != bIsVisible)
+	{
+		HPTextWidgetComp->SetVisibility(bIsVisible);
+	}
+
+	// 가시성 업데이트 (Steam 닉네임 위젯)
+	if (IsValid(SteamNameWidgetComp) && SteamNameWidgetComp->IsVisible() != bIsVisible)
+	{
+		SteamNameWidgetComp->SetVisibility(bIsVisible);
 	}
 }

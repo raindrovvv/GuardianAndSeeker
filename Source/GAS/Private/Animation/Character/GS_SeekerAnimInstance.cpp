@@ -18,19 +18,7 @@ UGS_SeekerAnimInstance::UGS_SeekerAnimInstance()
 
 void UGS_SeekerAnimInstance::NativeInitializeAnimation()
 {
-	// Ensure ChooserInputObj is valid (should be created in constructor, but backup for old assets)
-	if (!ChooserInputObj)
-	{
-		ChooserInputObj = NewObject<UGS_ChooserInputObj>(this);
-	}
-
-	if (ChooserInputObj)
-	{
-		ChooserInputObj->MovementState = EMovementState::Idle;
-		ChooserInputObj->RotationMode = ERotationMode::OrientToMovement;
-		ChooserInputObj->Gait = EGait::Run;
-		ChooserInputObj->LastGait = EGait::Run;
-	}
+	Super::NativeInitializeAnimation();
 
 	AGS_Seeker* OwnerPawn = Cast<AGS_Seeker>(TryGetPawnOwner());
 	if (OwnerPawn)
@@ -38,48 +26,51 @@ void UGS_SeekerAnimInstance::NativeInitializeAnimation()
 		OwnerCharacter = OwnerPawn;
 		OwnerCharacterMovement = OwnerCharacter->GetCharacterMovement();
 
+		if (ChooserInputObj)
+		{
+			ChooserInputObj->Gait = OwnerPawn->GetSeekerGait();
+			ChooserInputObj->LastGait = ChooserInputObj->Gait;
+			LastGait = ChooserInputObj->Gait;
+		}
+
 		if (OwnerPawn->HasAuthority())
 		{
 			bUseOffsetRootBone = true;
 		}
 	}
-
-	Super::NativeInitializeAnimation();
 }
 
 void UGS_SeekerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
-	// Ensure ChooserInputObj is valid (Lazy initialization for safety)
-	if (!ChooserInputObj)
+	Super::NativeUpdateAnimation(DeltaSeconds);
+
+	// 스레드 안전성 확인: OwnerCharacter가 없으면 재탐색
+	if (!OwnerCharacter)
 	{
-		ChooserInputObj = NewObject<UGS_ChooserInputObj>(this);
-		if (ChooserInputObj)
+		OwnerCharacter = Cast<AGS_Character>(TryGetPawnOwner());
+		if (OwnerCharacter)
 		{
-			ChooserInputObj->MovementState = EMovementState::Idle;
-			ChooserInputObj->RotationMode = ERotationMode::OrientToMovement;
-			ChooserInputObj->Gait = EGait::Run;
-			ChooserInputObj->LastGait = EGait::Run;
+			OwnerCharacterMovement = OwnerCharacter->GetCharacterMovement();
 		}
 	}
 
-	Super::NativeUpdateAnimation(DeltaSeconds);
-	if (OwnerCharacter)
+	if (OwnerCharacter && OwnerCharacterMovement)
 	{
-		UpdateEssentialValue();
+		UpdateEssentialValue(DeltaSeconds);
 		UpdateTrajectory();
 		UpdateState();
 
-		// 빈사 상태 업데이트 (Animation Blueprint에서 사용)
+		// 빈사 상태 업데이트
 		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 		{
 			bIsDying = Seeker->IsInDyingState();
 		}
 
-		// Cache Aim Offset values for thread-safe access
+		// Thread-safe 캐싱
 		CachedAOValue = Get_AOValue_Internal();
 		bCachedEnableAO = Enable_AO_Internal();
 
-		// Gait 전환 타이머 업데이트
+		// Gait 전환 타이머
 		if (bIsTransitioningGait)
 		{
 			GaitTransitionTimer -= DeltaSeconds;
@@ -92,7 +83,7 @@ void UGS_SeekerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 }
 
-void UGS_SeekerAnimInstance::UpdateEssentialValue_Implementation()
+void UGS_SeekerAnimInstance::UpdateEssentialValue_Implementation(float DeltaSeconds)
 {
 	if (!ChooserInputObj || !OwnerCharacter || !OwnerCharacterMovement)
 	{
@@ -110,8 +101,7 @@ void UGS_SeekerAnimInstance::UpdateEssentialValue_Implementation()
 	ChooserInputObj->Velocity = OwnerCharacterMovement->Velocity;
 	ChooserInputObj->Speed2D = UKismetMathLibrary::VSizeXY(ChooserInputObj->Velocity);
 
-	const float WorldDT = UGameplayStatics::GetWorldDeltaSeconds(OwnerCharacter->GetWorld());
-	const float SafeDT = FMath::Max(WorldDT, 0.001f);
+	const float SafeDT = FMath::Max(DeltaSeconds, 0.001f);
 
 	VelocityAcceleration = (ChooserInputObj->Velocity - VelocityLastFrame) / SafeDT;
 
@@ -145,7 +135,16 @@ void UGS_SeekerAnimInstance::UpdateState_Implementation()
 	ChooserInputObj->LastMovementState = ChooserInputObj->MovementState;
 	if (ChooserInputObj->IsMoving())
 	{
-		OwnerCharacter->bUseControllerRotationYaw = true;
+		// Strafe 모드일 때만 컨트롤러 회전 사용 (조준 중 등)
+		if (ChooserInputObj->RotationMode == ERotationMode::Strafe)
+		{
+			OwnerCharacter->bUseControllerRotationYaw = true;
+		}
+		else
+		{
+			// OrientToMovement 모드일 때는 Smooth Turn을 위해 Yaw 비활성화
+			OwnerCharacter->bUseControllerRotationYaw = false;
+		}
 		ChooserInputObj->MovementState = EMovementState::Moving;
 	}
 	else
@@ -161,18 +160,20 @@ void UGS_SeekerAnimInstance::UpdateState_Implementation()
 		ChooserInputObj->MovementState = EMovementState::Idle;
 	}
 
-	// Set Gait State with Transition Safety
-	ChooserInputObj->LastGait = ChooserInputObj->Gait;
-
 	// Gait 변경 감지 및 전환 안전장치
 	if (LastGait != ChooserInputObj->Gait)
 	{
+		// AnimBP에서 이전 Gait를 참조할 수 있도록 명시적으로 설정
+		ChooserInputObj->LastGait = LastGait;
+
 		// Gait 전환 시작
 		bIsTransitioningGait = true;
 		GaitTransitionTimer = GaitTransitionDelay;
 
 		LastGait = ChooserInputObj->Gait;
 	}
+
+	bIsMoving = ChooserInputObj->IsMoving();
 }
 
 bool UGS_SeekerAnimInstance::GetMustTurnInPlace()
