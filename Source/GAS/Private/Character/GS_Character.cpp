@@ -113,6 +113,18 @@ void AGS_Character::BeginPlay()
 					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
 				}
 			}
+			else if (IsA<AGS_Seeker>())
+			{
+				// 시커(AI 포함)는 아군 정보나 적 정보를 위해 표시할 수 있음.
+				// 특히 RTS(가디언) 시점에서는 항상 보여야 함.
+				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				{
+					if (PC->IsA<AGS_RTSController>())
+					{
+						HPTextWidgetComp->SetVisibility(true);
+					}
+				}
+			}
 		}
 	}
 

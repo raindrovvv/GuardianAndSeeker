@@ -103,42 +103,31 @@ void UGS_ChanAimingSkill::OnSkillCanceledByDebuff()
 	}
 }
 
+// 스킬 애니메이션 종료 시 호출
 void UGS_ChanAimingSkill::OnSkillAnimationEnd()
 {
 	Super::OnSkillAnimationEnd();
 
 	if (CachedChanOwner.IsValid())
 	{
-		// Change Slot
 		CachedChanOwner->Multicast_SetMustTurnInPlace(false);
-		CachedChanOwner->SetSeekerGait(CachedChanOwner->GetLastSeekerGait());
-		// Change Slot
-		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 
+		// 기본적으로 Run 상태로 복구 (DeactiveSkill에서 이미 수행될 수 있으나 명확히 함)
+		CachedChanOwner->SetSeekerGait(EGait::Run);
+
+		CachedChanOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 		CachedChanOwner->CanChangeSeekerGait = true;
 
+		// 컨트롤 복원
 		CachedChanOwner->SetMoveControlValue(true, true);
 		CachedChanOwner->SetLookControlValue(true, true);
-
-		// 피격 애니메이션 재생 가능 설정
-		//CachedChanOwner->SetCanHitReact(true);
-
-		// SetIsActive(false); // 방어 상태를 유지하기 위해 제거
-
-		// =======================
-		// 스킬 종료 VFX 재생
-		// =======================
+		CachedChanOwner->SetCanHitReact(true);
 
 		if (OwningComp)
 		{
-			FVector SkillLocation = OwnerCharacter->GetActorLocation();
-			FRotator SkillRotation = OwnerCharacter->GetActorRotation();
-
 			// 스킬 종료 VFX 재생
-			OwningComp->Multicast_PlayEndVFX(CurrentSkillType, SkillLocation, SkillRotation);
+			OwningComp->Multicast_PlayEndVFX(CurrentSkillType, OwnerCharacter->GetActorLocation(), OwnerCharacter->GetActorRotation());
 		}
-
-		CachedChanOwner->SetCanHitReact(true);
 	}
 }
 
@@ -306,19 +295,16 @@ void UGS_ChanAimingSkill::ApplyEffectToGuardian(AGS_Guardian* Target)
 	}
 }
 
+// 스킬 비활성화 처리
 void UGS_ChanAimingSkill::DeactiveSkill()
 {
 	if (CachedChanOwner.IsValid())
 	{
-		// Set HitReact
 		CachedChanOwner->CanChangeSeekerGait = true;
-		CachedChanOwner->SetSeekerGait(EGait::Run);
-		//CachedChanOwner->SetCanHitReact(true);
 
-		// 방어 상태 비활성화 (스킬 완전 종료 시)
+		// 방어 상태 완전 해제
 		CachedChanOwner->SetDefending(false);
 	}
 
-	// 스킬 상태 업데이트
 	Super::DeactiveSkill();
 }
