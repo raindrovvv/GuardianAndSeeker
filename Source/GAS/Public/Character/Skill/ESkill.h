@@ -13,6 +13,8 @@ enum class ESkillSlot : uint8
 	Rolling,
 	Combo,
 	HealPotion,
+	BasicAttack, // AI semantic name
+	Skill_Q, // AI semantic name
 	End
 };
 
@@ -31,7 +33,7 @@ public:
 
 	bool CanMove() const { return bCanMoveForward || bCanMoveRight; }
 	bool CanLook() const { return bCanLookUp || bCanLookRight; }
-	
+
 	UPROPERTY(EditAnywhere)
 	bool bCanLookUp;
 
