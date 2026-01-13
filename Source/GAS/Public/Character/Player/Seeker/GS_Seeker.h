@@ -28,6 +28,7 @@ class UGS_DetectionEffectComponent;
 class AGS_Item;
 class UGS_MarkerPlacementComponent;
 class UGS_HitIndicatorComponent;
+class UGS_PositiveEffectComponent;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -325,6 +326,19 @@ public:
 	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	UGS_HitIndicatorComponent* HitIndicatorComponent;
+
+	// =======================
+	// 긍정적 효과(힐/버프) 화면 효과
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UPostProcessComponent* PositiveEffectPostProcessComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UGS_PositiveEffectComponent* PositiveEffectComp;
+
+	/** 긍정적 효과용 PostProcess 머티리얼 - Soft Reference */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	TSoftObjectPtr<UMaterialInterface> PositiveEffectMaterial;
 
 	// ================
 	// 함정 VFX 컴포넌트

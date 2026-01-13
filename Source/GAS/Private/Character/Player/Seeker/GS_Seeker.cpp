@@ -48,6 +48,7 @@
 #include "AI/SeekerAI/GS_SeekerAIController.h"
 #include "System/Utility/GS_AssetLoader.h"
 #include "Character/Component/GS_HitIndicatorComponent.h"
+#include "Character/Component/GS_PositiveEffectComponent.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
@@ -101,6 +102,17 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 
 	// 방향성 피격 HUD 컴포넌트 생성
 	HitIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_HitIndicatorComponent>(this, TEXT("HitIndicatorComponent"));
+
+	// Post Process Component 생성 (긍정적 효과 - 힐/버프)
+	PositiveEffectPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("PositiveEffectPostProcessComp"));
+	PositiveEffectPostProcessComp->SetupAttachment(RootComponent);
+	PositiveEffectPostProcessComp->bUnbound = true;
+	PositiveEffectPostProcessComp->Priority = 8; // LowHealth(10)보다 낮은 우선순위
+	PositiveEffectPostProcessComp->BlendWeight = 0.0f;
+
+	// 긍정적 효과 컴포넌트 생성 (힐/버프 시각 효과)
+	PositiveEffectComp = ObjectInitializer.CreateDefaultSubobject<UGS_PositiveEffectComponent>(this, TEXT("PositiveEffectComp"));
+	PositiveEffectComp->SetAutoActivate(false);
 
 	// 발 밑 용암 VFX
 	FeetLavaVFX_L = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FeetLavaVFX_L"));
@@ -227,6 +239,8 @@ void AGS_Seeker::BeginPlay()
 			AssetsToLoad.Add(DetectionEffectMaterial.ToSoftObjectPath());
 		if (!DyingEffectMaterial.IsNull())
 			AssetsToLoad.Add(DyingEffectMaterial.ToSoftObjectPath());
+		if (!PositiveEffectMaterial.IsNull())
+			AssetsToLoad.Add(PositiveEffectMaterial.ToSoftObjectPath());
 		if (!DetectionHUDWidgetClass.IsNull())
 			AssetsToLoad.Add(DetectionHUDWidgetClass.ToSoftObjectPath());
 
@@ -609,6 +623,19 @@ void AGS_Seeker::InitializeCameraManager()
 				DyingPostProcessComp->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, DyingDynamicMaterial));
 				DyingPostProcessComp->bEnabled = false;
 			}
+		}
+
+		// PositiveEffect: 컴포넌트 초기화 (힐/버프 화면 효과)
+		if (PositiveEffectComp)
+		{
+			UMaterialInterface* LoadedMaterial = nullptr;
+			if (!PositiveEffectMaterial.IsNull())
+			{
+				LoadedMaterial = UGS_AssetLoader::SyncLoadAsset(PositiveEffectMaterial);
+			}
+
+			// LoadedMaterial이 null이어도 호출 (컴포넌트 자체 Material 사용 가능하도록 함)
+			PositiveEffectComp->InitializeForOwner(this, PositiveEffectPostProcessComp, LoadedMaterial);
 		}
 	}
 }

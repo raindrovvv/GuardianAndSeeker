@@ -209,18 +209,10 @@ EHitDirection UGS_HitIndicatorComponent::DetermineDirection(float ForwardDot, fl
 	float AbsRight = FMath::Abs(RightDot);
 	float MaxHorizontal = FMath::Max(AbsForward, AbsRight);
 
-	// 1. 수직 방향 체크 - 수직 성분이 임계값 이상이고, 수평 성분보다 확실히 클 때만 상하 판정
-	// 이렇게 하면 프로젝타일이 약간 아래에서 맞아도 수평 방향으로 판정됨
-	if (AbsUp > VerticalThreshold && AbsUp > MaxHorizontal * 1.5f)
+	// 1. 수직 방향 체크 - 수직 성분이 임계값 이상이고, 수평 성분보다 클 때 상하 판정
+	if (AbsUp > VerticalThreshold && AbsUp > MaxHorizontal)
 	{
-		if (UpDot > 0.f)
-		{
-			return EHitDirection::Up;
-		}
-		else
-		{
-			return EHitDirection::Down;
-		}
+		return (UpDot > 0.f) ? EHitDirection::Up : EHitDirection::Down;
 	}
 
 	// 2. 수평 방향 판별 (전후좌우 중 가장 강한 방향 선택)

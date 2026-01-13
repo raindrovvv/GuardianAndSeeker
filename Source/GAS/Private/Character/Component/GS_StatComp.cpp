@@ -15,6 +15,7 @@
 #include "Sound/GS_SeekerAudioComponent.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
 #include "Character/Component/GS_DrakharAudioComponent.h"
+#include "Character/Component/GS_PositiveEffectComponent.h"
 #include "System/GS_PlayerState.h"
 
 UGS_StatComp::UGS_StatComp()
@@ -48,7 +49,7 @@ void UGS_StatComp::BeginPlay()
 			if (UGS_ArcaneBoardManager* Manager = LPS->GetOrCreateBoardManager())
 			{
 				FArcaneBoardStats AppliedStats = Manager->AppliedBoardStats;
-				FGS_StatRow RuneStats = AppliedStats.RuneStats+ AppliedStats.BonusStats;
+				FGS_StatRow RuneStats = AppliedStats.RuneStats + AppliedStats.BonusStats;
 				UpdateStat(RuneStats);
 
 				UE_LOG(LogTemp, Warning, TEXT("StatComp BeginPlay: 룬 스탯 적용 완료"));
@@ -56,16 +57,16 @@ void UGS_StatComp::BeginPlay()
 		}
 	}
 }
- 
+
 void UGS_StatComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	OnCurrentHPChanged.Clear();
 	Super::EndPlay(EndPlayReason);
 }
- 
+
 void UGS_StatComp::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);	
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ThisClass, CurrentHealth);
 }
@@ -73,7 +74,7 @@ void UGS_StatComp::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& O
 void UGS_StatComp::InitStat(FName RowName)
 {
 	if (!IsValid(StatDataTable))
-	{	
+	{
 		return;
 	}
 
@@ -92,13 +93,13 @@ void UGS_StatComp::InitStat(FName RowName)
 		{
 			CurrentHealth = FMath::Clamp(PS->CurrentHealth, 0.f, MaxHealth);
 			UE_LOG(LogTemp, Warning, TEXT("StatComp InitStat 성공: RowName=%s, HP=%.1f, ATK=%.1f, DEF=%.1f, AGL=%.1f, ATS=%.1f"),
-			*RowName.ToString(), MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
+			       *RowName.ToString(), MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
 		}
 		else
 		{
 			CurrentHealth = MaxHealth;
 		}
-		
+
 		//UE_LOG(LogTemp, Warning, TEXT("StatComp InitStat 성공: RowName=%s, HP=%.1f, ATK=%.1f, DEF=%.1f, AGL=%.1f, ATS=%.1f"),
 		//	*RowName.ToString(), MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
 	}
@@ -146,7 +147,7 @@ void UGS_StatComp::UpdateStat_Implementation(const FGS_StatRow& RuneStats)
 		AttackSpeed = FoundRow->ATS + RuneStats.ATS;
 
 		UE_LOG(LogTemp, Log, TEXT("캐릭터 스탯 업데이트 - HP: %.1f, ATK: %.1f, DEF: %.1f, AGL: %.1f, ATS: %.1f"),
-			MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
+		       MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
 	}
 	else
 	{
@@ -178,10 +179,22 @@ void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)
 	if (bIsHealing)
 	{
 		CurrentHealth = FMath::Min(CurrentHealth, MaxHealth);
+		const float ActualHeal = CurrentHealth - PreviousHealth;
 		OnCurrentHPChanged.Broadcast(this);
 
+		// 힐 효과 알림 (네트워크 최적화: 유의미한 힐량이거나 빈사 상태일 때만 호출)
+		if (GetOwner() && GetOwner()->HasAuthority())
+		{
+			const float HealRatio = (MaxHealth > 0.0f) ? (ActualHeal / MaxHealth) : 0.0f;
+			// 0.5% 이상의 힐이거나, 현재 체력이 낮은 위급 상황에서의 회복일 때 효과 강조
+			if (HealRatio > 0.005f || (MaxHealth > 0.0f && (CurrentHealth / MaxHealth) < 0.3f))
+			{
+				MulticastRPCNotifyPositiveEffect(EPositiveEffectType::Heal);
+			}
+		}
+
 		// 큰 힐링 시 즉시 복제 (20% 이상)
-		if (MaxHealth > 0.0f && FMath::Abs(CurrentHealth - PreviousHealth) > MaxHealth * 0.2f)
+		if (MaxHealth > 0.0f && FMath::Abs(ActualHeal) > MaxHealth * 0.2f)
 		{
 			GetOwner()->ForceNetUpdate();
 		}
@@ -269,7 +282,7 @@ void UGS_StatComp::SetAttackSpeed(float InAttackSpeed)
 void UGS_StatComp::MulticastRPCPlayTakeDamageMontage_Implementation()
 {
 	AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner());
-	
+
 	// 피격 애니메이션 재생 (몬스터만)
 	if (TakeDamageMontages.Num() > 0)
 	{
@@ -300,10 +313,30 @@ void UGS_StatComp::MulticastRPCPlayTakeDamageMontage_Implementation()
 	}
 }
 
+void UGS_StatComp::MulticastRPCNotifyPositiveEffect_Implementation(EPositiveEffectType EffectType)
+{
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
+	{
+		// 로컬 컨트롤러인 경우에만 화면에 효과를 표시함
+		if (Seeker->IsLocallyControlled() && Seeker->PositiveEffectComp)
+		{
+			Seeker->PositiveEffectComp->OnBuffReceived(EffectType);
+		}
+	}
+}
+
 void UGS_StatComp::OnRep_CurrentHealth(float OldHealth)
 {
-	// 클라이언트에서 Health 변화 처리
-	HandleHealthDamage(OldHealth, CurrentHealth);
+	// 힐링 판정 (시각 효과는 MulticastRPCNotifyPositiveEffect에서 처리하므로 여기서는 델리게이트만 브로드캐스트)
+	if (CurrentHealth > OldHealth)
+	{
+		// UI 업데이트만 수행
+	}
+	// 피격 판정
+	else
+	{
+		HandleHealthDamage(OldHealth, CurrentHealth);
+	}
 
 	// UI 업데이트 델리게이트 (기존 기능 유지)
 	OnCurrentHPChanged.Broadcast(this);
@@ -331,7 +364,7 @@ void UGS_StatComp::HandleHealthDamage(float OldHealth, float NewHealth)
 	// 피격 판정: 체력 감소 시에만
 	if (NewHealth >= OldHealth)
 	{
-		return;  // 체력 증가(힐링) 또는 변화 없음
+		return; // 체력 증가(힐링) 또는 변화 없음
 	}
 
 	// 오너 캐릭터 가져오기
@@ -352,12 +385,12 @@ void UGS_StatComp::HandleHealthDamage(float OldHealth, float NewHealth)
 				Seeker->SeekerAudioComponent->StopLowHPPainSound();
 			}
 		}
-		return;  // 죽음 판정 - OnDeath()에서 PlayDeathSoundLocal() 호출
+		return; // 죽음 판정 - OnDeath()에서 PlayDeathSoundLocal() 호출
 	}
 
 	// === 시커 LowHP Pain 사운드 시작 체크 ===
 	const ECharacterType CharType = OwnerCharacter->GetCharacterType();
-	
+
 	switch (CharType)
 	{
 	case ECharacterType::Ares:
@@ -421,21 +454,21 @@ void UGS_StatComp::HandleHealthDamage(float OldHealth, float NewHealth)
 // heal system
 void UGS_StatComp::ServerRPCHeal_Implementation(float InHealAmount)
 {
-    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority())
-    {
-        return;
-    }
+	if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
 
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
-    {
-	    if (Seeker->IsDead())
-	    {
-		    return;
-	    }
-    }
-    
-    float NewHealth = FMath::Min(CurrentHealth + InHealAmount, MaxHealth);
-    SetCurrentHealth(NewHealth, true);
+	{
+		if (Seeker->IsDead())
+		{
+			return;
+		}
+	}
+
+	float NewHealth = FMath::Min(CurrentHealth + InHealAmount, MaxHealth);
+	SetCurrentHealth(NewHealth, true);
 }
 
 ECharacterClass UGS_StatComp::MapCharacterTypeToCharacterClass(ECharacterType CharacterType)
@@ -464,13 +497,13 @@ void UGS_StatComp::HandleSeekerDyingTransition(AGS_Seeker* Seeker)
 	// 이미 빈사 상태인 경우 추가 데미지 무시
 	if (Seeker->IsInDyingState())
 	{
-		CurrentHealth = 1.0f;  // 최소 HP 유지
+		CurrentHealth = 1.0f; // 최소 HP 유지
 		UE_LOG(LogTemp, Warning, TEXT("[Seeker] 이미 빈사 상태 - 추가 데미지 무시"));
 		return;
 	}
 
 	// 빈사 상태 진입
 	Seeker->EnterDyingState();
-	CurrentHealth = 1.0f;  // 최소 HP 유지
+	CurrentHealth = 1.0f; // 최소 HP 유지
 	UE_LOG(LogTemp, Log, TEXT("[Seeker] 빈사 상태 진입"));
 }

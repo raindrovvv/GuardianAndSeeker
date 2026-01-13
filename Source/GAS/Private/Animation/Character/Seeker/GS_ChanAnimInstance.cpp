@@ -8,8 +8,11 @@
 void UGS_ChanAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	
-	ChooserInputObj->CharacterType = ECharacterType::Chan;
+
+	if (ChooserInputObj)
+	{
+		ChooserInputObj->CharacterType = ECharacterType::Chan;
+	}
 }
 
 void UGS_ChanAnimInstance::NativeUpdateAnimation(float DeltaSeconds)

@@ -8,7 +8,11 @@
 void UGS_AresAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	ChooserInputObj->CharacterType = ECharacterType::Chan; // [임시] Chan으로 해야 올바른 이동 모션이 실행됨
+
+	if (ChooserInputObj)
+	{
+		ChooserInputObj->CharacterType = ECharacterType::Chan; // [임시] Chan으로 해야 올바른 이동 모션이 실행됨
+	}
 }
 
 void UGS_AresAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
