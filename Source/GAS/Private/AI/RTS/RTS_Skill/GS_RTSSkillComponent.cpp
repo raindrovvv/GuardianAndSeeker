@@ -16,7 +16,7 @@ UGS_RTSSkillComponent::UGS_RTSSkillComponent()
 	MaxAether = 100.f;
 	InitialAether = 100.f;
 	CurrentAether = 100.f;
-	AetherRegenRate = 2.f;  // 초당 2 회복
+	AetherRegenRate = 2.f; // 초당 2 회복
 
 	// 타겟팅 모드 초기화
 	bIsInTargetingMode = false;
@@ -63,15 +63,21 @@ void UGS_RTSSkillComponent::UpdateCooldowns(float DeltaTime)
 		{
 			bAnySkillOnCooldown = true;
 			CooldownRemaining[i] = FMath::Max(0.f, CooldownRemaining[i] - DeltaTime);
-			
+
 			// Delta 체크: 0.1초 이상 변화가 있거나, 쿨다운이 끝난 경우에만 브로드캐스트 (UI 부하 감소)
 			if (FMath::Abs(CooldownRemaining[i] - LastBroadcastCooldown[i]) >= 0.1f || CooldownRemaining[i] == 0.f)
 			{
 				UGS_RTSSkillBase* Skill = Skills.IsValidIndex(i) ? Skills[i] : nullptr;
 				const float MaxCooldown = Skill ? Skill->GetCooldownTime() : 0.f;
-				
+
 				OnSkillCooldownChanged.Broadcast(i, CooldownRemaining[i], MaxCooldown);
 				LastBroadcastCooldown[i] = CooldownRemaining[i];
+
+				// 쿨다운이 정확히 0이 된 시점에 알림 호출
+				if (CooldownRemaining[i] == 0.f)
+				{
+					OnSkillCooldownFinished(i);
+				}
 			}
 		}
 	}
@@ -139,6 +145,7 @@ void UGS_RTSSkillComponent::InitializeSkills()
 		NewSkill->SetSkillData(SkillData);
 		NewSkill->Initialize(this);
 		NewSkill->SetSkillSlotIndex(i);
+		NewSkill->PreloadAssets(); // 에셋 비동기 로딩 시작
 		Skills[i] = NewSkill;
 	}
 
@@ -157,12 +164,11 @@ void UGS_RTSSkillComponent::StartAetherRegen()
 	if (AetherRegenRate > 0.f)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
-			AetherRegenTimer,
-			this,
-			&UGS_RTSSkillComponent::RegenAether,
-			0.5f,  // 0.5초마다 회복
-			true
-		);
+		    AetherRegenTimer,
+		    this,
+		    &UGS_RTSSkillComponent::RegenAether,
+		    0.5f, // 0.5초마다 회복
+		    true);
 	}
 }
 
@@ -170,7 +176,7 @@ void UGS_RTSSkillComponent::RegenAether()
 {
 	if (CurrentAether < MaxAether)
 	{
-		float RegenAmount = AetherRegenRate * 0.5f;  // 0.5초 간격이므로 절반
+		float RegenAmount = AetherRegenRate * 0.5f; // 0.5초 간격이므로 절반
 		AddAether(RegenAmount);
 	}
 }
@@ -373,6 +379,12 @@ void UGS_RTSSkillComponent::Multicast_OnSkillActivated_Implementation(int32 Skil
 	if (UGS_RTSSkillBase* Skill = GetSkill(SkillIndex))
 	{
 		Skill->PlayCastEffects(TargetLocation);
+
+		// 클라이언트에서도 UI를 위해 쿨다운 동기화 시작
+		if (GetOwnerRole() != ROLE_Authority)
+		{
+			StartSkillCooldown(SkillIndex);
+		}
 	}
 }
 
@@ -398,15 +410,36 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 {
 	if (CooldownRemaining.IsValidIndex(SkillIndex))
 	{
+		// 이미 처리된 경우(중복 호출) 무시
+		if (CooldownRemaining[SkillIndex] <= 0.f && LastBroadcastCooldown[SkillIndex] <= 0.f)
+		{
+			return;
+		}
+
 		CooldownRemaining[SkillIndex] = 0.f;
 		LastBroadcastCooldown[SkillIndex] = 0.f;
-		
+
 		UGS_RTSSkillBase* Skill = GetSkill(SkillIndex);
 		if (Skill)
 		{
 			OnSkillCooldownChanged.Broadcast(SkillIndex, 0.f, Skill->GetCooldownTime());
 		}
+
+		// 준비 완료 알림 브로드캐스트
+		OnSkillCooldownReady.Broadcast(SkillIndex);
+
+		// 서버인 경우 클라이언트에 명시적으로 알림 (연출 동기화)
+		if (GetOwnerRole() == ROLE_Authority)
+		{
+			Client_OnSkillCooldownFinished(SkillIndex);
+		}
 	}
+}
+
+void UGS_RTSSkillComponent::Client_OnSkillCooldownFinished_Implementation(int32 SkillIndex)
+{
+	// 서버로부터 쿨다운 종료 신호를 받으면 다시 한번 로컬에서도 종료 처리 (UI 연출용)
+	OnSkillCooldownFinished(SkillIndex);
 }
 
 void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
@@ -416,11 +449,11 @@ void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
 		UGS_RTSSkillBase* Skill = Skills[i];
 		if (Skill)
 		{
-			UE_LOG(LogTemp, Log, TEXT("Skill %d: %s - Cost: %.0f, CD: %.1f/%.1f"), 
-				i, *Skill->GetSkillName().ToString(), 
-				Skill->GetAetherCost(),
-				GetSkillCooldownRemaining(i),
-				Skill->GetCooldownTime());
+			UE_LOG(LogTemp, Log, TEXT("Skill %d: %s - Cost: %.0f, CD: %.1f/%.1f"),
+			       i, *Skill->GetSkillName().ToString(),
+			       Skill->GetAetherCost(),
+			       GetSkillCooldownRemaining(i),
+			       Skill->GetCooldownTime());
 		}
 	}
 }

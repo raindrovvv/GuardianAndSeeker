@@ -23,9 +23,23 @@ public:
 
 	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
 	virtual void PlayCastEffects(const FVector& TargetLocation) override;
+	virtual void PreloadAssets() override;
 
 protected:
 	const UGS_RTSSkillData_Summon* GetSummonData() const;
+
+	// 캐싱된 에셋들
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> CachedSummonVFX;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSummonSound_TPS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSummonSound_RTS;
+
+	UPROPERTY()
+	TArray<TSubclassOf<AGS_Monster>> CachedMonsterClasses;
 
 private:
 	// 소환 실행 (서버에서만)

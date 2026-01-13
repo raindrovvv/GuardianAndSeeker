@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GS_StatRow.h"
+#include "Character/Component/GS_PositiveEffectComponent.h"
 #include "GS_StatComp.generated.h"
 
 class AGS_Character;
@@ -64,6 +65,9 @@ public:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCPlayTakeDamageMontage();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPCNotifyPositiveEffect(EPositiveEffectType EffectType);
 
 	UFUNCTION()
 	void OnRep_CurrentHealth(float OldHealth);

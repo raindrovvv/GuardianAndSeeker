@@ -339,6 +339,11 @@ void UGS_SkillComp::Client_BroadcastSkillCooldownBlocked_Implementation(ESkillSl
 	OnSkillCooldownBlocked.Broadcast(Slot);
 }
 
+void UGS_SkillComp::Client_BroadcastSkillCooldownReady_Implementation(ESkillSlot Slot)
+{
+	OnSkillCooldownReady.Broadcast(Slot);
+}
+
 void UGS_SkillComp::Server_TryDeactiveSkill_Implementation(ESkillSlot Slot)
 {
 	if (SkillMap.Contains(Slot))
@@ -522,6 +527,12 @@ void UGS_SkillComp::HandleCooldownComplete(ESkillSlot Slot)
 	{
 		Skill->SetCoolingDown(false);
 	}
+
+	// 스킬 쿨다운 완료 알림을 클라이언트에 전송
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
+	{
+		Client_BroadcastSkillCooldownReady(Slot);
+	}
 }
 
 void UGS_SkillComp::HandleCooldownProgress(ESkillSlot Slot)
@@ -589,6 +600,7 @@ void UGS_SkillComp::InitializeSkillWidget(UGS_SkillWidget* InSkillWidget)
 			OnHealCountChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnHealCountChanged);
 			OnSkillActivated.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillActivated);
 			OnSkillCooldownBlocked.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillCooldownBlocked);
+			OnSkillCooldownReady.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillCooldownReady);
 		}
 	}
 }
@@ -812,6 +824,7 @@ void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OnHealCountChanged.Clear();
 	OnSkillActivated.Clear();
 	OnSkillCooldownBlocked.Clear();
+	OnSkillCooldownReady.Clear();
 
 	// 3. 마지막에 Super 호출
 	Super::EndPlay(EndPlayReason);

@@ -32,7 +32,7 @@ public:
 
 	// Anim Update
 	UFUNCTION(BlueprintNativeEvent, Category = "Update")
-	void UpdateEssentialValue();
+	void UpdateEssentialValue(float DeltaSeconds);
 	UFUNCTION(BlueprintImplementableEvent, Category = "Update")
 	void UpdateTrajectory();
 	UFUNCTION(BlueprintNativeEvent, Category = "Update")
@@ -114,7 +114,7 @@ protected:
 	float GaitTransitionTimer = 0.0f;
 
 	/** Gait 전환 대기 시간 (초) - 애니메이션 전환 안정화 */
-	static constexpr float GaitTransitionDelay = 0.1f;
+	static constexpr float GaitTransitionDelay = 0.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OffsetRootBone")
 	bool bUseOffsetRootBone = false;

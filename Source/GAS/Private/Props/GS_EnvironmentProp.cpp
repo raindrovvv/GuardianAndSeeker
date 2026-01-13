@@ -59,6 +59,30 @@ void AGS_EnvironmentProp::OnConstruction(const FTransform& Transform)
 	if (!IsRunningDedicatedServer())
 	{
 		ApplyDistanceCulling();
+
+#if WITH_EDITOR
+		// === 맵 체크 경고 해결을 위한 자동 보정 로직 ===
+		TArray<UStaticMeshComponent*> MeshComps;
+		GetComponents<UStaticMeshComponent>(MeshComps);
+		for (UStaticMeshComponent* Mesh : MeshComps)
+		{
+			if (Mesh)
+			{
+				// 1. BoundsScale이 1보다 크면 퍼포먼스 경고가 발생하므로 1.0으로 강제 수정
+				if (Mesh->BoundsScale > 1.0f)
+				{
+					Mesh->SetBoundsScale(1.0f);
+				}
+
+				// 2. Static Mesh가 할당되지 않은 경우 에디터 로그로 알림
+				if (Mesh->GetStaticMesh() == nullptr)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[MapCheck Fix] %s의 메쉬 컴포넌트(%s)에 StaticMesh가 할당되지 않았습니다!"),
+					       *GetName(), *Mesh->GetName());
+				}
+			}
+		}
+#endif
 	}
 }
 

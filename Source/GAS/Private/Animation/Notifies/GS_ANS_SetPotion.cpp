@@ -8,7 +8,7 @@
 
 
 void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration,
-	const FAnimNotifyEventReference& EventReference)
+                                    const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
@@ -27,7 +27,7 @@ void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSeque
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = Seeker; // 생성 주체 지정
-	
+
 	AGS_HP_Potion* Potion = World->SpawnActor<AGS_HP_Potion>(AGS_HP_Potion::StaticClass(), SpawnParams);
 	if (!Potion)
 	{
@@ -43,7 +43,7 @@ void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSeque
 }
 
 void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+                                  const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
@@ -57,9 +57,9 @@ void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenc
 	{
 		return;
 	}
-	
+
 	Potion->DropFromSocket();
-	
+
 	UStaticMeshComponent* Mesh = Potion->GetMeshComp();
 	if (Mesh)
 	{
@@ -68,16 +68,6 @@ void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenc
 		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	}
 
-	UGS_SkillComp* SkillComp = Seeker->GetSkillComp();
-	if (!SkillComp)
-	{
-		return;
-	}
-
-	UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(SkillComp->GetSkillFromSkillMap(ESkillSlot::HealPotion));
-	if (!HealSkill)
-	{
-		return;
-	}
-	HealSkill->DeactiveSkill();
+	// DeactiveSkill은 이제 몽타주 종료 콜백(OnMontageEnded)에서 처리됨
+	// 여기서 호출하면 몽타주 슬롯이 None으로 바뀌어 애니메이션이 중간에 끊김
 }

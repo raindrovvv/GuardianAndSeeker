@@ -923,11 +923,11 @@ void AGS_RTSController::SetRTSCursor(const FName& CursorPath)
 	// 커서 변경
 	if (CursorPath.IsNone())
 	{
-		ViewportClient->SetHardwareCursor(EMouseCursor::Default, NAME_None, FIntPoint(48, 48));
+		ViewportClient->SetHardwareCursor(EMouseCursor::Default, NAME_None, FVector2D(0.f, 0.f));
 	}
 	else
 	{
-		ViewportClient->SetHardwareCursor(EMouseCursor::Default, CursorPath, FIntPoint(48, 48));
+		ViewportClient->SetHardwareCursor(EMouseCursor::Default, CursorPath, FVector2D(0.f, 0.f));
 	}
 
 	CurrentCursorPath = CursorPath;
@@ -1029,7 +1029,7 @@ void AGS_RTSController::InitializeCursor()
 	}
 
 	// 커서 설정 시도
-	ViewportClient->SetHardwareCursor(EMouseCursor::Default, DefaultCursorPath, FIntPoint(48, 48));
+	ViewportClient->SetHardwareCursor(EMouseCursor::Default, DefaultCursorPath, FVector2D(0.f, 0.f));
 
 	ApplyRTSInputMode();
 

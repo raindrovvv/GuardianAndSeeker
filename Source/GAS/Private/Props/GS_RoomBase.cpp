@@ -48,6 +48,7 @@ void AGS_RoomBase::BeginPlay()
 	// 1. 상수값 캐싱 (한 번만 계산)
 	// ========================================
 	const float RoomCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+	const float WallCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::WALL_CULL_DISTANCE);
 	const float FoliageCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::FOLIAGE_CULL_DISTANCE);
 	const int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
 
@@ -76,7 +77,8 @@ void AGS_RoomBase::BeginPlay()
 		const bool bIsFoliage = CompName.Contains(TEXT("Foliage")) ||
 		                        CompName.Contains(TEXT("Vine")) ||
 		                        CompName.Contains(TEXT("Grass"));
-		const float CullDistance = bIsFoliage ? FoliageCullDistance : RoomCullDistance;
+		const bool bIsWall = (MeshComp == Wall);
+		const float CullDistance = bIsFoliage ? FoliageCullDistance : (bIsWall ? WallCullDistance : RoomCullDistance);
 
 		// [핵심] 엔진의 Distance Culling에 위임 - SetVisibility 불필요
 		MeshComp->SetCullDistance(CullDistance);
@@ -276,12 +278,15 @@ void AGS_RoomBase::UpdateVisibilityAndShadowCulling()
 	const float DistSq = FVector::DistSquared(GetActorLocation(), CameraLoc);
 
 	// 컬링 거리 계산 (RTS 배율 적용)
-	const float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+	const float RoomCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::ROOM_CULL_DISTANCE);
+	const float WallCullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::WALL_CULL_DISTANCE);
 
 	// 거리 제곱 임계값 캐싱 (1.21 = 1.1^2, 10% 여유치)
-	const float CullDistSqThreshold = (CullDistance * CullDistance) * 1.21f;
+	const float RoomCullDistSqThreshold = (RoomCullDistance * RoomCullDistance) * 1.21f;
+	const float WallCullDistSqThreshold = (WallCullDistance * WallCullDistance) * 1.21f;
 
-	const bool bShouldBeVisible = DistSq < CullDistSqThreshold;
+	// 방 전체 가시성 판단 (Floor 기준)
+	const bool bShouldBeVisible = DistSq < RoomCullDistSqThreshold;
 
 	const bool bIsRTSMode = GS_Rendering::IsRTSMode(this);
 
@@ -295,7 +300,9 @@ void AGS_RoomBase::UpdateVisibilityAndShadowCulling()
 
 		// [핵심] 개별 컴포넌트 위치 기준으로 거리 계산 (대형 방 모듈 대응)
 		const float CompDistSq = FVector::DistSquared(PrimComp->GetComponentLocation(), CameraLoc);
-		bool bCompShouldBeVisible = CompDistSq < CullDistSqThreshold;
+		const bool bIsWall = (PrimComp == Wall);
+		const float currentThreshold = bIsWall ? WallCullDistSqThreshold : RoomCullDistSqThreshold;
+		bool bCompShouldBeVisible = CompDistSq < currentThreshold;
 
 		// 태그 기반 가시성 판단
 		if (bCompShouldBeVisible)

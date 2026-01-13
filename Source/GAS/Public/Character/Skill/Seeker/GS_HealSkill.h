@@ -24,7 +24,7 @@ public:
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Heal")
 	float HealAmount;
 
@@ -61,11 +61,11 @@ public:
 	// 포션 사용 가능 여부 확인
 	UFUNCTION(BlueprintCallable, Category = "Heal")
 	bool CanUseHeal() const;
-	
+
 	// 체력이 가득 찼는지 확인
 	UFUNCTION(BlueprintCallable, Category = "Heal")
 	bool IsHealthFull() const;
-	
+
 	// 힐 스킬 사용 가능 여부 확인 (포션 + 체력 체크)
 	UFUNCTION(BlueprintCallable, Category = "Heal")
 	bool CanActivateHealSkill() const;
@@ -75,6 +75,10 @@ public:
 
 	// Delegate
 	virtual void InitializeDelegate() override;
+
+	// 몽타주 종료 콜백 - 몽타주가 완전히 끝난 후 DeactiveSkill 호출
+	UFUNCTION()
+	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	// Get
 	float GetHealAmount();

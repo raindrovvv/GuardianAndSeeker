@@ -9,6 +9,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 UGS_RTSSkill_SummonElite::UGS_RTSSkill_SummonElite()
 {
@@ -36,24 +37,83 @@ void UGS_RTSSkill_SummonElite::PlayCastEffects(const FVector& TargetLocation)
 		return;
 	}
 
-	// 클라이언트에서는 NavMesh 접근이 제한적일 수 있으므로 
-	// 타겟 위치에 바로 VFX와 사운드를 재생합니다.
 	const FVector SpawnLocation = TargetLocation + FVector(0.f, 0.f, SummonData->SpawnHeightOffset);
 
-	// Soft Reference 로드
-	UNiagaraSystem* LoadedSummonVFX = SummonData->SummonVFX.IsNull() ? nullptr : SummonData->SummonVFX.LoadSynchronous();
-	if (LoadedSummonVFX)
+	UNiagaraSystem* SummonVFX = CachedSummonVFX;
+	if (!SummonVFX && !SummonData->SummonVFX.IsNull())
 	{
-		PlaySkillVFX(LoadedSummonVFX, SpawnLocation);
+		SummonVFX = UGS_AssetLoader::SyncLoadAsset(SummonData->SummonVFX);
 	}
 
-	// Soft Reference 로드
-	UAkAudioEvent* SummonSoundTPS = SummonData->SummonSound_TPS.IsNull() ? nullptr : SummonData->SummonSound_TPS.LoadSynchronous();
-	UAkAudioEvent* SummonSoundRTS = SummonData->SummonSound_RTS.IsNull() ? nullptr : SummonData->SummonSound_RTS.LoadSynchronous();
-	UAkAudioEvent* SoundToPlay = SelectSoundEvent(SummonSoundTPS, SummonSoundRTS);
+	if (SummonVFX)
+	{
+		PlaySkillVFX(SummonVFX, SpawnLocation);
+	}
+
+	UAkAudioEvent* TPSSound = CachedSummonSound_TPS;
+	UAkAudioEvent* RTSSound = CachedSummonSound_RTS;
+
+	if (SummonData && (!TPSSound || !RTSSound))
+	{
+		if (!TPSSound)
+			TPSSound = UGS_AssetLoader::SyncLoadAsset(SummonData->SummonSound_TPS);
+		if (!RTSSound)
+			RTSSound = UGS_AssetLoader::SyncLoadAsset(SummonData->SummonSound_RTS);
+	}
+
+	UAkAudioEvent* SoundToPlay = SelectSoundEvent(TPSSound, RTSSound);
 	if (SoundToPlay)
 	{
 		PlaySkillSound(SoundToPlay, SpawnLocation);
+	}
+}
+
+void UGS_RTSSkill_SummonElite::PreloadAssets()
+{
+	Super::PreloadAssets();
+
+	const UGS_RTSSkillData_Summon* SummonData = GetSummonData();
+	if (!SummonData)
+		return;
+
+	TArray<FSoftObjectPath> Paths;
+	if (!SummonData->SummonVFX.IsNull())
+		Paths.Add(SummonData->SummonVFX.ToSoftObjectPath());
+	if (!SummonData->SummonSound_TPS.IsNull())
+		Paths.Add(SummonData->SummonSound_TPS.ToSoftObjectPath());
+	if (!SummonData->SummonSound_RTS.IsNull())
+		Paths.Add(SummonData->SummonSound_RTS.ToSoftObjectPath());
+
+	for (const auto& MonsterClassPtr : SummonData->MonsterClasses)
+	{
+		if (!MonsterClassPtr.IsNull())
+			Paths.Add(MonsterClassPtr.ToSoftObjectPath());
+	}
+
+	if (Paths.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_RTSSkill_SummonElite> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(Paths, [WeakThis]()
+		                                         {
+			if (UGS_RTSSkill_SummonElite* StrongThis = WeakThis.Get())
+			{
+				const UGS_RTSSkillData_Summon* SData = StrongThis->GetSummonData();
+				if (SData)
+				{
+					StrongThis->CachedSummonVFX = SData->SummonVFX.Get();
+					StrongThis->CachedSummonSound_TPS = SData->SummonSound_TPS.Get();
+					StrongThis->CachedSummonSound_RTS = SData->SummonSound_RTS.Get();
+
+					StrongThis->CachedMonsterClasses.Empty();
+					for (const auto& MClassPtr : SData->MonsterClasses)
+					{
+						if (auto* LoadedClass = MClassPtr.Get())
+						{
+							StrongThis->CachedMonsterClasses.Add(LoadedClass);
+						}
+					}
+				}
+			} });
 	}
 }
 
@@ -87,10 +147,15 @@ FVector UGS_RTSSkill_SummonElite::SpawnEliteMonsterAtLocation(const FVector& Loc
 
 	const int32 RandomIndex = FMath::RandRange(0, SummonData->MonsterClasses.Num() - 1);
 
-	// Soft Reference 로드
-	TSubclassOf<AGS_Monster> EliteMonsterClass = SummonData->MonsterClasses[RandomIndex].IsNull()
-		? nullptr
-		: SummonData->MonsterClasses[RandomIndex].LoadSynchronous();
+	TSubclassOf<AGS_Monster> EliteMonsterClass;
+	if (CachedMonsterClasses.IsValidIndex(RandomIndex))
+	{
+		EliteMonsterClass = CachedMonsterClasses[RandomIndex];
+	}
+	else if (!SummonData->MonsterClasses[RandomIndex].IsNull())
+	{
+		EliteMonsterClass = UGS_AssetLoader::SyncLoadAsset(SummonData->MonsterClasses[RandomIndex]);
+	}
 
 	if (!EliteMonsterClass)
 	{
@@ -105,11 +170,10 @@ FVector UGS_RTSSkill_SummonElite::SpawnEliteMonsterAtLocation(const FVector& Loc
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
 	AGS_Monster* SpawnedMonster = World->SpawnActor<AGS_Monster>(
-		EliteMonsterClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams
-	);
+	    EliteMonsterClass,
+	    SpawnLocation,
+	    SpawnRotation,
+	    SpawnParams);
 
 	if (SpawnedMonster)
 	{
@@ -169,10 +233,9 @@ bool UGS_RTSSkill_SummonElite::FindValidSpawnLocation(const FVector& DesiredLoca
 	{
 		FNavLocation NavLocation;
 		bool bFound = NavSys->ProjectPointToNavigation(
-			DesiredLocation,
-			NavLocation,
-			FVector(500.f, 500.f, 500.f)
-		);
+		    DesiredLocation,
+		    NavLocation,
+		    FVector(500.f, 500.f, 500.f));
 
 		if (bFound)
 		{

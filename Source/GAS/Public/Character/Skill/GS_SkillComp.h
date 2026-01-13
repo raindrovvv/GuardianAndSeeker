@@ -42,6 +42,7 @@ struct FSkillRuntimeState
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSkillCooldownChanged, ESkillSlot, float);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillActivated, ESkillSlot, SkillSlot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillCooldownBlocked, ESkillSlot, SkillSlot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillCooldownReady, ESkillSlot, SkillSlot);
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnHealCountChanged, ESkillSlot, int32, int32);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -58,6 +59,8 @@ public:
 	FOnSkillActivated OnSkillActivated;
 	UPROPERTY(BlueprintAssignable)
 	FOnSkillCooldownBlocked OnSkillCooldownBlocked;
+	UPROPERTY(BlueprintAssignable)
+	FOnSkillCooldownReady OnSkillCooldownReady;
 
 	UFUNCTION(Server, Reliable)
 	void Server_TryActivateSkill(ESkillSlot Slot);
@@ -79,6 +82,9 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void Client_BroadcastSkillCooldownBlocked(ESkillSlot Slot);
+
+	UFUNCTION(Client, Reliable)
+	void Client_BroadcastSkillCooldownReady(ESkillSlot Slot);
 
 	UFUNCTION(Server, Reliable)
 	void Server_TrySkillAnimationEnd(ESkillSlot Slot);

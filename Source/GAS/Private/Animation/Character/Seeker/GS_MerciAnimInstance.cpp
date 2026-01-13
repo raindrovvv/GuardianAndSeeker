@@ -9,7 +9,10 @@ void UGS_MerciAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 
-	ChooserInputObj->CharacterType = ECharacterType::Merci;
+	if (ChooserInputObj)
+	{
+		ChooserInputObj->CharacterType = ECharacterType::Merci;
+	}
 }
 
 void UGS_MerciAnimInstance::NativeUpdateAnimation(float DeltaSeconds)

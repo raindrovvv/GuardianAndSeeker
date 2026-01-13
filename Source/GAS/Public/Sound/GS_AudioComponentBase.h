@@ -70,12 +70,12 @@ public:
 	static constexpr float RTPCDistanceThreshold = 50.0f; // RTPC 업데이트를 위한 최소 거리 차이
 
 	// 모드별 거리 설정 상수
-	static constexpr float RTSMaxDistance = 20000.0f; // RTS 모드 최대 거리 (200m)
-	static constexpr float TPSMaxDistance = 2000.0f; // TPS 모드 최대 거리 (20m)
+	static constexpr float RTSMaxDistance = 8000.0f; // RTS 모드 최대 가청 거리 (80m)
+	static constexpr float TPSMaxDistance = 3000.0f; // TPS 모드 최대 가청 거리 (30m)
 
-	// Distance Scaling 설정 상수 (개선된 RTS/TPS 구분)
-	static constexpr float RTSDistanceScaling = 12.0f; // RTS 모드 (1200% = 240m)
-	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20m)
+	// Distance Scaling 설정 상수 (가청 반경 배율)
+	static constexpr float RTSDistanceScaling = 4.0f; // RTS 모드 (400% = 40~80m)
+	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20~30m)
 
 	// 기타 상수들
 	static constexpr float LocalSoundCooldownMultiplier = 0.9f; // 로컬 사운드 쿨다운 배율

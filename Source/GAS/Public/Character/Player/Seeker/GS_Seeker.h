@@ -27,6 +27,8 @@ class UGS_LowHealthEffectComponent;
 class UGS_DetectionEffectComponent;
 class AGS_Item;
 class UGS_MarkerPlacementComponent;
+class UGS_HitIndicatorComponent;
+class UGS_PositiveEffectComponent;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -57,9 +59,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectedByGuardianChanged, bool, 
 
 // Seeker Gait Speeds (Ratios)
 static constexpr float GAIT_SPEED_WALK = 0.45f;
-static constexpr float GAIT_SPEED_RUN = 0.75f;
-static constexpr float GAIT_SPEED_SPRINT = 1.0f;
+static constexpr float GAIT_SPEED_RUN = 1.0f;
+static constexpr float GAIT_SPEED_SPRINT = 1.4f;
 static constexpr float GAIT_SPEED_CRAWL = 0.2f;
+
+// 마커 배치 컴포넌트 전방 선언
+class UGS_MarkerPlacementComponent;
 
 // 충돌 사운드 타입 열거형
 UENUM(BlueprintType)
@@ -315,6 +320,25 @@ public:
 	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Marker")
 	UGS_MarkerPlacementComponent* MarkerPlacementComponent;
+
+	// =======================
+	// 방향성 피격 HUD 컴포넌트
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	UGS_HitIndicatorComponent* HitIndicatorComponent;
+
+	// =======================
+	// 긍정적 효과(힐/버프) 화면 효과
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UPostProcessComponent* PositiveEffectPostProcessComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UGS_PositiveEffectComponent* PositiveEffectComp;
+
+	/** 긍정적 효과용 PostProcess 머티리얼 - Soft Reference */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	TSoftObjectPtr<UMaterialInterface> PositiveEffectMaterial;
 
 	// ================
 	// 함정 VFX 컴포넌트
@@ -860,4 +884,12 @@ private:
 
 	UFUNCTION()
 	void OnRep_ReviveProgress();
+
+protected:
+	/** HP 위젯 가시성 업데이트 (거리 및 사양 기반) */
+	void UpdateHPWidgetVisibility();
+
+private:
+	/** HP 위젯 가시성 업데이트 타이머 핸들 */
+	FTimerHandle HPWidgetVisibilityTimerHandle;
 };

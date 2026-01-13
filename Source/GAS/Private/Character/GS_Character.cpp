@@ -7,6 +7,7 @@
 #include "Character/Component/GS_DebuffComp.h"
 #include "Character/Component/GS_DrakharAudioComponent.h"
 #include "Character/Component/GS_HitReactComp.h"
+#include "Character/Component/GS_HitIndicatorComponent.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "Character/Player/GS_Player.h"
@@ -27,6 +28,7 @@
 #include "System/Utility/GS_AssetLoader.h"
 #include "UI/Character/GS_HPText.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
+#include "Weapon/Projectile/GS_WeaponProjectile.h"
 #include "UI/Character/GS_HPWidget.h"
 #include "UI/Character/GS_PlayerInfoWidget.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
@@ -111,6 +113,18 @@ void AGS_Character::BeginPlay()
 				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 				{
 					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				}
+			}
+			else if (IsA<AGS_Seeker>())
+			{
+				// 시커(AI 포함)는 아군 정보나 적 정보를 위해 표시할 수 있음.
+				// 특히 RTS(가디언) 시점에서는 항상 보여야 함.
+				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				{
+					if (PC->IsA<AGS_RTSController>())
+					{
+						HPTextWidgetComp->SetVisibility(true);
+					}
 				}
 			}
 		}
@@ -411,6 +425,40 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
 		}
+	}
+
+	// 피격 방향 HUD 표시 (CanHitReact와 관계없이 항상 호출)
+	if (UGS_HitIndicatorComponent* HitIndicator =
+	        GetComponentByClass<UGS_HitIndicatorComponent>())
+	{
+		// 기본값은 Omni(전 방향)로 설정 - ZeroVector가 전달되면 Omni 인디케이터 활성화
+		FVector DirToAttacker = FVector::ZeroVector;
+
+		// 1. Point Damage: 탄환, 근접공격 등 정확한 타격 방향이 있음
+		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+		{
+			const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+			DirToAttacker = -PointEvent->ShotDirection;
+		}
+		// 2. Radial Damage: 폭발 등 중심점이 있음
+		else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+		{
+			const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+			DirToAttacker = (RadialEvent->Origin - GetActorLocation()).GetSafeNormal();
+		}
+		// 3. 캐릭터(몬스터, 가디언 등)가 공격한 경우 - 공격자 위치 방향 표시
+		else if (AGS_Character* AttackerCharacter = Cast<AGS_Character>(DamageCauser))
+		{
+			DirToAttacker = (AttackerCharacter->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+		}
+		// 4. 프로젝타일(가디언 원거리, 몬스터 투사체 등)이 공격한 경우 - 프로젝타일 위치 방향 표시
+		else if (AGS_WeaponProjectile* Projectile = Cast<AGS_WeaponProjectile>(DamageCauser))
+		{
+			DirToAttacker = (Projectile->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+		}
+		// 5. 그 외 (도트 데미지, 환경 데미지, 함정 등): Omni (ZeroVector 유지)
+
+		HitIndicator->NotifyDamageDirection(DirToAttacker, ActualDamage);
 	}
 
 	float NewHealth = CurrentHealth - ActualDamage;

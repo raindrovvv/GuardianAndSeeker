@@ -9,6 +9,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/DamageEvents.h"
 
@@ -56,21 +57,24 @@ void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& Tar
 	const float WarningDuration = FireballData->WarningDuration;
 	const float EffectRadius = GetEffectRadius();
 
-	// Soft Reference 로드
-	UMaterialInterface* WarningDecalMaterial = FireballData->WarningDecalMaterial.IsNull() ? nullptr : FireballData->WarningDecalMaterial.LoadSynchronous();
-	if (WarningDecalMaterial)
+	UMaterialInterface* WarningDecalMat = CachedWarningDecalMaterial;
+	if (!WarningDecalMat && !FireballData->WarningDecalMaterial.IsNull())
+	{
+		WarningDecalMat = UGS_AssetLoader::SyncLoadAsset(FireballData->WarningDecalMaterial);
+	}
+
+	if (WarningDecalMat)
 	{
 		FVector DecalLocation = TargetLocation;
 		DecalLocation.Z += 5.f;
 
 		UDecalComponent* WarningDecal = UGameplayStatics::SpawnDecalAtLocation(
-			World,
-			WarningDecalMaterial,
-			FVector(EffectRadius, EffectRadius, 100.f),
-			DecalLocation,
-			FRotator(-90.f, 0.f, 0.f),
-			WarningDuration + 0.5f
-		);
+		    World,
+		    WarningDecalMat,
+		    FVector(EffectRadius, EffectRadius, 100.f),
+		    DecalLocation,
+		    FRotator(-90.f, 0.f, 0.f),
+		    WarningDuration + 0.5f);
 
 		if (WarningDecal)
 		{
@@ -87,12 +91,60 @@ void UGS_RTSSkill_FireballStrike::ShowWarningAndSpawnFireball(const FVector& Tar
 	else
 	{
 		World->GetTimerManager().SetTimer(
-			SpawnFireballTimerHandle,
-			this,
-			&UGS_RTSSkill_FireballStrike::SpawnFireball,
-			WarningDuration,
-			false
-		);
+		    SpawnFireballTimerHandle,
+		    this,
+		    &UGS_RTSSkill_FireballStrike::SpawnFireball,
+		    WarningDuration,
+		    false);
+	}
+}
+
+void UGS_RTSSkill_FireballStrike::PreloadAssets()
+{
+	Super::PreloadAssets();
+
+	const UGS_RTSSkillData_Fireball* FireballData = GetFireballData();
+	if (!FireballData)
+		return;
+
+	TArray<FSoftObjectPath> Paths;
+	if (!FireballData->ProjectileClass.IsNull())
+		Paths.Add(FireballData->ProjectileClass.ToSoftObjectPath());
+	if (!FireballData->WarningDecalMaterial.IsNull())
+		Paths.Add(FireballData->WarningDecalMaterial.ToSoftObjectPath());
+	if (!FireballData->TrailVFX.IsNull())
+		Paths.Add(FireballData->TrailVFX.ToSoftObjectPath());
+	if (!FireballData->ExplosionVFX.IsNull())
+		Paths.Add(FireballData->ExplosionVFX.ToSoftObjectPath());
+	if (!FireballData->FallSound_TPS.IsNull())
+		Paths.Add(FireballData->FallSound_TPS.ToSoftObjectPath());
+	if (!FireballData->FallSound_RTS.IsNull())
+		Paths.Add(FireballData->FallSound_RTS.ToSoftObjectPath());
+	if (!FireballData->ExplosionSound_TPS.IsNull())
+		Paths.Add(FireballData->ExplosionSound_TPS.ToSoftObjectPath());
+	if (!FireballData->ExplosionSound_RTS.IsNull())
+		Paths.Add(FireballData->ExplosionSound_RTS.ToSoftObjectPath());
+
+	if (Paths.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_RTSSkill_FireballStrike> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(Paths, [WeakThis]()
+		                                         {
+			if (UGS_RTSSkill_FireballStrike* StrongThis = WeakThis.Get())
+			{
+				const UGS_RTSSkillData_Fireball* FData = StrongThis->GetFireballData();
+				if (FData)
+				{
+					StrongThis->CachedProjectileClass = FData->ProjectileClass.Get();
+					StrongThis->CachedWarningDecalMaterial = FData->WarningDecalMaterial.Get();
+					StrongThis->CachedTrailVFX = FData->TrailVFX.Get();
+					StrongThis->CachedExplosionVFX = FData->ExplosionVFX.Get();
+					StrongThis->CachedFallSound_TPS = FData->FallSound_TPS.Get();
+					StrongThis->CachedFallSound_RTS = FData->FallSound_RTS.Get();
+					StrongThis->CachedExplosionSound_TPS = FData->ExplosionSound_TPS.Get();
+					StrongThis->CachedExplosionSound_RTS = FData->ExplosionSound_RTS.Get();
+				}
+			} });
 	}
 }
 
@@ -118,43 +170,57 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 	const FVector SpawnLocation = TargetLocation + FVector(0.f, 0.f, FallStartHeight);
 	const FRotator SpawnRotation = FRotator(-90.f, 0.f, 0.f);
 
-	// Soft Reference 로드
-	TSubclassOf<AActor> LoadedProjectileClass = FireballData->ProjectileClass.IsNull() ? nullptr : FireballData->ProjectileClass.LoadSynchronous();
-	if (LoadedProjectileClass)
+	// Projectile Class
+	TSubclassOf<AActor> ProjectileClass = CachedProjectileClass ? CachedProjectileClass->GetClass() : nullptr;
+	if (!ProjectileClass && !FireballData->ProjectileClass.IsNull())
+	{
+		ProjectileClass = UGS_AssetLoader::SyncLoadAsset(FireballData->ProjectileClass);
+	}
+
+	if (ProjectileClass)
 	{
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		AActor* Fireball = World->SpawnActor<AActor>(
-			LoadedProjectileClass,
-			SpawnLocation,
-			SpawnRotation,
-			SpawnParams
-		);
+		    ProjectileClass,
+		    SpawnLocation,
+		    SpawnRotation,
+		    SpawnParams);
 
-	if (Fireball)
-	{
-		if (UProjectileMovementComponent* ProjectileMovement = Fireball->FindComponentByClass<UProjectileMovementComponent>())
+		if (Fireball)
 		{
-			ProjectileMovement->InitialSpeed = FallSpeed;
-			ProjectileMovement->MaxSpeed = FallSpeed;
-			ProjectileMovement->Velocity = FVector(0.f, 0.f, -FallSpeed);
+			if (UProjectileMovementComponent* ProjectileMovement = Fireball->FindComponentByClass<UProjectileMovementComponent>())
+			{
+				ProjectileMovement->InitialSpeed = FallSpeed;
+				ProjectileMovement->MaxSpeed = FallSpeed;
+				ProjectileMovement->Velocity = FVector(0.f, 0.f, -FallSpeed);
+			}
 		}
+
+		return;
 	}
 
-	return;
-	}
-
-	// Soft Reference 로드
-	UNiagaraSystem* LoadedTrailVFX = FireballData->TrailVFX.IsNull() ? nullptr : FireballData->TrailVFX.LoadSynchronous();
-	if (LoadedTrailVFX)
+	// Trail VFX
+	UNiagaraSystem* TrailVFX = CachedTrailVFX;
+	if (!TrailVFX && !FireballData->TrailVFX.IsNull())
 	{
-		PlaySkillVFX(LoadedTrailVFX, SpawnLocation);
+		TrailVFX = UGS_AssetLoader::SyncLoadAsset(FireballData->TrailVFX);
 	}
 
-	// Soft Reference 로드
-	UAkAudioEvent* FallSoundTPS = FireballData->FallSound_TPS.IsNull() ? nullptr : FireballData->FallSound_TPS.LoadSynchronous();
-	UAkAudioEvent* FallSoundRTS = FireballData->FallSound_RTS.IsNull() ? nullptr : FireballData->FallSound_RTS.LoadSynchronous();
+	if (TrailVFX)
+	{
+		PlaySkillVFX(TrailVFX, SpawnLocation);
+	}
+
+	// Fall Sound
+	UAkAudioEvent* FallSoundTPS = CachedFallSound_TPS;
+	UAkAudioEvent* FallSoundRTS = CachedFallSound_RTS;
+	if (!FallSoundTPS && !FireballData->FallSound_TPS.IsNull())
+		FallSoundTPS = UGS_AssetLoader::SyncLoadAsset(FireballData->FallSound_TPS);
+	if (!FallSoundRTS && !FireballData->FallSound_RTS.IsNull())
+		FallSoundRTS = UGS_AssetLoader::SyncLoadAsset(FireballData->FallSound_RTS);
+
 	UAkAudioEvent* FallSound = SelectSoundEvent(FallSoundTPS, FallSoundRTS);
 	if (FallSound)
 	{
@@ -166,81 +232,90 @@ void UGS_RTSSkill_FireballStrike::SpawnFireball()
 	FTimerHandle ExplosionTimerHandle;
 	TWeakObjectPtr<UGS_RTSSkill_FireballStrike> WeakThis = this;
 	World->GetTimerManager().SetTimer(
-		ExplosionTimerHandle,
-		[WeakThis, TargetLocation]()
-		{
-			if (!WeakThis.IsValid())
-			{
-				return;
-			}
+	    ExplosionTimerHandle,
+	    [WeakThis, TargetLocation]()
+	    {
+		    if (!WeakThis.IsValid())
+		    {
+			    return;
+		    }
 
-			const UGS_RTSSkillData_Fireball* FireballDataInner = WeakThis->GetFireballData();
-			if (!FireballDataInner)
-			{
-				return;
-			}
+		    const UGS_RTSSkillData_Fireball* FireballDataInner = WeakThis->GetFireballData();
+		    if (!FireballDataInner)
+		    {
+			    return;
+		    }
 
-			UWorld* WorldContext = WeakThis->GetSkillWorld();
-			if (!WorldContext)
-			{
-				return;
-			}
+		    UWorld* WorldContext = WeakThis->GetSkillWorld();
+		    if (!WorldContext)
+		    {
+			    return;
+		    }
 
-			// Soft Reference 로드
-			UNiagaraSystem* LoadedExplosionVFX = FireballDataInner->ExplosionVFX.IsNull() ? nullptr : FireballDataInner->ExplosionVFX.LoadSynchronous();
-			if (LoadedExplosionVFX)
-			{
-				WeakThis->PlaySkillVFX(LoadedExplosionVFX, TargetLocation);
-			}
+		    // Explosion VFX
+		    UNiagaraSystem* ExplosionVFX = WeakThis->CachedExplosionVFX;
+		    if (!ExplosionVFX && !FireballDataInner->ExplosionVFX.IsNull())
+		    {
+			    ExplosionVFX = UGS_AssetLoader::SyncLoadAsset(FireballDataInner->ExplosionVFX);
+		    }
 
-			// Soft Reference 로드
-			UAkAudioEvent* ExpSoundTPS = FireballDataInner->ExplosionSound_TPS.IsNull() ? nullptr : FireballDataInner->ExplosionSound_TPS.LoadSynchronous();
-			UAkAudioEvent* ExpSoundRTS = FireballDataInner->ExplosionSound_RTS.IsNull() ? nullptr : FireballDataInner->ExplosionSound_RTS.LoadSynchronous();
-			UAkAudioEvent* ExpSound = WeakThis->SelectSoundEvent(ExpSoundTPS, ExpSoundRTS);
-			if (ExpSound)
-			{
-				WeakThis->PlaySkillSound(ExpSound, TargetLocation);
-			}
+		    if (ExplosionVFX)
+		    {
+			    WeakThis->PlaySkillVFX(ExplosionVFX, TargetLocation);
+		    }
 
-			TArray<FOverlapResult> OverlapResults;
-			FCollisionShape CollisionShape = FCollisionShape::MakeSphere(WeakThis->GetEffectRadius());
-			FCollisionQueryParams QueryParams;
+		    // Explosion Sound
+		    UAkAudioEvent* ExpSoundTPS = WeakThis->CachedExplosionSound_TPS;
+		    UAkAudioEvent* ExpSoundRTS = WeakThis->CachedExplosionSound_RTS;
+		    if (!ExpSoundTPS && !FireballDataInner->ExplosionSound_TPS.IsNull())
+			    ExpSoundTPS = UGS_AssetLoader::SyncLoadAsset(FireballDataInner->ExplosionSound_TPS);
+		    if (!ExpSoundRTS && !FireballDataInner->ExplosionSound_RTS.IsNull())
+			    ExpSoundRTS = UGS_AssetLoader::SyncLoadAsset(FireballDataInner->ExplosionSound_RTS);
 
-			if (WorldContext->OverlapMultiByChannel(
-				OverlapResults,
-				TargetLocation,
-				FQuat::Identity,
-				ECC_Pawn,
-				CollisionShape,
-				QueryParams))
-			{
-				const float EffectRadiusInner = WeakThis->GetEffectRadius();
-				const float SkillPowerInner = WeakThis->GetSkillPower();
+		    UAkAudioEvent* ExpSound = WeakThis->SelectSoundEvent(ExpSoundTPS, ExpSoundRTS);
+		    if (ExpSound)
+		    {
+			    WeakThis->PlaySkillSound(ExpSound, TargetLocation);
+		    }
 
-				for (const FOverlapResult& Result : OverlapResults)
-				{
-					if (AGS_Character* HitCharacter = Cast<AGS_Character>(Result.GetActor()))
-					{
-						if (HitCharacter->IsA(AGS_Seeker::StaticClass()))
-						{
-							const float Distance = FVector::Dist(HitCharacter->GetActorLocation(), TargetLocation);
-							const float DamageMultiplier = (EffectRadiusInner > KINDA_SMALL_NUMBER)
-								? 1.f - FMath::Clamp(Distance / EffectRadiusInner, 0.f, 1.f)
-								: 1.f;
-							const float FinalDamage = SkillPowerInner * DamageMultiplier;
+		    TArray<FOverlapResult> OverlapResults;
+		    FCollisionShape CollisionShape = FCollisionShape::MakeSphere(WeakThis->GetEffectRadius());
+		    FCollisionQueryParams QueryParams;
 
-							FDamageEvent DamageEvent;
-							HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
+		    if (WorldContext->OverlapMultiByChannel(
+		            OverlapResults,
+		            TargetLocation,
+		            FQuat::Identity,
+		            ECC_Pawn,
+		            CollisionShape,
+		            QueryParams))
+		    {
+			    const float EffectRadiusInner = WeakThis->GetEffectRadius();
+			    const float SkillPowerInner = WeakThis->GetSkillPower();
 
-							HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
-						}
-					}
-				}
-			}
-		},
-		FallTime,
-		false
-	);
+			    for (const FOverlapResult& Result : OverlapResults)
+			    {
+				    if (AGS_Character* HitCharacter = Cast<AGS_Character>(Result.GetActor()))
+				    {
+					    if (HitCharacter->IsA(AGS_Seeker::StaticClass()))
+					    {
+						    const float Distance = FVector::Dist(HitCharacter->GetActorLocation(), TargetLocation);
+						    const float DamageMultiplier = (EffectRadiusInner > KINDA_SMALL_NUMBER)
+						                                       ? 1.f - FMath::Clamp(Distance / EffectRadiusInner, 0.f, 1.f)
+						                                       : 1.f;
+						    const float FinalDamage = SkillPowerInner * DamageMultiplier;
+
+						    FDamageEvent DamageEvent;
+						    HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
+
+						    HitCharacter->TakeDamage(FinalDamage, DamageEvent, nullptr, nullptr);
+					    }
+				    }
+			    }
+		    }
+	    },
+	    FallTime,
+	    false);
 }
 
 const UGS_RTSSkillData_Fireball* UGS_RTSSkill_FireballStrike::GetFireballData() const

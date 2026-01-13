@@ -14,6 +14,7 @@ class AGS_LavaTrap;
 class AGS_TrapManager;
 class AGS_AIGoalTrigger;
 class UGS_CompassIndicatorComponent;
+class AGS_TrapBase;
 
 /**
  * WorldSubsystem for managing and quickly accessing key game actors
@@ -55,6 +56,10 @@ public:
 	void RegisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger);
 	void UnregisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger);
 
+	void RegisterTrap(AGS_TrapBase* Trap);
+	void UnregisterTrap(AGS_TrapBase* Trap);
+	const TArray<TWeakObjectPtr<AGS_TrapBase>>& GetTraps() const { return RegisteredTraps; }
+
 	// --- Accessors ---
 	const TArray<TWeakObjectPtr<AGS_Monster>>& GetMonsters() const { return RegisteredMonsters; }
 	const TArray<TWeakObjectPtr<AGS_Seeker>>& GetSeekers() const { return RegisteredSeekers; }
@@ -92,6 +97,9 @@ private:
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AGS_AIGoalTrigger>> RegisteredGoalTriggers;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<class AGS_TrapBase>> RegisteredTraps;
 
 	FTimerHandle CleanupTimerHandle;
 };
