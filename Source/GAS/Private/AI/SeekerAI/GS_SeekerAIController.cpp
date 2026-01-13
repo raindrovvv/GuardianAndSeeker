@@ -1474,7 +1474,6 @@ bool AGS_SeekerAIController::FindNewExplorationTarget()
 		if (Blackboard)
 		{
 			Blackboard->SetValueAsVector(ExplorationTargetKey, NewTarget);
-			UE_LOG(LogTemp, Log, TEXT("[SeekerAI] %s: New Exploration Target set: %s"), *GetNameSafe(GetPawn()), *NewTarget.ToString());
 		}
 		StationaryTime = 0.0f;
 		return true;

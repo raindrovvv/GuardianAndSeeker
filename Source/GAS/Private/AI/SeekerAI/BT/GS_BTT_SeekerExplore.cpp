@@ -112,7 +112,6 @@ EBTNodeResult::Type UGS_BTT_SeekerExplore::ExecuteTask(UBehaviorTreeComponent& O
 
 	if (MoveResult.IsValid())
 	{
-		UE_LOG(LogTemp, Log, TEXT("[Explore Task] Moving to: %s (RequestID: %u)"), *ExplorationTarget.ToString(), (uint32)MoveResult.GetID());
 		return EBTNodeResult::InProgress;
 	}
 

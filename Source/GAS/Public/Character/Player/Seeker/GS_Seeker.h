@@ -27,6 +27,7 @@ class UGS_LowHealthEffectComponent;
 class UGS_DetectionEffectComponent;
 class AGS_Item;
 class UGS_MarkerPlacementComponent;
+class UGS_HitIndicatorComponent;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -318,6 +319,12 @@ public:
 	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Marker")
 	UGS_MarkerPlacementComponent* MarkerPlacementComponent;
+
+	// =======================
+	// 방향성 피격 HUD 컴포넌트
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	UGS_HitIndicatorComponent* HitIndicatorComponent;
 
 	// ================
 	// 함정 VFX 컴포넌트

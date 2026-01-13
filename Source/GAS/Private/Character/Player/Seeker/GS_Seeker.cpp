@@ -47,6 +47,7 @@
 #include "Character/Skill/Seeker/GS_HealSkill.h"
 #include "AI/SeekerAI/GS_SeekerAIController.h"
 #include "System/Utility/GS_AssetLoader.h"
+#include "Character/Component/GS_HitIndicatorComponent.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
@@ -97,6 +98,9 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 
 	// 마커 배치 컴포넌트 생성
 	MarkerPlacementComponent = ObjectInitializer.CreateDefaultSubobject<UGS_MarkerPlacementComponent>(this, TEXT("MarkerPlacementComponent"));
+
+	// 방향성 피격 HUD 컴포넌트 생성
+	HitIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_HitIndicatorComponent>(this, TEXT("HitIndicatorComponent"));
 
 	// 발 밑 용암 VFX
 	FeetLavaVFX_L = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FeetLavaVFX_L"));
