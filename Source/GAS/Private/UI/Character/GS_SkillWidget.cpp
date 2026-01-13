@@ -11,21 +11,42 @@
 #include "Sound/SoundBase.h"
 
 UGS_SkillWidget::UGS_SkillWidget(const FObjectInitializer& ObjectInitializer)
-	:Super(ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 }
 
 void UGS_SkillWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	
-	OwningCharacter = Cast<AGS_Player>(GetOwningPlayer()->GetPawn());
-	SetOwningActor(OwningCharacter);
 
-	if (IsValid(OwningCharacter))
+	if (APlayerController* PC = GetOwningPlayer())
 	{
-		OwningCharacter->GetSkillComp()->InitializeSkillWidget(this);
+		if (APawn* Pawn = PC->GetPawn())
+		{
+			OwningCharacter = Cast<AGS_Player>(Pawn);
+			SetOwningActor(OwningCharacter);
+
+			if (IsValid(OwningCharacter) && OwningCharacter->GetSkillComp())
+			{
+				OwningCharacter->GetSkillComp()->InitializeSkillWidget(this);
+			}
+		}
 	}
+}
+
+void UGS_SkillWidget::NativeDestruct()
+{
+	if (IsValid(OwningCharacter) && OwningCharacter->GetSkillComp())
+	{
+		UGS_SkillComp* SkillComp = OwningCharacter->GetSkillComp();
+		SkillComp->OnSkillCooldownChanged.RemoveAll(this);
+		SkillComp->OnHealCountChanged.RemoveAll(this);
+		SkillComp->OnSkillActivated.RemoveDynamic(this, &UGS_SkillWidget::OnSkillActivated);
+		SkillComp->OnSkillCooldownBlocked.RemoveDynamic(this, &UGS_SkillWidget::OnSkillCooldownBlocked);
+		SkillComp->OnSkillCooldownReady.RemoveDynamic(this, &UGS_SkillWidget::OnSkillCooldownReady);
+	}
+
+	Super::NativeDestruct();
 }
 
 void UGS_SkillWidget::InitSkill(UGS_SkillBase* Skill)
@@ -39,7 +60,7 @@ void UGS_SkillWidget::InitSkill(UGS_SkillBase* Skill)
 		if (SkillSlot == ESkillSlot::HealPotion)
 		{
 			CoolTimeBar->SetVisibility(ESlateVisibility::Hidden);
-			
+
 			// 힐 스킬일 때만 카운트 텍스트 표시
 			if (UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(Skill))
 			{
@@ -66,7 +87,7 @@ void UGS_SkillWidget::OnSkillActivated(ESkillSlot InSkillSlot)
 	{
 		PlayHeartbeatAnimation();
 		PlayGlowEffect();
-		
+
 		if (IsUltimateSkillSlot())
 		{
 			PlayUltimateSkillActivationSound();
@@ -84,9 +105,9 @@ void UGS_SkillWidget::OnSkillCoolTimeChanged(ESkillSlot InSkillSlot, float InCur
 	{
 		return;
 	}
-	
+
 	float CoolTime = OwningCharacter->GetSkillComp()->GetSkillFromSkillMap(SkillSlot)->GetCoolTime();
-	
+
 	//finish skill
 	if (InCurrentCoolTime < KINDA_SMALL_NUMBER)
 	{
@@ -98,14 +119,15 @@ void UGS_SkillWidget::OnSkillCoolTimeChanged(ESkillSlot InSkillSlot, float InCur
 	{
 		CurrentCoolTimeText->SetVisibility(ESlateVisibility::Visible);
 		CoolTimeBar->SetVisibility(ESlateVisibility::Visible);
-		CurrentCoolTimeText->SetText(FText::FromString(FString::Printf(TEXT("%d"),FMath::RoundToInt(InCurrentCoolTime))));
-		CoolTimeBar->SetPercent(InCurrentCoolTime/CoolTime);
+		CurrentCoolTimeText->SetText(FText::FromString(FString::Printf(TEXT("%d"), FMath::RoundToInt(InCurrentCoolTime))));
+		CoolTimeBar->SetPercent(InCurrentCoolTime / CoolTime);
 	}
 }
 
 void UGS_SkillWidget::OnHealCountChanged(ESkillSlot InSkillSlot, int32 CurrentCount, int32 MaxCount)
 {
-	if (SkillSlot != InSkillSlot) return;
+	if (SkillSlot != InSkillSlot)
+		return;
 
 	HealCountText->SetText(FText::FromString(FString::Printf(TEXT("%d"), CurrentCount)));
 
@@ -131,7 +153,7 @@ void UGS_SkillWidget::OnSkillCooldownBlocked(ESkillSlot InSkillSlot)
 	{
 		PlayCooldownBlockedAnimation();
 		PlayRedFlashEffect();
-		
+
 		if (IsUltimateSkillSlot())
 		{
 			PlayUltimateSkillCooldownSound();
@@ -169,5 +191,43 @@ void UGS_SkillWidget::PlayUltimateSkillCooldownSound()
 	if (bEnableAudio && UltimateSkillCooldownSound)
 	{
 		UGameplayStatics::PlaySound2D(this, UltimateSkillCooldownSound, AudioVolume);
+	}
+}
+
+void UGS_SkillWidget::OnSkillCooldownReady(ESkillSlot InSkillSlot)
+{
+	if (InSkillSlot == SkillSlot)
+	{
+		// 스킬 아이콘 주변 반짝임 효과
+		PlaySkillReadyAnimation();
+		PlaySkillReadyGlow();
+
+		// 사운드 재생
+		if (IsUltimateSkillSlot())
+		{
+			PlayUltimateSkillReadySound();
+			// 궁극기는 화면 테두리 황금빛 플래시 추가
+			PlayUltimateReadyScreenFlash();
+		}
+		else
+		{
+			PlaySkillReadySound();
+		}
+	}
+}
+
+void UGS_SkillWidget::PlaySkillReadySound()
+{
+	if (bEnableAudio && SkillReadySound)
+	{
+		UGameplayStatics::PlaySound2D(this, SkillReadySound, AudioVolume);
+	}
+}
+
+void UGS_SkillWidget::PlayUltimateSkillReadySound()
+{
+	if (bEnableAudio && UltimateSkillReadySound)
+	{
+		UGameplayStatics::PlaySound2D(this, UltimateSkillReadySound, AudioVolume);
 	}
 }

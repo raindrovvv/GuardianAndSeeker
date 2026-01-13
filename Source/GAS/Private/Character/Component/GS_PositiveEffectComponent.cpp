@@ -14,10 +14,10 @@ void UGS_PositiveEffectComponent::InitializeForOwner(AActor* InOwner, UPostProce
 	OwnerActor = InOwner;
 	ManagedPostProcessComp = InPostProcessComp;
 
-	if (ManagedPostProcessComp)
+	if (ManagedPostProcessComp.IsValid())
 	{
 		ManagedPostProcessComp->bEnabled = false;
-		ManagedPostProcessComp->Priority = 8; // LowHealth(10)보다 낮게 설정하여 위급 상황이 더 잘 보이게 함
+		ManagedPostProcessComp->Priority = 8;
 		ManagedPostProcessComp->BlendWeight = 1.0f;
 		ManagedPostProcessComp->bUnbound = true;
 		ManagedPostProcessComp->Settings.WeightedBlendables.Array.Empty();
@@ -36,7 +36,7 @@ void UGS_PositiveEffectComponent::EnsureMID()
 	if (!DynamicMaterial && EffectMaterial && OwnerActor.IsValid())
 	{
 		DynamicMaterial = UMaterialInstanceDynamic::Create(EffectMaterial, OwnerActor.Get());
-		if (ManagedPostProcessComp && DynamicMaterial)
+		if (ManagedPostProcessComp.IsValid() && DynamicMaterial)
 		{
 			ManagedPostProcessComp->Settings.WeightedBlendables.Array.Empty();
 			ManagedPostProcessComp->Settings.AddBlendable(DynamicMaterial, 1.0f);
@@ -46,7 +46,7 @@ void UGS_PositiveEffectComponent::EnsureMID()
 
 void UGS_PositiveEffectComponent::OnHealed(float HealAmount)
 {
-	if (!OwnerActor.IsValid() || !ManagedPostProcessComp)
+	if (!OwnerActor.IsValid() || !ManagedPostProcessComp.IsValid())
 	{
 		return;
 	}
@@ -62,19 +62,19 @@ void UGS_PositiveEffectComponent::OnHealed(float HealAmount)
 		DynamicMaterial->SetVectorParameterValue(ColorParamName, CurrentColor);
 	}
 
-	if (!bIsActive)
+	if (ManagedPostProcessComp.IsValid() && !bIsActive)
 	{
 		bIsActive = true;
 		ManagedPostProcessComp->bEnabled = true;
 		StartTimer();
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[PositiveEffect] Heal triggered - Amount: %.1f"), HealAmount);
+	// UE_LOG(LogTemp, Log, TEXT("[PositiveEffect] Heal triggered - Amount: %.1f"), HealAmount);
 }
 
 void UGS_PositiveEffectComponent::OnBuffReceived(EPositiveEffectType BuffType)
 {
-	if (!OwnerActor.IsValid() || !ManagedPostProcessComp || BuffType == EPositiveEffectType::None)
+	if (!OwnerActor.IsValid() || !ManagedPostProcessComp.IsValid() || BuffType == EPositiveEffectType::None)
 	{
 		return;
 	}
@@ -90,7 +90,7 @@ void UGS_PositiveEffectComponent::OnBuffReceived(EPositiveEffectType BuffType)
 		DynamicMaterial->SetVectorParameterValue(ColorParamName, CurrentColor);
 	}
 
-	if (!bIsActive)
+	if (ManagedPostProcessComp.IsValid() && !bIsActive)
 	{
 		bIsActive = true;
 		ManagedPostProcessComp->bEnabled = true;
@@ -105,7 +105,7 @@ void UGS_PositiveEffectComponent::StopEffect()
 	StopTimer();
 	ApplyEffect(0.0f, CurrentColor);
 
-	if (ManagedPostProcessComp)
+	if (ManagedPostProcessComp.IsValid())
 	{
 		ManagedPostProcessComp->bEnabled = false;
 	}
@@ -165,7 +165,8 @@ void UGS_PositiveEffectComponent::StopTimer()
 
 void UGS_PositiveEffectComponent::TickUpdate()
 {
-	if (!OwnerActor.IsValid())
+	// 액터가 파괴 중이거나 유효하지 않으면 즉시 중지
+	if (!OwnerActor.IsValid() || OwnerActor->IsPendingKillPending())
 	{
 		StopTimer();
 		return;
@@ -202,7 +203,7 @@ void UGS_PositiveEffectComponent::TickUpdate()
 	{
 		bIsActive = false;
 
-		if (ManagedPostProcessComp)
+		if (ManagedPostProcessComp.IsValid())
 		{
 			ManagedPostProcessComp->bEnabled = false;
 		}
@@ -224,7 +225,7 @@ void UGS_PositiveEffectComponent::EndPlay(const EEndPlayReason::Type EndPlayReas
 {
 	StopTimer();
 
-	if (ManagedPostProcessComp)
+	if (ManagedPostProcessComp.IsValid())
 	{
 		ManagedPostProcessComp->bEnabled = false;
 		ManagedPostProcessComp->Settings.WeightedBlendables.Array.Empty();

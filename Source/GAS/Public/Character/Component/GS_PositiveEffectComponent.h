@@ -102,7 +102,7 @@ public:
 	/** 효과 즉시 정지 */
 	void StopEffect();
 
-	UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp; }
+	UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp.Get(); }
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -126,8 +126,13 @@ private:
 
 private:
 	TWeakObjectPtr<AActor> OwnerActor;
-	UPostProcessComponent* ManagedPostProcessComp = nullptr;
-	UMaterialInstanceDynamic* DynamicMaterial = nullptr;
+
+	UPROPERTY()
+	TWeakObjectPtr<UPostProcessComponent> ManagedPostProcessComp;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
+
 	FTimerHandle UpdateTimerHandle;
 
 	bool bIsActive = false;

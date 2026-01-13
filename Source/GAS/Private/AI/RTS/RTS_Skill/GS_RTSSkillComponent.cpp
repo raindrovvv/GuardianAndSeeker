@@ -72,6 +72,12 @@ void UGS_RTSSkillComponent::UpdateCooldowns(float DeltaTime)
 
 				OnSkillCooldownChanged.Broadcast(i, CooldownRemaining[i], MaxCooldown);
 				LastBroadcastCooldown[i] = CooldownRemaining[i];
+
+				// 쿨다운이 정확히 0이 된 시점에 알림 호출
+				if (CooldownRemaining[i] == 0.f)
+				{
+					OnSkillCooldownFinished(i);
+				}
 			}
 		}
 	}
@@ -373,6 +379,12 @@ void UGS_RTSSkillComponent::Multicast_OnSkillActivated_Implementation(int32 Skil
 	if (UGS_RTSSkillBase* Skill = GetSkill(SkillIndex))
 	{
 		Skill->PlayCastEffects(TargetLocation);
+
+		// 클라이언트에서도 UI를 위해 쿨다운 동기화 시작
+		if (GetOwnerRole() != ROLE_Authority)
+		{
+			StartSkillCooldown(SkillIndex);
+		}
 	}
 }
 
@@ -398,6 +410,12 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 {
 	if (CooldownRemaining.IsValidIndex(SkillIndex))
 	{
+		// 이미 처리된 경우(중복 호출) 무시
+		if (CooldownRemaining[SkillIndex] <= 0.f && LastBroadcastCooldown[SkillIndex] <= 0.f)
+		{
+			return;
+		}
+
 		CooldownRemaining[SkillIndex] = 0.f;
 		LastBroadcastCooldown[SkillIndex] = 0.f;
 
@@ -406,7 +424,22 @@ void UGS_RTSSkillComponent::OnSkillCooldownFinished(int32 SkillIndex)
 		{
 			OnSkillCooldownChanged.Broadcast(SkillIndex, 0.f, Skill->GetCooldownTime());
 		}
+
+		// 준비 완료 알림 브로드캐스트
+		OnSkillCooldownReady.Broadcast(SkillIndex);
+
+		// 서버인 경우 클라이언트에 명시적으로 알림 (연출 동기화)
+		if (GetOwnerRole() == ROLE_Authority)
+		{
+			Client_OnSkillCooldownFinished(SkillIndex);
+		}
 	}
+}
+
+void UGS_RTSSkillComponent::Client_OnSkillCooldownFinished_Implementation(int32 SkillIndex)
+{
+	// 서버로부터 쿨다운 종료 신호를 받으면 다시 한번 로컬에서도 종료 처리 (UI 연출용)
+	OnSkillCooldownFinished(SkillIndex);
 }
 
 void UGS_RTSSkillComponent::DebugPrintSkillStatus() const
