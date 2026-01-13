@@ -54,7 +54,7 @@ void UGS_HitIndicatorComponent::CreateHitIndicatorWidget()
 			HitIndicatorWidget = CreateWidget<UGS_HitIndicatorWidget>(PC, HitIndicatorWidgetClass);
 			if (HitIndicatorWidget)
 			{
-				HitIndicatorWidget->AddToViewport(10);
+				HitIndicatorWidget->AddToViewport(-1); // 메인 HUD(0)보다 뒤에 표시
 				HitIndicatorWidget->SetOwnerComponent(this);
 				UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Widget Created Successfully!"));
 			}
