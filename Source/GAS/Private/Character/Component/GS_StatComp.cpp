@@ -279,6 +279,18 @@ void UGS_StatComp::SetAttackSpeed(float InAttackSpeed)
 	AttackSpeed = InAttackSpeed;
 }
 
+void UGS_StatComp::DirectSetHealth(float InHealth)
+{
+	if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	// 힐 이펙트 RPC를 발생시키지 않고 직접 HP 설정 (부활 등 특수 상황용)
+	CurrentHealth = FMath::Clamp(InHealth, 0.0f, MaxHealth);
+	OnCurrentHPChanged.Broadcast(this);
+}
+
 void UGS_StatComp::MulticastRPCPlayTakeDamageMontage_Implementation()
 {
 	AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner());

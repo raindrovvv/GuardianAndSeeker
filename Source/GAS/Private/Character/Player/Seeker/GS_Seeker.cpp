@@ -49,6 +49,8 @@
 #include "System/Utility/GS_AssetLoader.h"
 #include "Character/Component/GS_HitIndicatorComponent.h"
 #include "Character/Component/GS_PositiveEffectComponent.h"
+#include "Character/Component/GS_DeathCinematicComponent.h"
+#include "Character/Component/GS_RevivalEffectComponent.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
@@ -113,6 +115,28 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	// 긍정적 효과 컴포넌트 생성 (힐/버프 시각 효과)
 	PositiveEffectComp = ObjectInitializer.CreateDefaultSubobject<UGS_PositiveEffectComponent>(this, TEXT("PositiveEffectComp"));
 	PositiveEffectComp->SetAutoActivate(false);
+
+	// Post Process Component 생성 (죽음 연출 슬로우 모션)
+	DeathCinematicPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("DeathCinematicPostProcessComp"));
+	DeathCinematicPostProcessComp->SetupAttachment(RootComponent);
+	DeathCinematicPostProcessComp->bUnbound = true;
+	DeathCinematicPostProcessComp->Priority = 15; // 죽음 연출이 모든 효과보다 우선
+	DeathCinematicPostProcessComp->BlendWeight = 0.0f;
+
+	// 죽음 연출 컴포넌트 생성 (로컬 플레이어 전용)
+	DeathCinematicComp = ObjectInitializer.CreateDefaultSubobject<UGS_DeathCinematicComponent>(this, TEXT("DeathCinematicComp"));
+	DeathCinematicComp->SetAutoActivate(false);
+
+	// Post Process Component 생성 (부활 효과)
+	RevivalEffectPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("RevivalEffectPostProcessComp"));
+	RevivalEffectPostProcessComp->SetupAttachment(RootComponent);
+	RevivalEffectPostProcessComp->bUnbound = true;
+	RevivalEffectPostProcessComp->Priority = 14; // 부활 효과는 죽음 연출 다음 우선순위
+	RevivalEffectPostProcessComp->BlendWeight = 0.0f;
+
+	// 부활 효과 컴포넌트 생성 (로컬 플레이어 전용)
+	RevivalEffectComp = ObjectInitializer.CreateDefaultSubobject<UGS_RevivalEffectComponent>(this, TEXT("RevivalEffectComp"));
+	RevivalEffectComp->SetAutoActivate(false);
 
 	// 발 밑 용암 VFX
 	FeetLavaVFX_L = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FeetLavaVFX_L"));
@@ -241,6 +265,10 @@ void AGS_Seeker::BeginPlay()
 			AssetsToLoad.Add(DyingEffectMaterial.ToSoftObjectPath());
 		if (!PositiveEffectMaterial.IsNull())
 			AssetsToLoad.Add(PositiveEffectMaterial.ToSoftObjectPath());
+		if (!DeathCinematicMaterial.IsNull())
+			AssetsToLoad.Add(DeathCinematicMaterial.ToSoftObjectPath());
+		if (!RevivalEffectMaterial.IsNull())
+			AssetsToLoad.Add(RevivalEffectMaterial.ToSoftObjectPath());
 		if (!DetectionHUDWidgetClass.IsNull())
 			AssetsToLoad.Add(DetectionHUDWidgetClass.ToSoftObjectPath());
 
@@ -636,6 +664,29 @@ void AGS_Seeker::InitializeCameraManager()
 
 			// LoadedMaterial이 null이어도 호출 (컴포넌트 자체 Material 사용 가능하도록 함)
 			PositiveEffectComp->InitializeForOwner(this, PositiveEffectPostProcessComp, LoadedMaterial);
+		}
+
+		// DeathCinematic: 컴포넌트 초기화 (죽음 연출 슬로우 모션)
+		if (DeathCinematicComp)
+		{
+			UMaterialInterface* LoadedMat = nullptr;
+			if (!DeathCinematicMaterial.IsNull())
+			{
+				LoadedMat = UGS_AssetLoader::SyncLoadAsset(DeathCinematicMaterial);
+			}
+			// SpringArmComp를 전달하여 카메라 회전 기능 활성화
+			DeathCinematicComp->InitializeForOwner(this, DeathCinematicPostProcessComp, LoadedMat, SpringArmComp);
+		}
+
+		// RevivalEffect: 컴포넌트 초기화 (부활 화면 효과)
+		if (RevivalEffectComp)
+		{
+			UMaterialInterface* LoadedMat = nullptr;
+			if (!RevivalEffectMaterial.IsNull())
+			{
+				LoadedMat = UGS_AssetLoader::SyncLoadAsset(RevivalEffectMaterial);
+			}
+			RevivalEffectComp->InitializeForOwner(this, RevivalEffectPostProcessComp, LoadedMat);
 		}
 	}
 }
@@ -1247,6 +1298,9 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 
 void AGS_Seeker::OnDeath()
 {
+	// === 죽음 연출 효과 재생 (로컬 플레이어) ===
+	PlayDeathCinematic_Local();
+
 	// 사망 시 빈사 상태 효과 확실히 제거
 	if (HasAuthority())
 	{
@@ -1660,16 +1714,21 @@ void AGS_Seeker::OnRevived()
 		return;
 	}
 
-	// 25% HP로 회복
+	// 25% HP로 회복 (부활 효과만 발동, 힐 이펙트 제외)
 	if (UGS_StatComp* Stat = GetStatComp())
 	{
 		float MaxHP = Stat->GetMaxHealth();
 		float ReviveHP = MaxHP * ReviveHealthPercent;
-		Stat->SetCurrentHealth(ReviveHP, true); // true = healing
+		// 직접 HP 설정 (SetCurrentHealth의 힐 이벡트 RPC를 우회)
+		Stat->DirectSetHealth(ReviveHP);
+		ForceNetUpdate(); // 즉시 네트워크 복제
 	}
 
 	// 빈사 상태 해제
 	ExitDyingState(true);
+
+	// 클라이언트에게 부활 효과 재생 명령
+	ClientRPC_PlayRevivalEffect();
 }
 
 void AGS_Seeker::OnDyingTimeExpired()
@@ -2151,6 +2210,14 @@ void AGS_Seeker::OnRep_IsDead()
 	{
 		SeekerAudioComponent->StopLowHPPainSound();
 	}
+
+	// === 죽음 연출 효과 재생 (로컬 플레이어) ===
+	// 서버에서 죽음 판정 시 OnDeath가 호출되지만,
+	// 클라이언트는 OnRep_IsDead를 통해 죽음을 인지하므로 여기서도 호출이 필요함
+	if (IsDead())
+	{
+		PlayDeathCinematic_Local();
+	}
 }
 
 void AGS_Seeker::OnRep_IsBeingRevived()
@@ -2370,5 +2437,47 @@ void AGS_Seeker::UpdateHPWidgetVisibility()
 	if (IsValid(SteamNameWidgetComp) && SteamNameWidgetComp->IsVisible() != bIsVisible)
 	{
 		SteamNameWidgetComp->SetVisibility(bIsVisible);
+	}
+}
+
+void AGS_Seeker::ClientRPC_PlayRevivalEffect_Implementation()
+{
+	if (IsLocallyControlled() && RevivalEffectComp)
+	{
+		RevivalEffectComp->PlayRevivalEffect();
+	}
+}
+
+void AGS_Seeker::PlayDeathCinematic_Local()
+{
+	if (DeathCinematicComp)
+	{
+		DeathCinematicComp->PlayDeathCinematic();
+	}
+}
+
+void AGS_Seeker::Debug_Dying()
+{
+	Server_Debug_Dying();
+}
+
+void AGS_Seeker::Server_Debug_Dying_Implementation()
+{
+	if (!bIsInDyingState && !IsDead())
+	{
+		EnterDyingState();
+	}
+}
+
+void AGS_Seeker::Debug_Kill()
+{
+	Server_Debug_Kill();
+}
+
+void AGS_Seeker::Server_Debug_Kill_Implementation()
+{
+	if (!IsDead())
+	{
+		OnDeath();
 	}
 }

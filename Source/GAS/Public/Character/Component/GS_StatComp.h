@@ -63,6 +63,9 @@ public:
 	void SetAgility(float InAgility);
 	void SetAttackSpeed(float InAttackSpeed);
 
+	/** 힐 이펙트 없이 직접 HP 설정 (부활 등 특수 상황용) */
+	void DirectSetHealth(float InHealth);
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCPlayTakeDamageMontage();
 
