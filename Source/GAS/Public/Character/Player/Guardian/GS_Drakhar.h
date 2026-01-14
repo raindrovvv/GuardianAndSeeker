@@ -63,8 +63,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TSubclassOf<AGS_DrakharProjectile> FeverDraconicProjectile;
 
-	UPROPERTY(EditDefaultsOnly, Category = "VFX")
-	UNiagaraSystem* BloodEffectSystem;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TSoftObjectPtr<UNiagaraSystem> BloodEffectSystem;
 
 	//[fever mode]
 	FOnCurrentFeverGaugeChangedDelegate OnCurrentFeverGaugeChanged;
@@ -284,43 +284,43 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill|Earthquake", meta = (DisplayName = "Earthquake Camera Shake Info"))
 	FGS_CameraShakeInfo EarthquakeShakeInfo;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "WingRush Ribbon VFX"))
-	UNiagaraSystem* WingRushRibbonVFX;
+	TSoftObjectPtr<UNiagaraSystem> WingRushRibbonVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Fever WingRush Ribbon VFX"))
-	UNiagaraSystem* FeverWingRushRibbonVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverWingRushRibbonVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Dust VFX"))
-	UNiagaraSystem* DustVFX;
+	TSoftObjectPtr<UNiagaraSystem> DustVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Fever Dust VFX"))
-	UNiagaraSystem* FeverDustVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverDustVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Earthquake", meta = (DisplayName = "Ground Crack VFX"))
-	UNiagaraSystem* GroundCrackVFX;
+	TSoftObjectPtr<UNiagaraSystem> GroundCrackVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Earthquake", meta = (DisplayName = "Dust Cloud VFX"))
-	UNiagaraSystem* DustCloudVFX;
+	TSoftObjectPtr<UNiagaraSystem> DustCloudVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Earthquake", meta = (DisplayName = "Earthquake Impact VFX"))
-	UNiagaraSystem* EarthquakeImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> EarthquakeImpactVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Earthquake", meta = (DisplayName = "Fever Earthquake Impact VFX"))
-	UNiagaraSystem* FeverEarthquakeImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverEarthquakeImpactVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Projectile Impact VFX"))
-	UNiagaraSystem* DraconicProjectileImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> DraconicProjectileImpactVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Projectile Explosion VFX"))
-	UNiagaraSystem* DraconicProjectileExplosionVFX;
+	TSoftObjectPtr<UNiagaraSystem> DraconicProjectileExplosionVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Fever Projectile Impact VFX"))
-	UNiagaraSystem* FeverDraconicProjectileImpactVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverDraconicProjectileImpactVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Fever Projectile Explosion VFX"))
-	UNiagaraSystem* FeverDraconicProjectileExplosionVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverDraconicProjectileExplosionVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Normal Mode Indicator VFX"))
-	UNiagaraSystem* DraconicFuryIndicatorVFX;
+	TSoftObjectPtr<UNiagaraSystem> DraconicFuryIndicatorVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|DraconicFury", meta = (DisplayName = "Fever Mode Indicator VFX"))
-	UNiagaraSystem* FeverDraconicFuryIndicatorVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverDraconicFuryIndicatorVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Fever Footstep VFX"))
-	UNiagaraSystem* FeverFootstepVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverFootstepVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Flying Dust VFX"))
-	UNiagaraSystem* FlyingDustVFX;
+	TSoftObjectPtr<UNiagaraSystem> FlyingDustVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Flying Dust VFX Trace Distance"))
 	float FlyingDustTraceDistance;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Normal Attack Hit VFX"))
-	UNiagaraSystem* NormalAttackHitVFX;
+	TSoftObjectPtr<UNiagaraSystem> NormalAttackHitVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Drakhar", meta = (DisplayName = "Fever Attack Hit VFX"))
-	UNiagaraSystem* FeverAttackHitVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverAttackHitVFX;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|FeverMode")
 	UMaterialInterface* FeverModeOverlayMaterial;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|FeverMode")
@@ -328,39 +328,48 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|FeverMode")
 	FLinearColor FeverOverlayColor = FLinearColor(1.0f, 1.0f, 1.0f, 1.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|FeverMode", meta = (DisplayName = "Fever Mode End VFX"))
-	UNiagaraSystem* FeverModeEndVFX;
+	TSoftObjectPtr<UNiagaraSystem> FeverModeEndVFX;
 
 	// === Wwise Sound Events ===
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Combo")
-	UAkAudioEvent* ComboAttackSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> ComboAttackSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Skill")
-	UAkAudioEvent* DashSkillSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DashSkillSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Skill")
-	UAkAudioEvent* EarthquakeSkillSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> EarthquakeSkillSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Skill")
-	UAkAudioEvent* DraconicFurySkillSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DraconicFurySkillSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Skill")
-	UAkAudioEvent* DraconicProjectileSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DraconicProjectileSoundEvent;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* DraconicProjectileImpactSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DraconicProjectileImpactSoundEvent;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* DraconicProjectileExplosionSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DraconicProjectileExplosionSoundEvent;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* AttackHitSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> AttackHitSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Combo")
-	UAkAudioEvent* ComboFinisherSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> ComboFinisherSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Fever")
-	UAkAudioEvent* FeverModeStartSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> FeverModeStartSoundEvent;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Fever")
-	UAkAudioEvent* FeverModeEndSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> FeverModeEndSoundEvent;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Fever")
-	UAkAudioEvent* FeverModeStateSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> FeverModeStateSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* HurtSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> HurtSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* DeathSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> DeathSoundEvent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound|Impact")
-	UAkAudioEvent* LandingSoundEvent;
+	TSoftObjectPtr<UAkAudioEvent> LandingSoundEvent;
 
 	FORCEINLINE UGS_DrakharVFXComponent* GetDrakharVFXComponent() const { return DrakharVFXComponent; }
 	FORCEINLINE UGS_DrakharAudioComponent* GetAudioComponent() const { return AudioComponent; }

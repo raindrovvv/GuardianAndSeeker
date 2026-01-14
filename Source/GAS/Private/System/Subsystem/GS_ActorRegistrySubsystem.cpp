@@ -8,6 +8,8 @@
 #include "Props/Trap/NonTriggerTrap/GS_LavaTrap.h"
 #include "Props/Trap/GS_TrapManager.h"
 #include "UI/Character/GS_CompassIndicatorComponent.h"
+#include "AI/SeekerAI/GS_AIGoalTrigger.h"
+#include "Props/Trap/GS_TrapBase.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 
@@ -62,6 +64,12 @@ void UGS_ActorRegistrySubsystem::CleanupInvalidEntries()
 	{
 		RegisteredTrapManager = nullptr;
 	}
+
+	RegisteredGoalTriggers.RemoveAllSwap([](const TWeakObjectPtr<AGS_AIGoalTrigger>& Ptr)
+	                                     { return !Ptr.IsValid(); });
+
+	RegisteredTraps.RemoveAllSwap([](const TWeakObjectPtr<AGS_TrapBase>& Ptr)
+	                              { return !Ptr.IsValid(); });
 }
 
 
@@ -174,6 +182,38 @@ void UGS_ActorRegistrySubsystem::UnregisterTrapManager(AGS_TrapManager* TrapMana
 	if (RegisteredTrapManager == TrapManager)
 	{
 		RegisteredTrapManager = nullptr;
+	}
+}
+
+void UGS_ActorRegistrySubsystem::RegisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger)
+{
+	if (IsValid(GoalTrigger))
+	{
+		RegisteredGoalTriggers.AddUnique(GoalTrigger);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger)
+{
+	if (GoalTrigger)
+	{
+		RegisteredGoalTriggers.Remove(GoalTrigger);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::RegisterTrap(AGS_TrapBase* Trap)
+{
+	if (IsValid(Trap))
+	{
+		RegisteredTraps.AddUnique(Trap);
+	}
+}
+
+void UGS_ActorRegistrySubsystem::UnregisterTrap(AGS_TrapBase* Trap)
+{
+	if (Trap)
+	{
+		RegisteredTraps.Remove(Trap);
 	}
 }
 

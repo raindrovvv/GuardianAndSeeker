@@ -11,7 +11,7 @@ UCLASS()
 class GAS_API AGS_DrakharProjectile : public AGS_WeaponProjectile
 {
 	GENERATED_BODY()
-	
+
 public:
 	AGS_DrakharProjectile();
 
@@ -20,12 +20,12 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-		const FHitResult& Hit) override;
+	                   UPrimitiveComponent* OtherComp, FVector NormalImpulse,
+	                   const FHitResult& Hit) override;
 
 	// 인디케이터 VFX 설정 함수 (InIndicatorRadius는 Scale_All 계산에 사용)
 	UFUNCTION(BlueprintCallable, Category = "Indicator")
-	void SetIndicatorVFX(UNiagaraSystem* InIndicatorVFX, float InIndicatorRadius);
+	void SetIndicatorVFX(TSoftObjectPtr<UNiagaraSystem> InIndicatorVFX, float InIndicatorRadius);
 
 protected:
 	// === 인디케이터 생성 관련 메서드 ===
@@ -65,7 +65,7 @@ protected:
 
 	// 인디케이터 VFX 에셋 (리플리케이트)
 	UPROPERTY(ReplicatedUsing = OnRep_IndicatorVFX)
-	UNiagaraSystem* IndicatorVFX;
+	TSoftObjectPtr<UNiagaraSystem> IndicatorVFX;
 
 	// 인디케이터 나이아가라 컴포넌트
 	UPROPERTY()

@@ -27,3 +27,12 @@ enum class EWeaponHandlingState : uint8
 	UnArmd, // 소지 하지 않은 상태
 	End,
 };
+
+UENUM(BlueprintType)
+enum class EImpactMaterialType : uint8
+{
+	Flesh UMETA(DisplayName = "Flesh"), // 살점
+	Armor UMETA(DisplayName = "Armor"), // 갑옷/금속
+	Stone UMETA(DisplayName = "Stone"), // 돌/단단한 껍질
+	Wood UMETA(DisplayName = "Wood") // 나무/오브젝트
+};

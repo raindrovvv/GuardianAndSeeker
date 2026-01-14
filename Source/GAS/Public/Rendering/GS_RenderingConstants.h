@@ -14,39 +14,54 @@ namespace GS_Rendering
 // Skeletal Mesh Culling Distances
 // ========================================
 
-/** SmallClaw 몬스터 컬링 거리 (40m) */
-constexpr float MONSTER_SMALL_CULL_DISTANCE = 4000.0f;
+/** SmallClaw 몬스터 컬링 거리 */
+constexpr float MONSTER_SMALL_CULL_DISTANCE = 5000.0f;
 
-/** NeedleFang 몬스터 컬링 거리 (45m) */
-constexpr float MONSTER_MEDIUM_CULL_DISTANCE = 4500.0f;
+/** NeedleFang 몬스터 컬링 거리 */
+constexpr float MONSTER_MEDIUM_CULL_DISTANCE = 5000.0f;
 
-/** ShadowFang 몬스터 컬링 거리 (60m) */
-constexpr float MONSTER_LARGE_CULL_DISTANCE = 6000.0f;
+/** ShadowFang 몬스터 컬링 거리 */
+constexpr float MONSTER_LARGE_CULL_DISTANCE = 5000.0f;
+
+/** 다른 플레이어(시커) 컬링 거리 (70m) - 몬스터보다 중요하므로 더 멀리 설정 */
+constexpr float PLAYER_CULL_DISTANCE = 7000.0f;
 
 // ========================================
 // Static Mesh Culling Distances
 // ========================================
 
-/** 작은 함정 컬링 거리 (30m) */
+/** 작은 함정 컬링 거리 */
 constexpr float TRAP_SMALL_CULL_DISTANCE = 3000.0f;
 
-/** 중간 함정 컬링 거리 (45m) */
-constexpr float TRAP_MEDIUM_CULL_DISTANCE = 4500.0f;
+/** 중간 함정 컬링 거리 */
+constexpr float TRAP_MEDIUM_CULL_DISTANCE = 3500.0f;
 
-/** 큰 함정 컬링 거리 (60m) */
-constexpr float TRAP_LARGE_CULL_DISTANCE = 6000.0f;
+/** 큰 함정 컬링 거리 */
+constexpr float TRAP_LARGE_CULL_DISTANCE = 4500.0f;
 
-/** 방 모듈 컬링 거리 (60m) - Draw Call 최적화를 위해 축소 */
-constexpr float ROOM_CULL_DISTANCE = 6000.0f;
+/** 방 모듈 컬링 거리 - Draw Call 최적화를 위해 축소 */
+constexpr float ROOM_CULL_DISTANCE = 8500.0f;
 
-/** 폴리지 컬링 거리 (30m) - Nanite 미지원으로 인한 공격적 컬링 */
-constexpr float FOLIAGE_CULL_DISTANCE = 3000.0f;
+/** 벽 모듈 컬링 거리 - 방보다 앞서 컬링되거나 가시성 제어를 위해 분리 */
+constexpr float WALL_CULL_DISTANCE = 9000.0f;
 
-/** 무기 컬링 거리 (45m) */
-constexpr float WEAPON_CULL_DISTANCE = 4500.0f;
+/** 폴리지 컬링 거리 (15m) - Nanite 미지원으로 인한 공격적 컬링 */
+constexpr float FOLIAGE_CULL_DISTANCE = 1500.0f;
+
+/** 라이트 컬링 거리 (20m) - 던전 조명 유지 */
+constexpr float LIGHT_CULL_DISTANCE = 1600.0f;
+
+/** 무기 컬링 거리 (30m) */
+constexpr float WEAPON_CULL_DISTANCE = 3000.0f;
+
+/** 투사체 컬링 거리 (150m) - 원거리 가시성 확보 (특히 RTS 모드) */
+constexpr float PROJECTILE_CULL_DISTANCE = 15000.0f;
 
 /** HP 위젯 기본 컬링 거리 (60m) */
 constexpr float HP_WIDGET_CULL_DISTANCE = 6000.0f;
+
+/** 스팀 닉네임 위젯 컬링 거리 (60m) */
+constexpr float STEAM_NAME_WIDGET_CULL_DISTANCE = 6000.0f;
 
 // ========================================
 // Culling Optimization Settings
@@ -164,6 +179,9 @@ constexpr float VFX_DISABLE_DISTANCE = 6000.0f;
 /** VFX 저품질 전환 거리 (30m - 파티클 수 50% 감소) */
 constexpr float VFX_LOW_QUALITY_DISTANCE = 3000.0f;
 
+/** 혈흔 이펙트 최대 재생 거리 (20m) */
+constexpr float BLOOD_VFX_MAX_DISTANCE = 2000.0f;
+
 /** VFX 중품질 전환 거리 (15m - 파티클 수 75% 유지) */
 constexpr float VFX_MEDIUM_QUALITY_DISTANCE = 1500.0f;
 
@@ -180,8 +198,8 @@ constexpr float VFX_MEDIUM_QUALITY_SCALE = 0.75f;
 /** Seeker 전투 트리거 반경 기본값 (8m) - Monster HP 위젯 가시성 등에서 공유 */
 constexpr float DEFAULT_COMBAT_TRIGGER_RADIUS = 800.0f;
 
-/** TPS 모드에서 HP 위젯이 보이기 시작하는 최대 거리 (30m) */
-constexpr float TPS_HP_WIDGET_VISIBLE_DISTANCE = 3000.0f;
+/** TPS 모드에서 HP 위젯이 보이기 시작하는 최대 거리 (15m) */
+constexpr float TPS_HP_WIDGET_VISIBLE_DISTANCE = 1500.0f;
 
 /** HP 위젯 가시성 트레이스를 위한 허리 높이 오프셋 */
 constexpr float HP_WIDGET_VISIBILITY_TRACE_OFFSET = 50.0f;

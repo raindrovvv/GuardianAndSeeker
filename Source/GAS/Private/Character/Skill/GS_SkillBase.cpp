@@ -107,6 +107,12 @@ void UGS_SkillBase::InterruptSkill()
 	{
 		Seeker->StateReset();
 		Seeker->SetSeekerGait(EGait::Run);
+
+		// Ensure skill mask is reset after interruption to allow next skill usage
+		if (Seeker->GetSkillComp())
+		{
+			Seeker->GetSkillComp()->ResetAllowedSkillsMask();
+		}
 	}
 }
 
@@ -169,6 +175,26 @@ void UGS_SkillBase::PreloadSkillAssets()
 		}
 	}
 
+	// 데이터 테이블에서 스킬 오디오 정보 가져와 프리로드 리스트에 추가
+	const FSkillInfo* Info = GetCurrentSkillInfo();
+	if (Info)
+	{
+		if (!Info->SkillStartSound.IsNull())
+			AssetsToLoad.Add(Info->SkillStartSound.ToSoftObjectPath());
+		if (!Info->SkillEndSound.IsNull())
+			AssetsToLoad.Add(Info->SkillEndSound.ToSoftObjectPath());
+		if (!Info->SkillLoopSound.IsNull())
+			AssetsToLoad.Add(Info->SkillLoopSound.ToSoftObjectPath());
+		if (!Info->SkillLoopStopSound.IsNull())
+			AssetsToLoad.Add(Info->SkillLoopStopSound.ToSoftObjectPath());
+		if (!Info->WallCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->WallCollisionSound.ToSoftObjectPath());
+		if (!Info->MonsterCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->MonsterCollisionSound.ToSoftObjectPath());
+		if (!Info->GuardianCollisionSound.IsNull())
+			AssetsToLoad.Add(Info->GuardianCollisionSound.ToSoftObjectPath());
+	}
+
 	if (AssetsToLoad.Num() > 0)
 	{
 		// TWeakObjectPtr로 캡처하여 UObject 파괴 후 람다 호출 시 안전성 확보
@@ -190,6 +216,18 @@ void UGS_SkillBase::PreloadSkillAssets()
 				for (int32 i = 0; i < Strong->SkillAnimMontages.Num(); ++i)
 				{
 					Strong->CachedAnimMontages[i] = Strong->SkillAnimMontages[i].Get();
+				}
+
+				// 오디오 캐싱
+				if (const FSkillInfo* InfoPtr = Strong->GetCurrentSkillInfo())
+				{
+					Strong->CachedSkillStartSound = InfoPtr->SkillStartSound.Get();
+					Strong->CachedSkillEndSound = InfoPtr->SkillEndSound.Get();
+					Strong->CachedSkillLoopSound = InfoPtr->SkillLoopSound.Get();
+					Strong->CachedSkillLoopStopSound = InfoPtr->SkillLoopStopSound.Get();
+					Strong->CachedWallCollisionSound = InfoPtr->WallCollisionSound.Get();
+					Strong->CachedMonsterCollisionSound = InfoPtr->MonsterCollisionSound.Get();
+					Strong->CachedGuardianCollisionSound = InfoPtr->GuardianCollisionSound.Get();
 				}
 			} });
 	}

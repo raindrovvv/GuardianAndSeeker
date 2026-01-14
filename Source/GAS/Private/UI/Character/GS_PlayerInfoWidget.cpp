@@ -21,7 +21,7 @@ void UGS_PlayerInfoWidget::NativeConstruct()
 	{
 		OwningCharacter = Cast<AGS_Player>(GetOwningPlayer()->GetPawn());
 	}
-	
+
 	if (IsValid(OwningCharacter))
 	{
 		OwningCharacter->SetPlayerInfoWidget(this);
@@ -34,7 +34,32 @@ void UGS_PlayerInfoWidget::InitializePlayerInfoWidget(AGS_Player* InPlayer)
 	{
 		OnCurrentHPBarChanged(InPlayer->GetStatComp());
 
-		PlayerName->SetText(FText::FromString(InPlayer->GetPlayerState()->GetPlayerName()));
+		// PlayerName 설정 (AI 시커는 PlayerState가 없을 수 있음)
+		if (InPlayer->GetPlayerState())
+		{
+			PlayerName->SetText(FText::FromString(InPlayer->GetPlayerState()->GetPlayerName()));
+		}
+		else
+		{
+			// AI 시커인 경우 캐릭터 타입에 따른 이름 표시
+			FString AIName = TEXT("AI Seeker");
+			switch (InPlayer->CharacterType)
+			{
+			case ECharacterType::Chan:
+				AIName = TEXT("AI Chan");
+				break;
+			case ECharacterType::Ares:
+				AIName = TEXT("AI Ares");
+				break;
+			case ECharacterType::Merci:
+				AIName = TEXT("AI Merci");
+				break;
+			case ECharacterType::Reina:
+				AIName = TEXT("AI Reina");
+				break;
+			}
+			PlayerName->SetText(FText::FromString(AIName));
+		}
 
 		// CharacterType에서 SeekerJob으로 직접 변환
 		// (PlayerState의 CurrentSeekerJob은 타이밍 이슈로 신뢰할 수 없음)
@@ -56,13 +81,19 @@ void UGS_PlayerInfoWidget::InitializePlayerInfoWidget(AGS_Player* InPlayer)
 		{
 			SeekerJob = ESeekerJob::Reina;
 		}
-		
-		const FAssetToSpawn* SpawnInfo = PawnMappingData->SeekerPawnClasses.Find(SeekerJob);
-		PlayerClass->SetBrushFromTexture(SpawnInfo->ClassIconTexture);
+
+		if (IsValid(PawnMappingData))
+		{
+			const FAssetToSpawn* SpawnInfo = PawnMappingData->SeekerPawnClasses.Find(SeekerJob);
+			if (SpawnInfo)
+			{
+				PlayerClass->SetBrushFromTexture(SpawnInfo->ClassIconTexture);
+			}
+		}
 	}
 }
 
 void UGS_PlayerInfoWidget::OnCurrentHPBarChanged(UGS_StatComp* InStatComp)
 {
-	HPBarWidget->SetPercent(InStatComp->GetCurrentHealth()/InStatComp->GetMaxHealth());
+	HPBarWidget->SetPercent(InStatComp->GetCurrentHealth() / InStatComp->GetMaxHealth());
 }

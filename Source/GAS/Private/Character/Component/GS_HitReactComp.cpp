@@ -150,19 +150,35 @@ FName UGS_HitReactComp::CalculateHitDirection(FVector HitDirection)
 void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
 {
 	// 다른 애니메이션(예: 구르기)에 의해 중단된 경우, 상태를 복구하지 않음.
-	// 중단시킨 애니메이션이 자신의 상태를 관리할 것이기 때문.
 	if (bInterrupted)
 	{
 		return;
 	}
 
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
-	{
-		// HitReact 애니메이션 종료 후 상태 복구
-		Seeker->StateReset();
-		Seeker->SetSeekerGait(EGait::Run);
+	AActor* Owner = GetOwner();
+	if (!Owner)
+		return;
 
-		// 외부(Seeker 등)에서 추가 처리를 할 수 있도록 델리게이트 호출
+	// 모든 캐릭터(시커, 몬스터 등)에 대해 공통적으로 무기 콜리전 초기화
+	if (AGS_Character* Character = Cast<AGS_Character>(Owner))
+	{
+		// 1. 등록된 모든 무기 슬롯의 콜리전 강제 비활성화
+		for (int32 i = 0; i < 5; ++i) // 최대 5개 슬롯 체크
+		{
+			if (AGS_WeaponEquipable* Weapon = Cast<AGS_WeaponEquipable>(Character->GetWeaponByIndex(i)))
+			{
+				Weapon->ForceDisableHit();
+			}
+		}
+
+		// 2. 시커 전용 상태 복구
+		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Character))
+		{
+			Seeker->StateReset();
+			Seeker->SetSeekerGait(EGait::Run);
+		}
+
+		// 외부 델리게이트 호출
 		OnHitReactEnd.Broadcast(Montage, bInterrupted);
 	}
 }

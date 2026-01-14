@@ -11,6 +11,8 @@
 #include "NiagaraSystem.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Rendering/GS_RenderingConstants.h"
+#include "Sound/GS_AudioMixingComponent.h"
+#include "AkAudioEvent.h"
 
 AGS_SmallClaw::AGS_SmallClaw()
 {
@@ -59,7 +61,7 @@ void AGS_SmallClaw::OnAttackBiteboxOverlap(UPrimitiveComponent* OverlappedCompon
 	{
 		return;
 	}
-	
+
 	AGS_Character* Damaged = Cast<AGS_Character>(OtherActor);
 	AGS_Character* Attacker = this;
 	if (!Damaged || !Attacker || !Damaged->IsEnemy(Attacker))
@@ -71,25 +73,28 @@ void AGS_SmallClaw::OnAttackBiteboxOverlap(UPrimitiveComponent* OverlappedCompon
 	{
 		if (!DamagedCharacter->IsEnemy(Cast<AGS_Character>(this)))
 		{
-			return; 
+			return;
 		}
-		
+
 		float Damage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter);
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::DamageOnly;
-		
+
 		float ActualDamage = OtherActor->TakeDamage(Damage, DamageEvent, GetController(), this);
-		
-		// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 재생
+
+		// 실제로 데미지가 적용된 경우에만 혈흔 이펙트 및 레이어드 사운드 재생
 		if (ActualDamage > 0.0f)
 		{
 			// 혈흔 이펙트 재생 - 깨물기 지점에서 재생
 			FVector HitLocation = SweepResult.bBlockingHit ? FVector(SweepResult.ImpactPoint) : DamagedCharacter->GetActorLocation();
 			FVector HitNormal = SweepResult.bBlockingHit ? FVector(SweepResult.ImpactNormal) : FVector::UpVector;
-			
+
 			Multicast_PlayBloodEffect(HitLocation, HitNormal);
+
+			// [추가] 레이어드 사운드 재생
+			Multicast_PlayLayeredHitSound(SweepResult, OtherActor);
 		}
-	
+
 		BiteCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 }
@@ -100,6 +105,45 @@ void AGS_SmallClaw::Multicast_PlayBloodEffect_Implementation(FVector HitLocation
 	{
 		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), 0.8f);
 	}
+}
+
+void AGS_SmallClaw::PlayLayeredHitSound(const FHitResult& HitResult, AActor* HitActor)
+{
+	if (!GetWorld() || IsRunningDedicatedServer() || !AudioMixingComponent)
+	{
+		return;
+	}
+
+	// HitActor의 재질 타입에 따라 적절한 사운드 선택
+	UAkAudioEvent* ImpactEvent = ImpactFleshSoundEvent;
+
+	if (AGS_Character* TargetChar = Cast<AGS_Character>(HitActor))
+	{
+		EImpactMaterialType MatType = TargetChar->GetImpactMaterialType();
+		switch (MatType)
+		{
+		case EImpactMaterialType::Armor:
+			ImpactEvent = ImpactArmorSoundEvent;
+			break;
+		case EImpactMaterialType::Flesh:
+		default:
+			ImpactEvent = ImpactFleshSoundEvent;
+			break;
+		}
+
+		// 해당 재질 이벤트가 없으면 Flesh로 폴백
+		if (!ImpactEvent)
+		{
+			ImpactEvent = ImpactFleshSoundEvent;
+		}
+	}
+
+	AudioMixingComponent->PostLayeredSound(ImpactEvent, ReverbSoundEvent, HitResult.ImpactPoint, HitActor);
+}
+
+void AGS_SmallClaw::Multicast_PlayLayeredHitSound_Implementation(const FHitResult& HitResult, AActor* HitActor)
+{
+	PlayLayeredHitSound(HitResult, HitActor);
 }
 
 float AGS_SmallClaw::GetOptimalCullDistance() const

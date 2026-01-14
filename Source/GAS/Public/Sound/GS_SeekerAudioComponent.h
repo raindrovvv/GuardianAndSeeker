@@ -34,41 +34,36 @@ struct FSeekerAudioConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* HurtSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* DeathSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Hurt Sound"))
-	UAkAudioEvent* RTS_HurtSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Death Sound"))
-	UAkAudioEvent* RTS_DeathSound;
+	TSoftObjectPtr<UAkAudioEvent> HurtSound;
 
 	// 빈사 상태 불꽃 사운드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame Spawn Sound"))
-	UAkAudioEvent* DyingFlameSpawnSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameSpawnSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame Loop Sound"))
-	UAkAudioEvent* DyingFlameLoopSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameLoopSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|Dying", meta = (DisplayName = "Dying Flame End Sound"))
-	UAkAudioEvent* DyingFlameEndSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> DyingFlameEndSound;
 
 	// 거리 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0"))
 	float MaxAudioDistance = 1500.0f; // 이 거리 밖에서는 아예 사운드 이벤트 발생 안함
 
+	// 피격 사운드 빈도 설정
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0", DisplayName = "Hurt Sound Cooldown"))
+	float HurtSoundCooldown = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0", ClampMax = "1.0", DisplayName = "Hurt Sound Probability"))
+	float HurtSoundProbability = 0.8f; // 1.0f = 항상 재생, 0.5f = 50% 확률, 0.0f = 항상 재생하지 않음
+
 	FSeekerAudioConfig()
 	{
 		HurtSound = nullptr;
-		DeathSound = nullptr;
-		RTS_HurtSound = nullptr;
-		RTS_DeathSound = nullptr;
 	}
 };
 
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_SeekerAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
@@ -113,99 +108,59 @@ public:
 	// TPS Sounds (Third Person Shooter 모드)
 	// ===================
 
-	// 찬 전용 TPS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🛡️ Shield Slam Start Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ShieldSlamStartSound = nullptr;
+	// 찬 전용 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🛡️ Shield Slam Start Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ShieldSlamStartSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🛡️ Shield Slam Impact Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ShieldSlamImpactSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🛡️ Shield Slam Impact Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ShieldSlamImpactSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🪓 Axe Swing Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ChanAxeSwingSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🪓 Axe Swing Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ChanAxeSwingSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🪓 Axe Swing Stop Event", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ChanAxeSwingStopEvent = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🪓 Axe Swing Stop Event", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ChanAxeSwingStopEvent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🪓 Final Attack Extra Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ChanFinalAttackExtraSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🪓 Final Attack Extra Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ChanFinalAttackExtraSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🗣️ Attack Voice Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ChanAttackVoiceSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🗣️ Attack Voice Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ChanAttackVoiceSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Chan", meta = (DisplayName = "🛡️ Defense Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* ChanDefenseSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Chan", meta = (DisplayName = "🛡️ Defense Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ChanDefenseSound;
 
-	// 아레스 전용 TPS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Ares", meta = (DisplayName = "⚔️ Sword Swing Stop Event", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	UAkAudioEvent* AresSwordSwingStopEvent = nullptr;
+	// 아레스 전용 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Ares", meta = (DisplayName = "⚔️ Sword Swing Stop Event", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> AresSwordSwingStopEvent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Ares", meta = (DisplayName = "⚔️ Combo Swing Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> AresComboSwingSounds;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Ares", meta = (DisplayName = "⚔️ Combo Swing Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
+	TArray<TSoftObjectPtr<UAkAudioEvent>> AresComboSwingSounds;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Ares", meta = (DisplayName = "🗣️ Combo Voice Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> AresComboVoiceSounds;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Ares", meta = (DisplayName = "🗣️ Combo Voice Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
+	TArray<TSoftObjectPtr<UAkAudioEvent>> AresComboVoiceSounds;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Ares", meta = (DisplayName = "✨ Combo Extra Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> AresComboExtraSounds;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Ares", meta = (DisplayName = "✨ Combo Extra Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
+	TArray<TSoftObjectPtr<UAkAudioEvent>> AresComboExtraSounds;
 
-	// 메르시 전용 TPS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Bow Draw Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* BowDrawSound = nullptr;
+	// 메르시 전용 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Bow Draw Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> BowDrawSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Bow Release Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* BowReleaseSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Bow Release Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> BowReleaseSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Arrow Shot Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* ArrowShotSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Arrow Shot Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ArrowShotSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Arrow Type Change Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* ArrowTypeChangeSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Arrow Type Change Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ArrowTypeChangeSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Arrow Empty Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* ArrowEmptySound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Arrow Empty Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> ArrowEmptySound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|TPS Sounds|Merci", meta = (DisplayName = "🏹 Hit Feedback Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* HitFeedbackSound = nullptr;
-
-	// ===================
-	// RTS Sounds (Real Time Strategy 모드)
-	// ===================
-
-	// 찬 전용 RTS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Chan", meta = (DisplayName = "🛡️ RTS Shield Slam Start Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* RTSShieldSlamStartSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Chan", meta = (DisplayName = "🛡️ RTS Shield Slam Impact Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* RTSShieldSlamImpactSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Chan", meta = (DisplayName = "🪓 RTS Axe Swing Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* RTSChanAxeSwingSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Chan", meta = (DisplayName = "🗣️ RTS Attack Voice Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* RTSChanAttackVoiceSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Chan", meta = (DisplayName = "🛡️ RTS Defense Sound", EditCondition = "CharacterType == ECharacterType::Chan", EditConditionHides))
-	UAkAudioEvent* RTSChanDefenseSound = nullptr;
-
-	// 아레스 전용 RTS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Ares", meta = (DisplayName = "⚔️ RTS Sword Swing Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> RTSAresSwordSwingSounds;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Ares", meta = (DisplayName = "🗣️ RTS Combo Voice Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> RTSAresComboVoiceSounds;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Ares", meta = (DisplayName = "✨ RTS Combo Extra Sounds Array", EditCondition = "CharacterType == ECharacterType::Ares", EditConditionHides))
-	TArray<UAkAudioEvent*> RTSAresComboExtraSounds;
-
-	// 메르시 전용 RTS 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Merci", meta = (DisplayName = "🏹 RTS Bow Draw Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* RTSMerciBowDrawSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Merci", meta = (DisplayName = "🏹 RTS Bow Release Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* RTSMerciBowReleaseSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|RTS Sounds|Merci", meta = (DisplayName = "🏹 RTS Arrow Shot Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
-	UAkAudioEvent* RTSMerciArrowShotSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Merci", meta = (DisplayName = "🏹 Hit Feedback Sound", EditCondition = "CharacterType == ECharacterType::Merci", EditConditionHides))
+	TSoftObjectPtr<UAkAudioEvent> HitFeedbackSound;
 
 	// ===================
 	// Common Sounds (공통 사운드)
@@ -213,7 +168,7 @@ public:
 
 	// 스킬 관련 사운드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|Common Sounds", meta = (DisplayName = "Default Skill Event"))
-	UAkAudioEvent* SkillEvent = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> SkillEvent;
 
 	// ===================
 	// LowHP Pain Sound System (LowHP 통증 사운드 시스템)
@@ -221,11 +176,11 @@ public:
 
 	/** LowHP 루핑 사운드 (HP 30% 이하 시 재생) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|LowHP Pain", meta = (DisplayName = "🩸 LowHP Pain Loop Sound"))
-	UAkAudioEvent* LowHPPainLoopSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> LowHPPainLoopSound;
 
 	/** LowHP 중지 이벤트 (페이드아웃 포함) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|LowHP Pain", meta = (DisplayName = "🩸 LowHP Pain Stop Event"))
-	UAkAudioEvent* LowHPPainStopSound = nullptr;
+	TSoftObjectPtr<UAkAudioEvent> LowHPPainStopSound;
 
 	/** LowHP 볼륨 제어 RTPC */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker Audio|LowHP Pain", meta = (DisplayName = "🩸 LowHP Pain Volume RTPC"))
@@ -318,6 +273,9 @@ public:
 	/** 가디언 감지 해제 안도음 재생 (UI Sound) */
 	UFUNCTION(BlueprintCallable, Category = "Seeker Audio|UI Sounds")
 	void PlayDetectionClearedSound();
+
+	/** 시커 에셋 프리로딩 */
+	void PreloadSeekerAssets();
 
 	// ===================
 	// LowHP Pain Sound 제어 함수
@@ -435,13 +393,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sound|Combo")
 	void PlayComboAttackSound(UAkAudioEvent* SwingSound, UAkAudioEvent* VoiceSound, UAkAudioEvent* StopEvent, float ResetTime);
 
-	// 콤보 인덱스별 공격 사운드 재생 (개선된 버전)
+	// 콤보 인덱스별 공격 사운드 재생 (개선된 버전) - Blueprint Callable (Raw Pointer)
 	UFUNCTION(BlueprintCallable, Category = "Sound|Combo")
 	void PlayComboAttackSoundByIndex(int32 ComboIndex, const TArray<UAkAudioEvent*>& SwingSounds, const TArray<UAkAudioEvent*>& VoiceSounds, UAkAudioEvent* StopEvent, float ResetTime);
 
-	// 콤보 인덱스별 공격 사운드 재생 (추가 사운드 포함)
+	// 콤보 인덱스별 공격 사운드 재생 (개선된 버전) - C++ Internal (TObjectPtr Overload)
+	void PlayComboAttackSoundByIndex(int32 ComboIndex, const TArray<TObjectPtr<UAkAudioEvent>>& SwingSounds, const TArray<TObjectPtr<UAkAudioEvent>>& VoiceSounds, UAkAudioEvent* StopEvent, float ResetTime);
+
+	// 콤보 인덱스별 공격 사운드 재생 (추가 사운드 포함) - Blueprint Callable (Raw Pointer)
 	UFUNCTION(BlueprintCallable, Category = "Sound|Combo")
 	void PlayComboAttackSoundByIndexWithExtra(int32 ComboIndex, const TArray<UAkAudioEvent*>& SwingSounds, const TArray<UAkAudioEvent*>& VoiceSounds, const TArray<UAkAudioEvent*>& ExtraSounds, UAkAudioEvent* StopEvent, float ResetTime);
+
+	// 콤보 인덱스별 공격 사운드 재생 (추가 사운드 포함) - C++ Internal (TObjectPtr Overload)
+	void PlayComboAttackSoundByIndexWithExtra(int32 ComboIndex, const TArray<TObjectPtr<UAkAudioEvent>>& SwingSounds, const TArray<TObjectPtr<UAkAudioEvent>>& VoiceSounds, const TArray<TObjectPtr<UAkAudioEvent>>& ExtraSounds, UAkAudioEvent* StopEvent, float ResetTime);
 
 	// 콤보 마지막 타격 특별 사운드 (근접 공격 시커)
 	UFUNCTION(BlueprintCallable, Category = "Sound|Combo")
@@ -522,6 +486,9 @@ private:
 
 	// 서버에서 클라이언트로 사운드 동기화
 	TMap<ESeekerAudioState, float> LocalLastSoundPlayTimes;
+
+	// 피격 사운드 전용 마지막 재생 시간 (초기화 시 0.0f)
+	float LastHurtSoundPlayTime = 0.0f;
 
 	UPROPERTY(Transient)
 	TMap<ESeekerAudioState, float> ServerLastBroadcastTime;
@@ -644,11 +611,39 @@ private:
 	// DT_SkillSet에서 스킬 정보 조회
 	const struct FSkillInfo* GetSkillInfoFromDataTable(ESkillSlot SkillSlot) const;
 
-	/** 콤보 공격 사운드 재생 공통 로직 */
+	/** 콤보 공격 사운드 재생 공통 로직 (TObjectPtr 버전) */
+	void PlayComboSounds(int32 ArrayIndex, const TArray<TObjectPtr<UAkAudioEvent>>& SwingSounds,
+	                     const TArray<TObjectPtr<UAkAudioEvent>>& VoiceSounds,
+	                     const TArray<TObjectPtr<UAkAudioEvent>>* ExtraSounds = nullptr,
+	                     UAkAudioEvent* StopEvent = nullptr, float ResetTime = 0.0f);
+
+	/** 콤보 공격 사운드 재생 공통 로직 (Raw Pointer 버전) */
 	void PlayComboSounds(int32 ArrayIndex, const TArray<UAkAudioEvent*>& SwingSounds,
 	                     const TArray<UAkAudioEvent*>& VoiceSounds,
 	                     const TArray<UAkAudioEvent*>* ExtraSounds = nullptr,
 	                     UAkAudioEvent* StopEvent = nullptr, float ResetTime = 0.0f);
+
+	// ===================
+	// 프리로드 캐시 (GC 방지용)
+	// ===================
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedHurtSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSkillEvent;
+
+	// 캐릭터별 주요 액션 사운드 캐시 (배열 기반 사운드 포함)
+	UPROPERTY()
+	TArray<TObjectPtr<UAkAudioEvent>> CachedActionSounds;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UAkAudioEvent>> CachedComboSwingSounds;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UAkAudioEvent>> CachedComboVoiceSounds;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UAkAudioEvent>> CachedComboExtraSounds;
 
 	// ===================
 	// 상수 정의

@@ -11,6 +11,8 @@ class GAS_API UGS_SteamNameWidgetComp : public UWidgetComponent
 	GENERATED_BODY()
 
 public:
-	virtual void BeginPlay()override;
-	//virtual void InitWidget() override;
+	UGS_SteamNameWidgetComp();
+
+	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

@@ -234,13 +234,8 @@ void UGS_SkillComp::SetSkill(ESkillSlot Slot, const FSkillInfo& Info)
 	Skill->Cooltime = Info.Cooltime;
 	Skill->Damage = Info.Damage;
 
-	// TArray<UAnimMontage*>를 TArray<TSoftObjectPtr<UAnimMontage>>로 변환
-	Skill->SkillAnimMontages.Empty();
-	for (UAnimMontage* Montage : Info.Montages)
-	{
-		Skill->SkillAnimMontages.Add(TSoftObjectPtr<UAnimMontage>(Montage));
-	}
-
+	// Soft Reference 할당 (데이터 테이블에서 이미 SoftPtr 임)
+	Skill->SkillAnimMontages = Info.Montages;
 	Skill->SkillImage = Info.Image;
 
 
@@ -342,6 +337,11 @@ void UGS_SkillComp::Client_BroadcastHealCountChanged_Implementation(ESkillSlot S
 void UGS_SkillComp::Client_BroadcastSkillCooldownBlocked_Implementation(ESkillSlot Slot)
 {
 	OnSkillCooldownBlocked.Broadcast(Slot);
+}
+
+void UGS_SkillComp::Client_BroadcastSkillCooldownReady_Implementation(ESkillSlot Slot)
+{
+	OnSkillCooldownReady.Broadcast(Slot);
 }
 
 void UGS_SkillComp::Server_TryDeactiveSkill_Implementation(ESkillSlot Slot)
@@ -527,6 +527,12 @@ void UGS_SkillComp::HandleCooldownComplete(ESkillSlot Slot)
 	{
 		Skill->SetCoolingDown(false);
 	}
+
+	// 스킬 쿨다운 완료 알림을 클라이언트에 전송
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
+	{
+		Client_BroadcastSkillCooldownReady(Slot);
+	}
 }
 
 void UGS_SkillComp::HandleCooldownProgress(ESkillSlot Slot)
@@ -594,6 +600,7 @@ void UGS_SkillComp::InitializeSkillWidget(UGS_SkillWidget* InSkillWidget)
 			OnHealCountChanged.AddUObject(InSkillWidget, &UGS_SkillWidget::OnHealCountChanged);
 			OnSkillActivated.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillActivated);
 			OnSkillCooldownBlocked.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillCooldownBlocked);
+			OnSkillCooldownReady.AddDynamic(InSkillWidget, &UGS_SkillWidget::OnSkillCooldownReady);
 		}
 	}
 }
@@ -817,6 +824,7 @@ void UGS_SkillComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OnHealCountChanged.Clear();
 	OnSkillActivated.Clear();
 	OnSkillCooldownBlocked.Clear();
+	OnSkillCooldownReady.Clear();
 
 	// 3. 마지막에 Super 호출
 	Super::EndPlay(EndPlayReason);

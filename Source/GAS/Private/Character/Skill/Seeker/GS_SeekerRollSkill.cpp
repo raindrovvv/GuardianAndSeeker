@@ -7,6 +7,7 @@
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Skill/Seeker/GS_HealSkill.h"
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 
 UGS_SeekerRollSkill::UGS_SeekerRollSkill()
@@ -50,7 +51,14 @@ void UGS_SeekerRollSkill::ActiveSkill()
 				SeekerAnimInstance->Montage_SetEndDelegate(EndDelegate, AM_Roll);
 			}
 
+			// Ignore collision with all pawns (Seekers, Monsters, etc.) during roll
 			CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+			// Also disable collision in CharacterMovement to prevent physics-based collisions
+			if (UCharacterMovementComponent* MoveComp = CachedSeekerOwner->GetCharacterMovement())
+			{
+				MoveComp->SetAvoidanceEnabled(false);
+			}
 
 			// 스킬 시작 사운드 재생 (멀티캐스트)
 			if (UGS_SeekerAudioComponent* AudioComp = CachedSeekerOwner->SeekerAudioComponent)
@@ -93,7 +101,14 @@ void UGS_SeekerRollSkill::OnRollMontageEnded(UAnimMontage* Montage, bool bInterr
 			ESeekerMontageSlot::UpperBody);
 		}
 
+		// Restore collision after roll
 		CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+
+		// Re-enable avoidance in CharacterMovement
+		if (UCharacterMovementComponent* MoveComp = CachedSeekerOwner->GetCharacterMovement())
+		{
+			MoveComp->SetAvoidanceEnabled(true);
+		}
 	}
 
 	DeactiveSkill();

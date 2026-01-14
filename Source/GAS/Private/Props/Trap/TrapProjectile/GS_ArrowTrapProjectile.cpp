@@ -8,6 +8,7 @@
 #include "Props/Trap/TrapProjectile/GS_ProjectilePoolComp.h"
 #include "Net/UnrealNetwork.h"
 #include "AkGameplayStatics.h"
+#include "AkComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -16,15 +17,10 @@
 
 AGS_ArrowTrapProjectile::AGS_ArrowTrapProjectile()
 {
-	// TPS Mode Audio Events
-	ImpactSoundEvent_TPS = nullptr;
-	PlayerHitSoundEvent_TPS = nullptr;
-	ArrowBySoundEvent_TPS = nullptr;
-
-	// RTS Mode Audio Events
-	ImpactSoundEvent_RTS = nullptr;
-	PlayerHitSoundEvent_RTS = nullptr;
-	ArrowBySoundEvent_RTS = nullptr;
+	// Audio Events (TPS/RTS Unified)
+	ImpactSoundEvent = nullptr;
+	PlayerHitSoundEvent = nullptr;
+	ArrowBySoundEvent = nullptr;
 
 	// VFX
 	ImpactVFX = nullptr;
@@ -67,7 +63,7 @@ void AGS_ArrowTrapProjectile::Init(AGS_NonTrigTrapBase* InTrap)
 	// 함정의 혈흔 이펙트 설정 (직접 설정이 없으면 함정 데이터에서 가져오기)
 	if (!BloodEffectOverride && OwningTrap)
 	{
-		BloodEffectOverride = OwningTrap->TrapData.TrapHitBloodEffect;
+		BloodEffectOverride = OwningTrap->TrapData.TrapHitBloodEffect.Get();
 	}
 
 	if (HasAuthority())
@@ -79,9 +75,9 @@ void AGS_ArrowTrapProjectile::Init(AGS_NonTrigTrapBase* InTrap)
 }
 
 void AGS_ArrowTrapProjectile::OnBeginOverlap(
-	UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	bool bFromSweep, const FHitResult& SweepResult)
+    UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+    bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!HasAuthority() || !OtherActor || OtherActor == this)
 	{
@@ -127,7 +123,6 @@ void AGS_ArrowTrapProjectile::OnBeginOverlap(
 		StickWithVisualOnly(SweepResult);
 		return;
 	}
-
 }
 
 EArrowHitType AGS_ArrowTrapProjectile::DetermineHitType(AActor* HitActor, const FHitResult& Hit) const
@@ -162,7 +157,7 @@ void AGS_ArrowTrapProjectile::HandleHitEffects(EArrowHitType HitType, const FVec
 {
 	// 사운드 재생
 	PlayHitSound(HitType, ImpactPoint);
-	
+
 	// VFX 재생
 	PlayHitVFX(HitType, ImpactPoint, ImpactNormal);
 }
@@ -173,19 +168,26 @@ void AGS_ArrowTrapProjectile::PlayHitSound(EArrowHitType HitType, const FVector&
 
 	switch (HitType)
 	{
-		case EArrowHitType::Player:
-			SoundToPlay = SelectSoundEventByMode(PlayerHitSoundEvent_TPS, PlayerHitSoundEvent_RTS);
-			break;
-		case EArrowHitType::Wall:
-		case EArrowHitType::Other:
-		default:
-			SoundToPlay = SelectSoundEventByMode(ImpactSoundEvent_TPS, ImpactSoundEvent_RTS);
-			break;
+	case EArrowHitType::Player:
+		SoundToPlay = UGS_AssetLoader::SyncLoadAsset(PlayerHitSoundEvent);
+		break;
+	case EArrowHitType::Wall:
+	case EArrowHitType::Other:
+	default:
+		SoundToPlay = UGS_AssetLoader::SyncLoadAsset(ImpactSoundEvent);
+		break;
 	}
 
 	if (SoundToPlay)
 	{
-		UAkGameplayStatics::PostEventAtLocation(SoundToPlay, Location, FRotator::ZeroRotator, GetWorld());
+		const bool bIsRTS = IsRTSMode();
+		// 위치에서 사운드 재생 및 거리 감쇠 스케일 적용
+		UAkComponent* AkComp = UAkGameplayStatics::SpawnAkComponentAtLocation(GetWorld(), SoundToPlay, Location, FRotator::ZeroRotator, false, true);
+		if (AkComp)
+		{
+			AkComp->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
+			AkComp->PostAkEvent(SoundToPlay, 0, FOnAkPostEventCallback());
+		}
 	}
 }
 
@@ -205,11 +207,6 @@ bool AGS_ArrowTrapProjectile::IsRTSMode() const
 	return Cast<AGS_RTSController>(LocalPC) != nullptr;
 }
 
-UAkAudioEvent* AGS_ArrowTrapProjectile::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const
-{
-	const bool bRTS = IsRTSMode();
-	return bRTS ? RTSSound : TPSSound;
-}
 
 void AGS_ArrowTrapProjectile::PlayHitVFX(EArrowHitType HitType, const FVector& ImpactPoint, const FVector& ImpactNormal)
 {
@@ -217,17 +214,19 @@ void AGS_ArrowTrapProjectile::PlayHitVFX(EArrowHitType HitType, const FVector& I
 
 	switch (HitType)
 	{
-		case EArrowHitType::Player:
-			VFXToPlay = PlayerHitVFX;
+	case EArrowHitType::Player:
+	{
+		VFXToPlay = PlayerHitVFX;
 
-			// 혈흔 이펙트 재생
-			UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectOverride, ImpactPoint, FRotationMatrix::MakeFromZ(ImpactNormal).Rotator(), 1.0f);
-			break;
-		case EArrowHitType::Wall:
-		case EArrowHitType::Other:
-		default:
-			VFXToPlay = ImpactVFX;
-			break;
+		// 혈흔 이펙트 재생
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectOverride, ImpactPoint, FRotationMatrix::MakeFromZ(ImpactNormal).Rotator(), 1.0f);
+		break;
+	}
+	case EArrowHitType::Wall:
+	case EArrowHitType::Other:
+	default:
+		VFXToPlay = ImpactVFX;
+		break;
 	}
 
 	if (VFXToPlay)
@@ -235,11 +234,10 @@ void AGS_ArrowTrapProjectile::PlayHitVFX(EArrowHitType HitType, const FVector& I
 		// 히트 노말을 기준으로 회전 계산
 		FRotator VFXRotation = FRotationMatrix::MakeFromZ(ImpactNormal).Rotator();
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(), 
-			VFXToPlay, 
-			ImpactPoint, 
-			VFXRotation
-		);
+		    GetWorld(),
+		    VFXToPlay,
+		    ImpactPoint,
+		    VFXRotation);
 	}
 }
 
@@ -273,11 +271,10 @@ void AGS_ArrowTrapProjectile::Multicast_PlayHitVFXOnly_Implementation(const FVec
 	{
 		FRotator VFXRotation = FRotationMatrix::MakeFromZ(ImpactNormal).Rotator();
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			ImpactVFX,
-			ImpactPoint,
-			VFXRotation
-		);
+		    GetWorld(),
+		    ImpactVFX,
+		    ImpactPoint,
+		    VFXRotation);
 	}
 }
 
@@ -301,19 +298,18 @@ void AGS_ArrowTrapProjectile::StickWithVisualOnly(const FHitResult& Hit)
 
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	
+
 
 	AGS_TrapVisualProjectile* VisualArrow = GetWorld()->SpawnActor<AGS_TrapVisualProjectile>(AGS_TrapVisualProjectile::StaticClass(), SpawnLocation, AdjustedRotation, Params);
-	
+
 	if (!VisualArrow)
 	{
 		return;
 	}
-	
+
 	if (VisualArrow)
 	{
 		VisualArrow->AttachToComponent(Hit.GetComponent(), FAttachmentTransformRules::KeepWorldTransform, Hit.BoneName);
-
 	}
 
 	if (OwningPool)
@@ -324,7 +320,7 @@ void AGS_ArrowTrapProjectile::StickWithVisualOnly(const FHitResult& Hit)
 
 bool AGS_ArrowTrapProjectile::IsReady() const
 {
-	//숨겨져 있으면 true를 반환 
+	//숨겨져 있으면 true를 반환
 	return IsHidden() && IsValid(this);
 }
 
@@ -399,9 +395,7 @@ void AGS_ArrowTrapProjectile::DeactivateProjectile()
 		ProjectileMovementComponent->StopMovementImmediately();
 		ProjectileMovementComponent->Velocity = FVector::ZeroVector;
 		ProjectileMovementComponent->UpdateComponentVelocity();
-
 	}
-	
 }
 
 void AGS_ArrowTrapProjectile::OnActivateEffect_Implementation()
@@ -424,7 +418,7 @@ void AGS_ArrowTrapProjectile::OnLifeSpanExpired()
 // ===================
 
 void AGS_ArrowTrapProjectile::OnArrowByCollisionBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+                                                             UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!OtherActor || OtherActor == this)
 	{
@@ -444,7 +438,7 @@ void AGS_ArrowTrapProjectile::OnArrowByCollisionBeginOverlap(UPrimitiveComponent
 }
 
 void AGS_ArrowTrapProjectile::OnArrowByCollisionEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+                                                           UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	// 시커와의 오버랩이 끝났을 때 추가 처리 가능
 	// 현재는 특별한 처리 없이 유지
@@ -457,11 +451,17 @@ void AGS_ArrowTrapProjectile::PlayArrowBySound()
 		return; // 이미 재생되었으면 중복 재생 방지
 	}
 
-	UAkAudioEvent* SoundToPlay = SelectSoundEventByMode(ArrowBySoundEvent_TPS, ArrowBySoundEvent_RTS);
+	UAkAudioEvent* SoundToPlay = UGS_AssetLoader::SyncLoadAsset(ArrowBySoundEvent);
 	if (SoundToPlay)
 	{
-		// 화살 위치에서 사운드 재생
-		UAkGameplayStatics::PostEventAtLocation(SoundToPlay, GetActorLocation(), GetActorRotation(), GetWorld());
+		const bool bIsRTS = IsRTSMode();
+		// 화살 위치에서 사운드 재생 및 거리 감쇠 스케일 적용
+		UAkComponent* AkComp = UAkGameplayStatics::SpawnAkComponentAtLocation(GetWorld(), SoundToPlay, GetActorLocation(), GetActorRotation(), false, true);
+		if (AkComp)
+		{
+			AkComp->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
+			AkComp->PostAkEvent(SoundToPlay, 0, FOnAkPostEventCallback());
+		}
 		bArrowBySoundPlayed = true;
 	}
 }

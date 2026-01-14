@@ -32,8 +32,11 @@ enum class ERTSCommandSoundType : uint8
 /**
  * 오디오 컴포넌트의 공통 기능을 제공하는 베이스 클래스
  * 몬스터와 시커 오디오 컴포넌트가 상속받아 사용
+ * 
+ * Abstract: 이 클래스는 직접 인스턴스화할 수 없으며, 자식 클래스를 통해서만 사용
+ * HideCategories: BaseAudioComponent 카테고리를 에디터에서 숨김 (자식 클래스에서 설정)
  */
-UCLASS(ClassGroup = (Audio), BlueprintType)
+UCLASS(Abstract, ClassGroup = (Audio), BlueprintType, HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_AudioComponentBase : public UActorComponent
 {
 	GENERATED_BODY()
@@ -41,14 +44,14 @@ class GAS_API UGS_AudioComponentBase : public UActorComponent
 public:
 	UGS_AudioComponentBase();
 
-	// RTPC 포인터 (UAkRtpc* 기반 통일)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	// RTPC 포인터
+	UPROPERTY()
 	UAkRtpc* DistanceToPlayerRTPC = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	UPROPERTY()
 	UAkRtpc* AttenuationModeRTPC = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio|RTPC")
+	UPROPERTY()
 	UAkRtpc* OcclusionDisableRTPC = nullptr;
 
 protected:
@@ -67,12 +70,12 @@ public:
 	static constexpr float RTPCDistanceThreshold = 50.0f; // RTPC 업데이트를 위한 최소 거리 차이
 
 	// 모드별 거리 설정 상수
-	static constexpr float RTSMaxDistance = 20000.0f; // RTS 모드 최대 거리 (200m)
-	static constexpr float TPSMaxDistance = 2000.0f; // TPS 모드 최대 거리 (20m)
+	static constexpr float RTSMaxDistance = 8000.0f; // RTS 모드 최대 가청 거리 (80m)
+	static constexpr float TPSMaxDistance = 3000.0f; // TPS 모드 최대 가청 거리 (30m)
 
-	// Distance Scaling 설정 상수 (개선된 RTS/TPS 구분)
-	static constexpr float RTSDistanceScaling = 2.0f; // RTS 모드 (200% = 400m)
-	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20m)
+	// Distance Scaling 설정 상수 (가청 반경 배율)
+	static constexpr float RTSDistanceScaling = 4.0f; // RTS 모드 (400% = 40~80m)
+	static constexpr float TPSDistanceScaling = 1.0f; // TPS 모드 (100% = 20~30m)
 
 	// 기타 상수들
 	static constexpr float LocalSoundCooldownMultiplier = 0.9f; // 로컬 사운드 쿨다운 배율
@@ -168,9 +171,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Audio|Validation")
 	bool SafeUpdateAkComponentTransform(UAkComponent* AkComp, const FVector& NewLocation, const FRotator& NewRotation);
 
+	/** 오클루전 디버그 라인 그리기 (콘솔 명령어 GS.Audio.ShowOcclusionRay 1 로 활성화) */
+	static void DrawOcclusionDebug(const UObject* WorldContextObject, const FVector& SoundLocation, const FVector& ListenerLocation);
+
 	/** 죽음 사운드 로컬 재생 (하위 클래스에서 오버라이드) */
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	virtual void PlayDeathSoundLocal();
+
+	/** 오디오 에셋 프리로딩 (동적 스케일링 준비) */
+	void PreloadCommonSounds();
 
 	// ===================
 	// 공통 인터페이스
@@ -239,16 +248,17 @@ protected:
 	AGS_RoomBase* FindRoomAtLocation(const FVector& Location) const;
 
 	// ==========================
-	// 공통 사운드 에셋
+	// 공통 사운드 에셋 (자식 클래스에서 설정)
 	// ==========================
 
-	/** 죽음 사운드 */
-	UPROPERTY(EditAnywhere, Category = "Audio|Common")
-	TObjectPtr<class UAkAudioEvent> DeathSound;
+	/** 죽음 사운드 (TPS/RTS 통합 에셋) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events", meta = (DisplayName = "Death Sound"))
+	TSoftObjectPtr<class UAkAudioEvent> DeathSound;
 
-	/** RTS 모드 죽음 사운드 (필요한 경우) */
-	UPROPERTY(EditAnywhere, Category = "Audio|Common")
-	TObjectPtr<class UAkAudioEvent> RTS_DeathSound;
+protected:
+	/** 캐시된 죽음 사운드 (프리로드용) */
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDeathSound;
 
 	// ==========================
 	// Multicast RPC 최적화 헬퍼
@@ -275,16 +285,6 @@ protected:
 	 * @return 사운드를 재생해야 하면 true
 	 */
 	bool PrepareMulticastSound(AActor* SourceActor, bool bSkipViewFrustumCheck = false);
-
-	/**
-	 * 모드별 사운드 이벤트 선택 (TPS/RTS 자동 폴백)
-	 *
-	 * @param TPSSound TPS 모드 사운드
-	 * @param RTSSound RTS 모드 사운드
-	 * @param bUseRTSMode 강제로 RTS 모드 사용 (기본값은 자동 감지)
-	 * @return 선택된 사운드 이벤트 (RTS가 없으면 TPS로 폴백)
-	 */
-	UAkAudioEvent* SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound, bool bUseRTSMode = false) const;
 
 	/**
 	 * 리슨 서버 RPC 중복 실행 방지 체크

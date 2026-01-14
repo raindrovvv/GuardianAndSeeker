@@ -4,13 +4,14 @@
 #include "AI/RTS/RTS_Skill/GS_RTSSkillComponent.h"
 #include "AI/RTS/RTS_Skill/GS_RTSSkillData.h"
 #include "AI/RTS/GS_RTSController.h"
+#include "System/Utility/GS_AssetLoader.h"
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 
 UGS_RTSSkillBase::UGS_RTSSkillBase()
-	: SkillSlotIndex(-1)
+    : SkillSlotIndex(-1)
 {
 	SkillData = nullptr;
 }
@@ -67,26 +68,64 @@ float UGS_RTSSkillBase::GetEffectDuration() const
 
 UNiagaraSystem* UGS_RTSSkillBase::GetActivationVFX() const
 {
-	// Soft Reference 로드
+	if (CachedActivationVFX)
+	{
+		return CachedActivationVFX;
+	}
+
+	// 폴백 (비동기 로드 완료 전 호출 시)
 	if (SkillData && !SkillData->ActivationVFX.IsNull())
 	{
-		return SkillData->ActivationVFX.LoadSynchronous();
+		return UGS_AssetLoader::SyncLoadAsset(SkillData->ActivationVFX);
 	}
 	return nullptr;
 }
 
 UAkAudioEvent* UGS_RTSSkillBase::GetCastSound() const
 {
-	if (!SkillData)
+	UAkAudioEvent* TPSSound = CachedCastSound_TPS;
+	UAkAudioEvent* RTSSound = CachedCastSound_RTS;
+
+	// 폴백
+	if (SkillData && (!TPSSound || !RTSSound))
 	{
-		return nullptr;
+		if (!TPSSound)
+			TPSSound = UGS_AssetLoader::SyncLoadAsset(SkillData->CastSound_TPS);
+		if (!RTSSound)
+			RTSSound = UGS_AssetLoader::SyncLoadAsset(SkillData->CastSound_RTS);
 	}
 
-	// Soft Reference 로드
-	UAkAudioEvent* TPSSound = SkillData->CastSound_TPS.IsNull() ? nullptr : SkillData->CastSound_TPS.LoadSynchronous();
-	UAkAudioEvent* RTSSound = SkillData->CastSound_RTS.IsNull() ? nullptr : SkillData->CastSound_RTS.LoadSynchronous();
-
 	return SelectSoundEvent(TPSSound, RTSSound);
+}
+
+void UGS_RTSSkillBase::PreloadAssets()
+{
+	if (!SkillData)
+		return;
+
+	TArray<FSoftObjectPath> Paths;
+	if (!SkillData->ActivationVFX.IsNull())
+		Paths.Add(SkillData->ActivationVFX.ToSoftObjectPath());
+	if (!SkillData->CastSound_TPS.IsNull())
+		Paths.Add(SkillData->CastSound_TPS.ToSoftObjectPath());
+	if (!SkillData->CastSound_RTS.IsNull())
+		Paths.Add(SkillData->CastSound_RTS.ToSoftObjectPath());
+
+	if (Paths.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_RTSSkillBase> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(Paths, [WeakThis]()
+		                                         {
+			if (UGS_RTSSkillBase* StrongThis = WeakThis.Get())
+			{
+				if (StrongThis->SkillData)
+				{
+					StrongThis->CachedActivationVFX = StrongThis->SkillData->ActivationVFX.Get();
+					StrongThis->CachedCastSound_TPS = StrongThis->SkillData->CastSound_TPS.Get();
+					StrongThis->CachedCastSound_RTS = StrongThis->SkillData->CastSound_RTS.Get();
+				}
+			} });
+	}
 }
 
 void UGS_RTSSkillBase::SetSkillData(UGS_RTSSkillData* InSkillData)
@@ -167,11 +206,10 @@ void UGS_RTSSkillBase::PlaySkillVFX(UNiagaraSystem* NiagaraSystem, const FVector
 
 	// 기본 파라미터로 스폰 시도
 	UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		World,
-		NiagaraSystem,
-		Location,
-		Rotation
-	);
+	    World,
+	    NiagaraSystem,
+	    Location,
+	    Rotation);
 }
 
 bool UGS_RTSSkillBase::IsRTSMode() const
@@ -220,9 +258,8 @@ void UGS_RTSSkillBase::PlaySkillSound(UAkAudioEvent* Sound, const FVector& Locat
 	}
 
 	UAkGameplayStatics::PostEventAtLocation(
-		Sound,
-		Location,
-		FRotator::ZeroRotator,
-		World
-	);
+	    Sound,
+	    Location,
+	    FRotator::ZeroRotator,
+	    World);
 }

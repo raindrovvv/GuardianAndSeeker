@@ -45,6 +45,8 @@ void UGS_AN_ShieldAttack::Notify(USkeletalMeshComponent* MeshComp, UAnimSequence
 	{
 		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(Chan->GetWeaponByIndex(i)))
 		{
+			// 서버에서 콜리전 활성화 및 자동 비활성화 타이머 처리
+			// (ServerEnableAttackHit_Implementation 내부에서 0.3초 타이머 설정)
 			Shield->ServerEnableAttackHit();
 			break;
 		}

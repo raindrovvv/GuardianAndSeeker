@@ -577,7 +577,7 @@ void AGS_RTSController::OnLeftMousePressed()
 	switch (CurrentCommand)
 	{
 	case ERTSCommand::Move:
-		if (bHit)
+		if (!UnitSelection.IsEmpty() && bHit)
 		{
 			SpawnCommandDecal(ERTSCommand::Move, Hit.Location);
 
@@ -593,7 +593,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		else
 		{
-			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			// 허공 클릭 또는 선택 유닛 없음: 불가능 사운드 재생 및 명령 취소
 			if (CommandCancelSound)
 			{
 				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
@@ -605,7 +605,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		break;
 	case ERTSCommand::Attack:
-		if (bHit)
+		if (!UnitSelection.IsEmpty() && bHit)
 		{
 			ShowAttackCursor();
 
@@ -631,7 +631,7 @@ void AGS_RTSController::OnLeftMousePressed()
 		}
 		else
 		{
-			// 허공 클릭: 불가능 사운드 재생 및 명령 취소
+			// 허공 클릭 또는 선택 유닛 없음: 불가능 사운드 재생 및 명령 취소
 			if (CommandCancelSound)
 			{
 				UGameplayStatics::PlaySound2D(this, CommandCancelSound);
@@ -681,6 +681,11 @@ void AGS_RTSController::OnLeftMousePressed()
 
 void AGS_RTSController::OnLeftMouseReleased()
 {
+	if (RTSSkillComp && RTSSkillComp->IsInSkillTargetingMode())
+	{
+		return;
+	}
+
 	if (bShiftDown || bCtrlDown)
 	{
 		return;
@@ -718,6 +723,12 @@ void AGS_RTSController::OnRightMousePressed(const FInputActionValue& InputValue)
 		}
 
 		UpdateCursorForEdgeScroll();
+		return;
+	}
+
+	// 선택된 유닛이 없으면 무시 (서버 Validate 킥 방지)
+	if (UnitSelection.IsEmpty())
+	{
 		return;
 	}
 
@@ -912,11 +923,11 @@ void AGS_RTSController::SetRTSCursor(const FName& CursorPath)
 	// 커서 변경
 	if (CursorPath.IsNone())
 	{
-		ViewportClient->SetHardwareCursor(EMouseCursor::Default, NAME_None, FIntPoint(48, 48));
+		ViewportClient->SetHardwareCursor(EMouseCursor::Default, NAME_None, FVector2D(0.f, 0.f));
 	}
 	else
 	{
-		ViewportClient->SetHardwareCursor(EMouseCursor::Default, CursorPath, FIntPoint(48, 48));
+		ViewportClient->SetHardwareCursor(EMouseCursor::Default, CursorPath, FVector2D(0.f, 0.f));
 	}
 
 	CurrentCursorPath = CursorPath;
@@ -1018,7 +1029,7 @@ void AGS_RTSController::InitializeCursor()
 	}
 
 	// 커서 설정 시도
-	ViewportClient->SetHardwareCursor(EMouseCursor::Default, DefaultCursorPath, FIntPoint(48, 48));
+	ViewportClient->SetHardwareCursor(EMouseCursor::Default, DefaultCursorPath, FVector2D(0.f, 0.f));
 
 	ApplyRTSInputMode();
 

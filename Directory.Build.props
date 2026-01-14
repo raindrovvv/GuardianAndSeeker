@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <!-- NuGet 보안 감사 비활성화 (Magick.NET 취약성 경고 숨김) -->
+    <NuGetAudit>false</NuGetAudit>
+
+    <!-- 또는 감사 레벨을 높여서 중요한 취약성만 표시 (위 옵션 대신 사용 가능) -->
+    <!-- <NuGetAuditLevel>critical</NuGetAuditLevel> -->
+  </PropertyGroup>
+</Project>

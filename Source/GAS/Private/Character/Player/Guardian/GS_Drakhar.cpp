@@ -1,5 +1,6 @@
 #include "Character/Player/Guardian/GS_Drakhar.h"
 #include "Character/GS_Character.h"
+#include "Rendering/GS_RenderingConstants.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Player/Guardian/GS_DrakharAnimInstance.h"
@@ -1268,9 +1269,10 @@ void AGS_Drakhar::MulticastPlayFeverModeEndEffects_Implementation()
 		}
 
 		// 피버 모드 종료 사운드 재생
-		if (FeverModeEndSoundEvent)
+		UAkAudioEvent* EndSound = FeverModeEndSoundEvent.Get();
+		if (EndSound)
 		{
-			UAkGameplayStatics::PostEvent(FeverModeEndSoundEvent, this, 0, FOnAkPostEventCallback());
+			UAkGameplayStatics::PostEvent(EndSound, this, 0, FOnAkPostEventCallback());
 		}
 	}
 
@@ -1384,8 +1386,8 @@ void AGS_Drakhar::MulticastStartDustCloudVFX_Implementation()
 
 void AGS_Drakhar::HandleDraconicProjectileImpact(const FVector& ImpactLocation, const FVector& ImpactNormal, bool bHitCharacter)
 {
-	// VFX 거리 기반 컬링 (궁극기 투사체)
-	if (!ShouldPlayVFXAtLocation(ImpactLocation, 5000.0f))
+	// VFX 거리 기반 컬링 (궁극기 투사체 - 60m 전역 상수 사용)
+	if (!ShouldPlayVFXAtLocation(ImpactLocation, GS_Rendering::VFX_DISABLE_DISTANCE))
 	{
 		return;
 	}
@@ -1533,7 +1535,8 @@ void AGS_Drakhar::Multicast_PlayBloodEffect_Implementation(FVector HitLocation, 
 {
 	if (ShouldPlayVFXAtLocation(HitLocation))
 	{
-		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodEffectSystem, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
+		UNiagaraSystem* BloodVFX = BloodEffectSystem.Get();
+		UGS_VFX_FunctionLibrary::PlayBloodEffect(this, BloodVFX, HitLocation, FRotationMatrix::MakeFromZ(HitNormal).Rotator(), Scale);
 	}
 }
 

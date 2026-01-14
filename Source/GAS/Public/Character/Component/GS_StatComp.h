@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GS_StatRow.h"
+#include "Character/Component/GS_PositiveEffectComponent.h"
 #include "GS_StatComp.generated.h"
 
 class AGS_Character;
@@ -65,6 +66,9 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastRPCPlayTakeDamageMontage();
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPCNotifyPositiveEffect(EPositiveEffectType EffectType);
+
 	UFUNCTION()
 	void OnRep_CurrentHealth(float OldHealth);
 
@@ -78,7 +82,7 @@ protected:
 private:
 	//stat
 	UPROPERTY(VisibleAnywhere)
-	float MaxHealth = 99999.f;
+	float MaxHealth = 1000.f;
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth)
 	float CurrentHealth;
 	UPROPERTY(EditDefaultsOnly)
@@ -86,9 +90,9 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	float Defense;
 	UPROPERTY(EditDefaultsOnly)
-	float Agility;
+	float Agility; // 민첩
 	UPROPERTY(EditDefaultsOnly)
-	float AttackSpeed;
+	float AttackSpeed; // 공격속도
 
 	UFUNCTION()
 	void OnDamageMontageEnded(UAnimMontage* Montage, bool bInterrupted);

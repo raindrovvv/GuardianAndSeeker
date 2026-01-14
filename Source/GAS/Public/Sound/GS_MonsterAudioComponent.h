@@ -31,48 +31,49 @@ struct FMonsterAudioConfig
 {
 	GENERATED_BODY()
 
-	// 거리별 사운드 이벤트들
+	// 사운드 이벤트들
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* IdleSound;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* CombatSound;
+	TSoftObjectPtr<UAkAudioEvent> IdleSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* HurtSound;
+	TSoftObjectPtr<UAkAudioEvent> CombatSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
-	UAkAudioEvent* DeathSound;
+	TSoftObjectPtr<UAkAudioEvent> HurtSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Combat Sound"))
-	UAkAudioEvent* RTS_CombatSound;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events")
+	TSoftObjectPtr<UAkAudioEvent> SwingSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Hurt Sound"))
-	UAkAudioEvent* RTS_HurtSound;
+	// RTS 커맨드 사운드 (RTS 전용)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS Command", meta = (DisplayName = "Selection Click Sound"))
+	TSoftObjectPtr<UAkAudioEvent> SelectionClickSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS", meta = (DisplayName = "RTS Death Sound"))
-	UAkAudioEvent* RTS_DeathSound;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS Command", meta = (DisplayName = "RTS Move Command Sound"))
+	TSoftObjectPtr<UAkAudioEvent> RTSMoveCommandSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound Events|RTS Command", meta = (DisplayName = "RTS Attack Command Sound"))
+	TSoftObjectPtr<UAkAudioEvent> RTSAttackCommandSound;
 
 	// 게임 로직용 거리 설정 (Wwise Attenuation과 별개)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Logic", meta = (ClampMin = "0.0"))
-	float AlertDistance = 800.0f; // 이 거리 안에 시커가 있으면 Combat 상태
+	float AlertDistance = 800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Performance", meta = (ClampMin = "0.0"))
-	float MaxAudioDistance = 1500.0f; // 이 거리 밖에서는 아예 사운드 이벤트 발생 안함
+	float MaxAudioDistance = 1500.0f;
 
 	FMonsterAudioConfig()
 	{
 		IdleSound = nullptr;
 		CombatSound = nullptr;
 		HurtSound = nullptr;
-		DeathSound = nullptr;
-		RTS_CombatSound = nullptr;
-		RTS_HurtSound = nullptr;
-		RTS_DeathSound = nullptr;
+		SwingSound = nullptr;
+		SelectionClickSound = nullptr;
+		RTSMoveCommandSound = nullptr;
+		RTSAttackCommandSound = nullptr;
 	}
 };
 
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_MonsterAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
@@ -93,31 +94,14 @@ public:
 	FMonsterAudioConfig AudioConfig;
 
 	// 사운드 재생 간격 (초)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio", meta = (ClampMin = "1.0", ClampMax = "60.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio|TPS", meta = (ClampMin = "1.0", ClampMax = "60.0"))
 	float IdleSoundInterval = 6.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio", meta = (ClampMin = "1.0", ClampMax = "30.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio|TPS", meta = (ClampMin = "1.0", ClampMax = "30.0"))
 	float CombatSoundInterval = 4.0f;
-
-	// 스윙 사운드
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio|Swing Events", meta = (DisplayName = "Swing Sound (TPS)"))
-	UAkAudioEvent* SwingSound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio|Swing Events", meta = (DisplayName = "RTS Swing Sound"))
-	UAkAudioEvent* RTS_SwingSound = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Monster Audio|Swing", meta = (ClampMin = "0.0"))
 	float SwingResetTime = 0.2f;
-
-	// RTS 커맨드 사운드
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster Audio|RTS Command Events", meta = (DisplayName = "Selection Click Sound"))
-	UAkAudioEvent* SelectionClickSound = nullptr;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster Audio|RTS Command Events", meta = (DisplayName = "RTS Move Command Sound"))
-	UAkAudioEvent* RTSMoveCommandSound = nullptr;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster Audio|RTS Command Events", meta = (DisplayName = "RTS Attack Command Sound"))
-	UAkAudioEvent* RTSAttackCommandSound = nullptr;
 
 	/** 몬스터 상태 변경 시 호출 */
 	UFUNCTION(BlueprintCallable, Category = "Monster Audio")
@@ -154,6 +138,26 @@ public:
 
 	// Replication 설정
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	/** 몬스터 에셋 프리로딩 */
+	void PreloadMonsterAssets();
+
+protected:
+	// 프리로드된 오디오 캐시
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedIdleSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedCombatSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedHurtSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSwingSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedSelectionClickSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedRTSMoveCommandSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedRTSAttackCommandSound;
 
 protected:
 	// BaseClass override

@@ -12,7 +12,9 @@ class AGS_Guardian;
 class AGS_RTSController;
 class AGS_LavaTrap;
 class AGS_TrapManager;
+class AGS_AIGoalTrigger;
 class UGS_CompassIndicatorComponent;
+class AGS_TrapBase;
 
 /**
  * WorldSubsystem for managing and quickly accessing key game actors
@@ -51,6 +53,13 @@ public:
 	void RegisterTrapManager(AGS_TrapManager* TrapManager);
 	void UnregisterTrapManager(AGS_TrapManager* TrapManager);
 
+	void RegisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger);
+	void UnregisterGoalTrigger(AGS_AIGoalTrigger* GoalTrigger);
+
+	void RegisterTrap(AGS_TrapBase* Trap);
+	void UnregisterTrap(AGS_TrapBase* Trap);
+	const TArray<TWeakObjectPtr<AGS_TrapBase>>& GetTraps() const { return RegisteredTraps; }
+
 	// --- Accessors ---
 	const TArray<TWeakObjectPtr<AGS_Monster>>& GetMonsters() const { return RegisteredMonsters; }
 	const TArray<TWeakObjectPtr<AGS_Seeker>>& GetSeekers() const { return RegisteredSeekers; }
@@ -59,6 +68,7 @@ public:
 	const TArray<TWeakObjectPtr<AGS_LavaTrap>>& GetLavaTraps() const { return RegisteredLavaTraps; }
 	const TArray<TWeakObjectPtr<UGS_CompassIndicatorComponent>>& GetCompassIndicators() const { return RegisteredCompassIndicators; }
 	AGS_TrapManager* GetTrapManager() const { return RegisteredTrapManager.Get(); }
+	const TArray<TWeakObjectPtr<AGS_AIGoalTrigger>>& GetGoalTriggers() const { return RegisteredGoalTriggers; }
 
 	/** Combines Monsters and Guardians for Merci's ultimate or similar logic */
 	void GetAllHostileActors(TArray<AActor*>& OutActors) const;
@@ -84,6 +94,12 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AGS_TrapManager> RegisteredTrapManager;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AGS_AIGoalTrigger>> RegisteredGoalTriggers;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<class AGS_TrapBase>> RegisteredTraps;
 
 	FTimerHandle CleanupTimerHandle;
 };

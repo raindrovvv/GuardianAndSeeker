@@ -8,6 +8,7 @@
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Components/Overlay.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/OverlaySlot.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -50,6 +51,7 @@ void UGS_RTSSkillSlotWidget::NativeDestruct()
 	{
 		SkillComponent->OnSkillCooldownChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownChanged);
 		SkillComponent->OnAetherChanged.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleAetherChanged);
+		SkillComponent->OnSkillCooldownReady.RemoveDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownReady);
 	}
 
 	Super::NativeDestruct();
@@ -70,6 +72,7 @@ void UGS_RTSSkillSlotWidget::InitializeSlot(int32 InSlotIndex, UGS_RTSSkillCompo
 	{
 		SkillComponent->OnSkillCooldownChanged.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownChanged);
 		SkillComponent->OnAetherChanged.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleAetherChanged);
+		SkillComponent->OnSkillCooldownReady.AddDynamic(this, &UGS_RTSSkillSlotWidget::HandleCooldownReady);
 	}
 
 	RefreshSkillInfo();
@@ -201,6 +204,12 @@ void UGS_RTSSkillSlotWidget::HandleCooldownChanged(int32 InSkillIndex, float Rem
 	if (InSkillIndex == SlotIndex)
 	{
 		UpdateCooldownDisplay(RemainingCooldown, MaxCooldown);
+
+		// 쿨다운이 남았다면 상태를 OnCooldown으로 변경
+		if (RemainingCooldown > 0.f)
+		{
+			bIsOnCooldown = true;
+		}
 	}
 }
 
@@ -219,4 +228,22 @@ void UGS_RTSSkillSlotWidget::HandleAetherChanged(float CurrentAether, float MaxA
 
 	bool bCanAfford = CurrentAether >= Skill->GetAetherCost();
 	SetSkillAvailable(bCanAfford);
+}
+
+void UGS_RTSSkillSlotWidget::HandleCooldownReady(int32 InSkillIndex)
+{
+	// 현재 쿨다운 중이었고, 이 슬롯의 인덱스가 맞을 때만 실행
+	if (InSkillIndex == SlotIndex && bIsOnCooldown)
+	{
+		bIsOnCooldown = false;
+
+		// 스킬 준비 완료 애니메이션 재생
+		PlaySkillReadyAnimation();
+
+		// 사운드 재생
+		if (SkillReadySound)
+		{
+			UGameplayStatics::PlaySound2D(this, SkillReadySound, AudioVolume);
+		}
+	}
 }

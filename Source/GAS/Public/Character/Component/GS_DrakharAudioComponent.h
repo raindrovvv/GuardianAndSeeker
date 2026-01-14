@@ -12,7 +12,7 @@ class AGS_Drakhar;
  * 드라카르(가디언) 전용 오디오 컴포넌트
  * GS_AudioComponentBase를 상속받아 공통 기능 활용
  */
-UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Audio), meta = (BlueprintSpawnableComponent), HideCategories = ("BaseAudioComponent"))
 class GAS_API UGS_DrakharAudioComponent : public UGS_AudioComponentBase
 {
 	GENERATED_BODY()
@@ -23,6 +23,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	/** 드라카르 에셋 프리로딩 */
+	void PreloadDrakharAssets();
 
 public:
 	// === Wwise 사운드 재생 함수 ===
@@ -131,4 +134,43 @@ private:
 
 	// === Wwise 관련 헬퍼 함수 ===
 	void PlaySoundEvent(UAkAudioEvent* SoundEvent, const FVector& Location = FVector::ZeroVector);
+
+protected:
+	// 프리로드된 오디오 캐시
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedComboAttackSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDashSkillSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedEarthquakeSkillSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDraconicFurySkillSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDraconicProjectileSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDraconicProjectileImpactSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedDraconicProjectileExplosionSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedAttackHitSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedComboFinisherSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedFeverModeStartSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedFeverModeEndSound;
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedFeverModeStateSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedHurtSound;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedLandingSound;
 };

@@ -254,7 +254,8 @@ FName AGS_SeekerMerciArrow::FindClosestBoneName(USkeletalMeshComponent* MeshComp
 
 void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (!OtherActor || OtherActor == this || HitActors.Contains(OtherActor))
+	// 중복 히트 및 소유자(발사자) 히트 방지
+	if (!OtherActor || OtherActor == this || OtherActor == GetInstigator() || HitActors.Contains(OtherActor))
 	{
 		return;
 	}
@@ -274,7 +275,7 @@ void AGS_SeekerMerciArrow::OnBeginOverlap(UPrimitiveComponent* OverlappedComp, A
 	}
 
 	// 이펙트와 사운드 처리 (가상함수로 만들어 자식에서 오버라이드 가능)
-	ProcessHitEffects(TargetType, FixedHitResult);
+	ProcessHitEffects(TargetType, FixedHitResult, OtherActor);
 
 	// 서버에서만 데미지 및 로직 처리
 	if (HasAuthority())
@@ -366,15 +367,22 @@ bool AGS_SeekerMerciArrow::HandleTargetTypeGeneric(ETargetType TargetType, const
 	return false; // 기본적으로는 이동 중지 (박힘)
 }
 
-void AGS_SeekerMerciArrow::ProcessHitEffects(ETargetType TargetType, const FHitResult& SweepResult)
+void AGS_SeekerMerciArrow::ProcessHitEffects(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor)
 {
 	//Crosshair Hit Anim
 	if (TargetType == ETargetType::Guardian || TargetType == ETargetType::DungeonMonster)
 	{
-		if (AGS_Merci* MerciPlayer = Cast<AGS_Merci>(GetOwner()))
+		APawn* Shooter = GetInstigator();
+		if (!Shooter)
+			Shooter = Cast<APawn>(GetOwner());
+
+		if (AGS_Merci* MerciPlayer = Cast<AGS_Merci>(Shooter))
 		{
 			MerciPlayer->Client_ShowCrosshairHitFeedback();
 			MerciPlayer->Client_PlayHitFeedbackSound();
+
+			// 사운드 포커스 적용
+			ApplyImpactFocus();
 		}
 	}
 
@@ -382,10 +390,18 @@ void AGS_SeekerMerciArrow::ProcessHitEffects(ETargetType TargetType, const FHitR
 	if (ArrowFXComponent)
 	{
 		EArrowType CurrentType = GetArrowType();
-		ArrowFXComponent->PlayHitSound(TargetType, SweepResult, CurrentType);
+		ArrowFXComponent->PlayHitSound(TargetType, SweepResult, CurrentType, HitActor);
 		ArrowFXComponent->PlayHitVFX(TargetType, SweepResult, CurrentType);
+
+		/** 멀티 레이어 사운드 (피격/잔향) 재생 - 서버에서 호출하여 모든 클라이언트에서 재생되도록 함 */
+		if (HasAuthority())
+		{
+			// SweepResult.GetActor() 대신 전달받은 HitActor를 직접 활용하여 사운드 재생 보장
+			Multicast_PlayLayeredHitSound(SweepResult, HitActor);
+		}
 	}
 }
+
 
 void AGS_SeekerMerciArrow::ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor)
 {

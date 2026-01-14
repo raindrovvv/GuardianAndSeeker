@@ -34,7 +34,7 @@ public:
 
 	// Hit Sound 재생
 	UFUNCTION(BlueprintCallable, Category = "Arrow FX")
-	void PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
+	void PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType, AActor* HitActor = nullptr);
 
 	// 화살 타입 설정 (외부에서 호출용)
 	UFUNCTION(BlueprintCallable, Category = "Arrow FX")
@@ -53,7 +53,7 @@ public:
 
 	// 멀티캐스트 함수들 - Hit Sound
 	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType);
+	void Multicast_PlayHitSound(ETargetType TargetType, const FHitResult& SweepResult, EArrowType ArrowType, AActor* HitActor);
 
 protected:
 	virtual void BeginPlay() override;
@@ -112,4 +112,8 @@ private:
 	// 현재 화살 타입 (히트 VFX 선택용)
 	UPROPERTY(Replicated)
 	EArrowType CurrentArrowType = EArrowType::Normal;
+
+	// 히트 사운드 RPC 스로틀링 (성능 최적화)
+	float LastHitSoundRPCTime = 0.0f;
+	static constexpr float HitSoundThrottle = 0.05f;
 };

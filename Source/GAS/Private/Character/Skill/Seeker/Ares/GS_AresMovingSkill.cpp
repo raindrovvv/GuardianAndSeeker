@@ -838,10 +838,10 @@ void UGS_AresMovingSkill::Multicast_PlayDashHitSound_Implementation(EAresDashHit
 	switch (TargetType)
 	{
 	case EAresDashHitTargetType::Guardian:
-		SoundEventToPlay = SkillInfo->GuardianCollisionSound;
+		SoundEventToPlay = SkillInfo->GuardianCollisionSound.Get();
 		break;
 	case EAresDashHitTargetType::Monster:
-		SoundEventToPlay = SkillInfo->MonsterCollisionSound;
+		SoundEventToPlay = SkillInfo->MonsterCollisionSound.Get();
 		break;
 	case EAresDashHitTargetType::Other:
 	default:
@@ -884,7 +884,7 @@ void UGS_AresMovingSkill::Multicast_PlayDashEndVFX_Implementation(const FVector&
 	}
 
 	// SkillImpactVFX 사용 (데이터 테이블에서 설정됨)
-	UNiagaraSystem* FireSlashVFX = SkillInfo->SkillImpactVFX;
+	UNiagaraSystem* FireSlashVFX = SkillInfo->SkillImpactVFX.Get();
 
 	if (!FireSlashVFX)
 	{

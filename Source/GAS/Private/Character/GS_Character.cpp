@@ -1,11 +1,13 @@
 #include "Character/GS_Character.h"
 #include "SignificanceManager.h"
+#include "Engine/World.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "AkGameplayStatics.h"
 #include "Character/Component/GS_CameraShakeComponent.h"
 #include "Character/Component/GS_DebuffComp.h"
 #include "Character/Component/GS_DrakharAudioComponent.h"
 #include "Character/Component/GS_HitReactComp.h"
+#include "Character/Component/GS_HitIndicatorComponent.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "Character/Player/GS_Player.h"
@@ -26,10 +28,12 @@
 #include "System/Utility/GS_AssetLoader.h"
 #include "UI/Character/GS_HPText.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
+#include "Weapon/Projectile/GS_WeaponProjectile.h"
 #include "UI/Character/GS_HPWidget.h"
 #include "UI/Character/GS_PlayerInfoWidget.h"
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Weapon/GS_Weapon.h"
+#include "Sound/GS_AudioMixingComponent.h"
 
 AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -60,6 +64,9 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	bIsDead = false;
 	bIsHovered = false;
 	bIsInvincible = false;
+
+	// 다이내믹 사운드 믹싱 컴포넌트 생성
+	AudioMixingComponent = ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
 }
 
 void AGS_Character::BeginPlay()
@@ -106,6 +113,18 @@ void AGS_Character::BeginPlay()
 				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 				{
 					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
+				}
+			}
+			else if (IsA<AGS_Seeker>())
+			{
+				// 시커(AI 포함)는 아군 정보나 적 정보를 위해 표시할 수 있음.
+				// 특히 RTS(가디언) 시점에서는 항상 보여야 함.
+				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				{
+					if (PC->IsA<AGS_RTSController>())
+					{
+						HPTextWidgetComp->SetVisibility(true);
+					}
 				}
 			}
 		}
@@ -298,41 +317,60 @@ float AGS_Character::TakeDamage(float DamageAmount,
 
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent,
 	                                       EventInstigator, DamageCauser);
+
+	if (!StatComp)
+	{
+		return 0.0f;
+	}
+
 	float CurrentHealth = StatComp->GetCurrentHealth();
 
 	OnDamageStart();
 
 	if (HasAuthority())
 	{
-		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		bool bSuppressCameraEffects = false;
+		if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
 		{
-			// 데미지 강도에 따른 카메라 쉐이크 선택
-			FGS_CameraShakeInfo SelectedShake;
-			float IntensityMultiplier = 1.0f;
+			const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
+			bSuppressCameraEffects = MyDamageEvent.bSuppressCameraEffects;
+		}
 
-			if (ActualDamage < LightDamageThreshold)
+		if (!bSuppressCameraEffects)
+		{
+			if (AController* C = GetController())
 			{
-				SelectedShake = LightDamageShake;
-				IntensityMultiplier = 0.5f;
-			}
-			else if (ActualDamage < NormalDamageThreshold)
-			{
-				SelectedShake = NormalDamageShake;
-				IntensityMultiplier = 1.0f;
-			}
-			else if (ActualDamage < HeavyDamageThreshold)
-			{
-				SelectedShake = HeavyDamageShake;
-				IntensityMultiplier = 1.5f;
-			}
-			else
-			{
-				SelectedShake = HeavyDamageShake;
-				IntensityMultiplier = 2.0f;
-			}
+				if (APlayerController* PC = Cast<APlayerController>(C))
+				{
+					// 데미지 강도에 따른 카메라 쉐이크 선택
+					FGS_CameraShakeInfo SelectedShake;
+					float IntensityMultiplier = 1.0f;
 
-			SelectedShake.Intensity *= IntensityMultiplier;
-			Client_PlayTakeDamageShake(PC, SelectedShake, IntensityMultiplier);
+					if (ActualDamage < LightDamageThreshold)
+					{
+						SelectedShake = LightDamageShake;
+						IntensityMultiplier = 0.5f;
+					}
+					else if (ActualDamage < NormalDamageThreshold)
+					{
+						SelectedShake = NormalDamageShake;
+						IntensityMultiplier = 1.0f;
+					}
+					else if (ActualDamage < HeavyDamageThreshold)
+					{
+						SelectedShake = HeavyDamageShake;
+						IntensityMultiplier = 1.5f;
+					}
+					else
+					{
+						SelectedShake = HeavyDamageShake;
+						IntensityMultiplier = 2.0f;
+					}
+
+					SelectedShake.Intensity *= IntensityMultiplier;
+					Client_PlayTakeDamageShake(PC, SelectedShake, IntensityMultiplier);
+				}
+			}
 		}
 	}
 
@@ -387,6 +425,40 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
 		}
+	}
+
+	// 피격 방향 HUD 표시 (CanHitReact와 관계없이 항상 호출)
+	if (UGS_HitIndicatorComponent* HitIndicator =
+	        GetComponentByClass<UGS_HitIndicatorComponent>())
+	{
+		// 기본값은 Omni(전 방향)로 설정 - ZeroVector가 전달되면 Omni 인디케이터 활성화
+		FVector DirToAttacker = FVector::ZeroVector;
+
+		// 1. Point Damage: 탄환, 근접공격 등 정확한 타격 방향이 있음
+		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+		{
+			const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
+			DirToAttacker = -PointEvent->ShotDirection;
+		}
+		// 2. Radial Damage: 폭발 등 중심점이 있음
+		else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
+		{
+			const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+			DirToAttacker = (RadialEvent->Origin - GetActorLocation()).GetSafeNormal();
+		}
+		// 3. 캐릭터(몬스터, 가디언 등)가 공격한 경우 - 공격자 위치 방향 표시
+		else if (AGS_Character* AttackerCharacter = Cast<AGS_Character>(DamageCauser))
+		{
+			DirToAttacker = (AttackerCharacter->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+		}
+		// 4. 프로젝타일(가디언 원거리, 몬스터 투사체 등)이 공격한 경우 - 프로젝타일 위치 방향 표시
+		else if (AGS_WeaponProjectile* Projectile = Cast<AGS_WeaponProjectile>(DamageCauser))
+		{
+			DirToAttacker = (Projectile->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+		}
+		// 5. 그 외 (도트 데미지, 환경 데미지, 함정 등): Omni (ZeroVector 유지)
+
+		HitIndicator->NotifyDamageDirection(DirToAttacker, ActualDamage);
 	}
 
 	float NewHealth = CurrentHealth - ActualDamage;
@@ -592,7 +664,7 @@ AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
 
 void AGS_Character::SetCharacterSpeed(float InRatio)
 {
-	if (InRatio >= 0.4f &&
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
 	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
@@ -618,7 +690,7 @@ bool AGS_Character::IsDead() const
 
 void AGS_Character::Server_SetCharacterSpeed_Implementation(float InRatio)
 {
-	if (InRatio >= 0.8f &&
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
 	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
@@ -930,8 +1002,39 @@ float AGS_Character::CalculateSignificance(const FTransform& Viewpoint)
 	float DistSq = FVector::DistSquared(ActorLoc, ViewLoc);
 
 	// 기본 거리 기반 점수 (플레이어는 50m 기준)
-	float MaxRangeSq = FMath::Square(5000.0f);
-	Score = FMath::Clamp(1.2f - (DistSq / MaxRangeSq), 0.1f, 1.0f);
+	float CullDistance = 5000.0f;
+
+	// 캐릭터 타입별 상수 거리 적용
+	switch (CharacterType)
+	{
+	case ECharacterType::SmallClaw:
+		CullDistance = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+		break;
+	case ECharacterType::NeedleFang:
+		CullDistance = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+		break;
+	case ECharacterType::ShadowFang:
+		CullDistance = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
+		break;
+	case ECharacterType::Ares:
+	case ECharacterType::Chan:
+	case ECharacterType::Merci:
+	case ECharacterType::Drakhar:
+		CullDistance = 8000.0f;
+		break; // 플레이어 캐릭터는 멀리서도 보여야 함
+	default:
+		break;
+	}
+
+	// [멀티플레이 대응] RTS 모드(가디언)일 경우 더 높은 곳에서 내려다보므로 컬링 거리 확장
+	if (GS_Rendering::IsRTSMode(this))
+	{
+		CullDistance *= GS_Rendering::RTS_CULL_DISTANCE_SCALE;
+	}
+
+	// 점수 하락 곡선을 더 가파르게 하여 설정 거리 근처에서 확실히 0이 되도록 함
+	float DistRatio = DistSq / FMath::Square(CullDistance);
+	Score = FMath::Clamp(1.0f - DistRatio, 0.0f, 1.0f);
 
 	return Score;
 }
@@ -995,23 +1098,81 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 	{
 		NetUpdateFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
 	}
+
+	// 6. 가시성 컬링 (드로우콜 절감)
+	// 중요도가 매우 낮으면 (카메라에서 매우 멀면) 메시를 숨김
+	const bool bShouldShow = NewSignificance > 0.08f;
+	if (MeshComp->GetVisibleFlag() != bShouldShow)
+	{
+		MeshComp->SetVisibility(bShouldShow, true); // true: 자식 컴포넌트(무기 등)도 함께 제어
+
+		// 그림자 상태도 즉시 갱신
+		UpdateShadowCulling();
+	}
 }
 
 void AGS_Character::UpdateShadowCulling()
 {
-	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+		return;
+
+	// Significance Manager가 놓치는 경우를 대비해 직접 거리 기반 가시성 체크 병행
+	// IsPlayerControlled()는 멀티플레이에서 다른 클라이언트의 캐릭터를 감지 못함
+	// 따라서 클래스 타입(AGS_Player)으로 직접 체크해야 함
+	bool bIsPlayerCharacter = Cast<AGS_Player>(this) != nullptr;
+	if (!IsLocallyControlled() && !bIsPlayerCharacter)
 	{
-		GS_Rendering::UpdateShadowCulling(this, MeshComp);
+		float DistSq = 0.0f;
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (PC->PlayerCameraManager)
+			{
+				DistSq = FVector::DistSquared(GetActorLocation(), PC->PlayerCameraManager->GetCameraLocation());
+			}
+		}
+
+		// CalculateSignificance와 동일한 기준 적용
+		float BaseCullDist = 3000.0f;
+		switch (CharacterType)
+		{
+		case ECharacterType::SmallClaw:
+			BaseCullDist = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+			break;
+		case ECharacterType::NeedleFang:
+			BaseCullDist = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+			break;
+		case ECharacterType::ShadowFang:
+			BaseCullDist = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
+			break;
+		default:
+			BaseCullDist = 6000.0f;
+			break;
+		}
+
+		if (GS_Rendering::IsRTSMode(this))
+			BaseCullDist *= GS_Rendering::RTS_CULL_DISTANCE_SCALE;
+
+		// 5% 여유 공간을 두고 가시성 강제 업데이트
+		bool bInRange = DistSq < FMath::Square(BaseCullDist * 1.05f);
+		if (MeshComp->GetVisibleFlag() != bInRange)
+		{
+			MeshComp->SetVisibility(bInRange, true);
+		}
 	}
+
+	// 기존 그림자 컬링 로직 실행
+	GS_Rendering::UpdateShadowCulling(this, MeshComp);
 }
 void AGS_Character::Multicast_ApplyHitStop_Implementation(float Duration, float TimeDilation, bool bPlayShake)
 {
 	if (IsRunningDedicatedServer())
 		return;
 
-	// 멀티플레이 최적화: 내가 컨트롤하는 캐릭터거나 내가 타겟일 때만 연출 적용
-	// 제3자 시점에서는 타격 시마다 멈추면 렉처럼 보일 수 있으므로 제외
-	if (!IsLocallyControlled() && !IsPlayerControlled())
+	// 멀티플레이 최적화: 플레이어 캐릭터는 히트스톱 연출 적용
+	// IsPlayerControlled()는 멀티플레이에서 다른 클라이언트 캐릭터를 감지 못하므로 클래스 타입으로 체크
+	bool bIsPlayerCharacter = Cast<AGS_Player>(this) != nullptr;
+	if (!IsLocallyControlled() && !bIsPlayerCharacter)
 		return;
 
 	// Tactile Camera: 본인일 때만 카메라 쉐이크

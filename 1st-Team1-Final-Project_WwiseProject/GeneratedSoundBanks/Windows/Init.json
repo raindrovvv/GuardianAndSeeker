@@ -10,7 +10,7 @@
     "Type": "User",
     "GUID": "{701ECBBD-9C7B-4030-8CDB-749EE5D1C7B9}",
     "Language": "SFX",
-    "Hash": "{3E6B2D9A-B844-B70C-5436-8B800C65B040}",
+    "Hash": "{AF490A27-5F63-BC77-7084-20A056F2118D}",
     "ObjectPath": "Init",
     "ShortName": "Init",
     "Path": "Init.bnk",
@@ -53,6 +53,19 @@
      ]
     },
     "Busses": [
+     {
+      "Id": "393239870",
+      "Name": "SFX",
+      "ObjectPath": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\SFX",
+      "GUID": "{AD4E9B4F-B141-4279-A6CC-B57D91AE0278}",
+      "MaxAttenuation": "1800"
+     },
+     {
+      "Id": "623754159",
+      "Name": "UI_Sound",
+      "ObjectPath": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\UI_Sound",
+      "GUID": "{836D4A21-90EA-4615-922B-077674E0F320}"
+     },
      {
       "Id": "3803692087",
       "Name": "Master Audio Bus",
@@ -114,6 +127,12 @@
       "GUID": "{CE0DA21D-B039-4D70-A62B-0321CD32566D}"
      },
      {
+      "Id": "3177088326",
+      "Name": "Impact_Focus",
+      "ObjectPath": "\\Game Parameters\\Default Work Unit\\Impact_Focus",
+      "GUID": "{6C53ECAE-8B41-4B29-ACE2-F8C30A1CFE5B}"
+     },
+     {
       "Id": "3474855001",
       "Name": "Occlusion_Disable",
       "ObjectPath": "\\Game Parameters\\Default Work Unit\\Occlusion_Disable",
@@ -130,6 +149,12 @@
       "Name": "RTS_Base_20m",
       "ObjectPath": "\\Game Parameters\\Default Work Unit\\RTS_Base_20m",
       "GUID": "{0D40C47D-E51C-450D-8A24-0C6878B9E10F}"
+     },
+     {
+      "Id": "4143275766",
+      "Name": "Reverb_Volume",
+      "ObjectPath": "\\Game Parameters\\Default Work Unit\\Reverb_Volume",
+      "GUID": "{76D91E63-E2AC-443E-887A-1160F351F204}"
      }
     ],
     "StateGroups": [
@@ -278,6 +303,6 @@
     ]
    }
   ],
-  "FileHash": "{CEA7DEC4-BB7F-7597-EB89-E71A9791C3FA}"
+  "FileHash": "{B28B2C3B-E765-6ED1-F1C7-B8766EFB336F}"
  }
 }

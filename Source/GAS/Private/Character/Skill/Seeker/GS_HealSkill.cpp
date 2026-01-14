@@ -34,17 +34,23 @@ void UGS_HealSkill::ActiveSkill()
 		return;
 	}
 
-	if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
-	{
-		OwnerCharacter->Multicast_PlaySkillMontage(LoadedMontage);
-	}
-	bIsCoolingDown = true;
-
 	// 캐싱
 	if (!CachedSeekerOwner.IsValid())
 	{
 		CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
 	}
+
+	if (UAnimMontage* LoadedMontage = GetCachedMontage(0))
+	{
+		OwnerCharacter->Multicast_PlaySkillMontage(LoadedMontage);
+
+		// 몽타주 종료 콜백 등록 - 몽타주가 완전히 끝난 후 DeactiveSkill 호출
+		if (UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance())
+		{
+			AnimInstance->OnMontageEnded.AddUniqueDynamic(this, &UGS_HealSkill::OnMontageEnded);
+		}
+	}
+	bIsCoolingDown = true;
 
 	if (CachedSeekerOwner.IsValid())
 	{
@@ -57,9 +63,9 @@ void UGS_HealSkill::DeactiveSkill()
 {
 	// 부모 클래스의 DeactiveSkill 호출
 	Super::DeactiveSkill();
-	
+
 	bIsCoolingDown = false;
-	
+
 	// 서버 권한에서 스킬 마스크 리셋
 	if (OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
@@ -89,12 +95,12 @@ void UGS_HealSkill::InterruptSkill()
 		{
 			return;
 		}
-		
+
 		if (CachedSeekerOwner->GetSkillComp())
 		{
 			CachedSeekerOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 			CachedSeekerOwner->SetMoveControlValue(true, true);
-			
+
 			// Potion 떨구기
 			SetIsActive(false);
 			bIsCoolingDown = false; // hard coding // SJE
@@ -103,7 +109,7 @@ void UGS_HealSkill::InterruptSkill()
 			if (Potion)
 			{
 				Potion->DropFromSocket();
-                	
+
 				UStaticMeshComponent* Mesh = Potion->GetMeshComp();
 				if (Mesh)
 				{
@@ -124,10 +130,10 @@ bool UGS_HealSkill::CanActive() const
 	{
 		return false;
 	}
-	
+
 	// 힐 스킬 전용 조건 체크
 	bool bCanActivateHeal = CanActivateHealSkill();
-	
+
 	return bCanActivateHeal;
 }
 
@@ -135,13 +141,13 @@ void UGS_HealSkill::SetCurrentHealCount(int32 NewCount)
 {
 	int32 OldCount = CurrentHealCount;
 	CurrentHealCount = FMath::Clamp(NewCount, 0, MaxHealCount);
-	
+
 	if (OldCount == 0 && NewCount > 0)
 	{
 		bIsPotionDepletedOrHealthFull = false;
 		SetCoolingDown(false);
 	}
-	
+
 	// UI 업데이트를 위해 클라이언트에 알림 (서버에서만 실행)
 	if (OwningComp && OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
@@ -161,13 +167,13 @@ bool UGS_HealSkill::IsHealthFull() const
 	{
 		return false;
 	}
-	
+
 	UGS_StatComp* StatComp = OwnerCharacter->GetStatComp();
 	if (!StatComp)
 	{
 		return false;
 	}
-	
+
 	bool bIsFull = StatComp->GetCurrentHealth() >= StatComp->GetMaxHealth();
 	return bIsFull;
 }
@@ -178,7 +184,7 @@ bool UGS_HealSkill::CanActivateHealSkill() const
 	bool bCanUsePotion = CanUseHeal();
 	bool bIsHealthFull = IsHealthFull();
 	bool bShouldBeBlocked = !bCanUsePotion || bIsHealthFull;
-	
+
 	// 실제 상태와 bIsPotionDepletedOrHealthFull이 다르면 동기화
 	if (!bShouldBeBlocked && bIsPotionDepletedOrHealthFull)
 	{
@@ -196,9 +202,9 @@ bool UGS_HealSkill::CanActivateHealSkill() const
 	{
 		return false;
 	}
-	
+
 	bool bCanActivate = bCanUsePotion && !bIsHealthFull;
-	
+
 	return bCanActivate;
 }
 
@@ -234,6 +240,28 @@ void UGS_HealSkill::InitializeDelegate()
 			CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
 		}
 	}
+}
+
+void UGS_HealSkill::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	// 힐 스킬의 몽타주인지 확인
+	UAnimMontage* HealMontage = GetCachedMontage(0);
+	if (!HealMontage || Montage != HealMontage)
+	{
+		return;
+	}
+
+	// 콜백 해제 (중복 호출 방지)
+	if (OwnerCharacter && OwnerCharacter->GetMesh())
+	{
+		if (UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance())
+		{
+			AnimInstance->OnMontageEnded.RemoveDynamic(this, &UGS_HealSkill::OnMontageEnded);
+		}
+	}
+
+	// 몽타주가 완전히 끝났으므로 스킬 비활성화
+	DeactiveSkill();
 }
 
 float UGS_HealSkill::GetHealAmount()
@@ -281,7 +309,7 @@ int32 UGS_HealSkill::GetMaxHealCount()
 void UGS_HealSkill::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
 	DOREPLIFETIME(UGS_HealSkill, CurrentHealCount);
 }
 
@@ -299,14 +327,15 @@ void UGS_HealSkill::OnRep_CurrentHealCount()
 	/*if (OwningComp)
 	{
 		OwningComp->Client_BroadcastHealCountChanged(CurrentSkillType, CurrentHealCount, MaxHealCount);
-	}*/ // SJE
+	}*/
+	// SJE
 }
 
 void UGS_HealSkill::OnOwnerDamaged(AActor* DamagedActor, float DamageAmount, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
 {
 	// 체력이 가득 찬 상태에서 피해를 입었을 때만 제한 해제
 	if (bIsPotionDepletedOrHealthFull)
-	{		
+	{
 		if (!IsHealthFull())
 		{
 			bIsPotionDepletedOrHealthFull = false;

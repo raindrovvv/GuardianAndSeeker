@@ -41,21 +41,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
 	FVector AudioAnchorRelativeLocation = FVector(0.0f, 0.0f, 120.0f);
 
-	/** 문 열림 사운드 (TPS 모드용) */
+	/** 문 열림 사운드 (TPS/RTS Unified) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* OpenSound_TPS;
+	TSoftObjectPtr<UAkAudioEvent> OpenSound;
 
-	/** 문 열림 사운드 (RTS 모드용) */
+	/** 문 닫힘 사운드 (TPS/RTS Unified) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* OpenSound_RTS;
-
-	/** 문 닫힘 사운드 (TPS 모드용) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* CloseSound_TPS;
-
-	/** 문 닫힘 사운드 (RTS 모드용) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
-	UAkAudioEvent* CloseSound_RTS;
+	TSoftObjectPtr<UAkAudioEvent> CloseSound;
 
 	/** 문 사운드 최대 거리 (기본값: 3000.0f = 30m) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Audio")
@@ -68,16 +60,35 @@ public:
 	bool bIsOpen = false;
 
 	FTimerHandle DoorCloseTimerHandle;
+	FTimerHandle ShadowCullingTimerHandle;
+
+	/** 컬링 대상이 되는 Primitive 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPrimitiveComponent>> CachedPrimitiveComponents;
+
+	/** 컬링 대상이 되는 Light 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class ULightComponent>> CachedLightComponents;
+
+	/** 컬링 대상이 되는 Niagara 컴포넌트 캐싱 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UNiagaraComponent>> CachedNiagaraComponents;
+
+	/** 컴포넌트 캐싱 초기화 */
+	void CacheOptimizedComponents();
+
+	void ApplyDistanceCulling();
+	void UpdateCulling();
 
 	UFUNCTION()
 	void OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
+	                           UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	                           bool bFromSweep, const FHitResult& SweepResult);
 
-	UFUNCTION(BlueprintImplementableEvent, Category="Door")
+	UFUNCTION(BlueprintImplementableEvent, Category = "Door")
 	void InitDoor();
 
-	UFUNCTION(BlueprintNativeEvent, Category="Door")
+	UFUNCTION(BlueprintNativeEvent, Category = "Door")
 	void DoorOpen();
 	virtual void DoorOpen_Implementation();
 
@@ -99,9 +110,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Door|Audio")
 	bool IsRTSMode() const;
 
-	/** 모드에 맞는 사운드 이벤트 선택 */
-	UFUNCTION(BlueprintPure, Category = "Door|Audio")
-	UAkAudioEvent* SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound) const;
 
 	/** 문 사운드 재생 최적화를 위한 거리/시야 체크 */
 	UFUNCTION(BlueprintPure, Category = "Door|Audio")
@@ -135,9 +143,21 @@ private:
 	void RefreshDoorAudioSetup(bool bForceFindComponent = false);
 	void AttachDoorAkComponentToAnchor();
 
-	/** 안전한 타이머 정리 함수 (레벨 전환 안정성) */
-	void SafeClearTimer(FTimerHandle& TimerHandle);
+	/** Significance Manager 등록 */
+	void RegisterSignificanceManager();
+
+	/** 중요도 계산 (거리 기반) */
+	virtual float CalculateSignificance(const FTransform& Viewpoint);
+
+	/** 중요도 변경 시 호출 */
+	virtual void OnSignificanceChanged(float NewSignificance);
+
+	/** 현재 중요도 단계 */
+	float CurrentSignificance = 1.0f;
 
 	/** 월드 컨텍스트 검증 함수 */
 	bool IsWorldContextValid() const;
+
+	/** 타이머 안전하게 정리 */
+	void SafeClearTimer(FTimerHandle& TimerHandle);
 };

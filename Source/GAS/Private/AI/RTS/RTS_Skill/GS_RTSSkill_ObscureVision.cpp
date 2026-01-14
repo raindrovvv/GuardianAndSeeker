@@ -11,6 +11,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
+#include "System/Utility/GS_AssetLoader.h"
 
 UGS_RTSSkill_ObscureVision::UGS_RTSSkill_ObscureVision()
 {
@@ -38,12 +39,12 @@ bool UGS_RTSSkill_ObscureVision::CanActivate(UGS_RTSSkillComponent* SkillCompone
 			AGS_Seeker* Seeker = SeekerPtr.Get();
 			if (IsValid(Seeker) && !Seeker->IsDead())
 			{
-				return true;  // 살아있는 시커가 최소 1명 있음
+				return true; // 살아있는 시커가 최소 1명 있음
 			}
 		}
 	}
 
-	return false;  // 살아있는 시커 없음
+	return false; // 살아있는 시커 없음
 }
 
 FVector UGS_RTSSkill_ObscureVision::ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation)
@@ -86,6 +87,40 @@ FVector UGS_RTSSkill_ObscureVision::ActivateSkill(UGS_RTSSkillComponent* SkillCo
 	return TargetLocation;
 }
 
+void UGS_RTSSkill_ObscureVision::PreloadAssets()
+{
+	Super::PreloadAssets();
+
+	const UGS_RTSSkillData_ObscureVision* ObscureData = GetObscureVisionData();
+	if (!ObscureData)
+		return;
+
+	TArray<FSoftObjectPath> Paths;
+	if (!ObscureData->ObscureDebuffClass.IsNull())
+		Paths.Add(ObscureData->ObscureDebuffClass.ToSoftObjectPath());
+	if (!ObscureData->ObscureActivateSound_TPS.IsNull())
+		Paths.Add(ObscureData->ObscureActivateSound_TPS.ToSoftObjectPath());
+	if (!ObscureData->ObscureActivateSound_RTS.IsNull())
+		Paths.Add(ObscureData->ObscureActivateSound_RTS.ToSoftObjectPath());
+
+	if (Paths.Num() > 0)
+	{
+		TWeakObjectPtr<UGS_RTSSkill_ObscureVision> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadMultipleAssets(Paths, [WeakThis]()
+		                                         {
+			if (UGS_RTSSkill_ObscureVision* StrongThis = WeakThis.Get())
+			{
+				const UGS_RTSSkillData_ObscureVision* OData = StrongThis->GetObscureVisionData();
+				if (OData)
+				{
+					// Note: Debuff class and other classes can be cached as needed
+					StrongThis->CachedObscureActivateSound_TPS = OData->ObscureActivateSound_TPS.Get();
+					StrongThis->CachedObscureActivateSound_RTS = OData->ObscureActivateSound_RTS.Get();
+				}
+			} });
+	}
+}
+
 void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 {
 	UWorld* World = GetSkillWorld();
@@ -98,10 +133,15 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 	UAkAudioEvent* ActivateSound = nullptr;
 	if (ObscureData)
 	{
-		// Soft Reference 로드
-		UAkAudioEvent* ActivateSoundTPS = ObscureData->ObscureActivateSound_TPS.IsNull() ? nullptr : ObscureData->ObscureActivateSound_TPS.LoadSynchronous();
-		UAkAudioEvent* ActivateSoundRTS = ObscureData->ObscureActivateSound_RTS.IsNull() ? nullptr : ObscureData->ObscureActivateSound_RTS.LoadSynchronous();
-		ActivateSound = SelectSoundEvent(ActivateSoundTPS, ActivateSoundRTS);
+		UAkAudioEvent* TPSSound = CachedObscureActivateSound_TPS;
+		UAkAudioEvent* RTSSound = CachedObscureActivateSound_RTS;
+
+		if (!TPSSound && !ObscureData->ObscureActivateSound_TPS.IsNull())
+			TPSSound = UGS_AssetLoader::SyncLoadAsset(ObscureData->ObscureActivateSound_TPS);
+		if (!RTSSound && !ObscureData->ObscureActivateSound_RTS.IsNull())
+			RTSSound = UGS_AssetLoader::SyncLoadAsset(ObscureData->ObscureActivateSound_RTS);
+
+		ActivateSound = SelectSoundEvent(TPSSound, RTSSound);
 	}
 
 	const float ObscureDuration = GetEffectDuration();
@@ -136,17 +176,16 @@ void UGS_RTSSkill_ObscureVision::ApplyObscureToAllSeekers()
 				// 지속 시간 후 해제하는 타이머 설정
 				FTimerHandle TimerHandle;
 				World->GetTimerManager().SetTimer(
-					TimerHandle,
-					[WeakSeeker = TWeakObjectPtr<AGS_Seeker>(Seeker)]()
-					{
-						if (WeakSeeker.IsValid())
-						{
-							WeakSeeker->Client_StopVisionObscured();
-						}
-					},
-					ObscureDuration,
-					false
-				);
+				    TimerHandle,
+				    [WeakSeeker = TWeakObjectPtr<AGS_Seeker>(Seeker)]()
+				    {
+					    if (WeakSeeker.IsValid())
+					    {
+						    WeakSeeker->Client_StopVisionObscured();
+					    }
+				    },
+				    ObscureDuration,
+				    false);
 
 				++AffectedCount;
 			}

@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "AI/RTS/GS_RTSController.h"
 #include "Engine/World.h"
+#include "Components/CapsuleComponent.h"
 #include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -16,7 +17,7 @@ AGS_TrigTrapBase::AGS_TrigTrapBase()
 {
 	TriggerBoxComp = CreateDefaultSubobject<UBoxComponent>(TEXT("TriggerBox"));
 	TriggerBoxComp->SetupAttachment(RotationSceneComp);
-	
+
 	//Trigger Box 설정
 	TriggerBoxComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	//ECC_GameTraceChannel4 : Trap
@@ -32,7 +33,6 @@ void AGS_TrigTrapBase::BeginPlay()
 	Super::BeginPlay();
 	TriggerBoxComp->OnComponentBeginOverlap.AddDynamic(this, &AGS_TrigTrapBase::OnTriggerBeginOverlap);
 	TriggerBoxComp->OnComponentEndOverlap.AddDynamic(this, &AGS_TrigTrapBase::OnTriggerEndOverlap);
-
 }
 
 void AGS_TrigTrapBase::ActivateTrap_Implementation(AActor* TargetActor)
@@ -41,14 +41,20 @@ void AGS_TrigTrapBase::ActivateTrap_Implementation(AActor* TargetActor)
 }
 
 void AGS_TrigTrapBase::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	bool bFromSweep, const FHitResult& SweepResult)
+                                             UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+                                             bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (OtherActor && OtherActor != this)
 	{
 		AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 		if (Seeker)
 		{
+			// Seeker의 경우 오직 CapsuleComponent와의 충돌만 인정 (CombatTrigger 등 감지 방지)
+			if (OtherComp != Cast<UPrimitiveComponent>(Seeker->GetCapsuleComponent()))
+			{
+				return;
+			}
+
 			if (!bIsTriggered)
 			{
 				//함정 트리거 이후, 동작 전 경고 사운드 함수(BP에서 구현)
@@ -65,7 +71,6 @@ void AGS_TrigTrapBase::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp
 				}
 			}
 		}
-
 	}
 }
 
@@ -76,7 +81,7 @@ void AGS_TrigTrapBase::CallTrapAlertSound(AActor* TargetActor)
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.AlertSound_TPS, TrapData.AlertSound_RTS);
+	UAkAudioEvent* SoundEvent = TrapData.AlertSound.Get();
 	if (SoundEvent)
 	{
 		Multicast_PlayTrapAlertSound(TargetActor);
@@ -106,12 +111,15 @@ void AGS_TrigTrapBase::Multicast_PlayTrapAlertSound_Implementation(AActor* Targe
 		return;
 	}
 
-	UAkAudioEvent* SoundEvent = SelectSoundEventByMode(TrapData.AlertSound_TPS, TrapData.AlertSound_RTS);
+	const bool bIsRTS = IsRTSMode();
+	UAkAudioEvent* SoundEvent = TrapData.AlertSound.Get();
 	if (SoundEvent)
 	{
 		// TrapAkComponent가 있으면 AudioAnchor 위치에서 재생, 없으면 Actor 자체 사용
 		if (IsValid(TrapAkComponent))
 		{
+			// 동적 거리 감쇠 설정 (Wwise Attenuation Scaling Factor)
+			TrapAkComponent->SetAttenuationScalingFactor(bIsRTS ? 2.0f : 1.0f);
 			TrapAkComponent->PostAkEvent(SoundEvent, 0, FOnAkPostEventCallback());
 		}
 		else
@@ -140,11 +148,10 @@ void AGS_TrigTrapBase::DelayTrapEffect(AActor* TargetActor)
 	if (TriggerDelay > 0.0f)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
-			DelayHandle,
-			FTimerDelegate::CreateUObject(this, &AGS_TrigTrapBase::ApplyTrapEffect, TargetActor),
-			TriggerDelay,
-			false
-		);
+		    DelayHandle,
+		    FTimerDelegate::CreateUObject(this, &AGS_TrigTrapBase::ApplyTrapEffect, TargetActor),
+		    TriggerDelay,
+		    false);
 	}
 	else
 	{
@@ -155,30 +162,48 @@ void AGS_TrigTrapBase::DelayTrapEffect(AActor* TargetActor)
 //만약 함정의 동작이 끝났는데 플레이어가 남아 있다면 함정 동작 다시 실행
 void AGS_TrigTrapBase::TrapEffectComplete()
 {
-	TArray<AActor*> OverlappingActors;
-	TriggerBoxComp->GetOverlappingActors(OverlappingActors);
+	TArray<UPrimitiveComponent*> OverlappingComponents;
+	TriggerBoxComp->GetOverlappingComponents(OverlappingComponents);
 
-	for (AActor* Actor : OverlappingActors)
+	for (UPrimitiveComponent* Comp : OverlappingComponents)
 	{
-		if (IsValid(Actor) && Actor->IsA<AGS_Player>())
+		if (IsValid(Comp))
 		{
-			Server_DelayTrapEffect(Actor);
-			return;
+			AActor* CompOwner = Comp->GetOwner();
+			if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(CompOwner))
+			{
+				// Seeker의 경우 캡슐 컴포넌트가 여전히 오버랩 중인지 확인
+				if (Comp == Cast<UPrimitiveComponent>(Seeker->GetCapsuleComponent()))
+				{
+					Server_DelayTrapEffect(Seeker);
+					return;
+				}
+			}
+			else if (AGS_Player* Player = Cast<AGS_Player>(CompOwner))
+			{
+				Server_DelayTrapEffect(Player);
+				return;
+			}
 		}
 	}
 	bIsTriggered = false;
 }
 
 
-
 void AGS_TrigTrapBase::OnTriggerEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+                                           UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (OtherActor && OtherActor != this && !bIsTriggered)
 	{
 		AGS_Seeker* Seeker = Cast<AGS_Seeker>(OtherActor);
 		if (Seeker)
 		{
+			// Seeker의 경우 오직 CapsuleComponent와의 충돌만 인정
+			if (OtherComp != Cast<UPrimitiveComponent>(Seeker->GetCapsuleComponent()))
+			{
+				return;
+			}
+
 			if (!HasAuthority())
 			{
 				Server_EndTrapEffect(OtherActor);
@@ -187,7 +212,6 @@ void AGS_TrigTrapBase::OnTriggerEndOverlap(UPrimitiveComponent* OverlappedComp, 
 			{
 				EndTrapEffect(OtherActor);
 			}
-
 		}
 	}
 }
@@ -244,23 +268,22 @@ UAkComponent* AGS_TrigTrapBase::GetOrCreateTrapAkComponent()
 		return nullptr;
 	}
 
-    TrapAkComponent = NewObject<UAkComponent>(this, UAkComponent::StaticClass(), NAME_None, RF_Transient);
+	TrapAkComponent = NewObject<UAkComponent>(this, UAkComponent::StaticClass(), NAME_None, RF_Transient);
 	if (!IsValid(TrapAkComponent))
 	{
 		return nullptr;
 	}
 
-    USceneComponent* AttachTarget = GetRootComponent();
-    TrapAkComponent->AttachToComponent(AttachTarget ? AttachTarget : GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+	USceneComponent* AttachTarget = GetRootComponent();
+	TrapAkComponent->AttachToComponent(AttachTarget ? AttachTarget : GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 	TrapAkComponent->RegisterComponent();
 	TrapAkComponent->SetAutoActivate(false);
 	TrapAkComponent->SetStopWhenOwnerDestroyed(true);
-	
+
 	TrapAkComponent->OcclusionRefreshInterval = 0.0f;
 
 	return TrapAkComponent;
 }
-
 
 
 void AGS_TrigTrapBase::EndTrapEffect_Implementation(AActor* TargetActor)

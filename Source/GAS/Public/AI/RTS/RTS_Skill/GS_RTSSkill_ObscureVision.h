@@ -26,9 +26,20 @@ public:
 	// 즉시 발동 스킬이므로 타겟 위치 불필요
 	virtual FVector ActivateSkill(UGS_RTSSkillComponent* SkillComponent, const FVector& TargetLocation) override;
 	virtual bool CanActivate(UGS_RTSSkillComponent* SkillComponent) const override;
+	virtual void PreloadAssets() override;
 
 protected:
 	const UGS_RTSSkillData_ObscureVision* GetObscureVisionData() const;
+
+	// 캐싱된 에셋들
+	UPROPERTY()
+	TObjectPtr<UGS_DebuffObscure> CachedObscureDebuffClass;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedObscureActivateSound_TPS;
+
+	UPROPERTY()
+	TObjectPtr<UAkAudioEvent> CachedObscureActivateSound_RTS;
 
 private:
 	// 모든 시커에게 디버프 적용

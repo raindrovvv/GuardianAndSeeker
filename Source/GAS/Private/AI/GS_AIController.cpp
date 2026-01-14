@@ -96,9 +96,10 @@ void AGS_AIController::OnPossess(APawn* InPawn)
 				UBehaviorTree* LoadedBT = StrongMonster->BTAsset.Get();
 				UBlackboardData* LoadedBB = StrongMonster->BBAsset.Get();
 
-				UBlackboardComponent* BlackboardComponent = StrongThis->Blackboard;
+				UBlackboardComponent* BlackboardComponent = nullptr;
 				if (LoadedBB && StrongThis->UseBlackboard(LoadedBB, BlackboardComponent))
 				{
+					StrongThis->Blackboard = BlackboardComponent;
 					BlackboardComponent->SetValueAsVector(StrongThis->HomePosKey, StrongPawn->GetActorLocation());
 
 					if (LoadedBT)

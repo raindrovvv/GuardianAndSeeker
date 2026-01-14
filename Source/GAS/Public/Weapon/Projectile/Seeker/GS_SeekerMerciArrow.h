@@ -73,7 +73,7 @@ protected:
 	virtual ETargetType DetermineTargetType(AActor* OtherActor) const;
 	virtual bool HandleTargetTypeGeneric(ETargetType TargetType, const FHitResult& SweepResult);
 
-	virtual void ProcessHitEffects(ETargetType TargetType, const FHitResult& SweepResult);
+	virtual void ProcessHitEffects(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor);
 	virtual void ProcessDamageLogic(ETargetType TargetType, const FHitResult& SweepResult, AActor* HitActor);
 	void ProcessStickLogic(AActor* HitActor, ETargetType TargetType, const FHitResult& SweepResult);
 

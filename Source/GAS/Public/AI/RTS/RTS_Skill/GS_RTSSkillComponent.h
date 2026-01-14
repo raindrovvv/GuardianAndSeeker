@@ -16,12 +16,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRTSAetherChanged, float, Current
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnRTSSkillCooldownChanged, int32, SkillIndex, float, RemainingCooldown, float, MaxCooldown);
 // 스킬 활성화 상태 변경 델리게이트
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillActivationStateChanged, int32, SkillIndex, bool, bIsActive);
+// RTS 스킬 준비 완료 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnRTSSkillCooldownReady, int32, SkillIndex);
 
 /**
  * RTS 모드에서 가디언이 사용할 수 있는 스킬들을 관리하는 컴포넌트
  * 에테르(Aether)를 자원으로 사용하여 스킬을 발동
  */
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_RTSSkillComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -30,75 +32,78 @@ public:
 	UGS_RTSSkillComponent();
 
 	// 델리게이트
-	UPROPERTY(BlueprintAssignable, Category="RTS|Skill")
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Skill")
 	FOnRTSAetherChanged OnAetherChanged;
 
-	UPROPERTY(BlueprintAssignable, Category="RTS|Skill")
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Skill")
 	FOnRTSSkillCooldownChanged OnSkillCooldownChanged;
 
-	UPROPERTY(BlueprintAssignable, Category="RTS|Skill")
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Skill")
 	FOnSkillActivationStateChanged OnSkillActivationStateChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Skill")
+	FOnRTSSkillCooldownReady OnSkillCooldownReady;
+
 	// 에테르 관련 Getter
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	float GetCurrentAether() const { return CurrentAether; }
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	float GetMaxAether() const { return MaxAether; }
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	float GetAetherPercent() const { return MaxAether > 0 ? CurrentAether / MaxAether : 0.f; }
 
 	// 에테르 소비/회복
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	bool ConsumeAether(float Amount);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	void AddAether(float Amount);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Aether")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Aether")
 	void SetAether(float Amount);
 
 	// 스킬 관련
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	bool TryActivateSkill(int32 SkillIndex);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	bool CanActivateSkill(int32 SkillIndex) const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	UGS_RTSSkillBase* GetSkill(int32 SkillIndex) const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	int32 GetSkillCount() const { return Skills.Num(); }
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetSkillCooldownRemaining(int32 SkillIndex) const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	float GetSkillCooldownPercent(int32 SkillIndex) const;
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	bool IsSkillOnCooldown(int32 SkillIndex) const;
 
 	// 스킬 타겟팅 모드
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void EnterSkillTargetingMode(int32 SkillIndex);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void ExitSkillTargetingMode();
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void ExecuteSkillAtLocation(const FVector& TargetLocation);
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	bool IsInSkillTargetingMode() const { return bIsInTargetingMode; }
 
-	UFUNCTION(BlueprintCallable, Category="RTS|Skill")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	int32 GetTargetingSkillIndex() const { return TargetingSkillIndex; }
 
 	// 디버그
-	UFUNCTION(BlueprintCallable, Category="RTS|Debug")
+	UFUNCTION(BlueprintCallable, Category = "RTS|Debug")
 	void DebugPrintSkillStatus() const;
 
 protected:
@@ -107,22 +112,22 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 에테르 설정
-	UPROPERTY(EditDefaultsOnly, Category="RTS|Aether", meta=(ClampMin="0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "RTS|Aether", meta = (ClampMin = "0.0"))
 	float MaxAether;
 
-	UPROPERTY(EditDefaultsOnly, Category="RTS|Aether", meta=(ClampMin="0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "RTS|Aether", meta = (ClampMin = "0.0"))
 	float InitialAether;
 
-	UPROPERTY(EditDefaultsOnly, Category="RTS|Aether", meta=(ClampMin="0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "RTS|Aether", meta = (ClampMin = "0.0"))
 	float AetherRegenRate;
 
 	// 스킬 데이터 에셋 설정 (에디터에서 지정)
-	UPROPERTY(EditDefaultsOnly, Category="RTS|Skill")
+	UPROPERTY(EditDefaultsOnly, Category = "RTS|Skill")
 	TArray<TObjectPtr<UGS_RTSSkillData>> SkillDataAssets;
 
 private:
 	// 현재 에테르
-	UPROPERTY(ReplicatedUsing=OnRep_CurrentAether)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentAether)
 	float CurrentAether;
 
 	// 스킬 인스턴스들
@@ -146,7 +151,7 @@ private:
 
 	// 에테르 회복 타이머
 	FTimerHandle AetherRegenTimer;
-	
+
 	// 쿨다운 업데이트
 	void UpdateCooldowns(float DeltaTime);
 
@@ -165,4 +170,7 @@ private:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_OnSkillActivated(int32 SkillIndex, const FVector& TargetLocation);
+
+	UFUNCTION(Client, Reliable)
+	void Client_OnSkillCooldownFinished(int32 SkillIndex);
 };

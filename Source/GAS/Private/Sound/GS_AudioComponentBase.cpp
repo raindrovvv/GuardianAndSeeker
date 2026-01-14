@@ -12,6 +12,17 @@
 #include "AkAudioEvent.h"
 #include "AkGameplayStatics.h"
 #include "Engine/OverlapResult.h"
+#include "Rendering/GS_RenderingConstants.h"
+#include "DrawDebugHelpers.h"
+#include "System/Utility/GS_AssetLoader.h"
+
+static TAutoConsoleVariable<int32> CVarShowOcclusionRay(
+    TEXT("GS.Audio.ShowOcclusionRay"),
+    0,
+    TEXT("오디오 오클루전 레이를 화면에 표시합니다.\n")
+        TEXT("0: 비활성화\n")
+            TEXT("1: 활성화 (몬스터, 함정, 문의 오클루전 상태 시각화)"),
+    ECVF_Cheat);
 
 
 UGS_AudioComponentBase::UGS_AudioComponentBase()
@@ -78,7 +89,11 @@ void UGS_AudioComponentBase::BeginPlay()
 
 	// Seamless Travel 대응: World가 완전히 준비될 때까지 대기 후 초기화
 	// 즉시 초기화 시도
-	if (!InitializeAudioSystem())
+	if (InitializeAudioSystem())
+	{
+		PreloadCommonSounds();
+	}
+	else
 	{
 		// 실패 시 다음 프레임에 재시도 (Seamless Travel 중일 가능성)
 		if (UWorld* World = GetWorld())
@@ -127,12 +142,31 @@ void UGS_AudioComponentBase::PlayDeathSoundLocal()
 	// 죽음 사운드 재생 전 활성 사운드 정리 (몬스터/시커 공통 로직 유지)
 	StopAllActiveSounds();
 
-	// 모드별 사운드 선택 (폴백 포함)
-	UAkAudioEvent* SoundToPlay = SelectSoundEventByMode(DeathSound.Get(), RTS_DeathSound.Get());
+	// 단일 사운드 사용 (동적 스케일링 적용)
+	UAkAudioEvent* SoundToPlay = CachedDeathSound ? CachedDeathSound.Get() : UGS_AssetLoader::SyncLoadAsset(DeathSound);
 
 	if (SoundToPlay)
 	{
 		PostEventWithCallback(SoundToPlay, GetOwner());
+	}
+}
+
+void UGS_AudioComponentBase::PreloadCommonSounds()
+{
+	if (IsRunningDedicatedServer())
+	{
+		return;
+	}
+
+	if (!DeathSound.IsNull())
+	{
+		TWeakObjectPtr<UGS_AudioComponentBase> WeakThis(this);
+		UGS_AssetLoader::AsyncLoadAsset<UAkAudioEvent>(DeathSound, [WeakThis](UAkAudioEvent* LoadedAsset)
+		                                               {
+			if (UGS_AudioComponentBase* Strong = WeakThis.Get())
+			{
+				Strong->CachedDeathSound = LoadedAsset;
+			} });
 	}
 }
 
@@ -229,14 +263,24 @@ bool UGS_AudioComponentBase::IsRTSMode() const
 		return false;
 	}
 
-	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!LocalPC)
+	// 로컬 플레이어의 컨트롤러를 찾아야 함 (GetPlayerController(0)는 멀티플레이어에서 로컬이 아닐 수 있음)
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
-		return false;
+		APlayerController* PC = Iterator->Get();
+		if (PC && PC->IsLocalController())
+		{
+			return Cast<AGS_RTSController>(PC) != nullptr;
+		}
 	}
 
-	bool bIsRTS = Cast<AGS_RTSController>(LocalPC) != nullptr;
-	return bIsRTS;
+	// Fallback: 로컬 컨트롤러를 찾지 못한 경우
+	APlayerController* LocalPC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (LocalPC)
+	{
+		return Cast<AGS_RTSController>(LocalPC) != nullptr;
+	}
+
+	return false;
 }
 
 bool UGS_AudioComponentBase::GetListenerLocation(FVector& OutLocation) const
@@ -282,9 +326,27 @@ bool UGS_AudioComponentBase::GetListenerTransform(FVector& OutLocation, FRotator
 	{
 		FVector CameraLocation;
 		FRotator CameraRotation;
+
 		if (GetActualCameraTransform(CameraLocation, CameraRotation))
 		{
-			OutLocation = CameraLocation;
+			// === RTS Listener Ground Projection ===
+			// 리스너를 카메라 위치가 아닌, 카메라가 바라보는 지면(Z=0)에 배치하여
+			// 거리 감쇠가 수평 이동에 따라 자연스럽게 반응하도록 개선
+			FVector CamForward = CameraRotation.Vector();
+
+			if (CamForward.Z < -0.1f) // 아래를 바라보고 있을 때만 투영
+			{
+				float t = -CameraLocation.Z / CamForward.Z;
+				OutLocation = CameraLocation + CamForward * t;
+
+				// 지면에서 약간 띄워줌 (0에 너무 붙어있으면 묻힐 수 있음)
+				OutLocation.Z = 100.0f;
+			}
+			else
+			{
+				OutLocation = CameraLocation;
+			}
+
 			OutRotation = CameraRotation;
 			return true;
 		}
@@ -386,12 +448,24 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 		return true; // 카메라 정보를 얻을 수 없으면, 안전하게 true 반환
 	}
 
+	// RTS 모드에서는 카메라 높이에 관계없이 지면상의 거리를 기준으로 컬링을 수행합니다.
+	// CameraLocation은 하늘에 떠있으므로, 실제 감쇠 기준점인 ListenerLocation(지면 투영)을 사용합니다.
+	FVector ListenerLocation;
+	float DistanceToListener = 0.0f;
+	if (GetListenerLocation(ListenerLocation))
+	{
+		DistanceToListener = FVector::Dist(ListenerLocation, SourceLocation);
+	}
+	else
+	{
+		DistanceToListener = FVector::Dist(CameraLocation, SourceLocation);
+	}
+
 	const FVector DirectionToSource = (SourceLocation - CameraLocation).GetSafeNormal();
 	const FVector CameraForwardVector = CameraRotation.Vector();
-	const float Distance = FVector::Dist(CameraLocation, SourceLocation);
 
-	// 1. 근접 체크: 매우 가까우면 항상 들리도록 처리
-	if (Distance <= 800.0f) // 8미터
+	// 1. 근접 체크: 지면 리스너와 매우 가까우면(8미터) 화면 밖이라도 항상 들리도록 처리
+	if (DistanceToListener <= 800.0f)
 	{
 		return true;
 	}
@@ -409,7 +483,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 			if (IsInSameRoom(ViewTarget->GetActorLocation(), SourceLocation))
 			{
 				// 같은 방 시스템 내에 있다면, 제한된 거리로 허용
-				if (Distance <= 2000.0f) // 카메라 뒤쪽: 20미터
+				// 카메라 뒤쪽이더라도 지면상의 거리가 15미터 이내면 들리도록 설정
+				if (DistanceToListener <= 1500.0f)
 				{
 					return true;
 				}
@@ -429,8 +504,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 			GEngine->GameViewport->GetViewportSize(ViewportSize);
 
 			// 뷰포트 경계 내에 있는지 확인 (약간의 여유분 포함)
-			// 화면 가장자리의 소리도 들을 수 있도록 마진 설정
-			const float Margin = 200.0f; // 200픽셀 여유 (화면 밖의 가까운 소리도 포함)
+			// RTS 모드에서는 화면 밖 소리를 더 엄격하게 제한 (200px -> 80px)
+			const float Margin = 80.0f;
 			if (ScreenPosition.X >= -Margin && ScreenPosition.X <= ViewportSize.X + Margin &&
 			    ScreenPosition.Y >= -Margin && ScreenPosition.Y <= ViewportSize.Y + Margin)
 			{
@@ -452,7 +527,8 @@ bool UGS_AudioComponentBase::IsSourceVisibleOnScreen(AGS_RTSController* RTSContr
 		if (IsInSameRoom(ViewTarget->GetActorLocation(), SourceLocation))
 		{
 			// 같은 방 시스템 내에 있다면, 더 먼 거리의 소리도 허용
-			if (Distance <= 3000.0f) // 같은/연결된 방일 경우 30미터
+			// RTS 모드에서는 화면 밖 가청 범위를 지면 거리 기준 25미터로 설정
+			if (DistanceToListener <= 2500.0f)
 			{
 				return true;
 			}
@@ -536,10 +612,16 @@ bool UGS_AudioComponentBase::GetActualCameraTransform(FVector& OutLocation, FRot
 
 		if (RTSCameraActor && IsValid(RTSCameraActor))
 		{
-			if (IsTransformValid(RTSCameraActor->GetActorLocation(), RTSCameraActor->GetActorRotation()))
+			// RTSCameraActor의 루트 위치가 아닌, 실제 카메라 컴포넌트의 위치와 회전을 가져옵니다.
+			// 이를 통해 스프링암에 의한 오프셋과 실제 카메라 기울기(Pitch)가 반영된 Projection이 가능해집니다.
+			UCameraComponent* CamComp = RTSCameraActor->GetCameraComponent();
+			FVector CamLocation = CamComp ? CamComp->GetComponentLocation() : RTSCameraActor->GetActorLocation();
+			FRotator CamRotation = CamComp ? CamComp->GetComponentRotation() : RTSCameraActor->GetActorRotation();
+
+			if (IsTransformValid(CamLocation, CamRotation))
 			{
-				CachedCameraLocation = RTSCameraActor->GetActorLocation();
-				CachedCameraRotation = RTSCameraActor->GetActorRotation();
+				CachedCameraLocation = CamLocation;
+				CachedCameraRotation = CamRotation;
 				LastCameraLocationUpdateTime = CurrentTime;
 				OutLocation = CachedCameraLocation;
 				OutRotation = CachedCameraRotation;
@@ -764,7 +846,10 @@ void UGS_AudioComponentBase::UpdateDistanceRTPC()
 			if (ShouldUpdateRTPC(DistanceToListener, CurrentTime))
 			{
 				// 거리를 0-1 범위로 정규화하여 통일된 RTPC 시스템 사용
-				const float MaxDistance = GetMaxAudioDistance();
+				// RTS 모드에서는 Distance Scaling이 적용되므로, 정규화 시에도 이를 반영하여
+				// Wwise Attenuation과 RTPC 값이 동기화되도록 함
+				const float ModeScaling = GetDistanceScalingForMode(bCurrentRTSMode);
+				const float MaxDistance = GetMaxAudioDistance() * ModeScaling;
 				const float NormalizedDistance = MaxDistance > 0.0f ? FMath::Clamp(DistanceToListener / MaxDistance, 0.0f, 1.0f) : 0.0f;
 
 				SetUnifiedRTPCValue(DistanceToPlayerRTPC, NormalizedDistance);
@@ -807,42 +892,28 @@ void UGS_AudioComponentBase::SetDistanceScaling(bool bIsRTS)
 		return;
 	}
 
-	// 통일된 RTPC 시스템 사용
-	// GetDistanceScalingForMode는 RTSDistanceScaling(2.0f) 또는 TPSDistanceScaling(1.0f) 값을 반환
-	// SetUnifiedRTPCValue는 0-1 범위를 기대하므로, 0-2 범위를 0-1로 정규화
+	// 1. 모드별 거리 배율 및 오클루전 설정값 계산
 	const float ScalingValue = GetDistanceScalingForMode(bIsRTS);
-	const float NormalizedScaling = ScalingValue / 2.0f; // 0-2 범위를 0-1로 정규화 (1.0f → 0.5f, 2.0f → 1.0f)
-	SetUnifiedRTPCValue(AttenuationModeRTPC, NormalizedScaling);
-
-	// RTS 모드에서는 오클루전/오브스트럭션 비활성화
 	const float OcclusionValue = bIsRTS ? 1.0f : 0.0f; // 1.0f = 비활성화, 0.0f = 활성화
-	SetUnifiedRTPCValue(OcclusionDisableRTPC, OcclusionValue); // 이미 0-1 범위
 
-	// RTS 모드에서는 AkComponent의 내장 오클루전 기능을 직접 비활성화!
+	// 2. Wwise 컴포넌트 설정 업데이트
 	UAkComponent* AkComp = GetOrCreateAkComponent();
 	if (IsValid(AkComp))
 	{
-		// Owner 및 Transform 검증
-		AActor* Owner = GetOwner();
-		if (!Owner || !IsValid(Owner))
-		{
-			return;
-		}
+		// Wwise 내장 Attenuation Scaling Factor 적용 (가청 반경 조절)
+		AkComp->SetAttenuationScalingFactor(ScalingValue);
 
-		const FVector Location = Owner->GetActorLocation();
-		const FRotator Rotation = Owner->GetActorRotation();
-
-		if (IsTransformValid(Location, Rotation))
-		{
-			// OcclusionRefreshInterval을 0으로 설정하면 오클루전 계산이 비활성화!
-			// TPS 모드에서는 0.2초마다 계산하도록 재활성화!
-			AkComp->OcclusionRefreshInterval = bIsRTS ? 0.0f : 0.2f;
-		}
-		else
-		{
-			// Invalid Transform - silently skip
-		}
+		// RTS 모드에서는 오클루전 계산 주기 최적화 (비활성화)
+		AkComp->OcclusionRefreshInterval = bIsRTS ? 0.0f : 0.2f;
 	}
+
+	// 3. Wwise RTPC 업데이트 (디자이너의 커스텀 믹싱용으로 유지)
+	SetUnifiedRTPCValue(OcclusionDisableRTPC, OcclusionValue);
+
+	// RTSDistanceScaling 또는 TPSDistanceScaling을 0-1 범위로 정규화
+	// RTSDistanceScaling이 최대값이므로 이를 기준으로 정규화
+	const float NormalizedScaling = FMath::Clamp(ScalingValue / RTSDistanceScaling, 0.0f, 1.0f);
+	SetUnifiedRTPCValue(AttenuationModeRTPC, NormalizedScaling);
 }
 
 UAkComponent* UGS_AudioComponentBase::GetOrCreateAkComponent()
@@ -933,7 +1004,7 @@ void UGS_AudioComponentBase::SetUnifiedRTPCValue(UAkRtpc* RTPC, float Normalized
 {
 	if (!RTPC)
 	{
-		// 한 번만 경고하고 스킵 (스팸 방지)
+		// 한 번만 경고하고 스팸 방지
 		static TSet<FString> WarnedActors;
 		FString ActorName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown");
 
@@ -1086,14 +1157,21 @@ void UGS_AudioComponentBase::SafeClearTimer(FTimerHandle& TimerHandle)
 
 bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool& OutIsRTSMode, FVector& OutListenerLocation, bool bSkipViewFrustumCheck) const
 {
-	// 1. 데디케이티드 서버에서는 오디오 처리 불필요
-	if (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+	// 1. World 유효성 체크 (서버 안정성 강화)
+	UWorld* World = GetWorld();
+	if (!World || !IsWorldContextValid())
 	{
 		return false;
 	}
 
-	// 2. Owner 및 World 유효성 체크 (서버 안정성 강화)
-	if (!SourceActor || !IsValid(SourceActor) || !GetWorld() || !IsWorldContextValid())
+	// 2. 데디케이티드 서버에서는 오디오 처리 불필요
+	if (World->GetNetMode() == NM_DedicatedServer)
+	{
+		return false;
+	}
+
+	// 3. Owner 유효성 체크
+	if (!SourceActor || !IsValid(SourceActor))
 	{
 		return false;
 	}
@@ -1130,6 +1208,16 @@ bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool&
 	}
 
 	// 6. 모드별 거리/시야각 체크
+	// 로컬 플레이어가 아닌 캐릭터는 거리 제한을 엄격하게 적용
+	bool bIsLocallyControlled = false;
+	if (APawn* SourcePawn = Cast<APawn>(SourceActor))
+	{
+		bIsLocallyControlled = SourcePawn->IsLocallyControlled();
+	}
+
+	// 로컬 플레이어가 아닌 경우 거리 제한 (40m)
+	const float NonLocalMaxDistance = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+
 	if (OutIsRTSMode)
 	{
 		// RTS 모드: ViewFrustum 체크 (화면에 보이는지 확인)
@@ -1137,11 +1225,21 @@ bool UGS_AudioComponentBase::ShouldPlayMulticastSound(AActor* SourceActor, bool&
 		{
 			return false;
 		}
+
+		// RTS 모드에서도 비로컬 캐릭터는 거리 체크 적용
+		// RTS 시야가 넓으므로 렌더링 배율(2.5x)을 적용하여 사운드 가청 범위 확대
+		const float ScaledRTSMaxDistance = NonLocalMaxDistance * GS_Rendering::RTS_CULL_DISTANCE_SCALE;
+		if (!bIsLocallyControlled && DistanceToListener > ScaledRTSMaxDistance)
+		{
+			return false;
+		}
 	}
 	else
 	{
 		// TPS 모드: 거리 기반 체크
-		if (DistanceToListener > MaxDistance)
+		// 로컬 플레이어는 기본 MaxDistance, 타인은 더 짧은 거리 적용
+		float EffectiveMaxDistance = bIsLocallyControlled ? MaxDistance : FMath::Min(MaxDistance, NonLocalMaxDistance);
+		if (DistanceToListener > EffectiveMaxDistance)
 		{
 			return false;
 		}
@@ -1180,18 +1278,6 @@ bool UGS_AudioComponentBase::PrepareMulticastSound(AActor* SourceActor, bool bSk
 	return true;
 }
 
-UAkAudioEvent* UGS_AudioComponentBase::SelectSoundEventByMode(UAkAudioEvent* TPSSound, UAkAudioEvent* RTSSound, bool bUseRTSMode) const
-{
-	const bool bRTS = bUseRTSMode || IsRTSMode();
-
-	if (bRTS)
-	{
-		// RTS 사운드가 있으면 사용, 없으면 TPS 사운드로 폴백
-		return RTSSound ? RTSSound : TPSSound;
-	}
-
-	return TPSSound;
-}
 
 bool UGS_AudioComponentBase::ShouldSkipListenServerRPC() const
 {
@@ -1266,9 +1352,18 @@ bool UGS_AudioComponentBase::IsInSameRoom(const FVector& Pos1, const FVector& Po
 		return true;
 	}
 
-	// 어느 한쪽이라도 방이 아닌 야외 공간에 있다면 소리가 들리도록 함
+	// 어느 한쪽이라도 방이 아닌 야외 공간에 있다면 처리
 	if (!Room1 || !Room2)
 	{
+		// RTS 모드일 때는 야외 공간이라도 실시간 화면 중심 가시성 체크가 더 중요하므로
+		// 여기서 true를 반환하면 화면 밖 멀리 있는 야외 소리도 다 들리게 됨.
+		// 따라서 RTS 모드 여부를 체크하여 더 보수적으로 판단.
+		if (IsRTSMode())
+		{
+			// 둘 다 야외 공간인 경우에만 기본 true, 그 외(하나만 야외)는 False로 오클루전 유도
+			return (!Room1 && !Room2);
+		}
+
 		return true;
 	}
 
@@ -1290,7 +1385,8 @@ bool UGS_AudioComponentBase::AreRoomsConnected(AGS_RoomBase* Room1, AGS_RoomBase
 
 AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location) const
 {
-	if (!GetWorld())
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return nullptr;
 	}
@@ -1300,7 +1396,7 @@ AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location
 	FCollisionObjectQueryParams ObjectQueryParams(ECollisionChannel::ECC_WorldStatic);
 
 	// Location 지점에서 1.0f 반경의 구체로 오버랩되는 액터를 찾음.
-	if (GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams, FCollisionShape::MakeSphere(1.0f)))
+	if (World->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams, FCollisionShape::MakeSphere(1.0f)))
 	{
 		for (const FOverlapResult& Overlap : Overlaps)
 		{
@@ -1316,4 +1412,34 @@ AGS_RoomBase* UGS_AudioComponentBase::FindRoomAtLocation(const FVector& Location
 	}
 
 	return nullptr;
+}
+
+void UGS_AudioComponentBase::DrawOcclusionDebug(const UObject* WorldContextObject, const FVector& SoundLocation, const FVector& ListenerLocation)
+{
+	if (CVarShowOcclusionRay.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
+
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	if (!World)
+	{
+		return;
+	}
+
+	// 실제 장애물 체크 수행 (Wwise가 오클루전 계산 시 사용하는 ECC_Visibility 채널 사용)
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Cast<AActor>(WorldContextObject)); // 자기 자신 무시
+
+	bool bIsOccluded = World->LineTraceSingleByChannel(HitResult, SoundLocation, ListenerLocation, ECC_Visibility, Params);
+
+	FColor LineColor = bIsOccluded ? FColor::Red : FColor::Green;
+	float Thickness = bIsOccluded ? 1.0f : 1.0f;
+
+	// 선 그리기 (1초 동안 유지하여 업데이트 간격 메움)
+	DrawDebugLine(World, SoundLocation, ListenerLocation, LineColor, false, 1.0f, 0, Thickness);
+
+	// 시작점(소리 발생지)에 작은 구체 표시
+	DrawDebugSphere(World, SoundLocation, 15.0f, 8, LineColor, false, 1.0f, 0, Thickness);
 }
