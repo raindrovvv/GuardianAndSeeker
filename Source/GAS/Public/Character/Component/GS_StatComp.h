@@ -43,6 +43,13 @@ public:
 	UFUNCTION(Server, Reliable)
 	void UpdateStat(const FGS_StatRow& RuneStats);
 
+	/**
+	 * 데미지 계산 (크리티컬 판정 포함)
+	 * @param bOutIsCritical 크리티컬 발생 여부 (출력 파라미터)
+	 */
+	float CalculateDamage(AGS_Character* InDamageCauser, AGS_Character* InDamagedCharacter, bool& bOutIsCritical, float InSkillCoefficient = 1.f, float SlopeCoefficient = 1.f);
+
+	/** 하위 호환용 오버로드 (크리티컬 정보 필요 없는 경우) */
 	float CalculateDamage(AGS_Character* InDamageCauser, AGS_Character* InDamagedCharacter, float InSkillCoefficient = 1.f, float SlopeCoefficient = 1.f);
 
 	//getter
@@ -54,6 +61,8 @@ public:
 	FORCEINLINE float GetDefense() const { return Defense; }
 	FORCEINLINE float GetAgility() const { return Agility; }
 	FORCEINLINE float GetAttackSpeed() const { return AttackSpeed; }
+	FORCEINLINE float GetCriticalRate() const { return CriticalRate; }
+	FORCEINLINE float GetCriticalDamage() const { return CriticalDamage; }
 
 	//setter
 	void SetCurrentHealth(float InHealth, bool bIsHealing);
@@ -96,6 +105,10 @@ private:
 	float Agility; // 민첩
 	UPROPERTY(EditDefaultsOnly)
 	float AttackSpeed; // 공격속도
+	UPROPERTY(EditDefaultsOnly)
+	float CriticalRate = 0.1f; // 크리티컬 확률 (10%)
+	UPROPERTY(EditDefaultsOnly)
+	float CriticalDamage = 1.5f; // 크리티컬 배율 (150%)
 
 	UFUNCTION()
 	void OnDamageMontageEnded(UAnimMontage* Montage, bool bInterrupted);

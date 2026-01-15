@@ -402,9 +402,11 @@ void AGS_Drakhar::MeleeAttackCheck()
 				UGS_StatComp* DamagedCharacterStat = DamagedCharacter->GetStatComp();
 				if (IsValid(DamagedCharacterStat))
 				{
-					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter);
+					bool bIsCritical = false;
+					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter, bIsCritical);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
+					DamageEvent.bIsCritical = bIsCritical;
 
 					float ActualDamage = DamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(), this);
 
@@ -463,9 +465,11 @@ void AGS_Drakhar::ComboLastAttack()
 				UGS_StatComp* DamagedCharacterStat = DamagedPlayer->GetStatComp();
 				if (IsValid(DamagedCharacterStat))
 				{
-					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedPlayer);
+					bool bIsCritical = false;
+					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedPlayer, bIsCritical);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
+					DamageEvent.bIsCritical = bIsCritical;
 
 					float ActualDamage = DamagedPlayer->TakeDamage(Damage + PlusDamage, DamageEvent, GetController(), this);
 
@@ -563,11 +567,13 @@ void AGS_Drakhar::ServerRPCEndDash_Implementation()
 
 	for (auto const& DamagedCharacter : DamagedCharactersFromDash)
 	{
+		bool bIsCritical = false;
 		float SkillCoefficient = GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::Moving)->Damage;
-		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, SkillCoefficient);
+		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, bIsCritical, SkillCoefficient);
 
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::DamageOnly; // 가드 풀리지 않도록 변경
+		DamageEvent.bIsCritical = bIsCritical;
 
 		float ActualDamage = DamagedCharacter->TakeDamage(RealDamage, DamageEvent, GetController(), this);
 
@@ -661,13 +667,15 @@ void AGS_Drakhar::ServerRPCEarthquakeAttackCheck_Implementation()
 
 	for (const auto& DamagedCharacter : CachedDamagedCharacters)
 	{
+		bool bIsCritical = false;
 		float SkillCoefficient = GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::Aiming)->Damage;
-		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, SkillCoefficient);
+		float RealDamage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, bIsCritical, SkillCoefficient);
 
 		FGS_DamageEvent DamageEvent;
 		if (IsValid(DamagedCharacter))
 		{
 			DamageEvent.HitReactType = EHitReactType::DamageOnly; // 가드 풀리지 않도록 변경
+			DamageEvent.bIsCritical = bIsCritical;
 
 			// 실제 데미지 적용
 			float ActualDamage = DamagedCharacter->TakeDamage(RealDamage, DamageEvent, GetController(), this);
@@ -1027,9 +1035,11 @@ void AGS_Drakhar::FeverComoLastAttack()
 				UGS_StatComp* DamagedCharacterStat = DamagedSeeker->GetStatComp();
 				if (IsValid(DamagedCharacterStat))
 				{
-					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedSeeker);
+					bool bIsCritical = false;
+					float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedSeeker, bIsCritical);
 					FGS_DamageEvent DamageEvent;
 					DamageEvent.HitReactType = EHitReactType::DamageOnly;
+					DamageEvent.bIsCritical = bIsCritical;
 
 					float ActualDamage = DamagedSeeker->TakeDamage(Damage + 20.f, DamageEvent, GetController(), this);
 

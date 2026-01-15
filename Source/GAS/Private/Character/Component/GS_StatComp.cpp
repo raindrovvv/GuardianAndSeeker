@@ -87,6 +87,8 @@ void UGS_StatComp::InitStat(FName RowName)
 		Defense = FoundRow->DEF;
 		Agility = FoundRow->AGL;
 		AttackSpeed = FoundRow->ATS;
+		CriticalRate = FoundRow->CritRate;
+		CriticalDamage = FoundRow->CritDamage;
 
 		AGS_Character* OwnerChar = Cast<AGS_Character>(GetOwner());
 		if (AGS_PlayerState* PS = OwnerChar->GetPlayerState<AGS_PlayerState>())
@@ -119,6 +121,8 @@ void UGS_StatComp::ChangeStat(const FGS_StatRow& InChangeStat)
 	Defense += InChangeStat.DEF;
 	Agility += InChangeStat.AGL;
 	AttackSpeed += InChangeStat.ATS;
+	CriticalRate += InChangeStat.CritRate;
+	CriticalDamage += InChangeStat.CritDamage;
 }
 
 void UGS_StatComp::ResetStat(const FGS_StatRow& InChangeStat)
@@ -128,6 +132,8 @@ void UGS_StatComp::ResetStat(const FGS_StatRow& InChangeStat)
 	Defense -= InChangeStat.DEF;
 	Agility -= InChangeStat.AGL;
 	AttackSpeed -= InChangeStat.ATS;
+	CriticalRate -= InChangeStat.CritRate;
+	CriticalDamage -= InChangeStat.CritDamage;
 }
 
 void UGS_StatComp::UpdateStat_Implementation(const FGS_StatRow& RuneStats)
@@ -145,6 +151,8 @@ void UGS_StatComp::UpdateStat_Implementation(const FGS_StatRow& RuneStats)
 		Defense = FoundRow->DEF + RuneStats.DEF;
 		Agility = FoundRow->AGL + RuneStats.AGL;
 		AttackSpeed = FoundRow->ATS + RuneStats.ATS;
+		CriticalRate = FoundRow->CritRate + RuneStats.CritRate;
+		CriticalDamage = FoundRow->CritDamage + RuneStats.CritDamage;
 
 		UE_LOG(LogTemp, Log, TEXT("캐릭터 스탯 업데이트 - HP: %.1f, ATK: %.1f, DEF: %.1f, AGL: %.1f, ATS: %.1f"),
 		       MaxHealth, AttackPower, Defense, Agility, AttackSpeed);
@@ -155,14 +163,49 @@ void UGS_StatComp::UpdateStat_Implementation(const FGS_StatRow& RuneStats)
 	}
 }
 
-float UGS_StatComp::CalculateDamage(AGS_Character* InDamageCauser, AGS_Character* InDamagedCharacter, float InSkillCoefficient, float SlopeCoefficient)
+float UGS_StatComp::CalculateDamage(AGS_Character* InDamageCauser, AGS_Character* InDamagedCharacter, bool& bOutIsCritical, float InSkillCoefficient, float SlopeCoefficient)
 {
+	// 초기화 및 null 체크
+	bOutIsCritical = false;
+
+	if (!IsValid(InDamageCauser) || !IsValid(InDamagedCharacter))
+	{
+		return 0.f;
+	}
+
+	UGS_StatComp* DamagedStat = InDamagedCharacter->GetStatComp();
+	UGS_StatComp* CauserStat = InDamageCauser->GetStatComp();
+
+	if (!IsValid(DamagedStat) || !IsValid(CauserStat))
+	{
+		return 0.f;
+	}
+
 	float Damage = 0.f;
-	float DamagedCharacterDefense = InDamagedCharacter->GetStatComp()->GetDefense();
-	float DamageCauserAttack = InDamageCauser->GetStatComp()->GetAttackPower();
+	float DamagedCharacterDefense = DamagedStat->GetDefense();
+	float DamageCauserAttack = CauserStat->GetAttackPower();
+
+	// 기본 데미지 계산
 	Damage = (DamageCauserAttack * InSkillCoefficient) * (100.f / (100.f + SlopeCoefficient * DamagedCharacterDefense));
 
+	// 크리티컬 판정 (CritRate 범위 제한)
+	float CritRate = FMath::Clamp(CauserStat->GetCriticalRate(), 0.f, 1.f);
+	float CritMultiplier = FMath::Max(1.f, CauserStat->GetCriticalDamage());
+
+	bOutIsCritical = FMath::FRand() < CritRate;
+	if (bOutIsCritical)
+	{
+		Damage *= CritMultiplier;
+	}
+
 	return Damage;
+}
+
+// 하위 호환용 오버로드 (크리티컬 정보 필요 없는 경우)
+float UGS_StatComp::CalculateDamage(AGS_Character* InDamageCauser, AGS_Character* InDamagedCharacter, float InSkillCoefficient, float SlopeCoefficient)
+{
+	bool bDummyCritical = false;
+	return CalculateDamage(InDamageCauser, InDamagedCharacter, bDummyCritical, InSkillCoefficient, SlopeCoefficient);
 }
 
 void UGS_StatComp::SetCurrentHealth(float InHealth, bool bIsHealing)

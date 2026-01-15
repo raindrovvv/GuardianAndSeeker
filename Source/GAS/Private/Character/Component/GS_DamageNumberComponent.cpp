@@ -40,16 +40,16 @@ void UGS_DamageNumberComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	Super::EndPlay(EndPlayReason);
 }
 
-void UGS_DamageNumberComponent::ShowDamageNumber(float Damage, EDamageNumberType Type, FVector WorldLocation)
+void UGS_DamageNumberComponent::ShowDamageNumber(float Damage, EDamageNumberType Type, FVector WorldLocation, AActor* TargetActor)
 {
 	// 서버에서만 RPC 호출
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		Multicast_ShowDamageNumber(Damage, Type, WorldLocation);
+		Multicast_ShowDamageNumber(Damage, Type, WorldLocation, TargetActor);
 	}
 }
 
-void UGS_DamageNumberComponent::Multicast_ShowDamageNumber_Implementation(float Damage, EDamageNumberType Type, FVector WorldLocation)
+void UGS_DamageNumberComponent::Multicast_ShowDamageNumber_Implementation(float Damage, EDamageNumberType Type, FVector WorldLocation, AActor* TargetActor)
 {
 	// 데디케이티드 서버에서는 UI 표시 안함
 	if (GetNetMode() == NM_DedicatedServer)
@@ -57,10 +57,10 @@ void UGS_DamageNumberComponent::Multicast_ShowDamageNumber_Implementation(float 
 		return;
 	}
 
-	ShowDamageNumberInternal(Damage, Type, WorldLocation);
+	ShowDamageNumberInternal(Damage, Type, WorldLocation, TargetActor);
 }
 
-void UGS_DamageNumberComponent::ShowDamageNumberInternal(float Damage, EDamageNumberType Type, FVector WorldLocation)
+void UGS_DamageNumberComponent::ShowDamageNumberInternal(float Damage, EDamageNumberType Type, FVector WorldLocation, AActor* TargetActor)
 {
 	if (!DamageNumberWidgetClass)
 	{
@@ -102,9 +102,70 @@ void UGS_DamageNumberComponent::ShowDamageNumberInternal(float Damage, EDamageNu
 		return;
 	}
 
+	// ====== 데미지 누적 시스템 ======
+	// 동일 타겟에 대해 활성화된 위젯이 있으면 데미지 누적
+	if (bEnableAccumulation && TargetActor != nullptr)
+	{
+		UGS_DamageNumberWidget* ExistingWidget = FindActiveWidgetForTarget(TargetActor);
+		if (ExistingWidget && ExistingWidget->AddDamage(Damage))
+		{
+			// 누적 성공 - 새 위젯 생성하지 않음
+			return;
+		}
+	}
+
+	// ====== 거리 기반 스케일 계산 ======
+	float DistanceScale = 1.0f;
+	if (bEnableDistanceScaling && LocalPC->GetPawn())
+	{
+		const float Distance = FVector::Dist(WorldLocation, LocalPC->GetPawn()->GetActorLocation());
+		// 거리에 따른 스케일 보간 (Near -> Max, Far -> Min)
+		DistanceScale = FMath::GetMappedRangeValueClamped(
+		    FVector2D(NearDistance, FarDistance),
+		    FVector2D(MaxDistanceScale, MinDistanceScale),
+		    Distance);
+	}
+
 	// 위치에 랜덤 오프셋 추가 (겹침 방지)
 	ScreenPosition.X += FMath::RandRange(-RandomOffset, RandomOffset);
 	ScreenPosition.Y += FMath::RandRange(-RandomOffset * 0.5f, RandomOffset * 0.5f);
+
+	// ====== 스마트 겹침 방지 ======
+	if (bEnableOverlapPrevention)
+	{
+		// 거리 제곱을 루프 밖에서 미리 계산 (최적화)
+		const float OverlapRadiusSq = FMath::Square(OverlapDetectionRadius);
+		const int32 MaxOverlapIterations = 5; // 무한 루프 방지
+
+		for (int32 Iteration = 0; Iteration < MaxOverlapIterations; ++Iteration)
+		{
+			bool bFoundOverlap = false;
+
+			for (UGS_DamageNumberWidget* ExistingWidget : ActiveWidgets)
+			{
+				if (!IsValid(ExistingWidget) || !ExistingWidget->IsActive())
+				{
+					continue;
+				}
+
+				const FVector2D ExistingPos = ExistingWidget->GetCurrentScreenPosition();
+				const float DistanceSq = FVector2D::DistSquared(ScreenPosition, ExistingPos);
+
+				if (DistanceSq < OverlapRadiusSq)
+				{
+					// 겹침 감지 - 위로 밀어냄
+					ScreenPosition.Y -= OverlapYOffset;
+					bFoundOverlap = true;
+					break;
+				}
+			}
+
+			if (!bFoundOverlap)
+			{
+				break;
+			}
+		}
+	}
 
 	// 풀에서 위젯 가져오기
 	UGS_DamageNumberWidget* Widget = GetPooledWidget(LocalPC);
@@ -113,11 +174,33 @@ void UGS_DamageNumberComponent::ShowDamageNumberInternal(float Damage, EDamageNu
 		return;
 	}
 
-	// 데미지 표시 시작
-	Widget->ShowDamage(Damage, Type, ScreenPosition, DisplayDuration);
+	// 타겟 액터 설정 (누적 시스템용)
+	Widget->SetTargetActor(TargetActor);
 
-	// 애니메이션 완료 시 풀에 반환
+	// 데미지 표시 시작 (거리 스케일 적용)
+	Widget->ShowDamage(Damage, Type, ScreenPosition, DisplayDuration, DistanceScale);
+
+	// 애니메이션 완료 시 풀에 반환 (기존 바인딩 해제 후 재바인딩)
+	Widget->OnAnimationComplete.Unbind();
 	Widget->OnAnimationComplete.BindUObject(this, &UGS_DamageNumberComponent::ReturnToPool);
+}
+
+UGS_DamageNumberWidget* UGS_DamageNumberComponent::FindActiveWidgetForTarget(AActor* TargetActor) const
+{
+	if (!TargetActor)
+	{
+		return nullptr;
+	}
+
+	for (UGS_DamageNumberWidget* Widget : ActiveWidgets)
+	{
+		if (IsValid(Widget) && Widget->IsActive() && Widget->GetTargetActor() == TargetActor)
+		{
+			return Widget;
+		}
+	}
+
+	return nullptr;
 }
 
 UGS_DamageNumberWidget* UGS_DamageNumberComponent::GetPooledWidget(APlayerController* PC)
@@ -127,8 +210,8 @@ UGS_DamageNumberWidget* UGS_DamageNumberComponent::GetPooledWidget(APlayerContro
 		return nullptr;
 	}
 
-	// 풀에서 사용 가능한 위젯 찾기
-	if (WidgetPool.Num() > 0)
+	// 풀에서 사용 가능한 위젯 찾기 (무효한 위젯은 건너뛰기)
+	while (WidgetPool.Num() > 0)
 	{
 		UGS_DamageNumberWidget* Widget = WidgetPool.Pop();
 		if (IsValid(Widget))
@@ -137,6 +220,7 @@ UGS_DamageNumberWidget* UGS_DamageNumberComponent::GetPooledWidget(APlayerContro
 			ActiveWidgets.Add(Widget);
 			return Widget;
 		}
+		// Invalid한 위젯은 버리고 다음 시도
 	}
 
 	// 풀이 비어있으면 새 위젯 생성
@@ -152,12 +236,15 @@ UGS_DamageNumberWidget* UGS_DamageNumberComponent::GetPooledWidget(APlayerContro
 	}
 
 	// 풀 한도 초과 - 가장 오래된 활성 위젯 재사용
-	if (ActiveWidgets.Num() > 0)
+	for (int32 i = 0; i < ActiveWidgets.Num(); ++i)
 	{
-		UGS_DamageNumberWidget* OldestWidget = ActiveWidgets[0];
-		ActiveWidgets.RemoveAt(0);
-		ActiveWidgets.Add(OldestWidget);
-		return OldestWidget;
+		if (IsValid(ActiveWidgets[i]))
+		{
+			UGS_DamageNumberWidget* OldestWidget = ActiveWidgets[i];
+			ActiveWidgets.RemoveAt(i);
+			ActiveWidgets.Add(OldestWidget);
+			return OldestWidget;
+		}
 	}
 
 	return nullptr;

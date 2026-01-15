@@ -470,12 +470,13 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	StatComp->SetCurrentHealth(NewHealth, false);
 
 	// 데미지 숫자 팝업 표시 (공격자 화면에 표시)
+	const FGS_DamageEvent* GSDamageEvent = DamageEvent.IsOfType(FGS_DamageEvent::ClassID) ? static_cast<const FGS_DamageEvent*>(&DamageEvent) : nullptr;
+
 	// DoT 데미지: HitReactType이 DamageOnly이고 Point/Radial 이벤트가 아닌 경우
 	bool bIsDotDamage = false;
-	if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
+	if (GSDamageEvent)
 	{
-		const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
-		bIsDotDamage = (MyDamageEvent.HitReactType == EHitReactType::DamageOnly) && !DamageEvent.IsOfType(FPointDamageEvent::ClassID) && !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
+		bIsDotDamage = (GSDamageEvent->HitReactType == EHitReactType::DamageOnly) && !DamageEvent.IsOfType(FPointDamageEvent::ClassID) && !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
 	}
 
 	// 공격자 캐릭터에게 데미지 숫자 표시 요청
@@ -501,7 +502,16 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	{
 		if (UGS_DamageNumberComponent* DmgNumComp = AttackerCharacter->GetDamageNumberComponent())
 		{
-			EDamageNumberType NumType = bIsDotDamage ? EDamageNumberType::DoT : EDamageNumberType::Normal;
+			// 데미지 타입 결정: Critical > DoT > Normal
+			EDamageNumberType NumType = EDamageNumberType::Normal;
+			if (GSDamageEvent && GSDamageEvent->bIsCritical)
+			{
+				NumType = EDamageNumberType::Critical;
+			}
+			else if (bIsDotDamage)
+			{
+				NumType = EDamageNumberType::DoT;
+			}
 
 			// 피해자의 머리 위치에 표시 (캡슐 높이 상단 - 너무 높지 않게)
 			FVector DisplayLocation = GetActorLocation();
@@ -618,9 +628,11 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 		UGS_StatComp* DamagedCharacterStat = InDamagedCharacter->GetStatComp();
 		if (IsValid(DamagedCharacterStat))
 		{
+			bool bIsCritical = false;
 			float Damage =
-			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter);
-			FDamageEvent DamageEvent;
+			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter, bIsCritical);
+			FGS_DamageEvent DamageEvent;
+			DamageEvent.bIsCritical = bIsCritical;
 			InDamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(),
 			                               this);
 

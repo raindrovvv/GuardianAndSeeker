@@ -5,6 +5,7 @@
 #include "Character/Skill/GS_SkillComp.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
+#include "Character/F_GS_DamageEvent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Character/Component/GS_CameraShakeComponent.h"
@@ -248,8 +249,10 @@ void AGS_Guardian::ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& Damag
 		UGS_StatComp* DamagedCharacterStat = DamagedCharacter->GetStatComp();
 		if (IsValid(DamagedCharacterStat))
 		{
-			float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter);
-			FDamageEvent DamageEvent;
+			bool bIsCritical = false;
+			float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter, bIsCritical);
+			FGS_DamageEvent DamageEvent;
+			DamageEvent.bIsCritical = bIsCritical;
 			DamagedCharacter->TakeDamage(Damage + PlusDamge, DamageEvent, GetController(), this);
 
 			//hit stop

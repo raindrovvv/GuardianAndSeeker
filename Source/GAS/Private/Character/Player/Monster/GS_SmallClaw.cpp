@@ -76,9 +76,11 @@ void AGS_SmallClaw::OnAttackBiteboxOverlap(UPrimitiveComponent* OverlappedCompon
 			return;
 		}
 
-		float Damage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter);
+		bool bIsCritical = false;
+		float Damage = DamagedCharacter->GetStatComp()->CalculateDamage(this, DamagedCharacter, bIsCritical);
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::DamageOnly;
+		DamageEvent.bIsCritical = bIsCritical;
 
 		float ActualDamage = OtherActor->TakeDamage(Damage, DamageEvent, GetController(), this);
 
