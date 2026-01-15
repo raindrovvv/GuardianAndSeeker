@@ -16,6 +16,7 @@ class UWidgetComponent;
 class UGS_MonsterSkillComp;
 class UGS_MonsterAnimInstance;
 class UGS_VFXComponent;
+class UGS_DebuffIndicatorComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterDead, AGS_Monster*,
                                             DeadUnit);
@@ -70,6 +71,10 @@ public:
 	// VFX 컴포넌트 (디버프 등 모든 VFX)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UGS_VFXComponent* VFXComponent;
+
+	// 디버프 아이콘 표시 컴포넌트 (시커/가디언 시점에서 보이는 머리 위 아이콘)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UGS_DebuffIndicatorComponent> DebuffIndicatorComponent;
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_OnDeath();

@@ -45,7 +45,7 @@ public:
 
 	void ApplyStrength(float Strength01);
 
-	UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp; }
+	UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp.Get(); }
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -58,7 +58,9 @@ private:
 
 private:
 	TWeakObjectPtr<AActor> OwnerActor;
-	UPostProcessComponent* ManagedPostProcessComp = nullptr;
+	TWeakObjectPtr<UPostProcessComponent> ManagedPostProcessComp;
+
+	UPROPERTY()
 	UMaterialInstanceDynamic* DynamicMaterial = nullptr;
 	FTimerHandle UpdateTimerHandle;
 	bool bIsActive = false;

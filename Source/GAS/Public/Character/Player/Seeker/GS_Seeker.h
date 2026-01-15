@@ -31,6 +31,7 @@ class UGS_HitIndicatorComponent;
 class UGS_PositiveEffectComponent;
 class UGS_DeathCinematicComponent;
 class UGS_RevivalEffectComponent;
+class UGS_DebuffIndicatorComponent;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -328,6 +329,12 @@ public:
 	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	UGS_HitIndicatorComponent* HitIndicatorComponent;
+
+	// =======================
+	// 디버프 아이콘 표시 컴포넌트 (동료 시커 머리 위 표시)
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	UGS_DebuffIndicatorComponent* DebuffIndicatorComponent;
 
 	// =======================
 	// 긍정적 효과(힐/버프) 화면 효과

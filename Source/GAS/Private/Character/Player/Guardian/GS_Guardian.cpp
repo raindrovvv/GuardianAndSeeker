@@ -14,6 +14,7 @@
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "Misc/App.h"
+#include "Character/Component/GS_DebuffIndicatorComponent.h"
 
 
 AGS_Guardian::AGS_Guardian(const FObjectInitializer& ObjectInitializer)
@@ -32,6 +33,9 @@ AGS_Guardian::AGS_Guardian(const FObjectInitializer& ObjectInitializer)
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	// NOTE: 자식 클래스(Drakhar 등)에서 FObjectInitializer::SetDefaultSubobjectClass 를 통해 클래스를 변경할 수 있음.
 	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
+
+	// 디버프 아이콘 표시 컴포넌트 생성 (시커/가디언 시점에서 보이는 머리 위 아이콘)
+	DebuffIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffIndicatorComponent>(this, TEXT("DebuffIndicatorComponent"));
 
 	// 컴포넌트 생성 및 초기화
 	TargetedUIComponent = ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));

@@ -51,6 +51,7 @@
 #include "Character/Component/GS_PositiveEffectComponent.h"
 #include "Character/Component/GS_DeathCinematicComponent.h"
 #include "Character/Component/GS_RevivalEffectComponent.h"
+#include "Character/Component/GS_DebuffIndicatorComponent.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
@@ -104,6 +105,9 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 
 	// 방향성 피격 HUD 컴포넌트 생성
 	HitIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_HitIndicatorComponent>(this, TEXT("HitIndicatorComponent"));
+
+	// 디버프 아이콘 표시 컴포넌트 생성 (동료 시커 머리 위 표시)
+	DebuffIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffIndicatorComponent>(this, TEXT("DebuffIndicatorComponent"));
 
 	// Post Process Component 생성 (긍정적 효과 - 힐/버프)
 	PositiveEffectPostProcessComp = ObjectInitializer.CreateDefaultSubobject<UPostProcessComponent>(this, TEXT("PositiveEffectPostProcessComp"));
