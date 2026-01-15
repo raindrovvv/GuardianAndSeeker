@@ -8,7 +8,9 @@
 #include "Character/Component/GS_DrakharAudioComponent.h"
 #include "Character/Component/GS_HitReactComp.h"
 #include "Character/Component/GS_HitIndicatorComponent.h"
+#include "Character/Component/GS_DamageNumberComponent.h"
 #include "Character/Component/GS_StatComp.h"
+#include "UI/Damage/EDamageNumberType.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "Character/Player/GS_Player.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
@@ -67,6 +69,9 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 
 	// 다이내믹 사운드 믹싱 컴포넌트 생성
 	AudioMixingComponent = ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
+
+	// 데미지 숫자 팝업 컴포넌트
+	DamageNumberComp = ObjectInitializer.CreateDefaultSubobject<UGS_DamageNumberComponent>(this, TEXT("DamageNumberComp"));
 }
 
 void AGS_Character::BeginPlay()
@@ -463,6 +468,48 @@ float AGS_Character::TakeDamage(float DamageAmount,
 
 	float NewHealth = CurrentHealth - ActualDamage;
 	StatComp->SetCurrentHealth(NewHealth, false);
+
+	// 데미지 숫자 팝업 표시 (공격자 화면에 표시)
+	// DoT 데미지: HitReactType이 DamageOnly이고 Point/Radial 이벤트가 아닌 경우
+	bool bIsDotDamage = false;
+	if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
+	{
+		const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
+		bIsDotDamage = (MyDamageEvent.HitReactType == EHitReactType::DamageOnly) && !DamageEvent.IsOfType(FPointDamageEvent::ClassID) && !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
+	}
+
+	// 공격자 캐릭터에게 데미지 숫자 표시 요청
+	// 직접 캐릭터가 공격했거나, 프로젝타일을 통해 공격한 경우 모두 처리
+	AGS_Character* AttackerCharacter = Cast<AGS_Character>(DamageCauser);
+
+	// DamageCauser가 캐릭터가 아닌 경우 (프로젝타일 등)
+	if (!AttackerCharacter)
+	{
+		// 프로젝타일인 경우 소유자(발사한 캐릭터) 찾기
+		if (AGS_WeaponProjectile* Projectile = Cast<AGS_WeaponProjectile>(DamageCauser))
+		{
+			AttackerCharacter = Cast<AGS_Character>(Projectile->GetOwner());
+		}
+		// 일반 무기인 경우
+		else if (AGS_Weapon* Weapon = Cast<AGS_Weapon>(DamageCauser))
+		{
+			AttackerCharacter = Cast<AGS_Character>(Weapon->GetOwner());
+		}
+	}
+
+	if (AttackerCharacter && ActualDamage > 0.0f)
+	{
+		if (UGS_DamageNumberComponent* DmgNumComp = AttackerCharacter->GetDamageNumberComponent())
+		{
+			EDamageNumberType NumType = bIsDotDamage ? EDamageNumberType::DoT : EDamageNumberType::Normal;
+
+			// 피해자의 머리 위치에 표시 (캡슐 높이 상단 - 너무 높지 않게)
+			FVector DisplayLocation = GetActorLocation();
+			DisplayLocation.Z += GetDefaultHalfHeight(); // 1.0x로 낮춤
+
+			DmgNumComp->ShowDamageNumber(ActualDamage, NumType, DisplayLocation);
+		}
+	}
 
 	return ActualDamage;
 }

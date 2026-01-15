@@ -23,6 +23,7 @@ class UGS_HPWidget;
 class AGS_Weapon;
 class UDecalComponent;
 class UNiagaraSystem;
+class UGS_DamageNumberComponent;
 
 USTRUCT(BlueprintType)
 struct FImpactVFXInfo
@@ -173,6 +174,7 @@ public:
 	FORCEINLINE UGS_StatComp* GetStatComp() const { return StatComp; }
 	FORCEINLINE UGS_DebuffComp* GetDebuffComp() const { return DebuffComp; }
 	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
+	FORCEINLINE UGS_DamageNumberComponent* GetDamageNumberComponent() const { return DamageNumberComp; }
 
 	//serverRPC
 	/** 타격 정격(Hit-stop) 효과 적용 (멀티캐스트) */
@@ -320,6 +322,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_StatComp> StatComp;
+
+	/** 데미지 숫자 팝업 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UGS_DamageNumberComponent> DamageNumberComp;
 
 	/** 공통 오디오 컴포넌트 변수 (내부 로직용으로만 사용, 에디터 노출은 자식 클래스에서 타입별로 수행) */
 	UPROPERTY()
