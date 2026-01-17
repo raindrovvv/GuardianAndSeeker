@@ -1725,6 +1725,13 @@ void AGS_Seeker::OnRevived()
 		float ReviveHP = MaxHP * ReviveHealthPercent;
 		// 직접 HP 설정 (SetCurrentHealth의 힐 이벡트 RPC를 우회)
 		Stat->DirectSetHealth(ReviveHP);
+
+		// 구조자에게 힐 어시스트 점수 부여 (서포트 기록)
+		if (CurrentReviver.IsValid())
+		{
+			NotifyHealed(CurrentReviver.Get(), ReviveHP);
+		}
+
 		ForceNetUpdate(); // 즉시 네트워크 복제
 	}
 

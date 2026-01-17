@@ -377,9 +377,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Revival")
 	TSoftObjectPtr<UMaterialInterface> RevivalEffectMaterial;
 
-	// ================
+	// =======================
 	// 함정 VFX 컴포넌트
-	// ================
+	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UNiagaraComponent* FeetLavaVFX_L;
 

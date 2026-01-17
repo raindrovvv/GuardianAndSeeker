@@ -368,11 +368,32 @@ void UGS_StatComp::MulticastRPCPlayTakeDamageMontage_Implementation()
 	}
 }
 
-void UGS_StatComp::MulticastRPCNotifyPositiveEffect_Implementation(EPositiveEffectType EffectType)
+void UGS_StatComp::MulticastRPCNotifyPositiveEffect_Implementation(EPositiveEffectType EffectType, AGS_Character* Instigator)
 {
+	// 서버에서 어시스트 기록 처리 (RPC 파라미터 Instigator는 서버에서만 유효함을 보장)
+	if (GetOwner() && GetOwner()->HasAuthority() && Instigator)
+	{
+		if (AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner()))
+		{
+			if (Instigator != OwnerCharacter)
+			{
+				// 힐 타입이면 NotifyHealed, 버프 타입이면 NotifyBuffed
+				if (EffectType == EPositiveEffectType::Heal)
+				{
+					// 힐량은 별도로 전달받지 않으므로 기본값 사용 (실제 힐량은 SetCurrentHealth에서 계산)
+					// 여기서는 서포트 등록만 수행
+				}
+				else
+				{
+					OwnerCharacter->NotifyBuffed(Instigator, EffectType);
+				}
+			}
+		}
+	}
+
+	// 시각 효과는 로컬 클라이언트에서만 표시
 	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
 	{
-		// 로컬 컨트롤러인 경우에만 화면에 효과를 표시함
 		if (Seeker->IsLocallyControlled() && Seeker->PositiveEffectComp)
 		{
 			Seeker->PositiveEffectComp->OnBuffReceived(EffectType);

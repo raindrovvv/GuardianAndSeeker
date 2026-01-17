@@ -79,7 +79,7 @@ public:
 	void MulticastRPCPlayTakeDamageMontage();
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastRPCNotifyPositiveEffect(EPositiveEffectType EffectType);
+	void MulticastRPCNotifyPositiveEffect(EPositiveEffectType EffectType, AGS_Character* Instigator = nullptr);
 
 	UFUNCTION()
 	void OnRep_CurrentHealth(float OldHealth);
