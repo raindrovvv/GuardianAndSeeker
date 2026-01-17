@@ -391,14 +391,15 @@ void UGS_StatComp::MulticastRPCNotifyPositiveEffect_Implementation(EPositiveEffe
 		}
 	}
 
+	// [비활성화] 힐/버프 화면 효과 - 2026-01-17: 화면 효과 폐기 결정
 	// 시각 효과는 로컬 클라이언트에서만 표시
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
-	{
-		if (Seeker->IsLocallyControlled() && Seeker->PositiveEffectComp)
-		{
-			Seeker->PositiveEffectComp->OnBuffReceived(EffectType);
-		}
-	}
+	// if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(GetOwner()))
+	// {
+	// 	if (Seeker->IsLocallyControlled() && Seeker->PositiveEffectComp)
+	// 	{
+	// 		Seeker->PositiveEffectComp->OnBuffReceived(EffectType);
+	// 	}
+	// }
 }
 
 void UGS_StatComp::OnRep_CurrentHealth(float OldHealth)
