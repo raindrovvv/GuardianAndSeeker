@@ -76,9 +76,9 @@ AGS_Player::AGS_Player()
 	bIsObscuring = false;
 
 	// 네트워크 최적화 초기화
-	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
-	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
-	LastNetUpdateFrequency = NetUpdateFrequency;
+	SetNetUpdateFrequency(GS_Rendering::NET_UPDATE_FREQ_CLOSE);
+	SetMinNetUpdateFrequency(GS_Rendering::NET_UPDATE_FREQ_MIN);
+	LastNetUpdateFrequency = GetNetUpdateFrequency();
 }
 
 void AGS_Player::BeginPlay()
@@ -631,7 +631,7 @@ void AGS_Player::UpdateNetworkOptimization()
 	// 변경이 있을 때만 업데이트 (불필요한 연산 방지)
 	if (FMath::Abs(NewFrequency - LastNetUpdateFrequency) > 0.1f)
 	{
-		NetUpdateFrequency = NewFrequency;
+		SetNetUpdateFrequency(NewFrequency);
 		LastNetUpdateFrequency = NewFrequency;
 
 		UE_LOG(LogTemp, Verbose, TEXT("[Player:%s] Network Optimization - NetUpdateFrequency: %.1fHz"), *GetName(), NewFrequency);

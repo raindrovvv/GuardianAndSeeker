@@ -79,9 +79,12 @@ protected:
 	
 	void SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData);
 
+	// 로딩 과정 임시 데이터
 	UPROPERTY()
 	TArray<FDESaveData> CachedSaveData;
-
+	UPROPERTY()
+	TArray<FDESaveData> PendingMonsterData;
+	
 	// --- [내비메시 관련 코드 추가] ---
 	void CheckNavMeshBuildStatus();
 	void OnNavMeshBuildComplete();
@@ -93,5 +96,9 @@ protected:
 	/** 캐싱된 클레스 데이터 (LoadClass 성능 최적화) */
 	UPROPERTY()
 	TMap<FString, TSubclassOf<AActor>> ClassCache;
+
+	// 플레이어 스타트 포인트 캐싱
+	UPROPERTY()
+	AActor* CachedPlayerStartPoint;
 };
 
