@@ -34,6 +34,7 @@
 AGS_Drakhar::AGS_Drakhar(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UGS_DrakharVFXComponent>(TEXT("VFXComponent")))
 {
+	// Set this character to call Tick() every frame.
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Super(AGS_Guardian)에서 생성한 "VFXComponent"가 UGS_DrakharVFXComponent 클래스로 생성.
@@ -162,12 +163,24 @@ void AGS_Drakhar::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 비행 중 카메라 줌 로직
 	if (SpringArmComp && bIsFlying)
 	{
+		// 1인칭 모드에서는 카메라 보간 로직 스킵 및 비행 상태 종료
+		if (IsFirstPerson())
+		{
+			// 1인칭에서는 카메라 연출 없이 비행 상태 종료 처리
+			bIsFlying = false;
+			SetActorTickEnabled(false);
+			return;
+		}
+
+		// 3인칭 줌 보간
 		if (FMath::IsNearlyEqual(SpringArmComp->TargetArmLength, TargetSpringArmLength, 1.0f))
 		{
 			SpringArmComp->TargetArmLength = TargetSpringArmLength;
 			bIsFlying = false;
+			SetActorTickEnabled(false);
 		}
 		else
 		{
@@ -176,8 +189,11 @@ void AGS_Drakhar::Tick(float DeltaTime)
 	}
 	else
 	{
-		// 보간이 필요 없을 때는 Tick 비활성화 (성능 최적화)
-		SetActorTickEnabled(false);
+		// 시점 전환 보간 중이 아닐 때만 Tick을 비활성화 (보간 끊김 방지)
+		if (!bIsPerspectiveTransitioning)
+		{
+			SetActorTickEnabled(false);
+		}
 	}
 }
 
@@ -1609,6 +1625,12 @@ bool AGS_Drakhar::ValidateCameraEffect(APlayerController*& OutPC) const
 
 void AGS_Drakhar::ApplyFeverModeEndCameraEffect()
 {
+	// 1인칭 모드에서는 카메라 연출 스킵
+	if (IsFirstPerson())
+	{
+		return;
+	}
+
 	APlayerController* PC = nullptr;
 	if (!ValidateCameraEffect(PC))
 	{
@@ -1648,6 +1670,14 @@ void AGS_Drakhar::ApplyFeverModeEndCameraEffect()
 // 통합 카메라 업데이트 함수
 void AGS_Drakhar::UpdateCameraEffect()
 {
+	// 1인칭 모드에서는 카메라 연출 스킵
+	if (IsFirstPerson())
+	{
+		SafeClearTimer(CameraZoomTimer);
+		CurrentCameraEffectPhase = ECameraEffectPhase::None;
+		return;
+	}
+
 	APlayerController* PC = nullptr;
 	if (!ValidateCameraEffect(PC))
 	{
