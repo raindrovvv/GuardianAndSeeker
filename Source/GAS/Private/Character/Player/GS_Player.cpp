@@ -82,8 +82,8 @@ AGS_Player::AGS_Player(const FObjectInitializer& ObjectInitializer)
 	bIsObscuring = false;
 
 	// 네트워크 최적화 초기화
-	NetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_CLOSE;
-	MinNetUpdateFrequency = GS_Rendering::NET_UPDATE_FREQ_MIN;
+	SetNetUpdateFrequency(GS_Rendering::NET_UPDATE_FREQ_CLOSE);
+	SetMinNetUpdateFrequency(GS_Rendering::NET_UPDATE_FREQ_MIN);
 }
 
 void AGS_Player::BeginPlay()

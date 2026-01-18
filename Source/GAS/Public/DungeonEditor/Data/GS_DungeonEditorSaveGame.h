@@ -22,9 +22,13 @@ public:
 	UFUNCTION()
 	TArray<FDESaveData>& GetSaveDatas() { return SavedDungeonActorData; }
 
-	UPROPERTY()
+	/*
+	 * 5. 세이브 데이터 비대화
+	 */
+	// Transient 추가 : Serialize 함수에서 수동으로 직렬화하므로 엔진의 자동 직렬화 제외
+	UPROPERTY(Transient)
 	TMap<FIntPoint,EDEditorCellType> FloorOccupancyData;
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TMap<FIntPoint,EDEditorCellType> CeilingOccupancyData;
 
 	// 직렬화 제외 플래그
@@ -35,6 +39,9 @@ public:
 	virtual void Serialize(FArchive& Ar) override;
 	
 protected:
-	UPROPERTY()
+	/*
+	 * 5. 세이브 데이터 비대화
+	 */
+	UPROPERTY(Transient)
 	TArray<FDESaveData> SavedDungeonActorData;
 };

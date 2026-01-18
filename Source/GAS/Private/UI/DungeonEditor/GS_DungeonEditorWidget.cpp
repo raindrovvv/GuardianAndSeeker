@@ -43,6 +43,12 @@ void UGS_DungeonEditorWidget::NativeConstruct()
 
 void UGS_DungeonEditorWidget::OnSaveButtonClicked()
 {
+	if (bIsProcessing)
+	{
+		return;
+	}
+	SetInputCooldown(0.3);
+	
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (AGS_DEController* DEPC = Cast<AGS_DEController>(PC))
@@ -54,6 +60,12 @@ void UGS_DungeonEditorWidget::OnSaveButtonClicked()
 
 void UGS_DungeonEditorWidget::OnLoadButtonClicked()
 {
+	if (bIsProcessing)
+	{
+		return;
+	}
+	SetInputCooldown(0.3);
+	
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (AGS_DEController* DEPC = Cast<AGS_DEController>(PC))
@@ -65,6 +77,12 @@ void UGS_DungeonEditorWidget::OnLoadButtonClicked()
 
 void UGS_DungeonEditorWidget::OnBackButtonClicked()
 {
+	if (bIsProcessing)
+	{
+		return;
+	}
+	SetInputCooldown(0.3);
+	
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (AGS_DEController* DEPC = Cast<AGS_DEController>(PC))
@@ -82,6 +100,12 @@ void UGS_DungeonEditorWidget::OnBackButtonClicked()
 
 void UGS_DungeonEditorWidget::OnResetButtonClicked()
 {
+	if (bIsProcessing)
+	{
+		return;
+	}
+	SetInputCooldown(0.3);
+	
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (AGS_DEController* DEPC = Cast<AGS_DEController>(PC))
@@ -89,4 +113,19 @@ void UGS_DungeonEditorWidget::OnResetButtonClicked()
 			DEPC->GetBuildManager()->ResetDungeonData();
 		}
 	}
+}
+
+void UGS_DungeonEditorWidget::SetInputCooldown(float Duration)
+{
+	bIsProcessing = true;
+
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(InputCooldownTimer, this, &UGS_DungeonEditorWidget::OnInputCooldownExpired, Duration, false);
+	}
+}
+
+void UGS_DungeonEditorWidget::OnInputCooldownExpired()
+{
+	bIsProcessing = false;
 }

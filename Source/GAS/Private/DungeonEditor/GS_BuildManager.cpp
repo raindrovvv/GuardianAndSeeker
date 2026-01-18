@@ -764,34 +764,56 @@ void AGS_BuildManager::PressedDel()
 
 void AGS_BuildManager::ResetDungeonData()
 {
+	/*
+	 * 4. 던전 에디터 소멸 로직 최적화 수정 전 코드
+	// for (const auto& Pair : OccupancyData)
+	// {
+	// 	const FDEOccupancyData& Data = Pair.Value;
+	// 	
+	// 	if (IsValid(Data.RoomOccupancyActor))
+	// 	{
+	// 		Data.RoomOccupancyActor->Destroy();
+	// 	}
+	// 	if (IsValid(Data.WallAndDoorOccupancyActor))
+	// 	{
+	// 		Data.WallAndDoorOccupancyActor->Destroy();
+	// 	}
+	// 	if (IsValid(Data.FloorOccupancyActor))
+	// 	{
+	// 		if (AGS_Monster* MonsterActor = Cast<AGS_Monster>(Data.FloorOccupancyActor))
+	// 		{
+	// 			MonsterActor->DestroyAllWeapons();
+	// 		}
+	// 		Data.FloorOccupancyActor->Destroy();
+	// 	}
+	// 	if (IsValid(Data.CeilingOccupancyActor))
+	// 	{
+	// 		Data.CeilingOccupancyActor->Destroy();
+	// 	}
+	// }
+	//
+	// OccupancyData.Empty();
+	*/
+
+	/*
+	 * 4. 던전 에디터 소멸 로직 최적화 수정 적용 코드
+	 */
+	TSet<AActor*> ActorsToDestroy;
 	for (const auto& Pair : OccupancyData)
 	{
 		const FDEOccupancyData& Data = Pair.Value;
-		
-		if (IsValid(Data.RoomOccupancyActor))
-		{
-			Data.RoomOccupancyActor->Destroy();
-		}
-		if (IsValid(Data.WallAndDoorOccupancyActor))
-		{
-			Data.WallAndDoorOccupancyActor->Destroy();
-		}
-		if (IsValid(Data.FloorOccupancyActor))
-		{
-			if (AGS_Monster* MonsterActor = Cast<AGS_Monster>(Data.FloorOccupancyActor))
-			{
-				MonsterActor->DestroyAllWeapons();
-			}
-			Data.FloorOccupancyActor->Destroy();
-		}
-		if (IsValid(Data.CeilingOccupancyActor))
-		{
-			Data.CeilingOccupancyActor->Destroy();
-		}
+		if (Data.RoomOccupancyActor) ActorsToDestroy.Add(Data.RoomOccupancyActor);
+		if (Data.FloorOccupancyActor) ActorsToDestroy.Add(Data.FloorOccupancyActor);
+		if (Data.CeilingOccupancyActor) ActorsToDestroy.Add(Data.CeilingOccupancyActor);
+		if (Data.WallAndDoorOccupancyActor) ActorsToDestroy.Add(Data.WallAndDoorOccupancyActor);
 	}
-	
-	OccupancyData.Empty();
+	for (AActor* Actor : ActorsToDestroy)
+	{
+		if (IsValid(Actor)) Actor->Destroy();
+	}
 
+	OccupancyData.Empty();
+	
 	//넥타르 리셋
 	NectarComp->InitializeMaxAmount(NectarComp->GetMaxAmount());
 }
@@ -914,8 +936,8 @@ void AGS_BuildManager::SaveDungeonData()
         	}
         	
             FDESaveData ObjectData;
-        	ObjectData.SpawnActorClassPath = CurActor->GetClass()->GetPathName();
-            //ObjectData.SpawnActorClass = CurActor->GetClass();
+            ObjectData.SpawnActorClass = CurActor->GetClass();
+        	// ObjectData.SpawnActorClassPath = CurActor->GetClass()->GetPathName();
             ObjectData.SpawnTransform = CurActor->GetActorTransform();
             if (UPlaceInfoComponent* PlaceInfo = CurActor->FindComponentByClass<UPlaceInfoComponent>())
         	{
@@ -981,7 +1003,7 @@ void AGS_BuildManager::LoadDungeonData()
 	UWorld* World = GetWorld();
 	if (IsValid(World))
 	{
-		TArray<FDESaveData> SortedObjectData = LoadGameObject->GetSaveDatas();
+		TArray<FDESaveData>& SortedObjectData = LoadGameObject->GetSaveDatas();
 
 		auto GetSortPriority = [](EObjectType Type) -> int32 {
 			switch (Type)
@@ -998,20 +1020,28 @@ void AGS_BuildManager::LoadDungeonData()
 		
 		for (const FDESaveData& ObjectData : SortedObjectData)
 		{
-			TSubclassOf<AActor> ActorClassToSpawn = nullptr;
-			if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
-			{
-				ActorClassToSpawn = *CachedClass;
-			}
-			else
-			{
-				ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
-				if (ActorClassToSpawn)
-				{
-					ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
-				}
-			}
+			/*
+			 * FString -> TSoftClassPtr로 전환해서 생긴 코드
+			 */
+			UClass* ActorClassToSpawn = ObjectData.SpawnActorClass.LoadSynchronous();
 
+			/*
+			 * FString -> TSoftClassPtr로 전환해서 사라진 코드 
+			// TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+			// if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+			// {
+			// 	ActorClassToSpawn = *CachedClass;
+			// }
+			// else
+			// {
+			// 	ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+			// 	if (ActorClassToSpawn)
+			// 	{
+			// 		ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+			// 	}
+			// }
+			*/
+			
 			if (ActorClassToSpawn)
 			{
 				FActorSpawnParameters SpawnParams;
@@ -1044,22 +1074,6 @@ void AGS_BuildManager::LoadDungeonData()
 					NectarComp->SpendResource(PlaceInfoCompo->ConstructionCost);
 				}
 			}
-
-			// for (const auto& FloorData : LoadGameObject->FloorOccupancyData)
-			// {
-			// 	FIntPoint CellCoordinates = FloorData.Key;
-			// 	const EDEditorCellType& Data = FloorData.Value;
-			//
-			// 	OccupancyData.FindOrAdd(CellCoordinates).FloorOccupancyData = Data;
-			// }
-			//
-			// for (const auto& CeilingData : LoadGameObject->CeilingOccupancyData)
-			// {
-			// 	FIntPoint CellCoordinates = CeilingData.Key;
-			// 	const EDEditorCellType& Data = CeilingData.Value;
-			//
-			// 	OccupancyData.FindOrAdd(CellCoordinates).CeilingOccupancyData = Data;
-			// }
 		}
 	}
     
