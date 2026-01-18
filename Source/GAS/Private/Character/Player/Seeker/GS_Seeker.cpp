@@ -26,6 +26,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Character/Component/GS_VFXComponent.h"
 #include "Animation/Character/Seeker/GS_ChooserInputObj.h"
 #include "Character/GS_TpsController.h"
@@ -159,6 +160,18 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	BodyLavaVFX->bAutoActivate = false;
 	BodyLavaVFX->SetRelativeLocation(FVector(-60.f, 0.f, 0.f));
 	BodyLavaVFX->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+
+	// 던전 탐색용 SpotLight (로컬 플레이어만 렌더링)
+	DungeonSpotLight = ObjectInitializer.CreateDefaultSubobject<USpotLightComponent>(this, TEXT("DungeonSpotLight"));
+	DungeonSpotLight->SetupAttachment(RootComponent); // 루트 컴포넌트에 부착
+	DungeonSpotLight->SetRelativeLocation(FVector(0.f, 0.f, 150.f)); // 캐릭터 위쪽
+	DungeonSpotLight->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f)); // 아래쪽을 향하도록 (Pitch -90도)
+	DungeonSpotLight->SetIntensity(800.f); // 조명 강도 (은은하게)
+	DungeonSpotLight->SetAttenuationRadius(1200.f); // 조명 범위
+	DungeonSpotLight->SetInnerConeAngle(25.f); // 내부 각도
+	DungeonSpotLight->SetOuterConeAngle(50.f); // 외부 각도
+	DungeonSpotLight->SetCastShadows(true);
+	DungeonSpotLight->bUseInverseSquaredFalloff = false;
 
 	// 빈사 상태 불꽃 VFX 컴포넌트 초기화
 	DyingFlameEffectComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("DyingFlameEffectComp"));
@@ -302,6 +315,12 @@ void AGS_Seeker::BeginPlay()
 				PS->OnPlayerAliveStatusChangedDelegate.AddUObject(this, &AGS_Seeker::HandleAliveStatusChanged);
 			}
 		}
+	}
+
+	// 던전 SpotLight는 로컬 플레이어가 조종하는 시커에만 활성화
+	if (DungeonSpotLight)
+	{
+		DungeonSpotLight->SetVisibility(IsLocallyControlled());
 	}
 
 	// Register to Subsystem for optimization

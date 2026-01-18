@@ -31,16 +31,16 @@ constexpr float PLAYER_CULL_DISTANCE = 7000.0f;
 // ========================================
 
 /** 작은 함정 컬링 거리 */
-constexpr float TRAP_SMALL_CULL_DISTANCE = 3000.0f;
+constexpr float TRAP_SMALL_CULL_DISTANCE = 3500.0f;
 
 /** 중간 함정 컬링 거리 */
-constexpr float TRAP_MEDIUM_CULL_DISTANCE = 3500.0f;
+constexpr float TRAP_MEDIUM_CULL_DISTANCE = 4000.0f;
 
 /** 큰 함정 컬링 거리 */
 constexpr float TRAP_LARGE_CULL_DISTANCE = 4500.0f;
 
 /** 방 모듈 컬링 거리 - Draw Call 최적화를 위해 축소 */
-constexpr float ROOM_CULL_DISTANCE = 8500.0f;
+constexpr float ROOM_CULL_DISTANCE = 9000.0f;
 
 /** 벽 모듈 컬링 거리 - 방보다 앞서 컬링되거나 가시성 제어를 위해 분리 */
 constexpr float WALL_CULL_DISTANCE = 9000.0f;
@@ -49,13 +49,13 @@ constexpr float WALL_CULL_DISTANCE = 9000.0f;
 constexpr float FOLIAGE_CULL_DISTANCE = 1500.0f;
 
 /** 라이트 컬링 거리 (20m) - 던전 조명 유지 */
-constexpr float LIGHT_CULL_DISTANCE = 1600.0f;
+constexpr float LIGHT_CULL_DISTANCE = 2000.0f;
 
 /** 무기 컬링 거리 (30m) */
 constexpr float WEAPON_CULL_DISTANCE = 3000.0f;
 
 /** 투사체 컬링 거리 (150m) - 원거리 가시성 확보 (특히 RTS 모드) */
-constexpr float PROJECTILE_CULL_DISTANCE = 15000.0f;
+constexpr float PROJECTILE_CULL_DISTANCE = 10000.0f;
 
 /** HP 위젯 기본 컬링 거리 (60m) */
 constexpr float HP_WIDGET_CULL_DISTANCE = 6000.0f;
@@ -71,7 +71,7 @@ constexpr float STEAM_NAME_WIDGET_CULL_DISTANCE = 6000.0f;
 constexpr float TPS_CULL_DISTANCE_SCALE = 1.0f;
 
 /** RTS 시점 컬링 거리 배율 (시야와 성능 간 균형) */
-constexpr float RTS_CULL_DISTANCE_SCALE = 2.5f;
+constexpr float RTS_CULL_DISTANCE_SCALE = 3.0f;
 
 /**
  * 현재 시점(RTS/TPS)에 맞는 최적의 컬링 거리를 계산합니다.

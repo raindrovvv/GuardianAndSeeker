@@ -390,6 +390,13 @@ public:
 	UNiagaraComponent* BodyLavaVFX;
 
 	// ================
+	// 시커 조명 (던전용 SpotLight)
+	// ================
+	/** 던전 탐색용 SpotLight (로컬 플레이어만 렌더링) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Light")
+	class USpotLightComponent* DungeonSpotLight;
+
+	// ================
 	// 빈사 상태 불꽃 VFX 컴포넌트
 	// ================
 	/** 푸른 불꽃 기둥 VFX ("불꽃의 안식처") */
