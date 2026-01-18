@@ -26,8 +26,9 @@
 // Sets default values
 AGS_Chan::AGS_Chan()
 {
-	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	// Tick 활성화 가능하되, 시작 시 비활성화 (시점 전환 보간 시에만 활성화)
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	CharacterType = ECharacterType::Chan;
 	SkillInputHandlerComponent = CreateDefaultSubobject<UGS_ChanSkillInputHandlerComp>(TEXT("SkillInputHandlerComp"));
 

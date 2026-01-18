@@ -8,11 +8,19 @@
 #include "System/GISubsys//GS_SeamlessTravelLoadingSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "System/GS_BaseGM.h"
+#include "Character/Component/GS_KillFeedbackComponent.h"
+
+
+AGS_BasePlayerController::AGS_BasePlayerController(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+	KillFeedbackComp = CreateDefaultSubobject<UGS_KillFeedbackComponent>(TEXT("KillFeedbackComp"));
+}
 
 void AGS_BasePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	MenuAction = nullptr;
 	Server_NotifyPlayerIsReady();
 }
@@ -21,7 +29,7 @@ void AGS_BasePlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent);
-	
+
 	if (MenuAction)
 	{
 		EnhancedInputComponent->BindAction(MenuAction, ETriggerEvent::Triggered, this, &AGS_BasePlayerController::OpenMenuUI);
@@ -61,7 +69,7 @@ void AGS_BasePlayerController::OpenKeyManual(const FInputActionValue& InputValue
 			QuickManualUI = CreateWidget<UGS_QuickManualUI>(this, QuickManualUIClass);
 			QuickManualUI->InitImage();
 			QuickManualUI->AddToViewport(1);
-			
+
 			// UI와 게임 입력을 모두 받을 수 있도록 설정
 			FInputModeGameAndUI InputMode;
 			InputMode.SetHideCursorDuringCapture(false);
@@ -85,7 +93,7 @@ void AGS_BasePlayerController::OpenKeyManual(const FInputActionValue& InputValue
 		else
 		{
 			QuickManualUI->SetVisibility(ESlateVisibility::Visible);
-			
+
 			// UI와 게임 입력을 모두 받을 수 있도록 설정
 			FInputModeGameAndUI InputMode;
 			InputMode.SetHideCursorDuringCapture(false);
@@ -105,7 +113,6 @@ void AGS_BasePlayerController::Server_NotifyPlayerIsReady_Implementation()
 
 void AGS_BasePlayerController::Client_StartGame_Implementation()
 {
-	
 }
 
 void AGS_BasePlayerController::Client_ShowSeamlessLoadingCover_Implementation()

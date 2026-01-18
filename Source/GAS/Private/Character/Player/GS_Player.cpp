@@ -21,6 +21,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "EnhancedInputComponent.h"
+#include "InputAction.h"
 
 AGS_Player::AGS_Player(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -204,6 +206,9 @@ void AGS_Player::Tick(float DeltaSeconds)
 			UpdateSteamNameWidgetRotation();
 		}
 	}
+
+	// 시점 전환 보간 처리
+	UpdatePerspectiveTransition(DeltaSeconds);
 }
 
 void AGS_Player::PossessedBy(AController* NewController)
@@ -433,6 +438,15 @@ void AGS_Player::Multicast_StopSkillMontage_Implementation(UAnimMontage* Montage
 void AGS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	// Enhanced Input: 시점 전환 (F5)
+	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		if (IA_TogglePerspective)
+		{
+			EnhancedInput->BindAction(IA_TogglePerspective, ETriggerEvent::Started, this, &AGS_Player::TogglePerspective);
+		}
+	}
 }
 
 void AGS_Player::SetupLocalAudioListener()
@@ -641,4 +655,169 @@ float AGS_Player::CalculateSignificance(const FTransform& Viewpoint)
 	}
 
 	return Score;
+}
+
+// ================
+// 시점 전환 시스템 구현
+// ================
+
+void AGS_Player::TogglePerspective()
+{
+	// 로컬 플레이어만 시점 전환 가능
+	if (!IsLocalPlayer())
+	{
+		return;
+	}
+
+	if (!SpringArmComp)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AGS_Player] TogglePerspective: SpringArmComp is null"));
+		return;
+	}
+
+	bIsFirstPerson = !bIsFirstPerson;
+	bIsPerspectiveTransitioning = true; // 보간 시작 플래그 ON
+
+	// 최적화를 위해 Tick이 꺼져 있을 수 있으므로, 보간을 위해 강제로 켬
+	SetActorTickEnabled(true);
+
+	// 서버에 시점 상태 동기화 (다른 플레이어에게 회전 모습 반영 위함)
+	Server_SetPerspectiveState(bIsFirstPerson);
+
+	if (bIsFirstPerson)
+	{
+		// TPS → 1인칭: 현재 설정 저장 후 즉시 전환
+		SavedTPSArmLength = SpringArmComp->TargetArmLength;
+		SavedTPSSocketOffset = SpringArmComp->SocketOffset;
+		bSavedUseControllerRotationYaw = bUseControllerRotationYaw;
+
+		// FOV 및 Near Clip Plane 저장 및 적용
+		if (CameraComp)
+		{
+			SavedTPSFOV = CameraComp->FieldOfView;
+			CameraComp->SetFieldOfView(FirstPersonFOV);
+
+			// Near Clip Plane 조정 (가까이 오브젝트 렌더링)
+			SavedNearClipPlane = GNearClippingPlane;
+			GNearClippingPlane = FirstPersonNearClipPlane;
+		}
+
+		// 1인칭 설정 적용
+		SpringArmComp->TargetArmLength = FirstPersonArmLength;
+		SpringArmComp->SocketOffset = FirstPersonEyeOffset;
+
+		// 카메라 방향에 따라 캐릭터 회전 (더 자연스러운 1인칭)
+		bUseControllerRotationYaw = true;
+
+		// 1인칭에서 카메라 충돌 테스트 비활성화 (벽에 밀리지 않도록)
+		SpringArmComp->bDoCollisionTest = false;
+
+		// 1인칭: 디더링 비활성화 (거리를 0으로 만들어 항상 보이게 함)
+		UpdateCharacterDither(false);
+	}
+	else
+	{
+		// 1인칭 → TPS: 저장된 설정으로 즉시 복원 시작
+		// SpringArmComp->TargetArmLength = SavedTPSArmLength; // 제거: UpdatePerspectiveTransition에서 처리
+		SpringArmComp->SocketOffset = SavedTPSSocketOffset;
+
+		// FOV 및 Near Clip Plane 복원
+		if (CameraComp)
+		{
+			CameraComp->SetFieldOfView(SavedTPSFOV);
+			GNearClippingPlane = SavedNearClipPlane;
+		}
+
+		// 캐릭터 회전 설정 복원
+		bUseControllerRotationYaw = bSavedUseControllerRotationYaw;
+
+		// TPS에서 카메라 충돌 테스트 다시 활성화
+		SpringArmComp->bDoCollisionTest = true;
+
+		// 3인칭: 디더링 다시 활성화
+		UpdateCharacterDither(true);
+	}
+}
+
+void AGS_Player::Server_SetPerspectiveState_Implementation(bool bFirstPerson)
+{
+	// 서버에서도 캐릭터 회전 로직을 시점에 맞게 설정
+	// 이를 통해 다른 플레이어들도 이 플레이어가 어디를 보는지 정확히 알 수 있음
+	bUseControllerRotationYaw = bFirstPerson;
+}
+
+void AGS_Player::UpdatePerspectiveTransition(float DeltaTime)
+{
+	// 보간 진행 중이 아니거나 SpringArm이 없거나 로컬 플레이어가 아니면 무시
+	if (!bIsPerspectiveTransitioning || !SpringArmComp || !IsLocalPlayer())
+	{
+		return;
+	}
+
+	// 목표 ArmLength 결정
+	float TargetLength = bIsFirstPerson ? FirstPersonArmLength : SavedTPSArmLength;
+
+	// 이미 목표값에 도달했으면 종료
+	if (FMath::IsNearlyEqual(SpringArmComp->TargetArmLength, TargetLength, 1.0f))
+	{
+		SpringArmComp->TargetArmLength = TargetLength;
+		bIsPerspectiveTransitioning = false; // 보간 완료 플래그 OFF
+
+		// 시점 전환 완료 후 Tick 비활성화 (성능 최적화)
+		// 서브클래스에서 다른 Tick 로직이 필요하면 해당 클래스에서 재활성화
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	// 부드러운 보간으로 전환
+	SpringArmComp->TargetArmLength = FMath::FInterpTo(
+	    SpringArmComp->TargetArmLength,
+	    TargetLength,
+	    DeltaTime,
+	    PerspectiveTransitionSpeed);
+}
+
+void AGS_Player::UpdateCharacterDither(bool bEnabled)
+{
+	float TargetDistance = bEnabled ? DefaultDitherDistance : 0.0f;
+
+	// 1. 현재 액터의 모든 메시 컴포넌트 찾기
+	TArray<UMeshComponent*> MeshComps;
+	GetComponents<UMeshComponent>(MeshComps);
+
+	// 2. 부착된 액터(무기 등)의 메시 컴포넌트도 포함하기
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors);
+	for (AActor* AttachedActor : AttachedActors)
+	{
+		if (AttachedActor)
+		{
+			TArray<UMeshComponent*> AttachedMeshComps;
+			AttachedActor->GetComponents<UMeshComponent>(AttachedMeshComps);
+			MeshComps.Append(AttachedMeshComps);
+		}
+	}
+
+	// 3. 자식 액터 컴포넌트 내부의 메시 탐색
+	TArray<UChildActorComponent*> ChildActorComps;
+	GetComponents<UChildActorComponent>(ChildActorComps);
+	for (UChildActorComponent* ChildComp : ChildActorComps)
+	{
+		if (ChildComp && ChildComp->GetChildActor())
+		{
+			TArray<UMeshComponent*> ChildMeshComps;
+			ChildComp->GetChildActor()->GetComponents<UMeshComponent>(ChildMeshComps);
+			MeshComps.Append(ChildMeshComps);
+		}
+	}
+
+	// 모든 수집된 메시의 머터리얼 파라미터 설정
+	// SetScalarParameterValueOnMaterials는 내부적으로 모든 머터리얼을 순회함
+	for (UMeshComponent* MeshComp : MeshComps)
+	{
+		if (MeshComp)
+		{
+			MeshComp->SetScalarParameterValueOnMaterials(DitherParamName, TargetDistance);
+		}
+	}
 }

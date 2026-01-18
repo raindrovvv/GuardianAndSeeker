@@ -8,9 +8,16 @@
 #include "Character/Component/GS_DrakharAudioComponent.h"
 #include "Character/Component/GS_HitReactComp.h"
 #include "Character/Component/GS_HitIndicatorComponent.h"
+#include "Character/Component/GS_DamageNumberComponent.h"
 #include "Character/Component/GS_StatComp.h"
+#include "UI/Damage/EDamageNumberType.h"
 #include "Character/F_GS_DamageEvent.h"
 #include "Character/Player/GS_Player.h"
+#include "Character/Component/GS_KillFeedbackComponent.h"
+#include "Character/Component/GS_PositiveEffectComponent.h"
+#include "Containers/Set.h"
+#include "GameFramework/PlayerState.h"
+#include "Character/CharacterDataAsset.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
@@ -67,6 +74,9 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 
 	// 다이내믹 사운드 믹싱 컴포넌트 생성
 	AudioMixingComponent = ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
+
+	// 데미지 숫자 팝업 컴포넌트
+	DamageNumberComp = ObjectInitializer.CreateDefaultSubobject<UGS_DamageNumberComponent>(this, TEXT("DamageNumberComp"));
 }
 
 void AGS_Character::BeginPlay()
@@ -464,6 +474,191 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	float NewHealth = CurrentHealth - ActualDamage;
 	StatComp->SetCurrentHealth(NewHealth, false);
 
+	// 데미지 숫자 팝업 표시 (공격자 화면에 표시)
+	const FGS_DamageEvent* GSDamageEvent = DamageEvent.IsOfType(FGS_DamageEvent::ClassID) ? static_cast<const FGS_DamageEvent*>(&DamageEvent) : nullptr;
+
+	// DoT 데미지: HitReactType이 DamageOnly이고 Point/Radial 이벤트가 아닌 경우
+	bool bIsDotDamage = false;
+	if (GSDamageEvent)
+	{
+		bIsDotDamage = (GSDamageEvent->HitReactType == EHitReactType::DamageOnly) && !DamageEvent.IsOfType(FPointDamageEvent::ClassID) && !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
+	}
+
+	// 공격자 캐릭터에게 데미지 숫자 표시 요청
+	// 직접 캐릭터가 공격했거나, 프로젝타일을 통해 공격한 경우 모두 처리
+	AGS_Character* AttackerCharacter = Cast<AGS_Character>(DamageCauser);
+
+	// DamageCauser가 캐릭터가 아닌 경우 (프로젝타일 등)
+	if (!AttackerCharacter)
+	{
+		// 프로젝타일인 경우 소유자(발사한 캐릭터) 찾기
+		if (AGS_WeaponProjectile* Projectile = Cast<AGS_WeaponProjectile>(DamageCauser))
+		{
+			AttackerCharacter = Cast<AGS_Character>(Projectile->GetOwner());
+		}
+		// 일반 무기인 경우
+		else if (AGS_Weapon* Weapon = Cast<AGS_Weapon>(DamageCauser))
+		{
+			AttackerCharacter = Cast<AGS_Character>(Weapon->GetOwner());
+		}
+	}
+
+	// 데미지 기록 업데이트 (서버 전용 어시스트 추적)
+	if (HasAuthority() && AttackerCharacter && AttackerCharacter != this && ActualDamage > 0.1f)
+	{
+		float CurrentTime = GetWorld()->GetTimeSeconds();
+		bool bFound = false;
+
+		// 기존 기록 확인
+		for (FDamageRecord& Record : DamageHistory)
+		{
+			if (Record.Damager.Get() == AttackerCharacter)
+			{
+				Record.DamageAmount += ActualDamage;
+				Record.LastDamageTime = CurrentTime;
+				bFound = true;
+				break;
+			}
+		}
+
+		// 새로운 기록 추가
+		if (!bFound)
+		{
+			FDamageRecord NewRecord;
+			NewRecord.Damager = AttackerCharacter;
+			NewRecord.DamageAmount = ActualDamage;
+			NewRecord.LastDamageTime = CurrentTime;
+			DamageHistory.Add(NewRecord);
+		}
+
+		// 오래된 기록 정리 (최적화)
+		DamageHistory.RemoveAll([CurrentTime, this](const FDamageRecord& Record)
+		                        { return !Record.Damager.IsValid() || (CurrentTime - Record.LastDamageTime) > AssistWindowSeconds; });
+	}
+
+	if (AttackerCharacter && ActualDamage > 0.0f)
+	{
+		if (UGS_DamageNumberComponent* DmgNumComp = AttackerCharacter->GetDamageNumberComponent())
+		{
+			// 데미지 타입 결정: Critical > DoT > Normal
+			EDamageNumberType NumType = EDamageNumberType::Normal;
+			if (GSDamageEvent && GSDamageEvent->bIsCritical)
+			{
+				NumType = EDamageNumberType::Critical;
+			}
+			else if (bIsDotDamage)
+			{
+				NumType = EDamageNumberType::DoT;
+			}
+
+			// 피해자의 머리 위치에 표시 (캡슐 높이 상단 - 너무 높지 않게)
+			FVector DisplayLocation = GetActorLocation();
+			DisplayLocation.Z += GetDefaultHalfHeight(); // 1.0x로 낮춤
+
+			DmgNumComp->ShowDamageNumber(ActualDamage, NumType, DisplayLocation);
+		}
+	}
+
+	// 킬 피드백 알림 (서버에서만 처리)
+	if (HasAuthority() && NewHealth <= 0.0f && CurrentHealth > 0.0f)
+	{
+		// 킬 피드백을 브로드캐스트할 수 있는 컴포넌트 찾기 (주로 공격자의 컨트롤러나 아무 PC)
+		UGS_KillFeedbackComponent* FeedbackComp = nullptr;
+
+		// 1. 공격자의 컨트롤러에서 찾기
+		if (AttackerCharacter && AttackerCharacter->GetController())
+		{
+			FeedbackComp = AttackerCharacter->GetController()->FindComponentByClass<UGS_KillFeedbackComponent>();
+		}
+
+		// 2. 공격자에게 없으면 아무 플레이어 컨트롤러에서나 찾기
+		if (!FeedbackComp)
+		{
+			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				if (APlayerController* PC = It->Get())
+				{
+					FeedbackComp = PC->FindComponentByClass<UGS_KillFeedbackComponent>();
+					if (FeedbackComp)
+						break;
+				}
+			}
+		}
+
+		if (FeedbackComp)
+		{
+			EKillFeedbackType Type = GetKillFeedbackType();
+			FString KillerName = AttackerCharacter ? AttackerCharacter->GetCharacterName() : TEXT("");
+			FString VictimName = GetCharacterName();
+			uint8 KillerTeam = AttackerCharacter ? AttackerCharacter->GetGenericTeamId().GetId() : 255;
+
+			FeedbackComp->NotifyKill(Type, VictimName, KillerName, KillerTeam);
+
+			// 어시스트 알림 처리
+			float CurrentTime = GetWorld()->GetTimeSeconds();
+			float MaxHP = StatComp ? StatComp->GetMaxHealth() : 1000.f;
+			float MinAssistDamage = MaxHP * AssistThresholdRatio;
+
+			TSet<FString> UniqueAssisters;
+
+			// 1. 직접 데미지 기여자
+			for (const FDamageRecord& Record : DamageHistory)
+			{
+				AGS_Character* DamagerChar = Record.Damager.Get();
+				if (!DamagerChar || DamagerChar == AttackerCharacter)
+				{
+					continue;
+				}
+
+				if ((CurrentTime - Record.LastDamageTime) <= AssistWindowSeconds &&
+				    Record.DamageAmount >= MinAssistDamage)
+				{
+					UniqueAssisters.Add(DamagerChar->GetCharacterName());
+
+					// 데미지 기여자를 도운 서포터들도 어시스트 (1단계만)
+					for (const FSupportRecord& SRecord : DamagerChar->GetSupportHistory())
+					{
+						AGS_Character* SupporterChar = SRecord.Supporter.Get();
+						// 피해자 본인 및 킬러 제외
+						if (SupporterChar && SupporterChar != this && SupporterChar != AttackerCharacter &&
+						    (CurrentTime - SRecord.LastSupportTime) <= AssistWindowSeconds)
+						{
+							UniqueAssisters.Add(SupporterChar->GetCharacterName());
+						}
+					}
+				}
+			}
+
+			// 2. 킬러를 도운 서포터들
+			if (AttackerCharacter)
+			{
+				for (const FSupportRecord& SRecord : AttackerCharacter->GetSupportHistory())
+				{
+					AGS_Character* SupporterChar = SRecord.Supporter.Get();
+					// 자기 자신 및 피해자 제외
+					if (!SupporterChar || SupporterChar == AttackerCharacter || SupporterChar == this)
+					{
+						continue;
+					}
+
+					if ((CurrentTime - SRecord.LastSupportTime) <= AssistWindowSeconds)
+					{
+						UniqueAssisters.Add(SupporterChar->GetCharacterName());
+					}
+				}
+			}
+
+			// 브로드캐스트
+			for (const FString& AssisterName : UniqueAssisters)
+			{
+				FeedbackComp->NotifyAssist(AssisterName);
+			}
+		}
+
+		// 사망 시 데미지 기록 초기화 (SupportHistory는 유지 - 킬러/어시스터에게 여전히 유효)
+		DamageHistory.Empty();
+	}
+
 	return ActualDamage;
 }
 
@@ -541,6 +736,47 @@ void AGS_Character::SetHPTextWidget(UGS_HPText* InHPTextWidget)
 	}
 }
 
+EKillFeedbackType AGS_Character::GetKillFeedbackType() const
+{
+	// Default behavior based on CharacterType
+	switch (CharacterType)
+	{
+	case ECharacterType::SmallClaw:
+	case ECharacterType::NeedleFang:
+	case ECharacterType::IronFang:
+	case ECharacterType::StoneClaw:
+		return EKillFeedbackType::MonsterKill;
+	case ECharacterType::ShadowFang:
+		return EKillFeedbackType::EliteKill;
+	case ECharacterType::Ares:
+	case ECharacterType::Chan:
+	case ECharacterType::Merci:
+	case ECharacterType::Reina:
+		return EKillFeedbackType::SeekerKill;
+	case ECharacterType::Drakhar:
+		return EKillFeedbackType::GuardianRepelled;
+	default:
+		return EKillFeedbackType::None;
+	}
+}
+
+FString AGS_Character::GetCharacterName() const
+{
+	if (APlayerState* PS = GetPlayerState())
+	{
+		return PS->GetPlayerName();
+	}
+
+	// Falls back to data asset name if available
+	if (CharacterData)
+	{
+		return CharacterData->CharacterName.ToString();
+	}
+
+	return GetName();
+}
+
+
 void AGS_Character::SetHPBarWidget(UGS_HPWidget* InHPBarWidget)
 {
 	UGS_HPWidget* HPBarWidget = Cast<UGS_HPWidget>(InHPBarWidget);
@@ -571,9 +807,11 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 		UGS_StatComp* DamagedCharacterStat = InDamagedCharacter->GetStatComp();
 		if (IsValid(DamagedCharacterStat))
 		{
+			bool bIsCritical = false;
 			float Damage =
-			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter);
-			FDamageEvent DamageEvent;
+			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter, bIsCritical);
+			FGS_DamageEvent DamageEvent;
+			DamageEvent.bIsCritical = bIsCritical;
 			InDamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(),
 			                               this);
 
@@ -1213,4 +1451,79 @@ void AGS_Character::Multicast_ApplyHitStop_Implementation(float Duration, float 
 				WeakAnimInstance->Montage_SetPlayRate(WeakMontage.Get(), OriginalPlayRate);
 			}
 		} }, Duration, false);
+}
+
+void AGS_Character::NotifyHealed(AGS_Character* Healer, float Amount)
+{
+	if (!HasAuthority() || !Healer || Healer == this || Amount <= 0.1f)
+	{
+		return;
+	}
+
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	bool bFound = false;
+
+	// 기존 기록 업데이트
+	for (FSupportRecord& Record : SupportHistory)
+	{
+		if (Record.Supporter.Get() == Healer)
+		{
+			Record.SupportWeight += Amount;
+			Record.LastSupportTime = CurrentTime;
+			bFound = true;
+			break;
+		}
+	}
+
+	// 새로운 기록 추가
+	if (!bFound)
+	{
+		FSupportRecord NewRecord;
+		NewRecord.Supporter = Healer;
+		NewRecord.SupportWeight = Amount;
+		NewRecord.LastSupportTime = CurrentTime;
+		SupportHistory.Add(NewRecord);
+	}
+
+	// 오래된 기록 정리 (최적화)
+	SupportHistory.RemoveAll([CurrentTime, this](const FSupportRecord& Record)
+	                         { return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
+}
+
+void AGS_Character::NotifyBuffed(AGS_Character* Buffer, EPositiveEffectType BuffType)
+{
+	if (!HasAuthority() || !Buffer || Buffer == this)
+	{
+		return;
+	}
+
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	bool bFound = false;
+
+	// 버프는 일정 수준의 가중치를 부여하여 어시스트 자격을 줌
+	float BuffWeight = 100.0f;
+
+	for (FSupportRecord& Record : SupportHistory)
+	{
+		if (Record.Supporter.Get() == Buffer)
+		{
+			Record.SupportWeight += BuffWeight;
+			Record.LastSupportTime = CurrentTime;
+			bFound = true;
+			break;
+		}
+	}
+
+	if (!bFound)
+	{
+		FSupportRecord NewRecord;
+		NewRecord.Supporter = Buffer;
+		NewRecord.SupportWeight = BuffWeight;
+		NewRecord.LastSupportTime = CurrentTime;
+		SupportHistory.Add(NewRecord);
+	}
+
+	// 오래된 기록 정리 (최적화)
+	SupportHistory.RemoveAll([CurrentTime, this](const FSupportRecord& Record)
+	                         { return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
 }

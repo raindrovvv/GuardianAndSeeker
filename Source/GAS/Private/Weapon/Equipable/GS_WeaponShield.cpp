@@ -4,6 +4,7 @@
 #include "Weapon/Equipable/GS_WeaponShield.h"
 #include "Character/GS_Character.h"
 #include "Character/Player/Guardian/GS_Guardian.h"
+#include "Character/F_GS_DamageEvent.h"
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Player/Seeker/GS_Chan.h"
@@ -231,9 +232,11 @@ void AGS_WeaponShield::OnAttackHit(UPrimitiveComponent* OverlappedComponent, AAc
 		UGS_StatComp* DamagedStat = Damaged->GetStatComp();
 		if (DamagedStat)
 		{
-			float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
+			bool bIsCritical = false;
+			float Damage = DamagedStat->CalculateDamage(Attacker, Damaged, bIsCritical);
 			FGS_DamageEvent DamageEvent;
 			DamageEvent.HitReactType = EHitReactType::Interrupt;
+			DamageEvent.bIsCritical = bIsCritical;
 			Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
 			// 피격자 히트스탑 적용

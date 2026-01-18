@@ -5,6 +5,7 @@
 #include "Character/Skill/GS_SkillComp.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
+#include "Character/F_GS_DamageEvent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Character/Component/GS_CameraShakeComponent.h"
@@ -14,6 +15,7 @@
 #include "System/Subsystem/GS_ActorRegistrySubsystem.h"
 #include "Rendering/GS_RenderingConstants.h"
 #include "Misc/App.h"
+#include "Character/Component/GS_DebuffIndicatorComponent.h"
 
 
 AGS_Guardian::AGS_Guardian(const FObjectInitializer& ObjectInitializer)
@@ -32,6 +34,9 @@ AGS_Guardian::AGS_Guardian(const FObjectInitializer& ObjectInitializer)
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	// NOTE: 자식 클래스(Drakhar 등)에서 FObjectInitializer::SetDefaultSubobjectClass 를 통해 클래스를 변경할 수 있음.
 	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
+
+	// 디버프 아이콘 표시 컴포넌트 생성 (시커/가디언 시점에서 보이는 머리 위 아이콘)
+	DebuffIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffIndicatorComponent>(this, TEXT("DebuffIndicatorComponent"));
 
 	// 컴포넌트 생성 및 초기화
 	TargetedUIComponent = ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));
@@ -244,8 +249,10 @@ void AGS_Guardian::ApplyDamageToDetectedPlayer(const TSet<AGS_Character*>& Damag
 		UGS_StatComp* DamagedCharacterStat = DamagedCharacter->GetStatComp();
 		if (IsValid(DamagedCharacterStat))
 		{
-			float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter);
-			FDamageEvent DamageEvent;
+			bool bIsCritical = false;
+			float Damage = DamagedCharacterStat->CalculateDamage(this, DamagedCharacter, bIsCritical);
+			FGS_DamageEvent DamageEvent;
+			DamageEvent.bIsCritical = bIsCritical;
 			DamagedCharacter->TakeDamage(Damage + PlusDamge, DamageEvent, GetController(), this);
 
 			//hit stop

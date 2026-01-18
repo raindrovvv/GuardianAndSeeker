@@ -21,6 +21,10 @@ struct FDebuffRepInfo
 
 	UPROPERTY(BlueprintReadOnly)
 	float RemainingTime = 0.0f;
+
+	/** 디버프 전체 지속 시간 (게이지 표시용) */
+	UPROPERTY(BlueprintReadOnly)
+	float TotalDuration = 0.0f;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnDebuffListUpdated, const TArray<FDebuffRepInfo>&);
@@ -35,7 +39,7 @@ public:
 
 	UPROPERTY(ReplicatedUsing = OnRep_DebuffList)
 	TArray<FDebuffRepInfo> ReplicatedDebuffs;
-	
+
 	// Sets default values for this component's properties
 	UGS_DebuffComp();
 
@@ -47,7 +51,7 @@ public:
 	bool IsDebuffActive(EDebuffType Type);
 
 	const TArray<FDebuffRepInfo>& GetDebuffList() const { return ReplicatedDebuffs; }
-	
+
 	UFUNCTION()
 	void OnRep_DebuffList();
 
@@ -76,7 +80,7 @@ protected:
 
 	/** 사용할 디버프 객체를 반환 (풀에서 꺼내거나 새로 생성) */
 	UGS_DebuffBase* GetOrCreateDebuffObject(EDebuffType Type, TSubclassOf<UGS_DebuffBase> DebuffClass);
-	
+
 	/** 만료된 디버프 객체를 풀에 반환 */
 	void ReturnDebuffToPool(UGS_DebuffBase* Debuff);
 

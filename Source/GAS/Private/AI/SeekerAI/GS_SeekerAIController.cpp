@@ -14,6 +14,7 @@
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Player/Seeker/GS_Merci.h"
 #include "Character/Player/Monster/GS_Monster.h"
+#include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Component/GS_StatComp.h"
 #include "Character/Component/Seeker/GS_MarkerPlacementComponent.h"
 #include "Props/Trap/GS_TrapBase.h"
@@ -645,6 +646,41 @@ void AGS_SeekerAIController::UpdateThreatAssessment()
 		}
 	}
 
+	// ========================================
+	// 가디언(드라카) 위협 평가 - 시커AI의 최우선 적
+	// ========================================
+	if (AGS_Guardian* Guardian = Registry->GetGuardian())
+	{
+		if (!Guardian->IsDead())
+		{
+			float Distance = FVector::Dist(ControlledPawn->GetActorLocation(), Guardian->GetActorLocation());
+			if (Distance <= SightRadius)
+			{
+				// 가디언은 최우선 타겟이므로 높은 기본 위협 수준 설정
+				float ThreatLevel = 0.8f; // 기본값을 높게 설정
+
+				// 거리 기반 추가 위협
+				ThreatLevel += FMath::Clamp(1.0f - (Distance / SightRadius), 0.0f, 1.0f) * 0.2f;
+
+				// 시야선 체크
+				if (!LineOfSightTo(Guardian))
+				{
+					if (Distance > 800.0f)
+					{
+						ThreatLevel *= 0.5f; // 가디언은 멀어도 중요하므로 페널티 완화
+					}
+					else
+					{
+						ThreatLevel *= 0.8f;
+					}
+				}
+
+				// 가디언은 항상 어그로 상태로 간주 (게임 로직상 항상 위협)
+				CurrentThreats.Add(FGS_ThreatData(Guardian, FMath::Clamp(ThreatLevel, 0.0f, 1.0f), Distance, true));
+			}
+		}
+	}
+
 	CurrentThreats.Sort([](const FGS_ThreatData& A, const FGS_ThreatData& B)
 	                    { return A.ThreatLevel > B.ThreatLevel; });
 
@@ -1252,8 +1288,24 @@ void AGS_SeekerAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 		return;
 	}
 
+	// 적 캐릭터 확인 (몬스터 또는 가디언)
+	AGS_Character* EnemyCharacter = nullptr;
+	bool bIsEnemy = false;
+
 	// 몬스터(적) 확인
 	if (AGS_Monster* Monster = Cast<AGS_Monster>(Actor))
+	{
+		EnemyCharacter = Monster;
+		bIsEnemy = true;
+	}
+	// 가디언(드라카) 확인 - 시커 AI에게는 적
+	else if (AGS_Guardian* Guardian = Cast<AGS_Guardian>(Actor))
+	{
+		EnemyCharacter = Guardian;
+		bIsEnemy = true;
+	}
+
+	if (bIsEnemy && EnemyCharacter)
 	{
 		if (Stimulus.WasSuccessfullySensed())
 		{
@@ -1268,18 +1320,18 @@ void AGS_SeekerAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 		{
 			// 시야를 잃음 - 그러나 가까이 있으면 계속 추적
 			APawn* ControlledPawn = GetPawn();
-			if (ControlledPawn && !Monster->IsDead())
+			if (ControlledPawn && !EnemyCharacter->IsDead())
 			{
-				float Distance = FVector::Dist(ControlledPawn->GetActorLocation(), Monster->GetActorLocation());
+				float Distance = FVector::Dist(ControlledPawn->GetActorLocation(), EnemyCharacter->GetActorLocation());
 
 				// 600 유닛 이내면 벽에 끼어도 계속 인식
 				// (시야가 막혀도 소리나 근접 센서로 인지한다고 가정)
 				if (Distance < 600.0f)
 				{
-					// 현재 타겟이 없으면 이 몬스터를 타겟으로
+					// 현재 타겟이 없으면 이 적을 타겟으로
 					if (!CurrentTargetEnemy.IsValid())
 					{
-						SetTargetEnemy(Monster);
+						SetTargetEnemy(EnemyCharacter);
 					}
 					// 시야가 막혀도 가까우면 마지막 위치 저장하지 않음 (계속 추적)
 					return;
@@ -1795,6 +1847,10 @@ ETeamAttitude::Type AGS_SeekerAIController::GetTeamAttitudeTowards(const AActor&
 				return ETeamAttitude::Friendly;
 			}
 			else if (OtherTeamId == FGenericTeamId(2)) // 팀 2: 몬스터 (적)
+			{
+				return ETeamAttitude::Hostile;
+			}
+			else if (OtherTeamId == FGenericTeamId(0)) // 팀 0: 가디언 (드라카) - 적대
 			{
 				return ETeamAttitude::Hostile;
 			}

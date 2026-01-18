@@ -10,6 +10,10 @@
 #include "System/Utility/GS_AssetLoader.h"
 #include "GS_Character.generated.h"
 
+class AGS_Character;
+enum class EKillFeedbackType : uint8;
+enum class EPositiveEffectType : uint8;
+
 class UGS_StatComp;
 class UGS_SkillComp;
 class UGS_DebuffComp;
@@ -23,6 +27,7 @@ class UGS_HPWidget;
 class AGS_Weapon;
 class UDecalComponent;
 class UNiagaraSystem;
+class UGS_DamageNumberComponent;
 
 USTRUCT(BlueprintType)
 struct FImpactVFXInfo
@@ -40,6 +45,38 @@ struct FImpactVFXInfo
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCharacterDeath);
+
+/** 데미지 기록 (어시스트용) */
+USTRUCT()
+struct FDamageRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AGS_Character> Damager;
+
+	UPROPERTY()
+	float DamageAmount = 0.0f;
+
+	UPROPERTY()
+	float LastDamageTime = 0.0f;
+};
+
+/** 서포트 기록 (힐, 버프 어시스트용) */
+USTRUCT()
+struct FSupportRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AGS_Character> Supporter;
+
+	UPROPERTY()
+	float SupportWeight = 0.0f;
+
+	UPROPERTY()
+	float LastSupportTime = 0.0f;
+};
 
 USTRUCT(BlueprintType)
 struct FWeaponSlot
@@ -173,6 +210,7 @@ public:
 	FORCEINLINE UGS_StatComp* GetStatComp() const { return StatComp; }
 	FORCEINLINE UGS_DebuffComp* GetDebuffComp() const { return DebuffComp; }
 	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
+	FORCEINLINE UGS_DamageNumberComponent* GetDamageNumberComponent() const { return DamageNumberComp; }
 
 	//serverRPC
 	/** 타격 정격(Hit-stop) 효과 적용 (멀티캐스트) */
@@ -251,6 +289,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "State")
 	bool IsInvincible() const { return bIsInvincible; }
 
+	/** 이 캐릭터가 처치되었을 때의 피드백 타입 반환 */
+	virtual EKillFeedbackType GetKillFeedbackType() const;
+
+	/** UI에 표시할 캐릭터 이름 반환 */
+	virtual FString GetCharacterName() const;
+
+	/** 힐을 받았을 때 호출 (어시스트 추적용) */
+	void NotifyHealed(AGS_Character* Healer, float Amount);
+
+	/** 버프를 받았을 때 호출 (어시스트 추적용) */
+	void NotifyBuffed(AGS_Character* Buffer, EPositiveEffectType BuffType);
+
+	/** 서포트 기록 조회 (읽기 전용) */
+	const TArray<FSupportRecord>& GetSupportHistory() const { return SupportHistory; }
+
 	/** 가드/방어 중인지 여부 (자식 클래스에서 오버라이드) */
 	UFUNCTION(BlueprintCallable, Category = "State")
 	virtual bool IsDefending() const { return false; }
@@ -320,6 +373,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_StatComp> StatComp;
+
+	/** 데미지 숫자 팝업 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UGS_DamageNumberComponent> DamageNumberComp;
 
 	/** 공통 오디오 컴포넌트 변수 (내부 로직용으로만 사용, 에디터 노출은 자식 클래스에서 타입별로 수행) */
 	UPROPERTY()
@@ -392,4 +449,16 @@ private:
 	// 무적 상태
 	UPROPERTY(Replicated)
 	bool bIsInvincible = false;
+
+	/** 데미지 기여자 추적 (어시스트 계산용) */
+	TArray<FDamageRecord> DamageHistory;
+
+	/** 서포트 기여자 추적 (힐/버프 어시스트용) */
+	TArray<FSupportRecord> SupportHistory;
+
+	/** 어시스트 유효 시간 (초) */
+	float AssistWindowSeconds = 10.0f;
+
+	/** 어시스트 인정을 위한 최소 데미지 비율 (최대 체력 대비) */
+	float AssistThresholdRatio = 0.1f;
 };

@@ -40,7 +40,7 @@ public:
 	// ===== 설정값 =====
 
 	/** 효과용 PostProcess 머티리얼 */
-	UPROPERTY(EditDefaultsOnly, Category = "PositiveEffect")
+	UPROPERTY()
 	UMaterialInterface* EffectMaterial = nullptr;
 
 	/** PostProcess 우선순위 */

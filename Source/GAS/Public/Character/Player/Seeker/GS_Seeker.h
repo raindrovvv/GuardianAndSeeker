@@ -29,6 +29,9 @@ class AGS_Item;
 class UGS_MarkerPlacementComponent;
 class UGS_HitIndicatorComponent;
 class UGS_PositiveEffectComponent;
+class UGS_DeathCinematicComponent;
+class UGS_RevivalEffectComponent;
+class UGS_DebuffIndicatorComponent;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -328,6 +331,12 @@ public:
 	UGS_HitIndicatorComponent* HitIndicatorComponent;
 
 	// =======================
+	// 디버프 아이콘 표시 컴포넌트 (동료 시커 머리 위 표시)
+	// =======================
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	UGS_DebuffIndicatorComponent* DebuffIndicatorComponent;
+
+	// =======================
 	// 긍정적 효과(힐/버프) 화면 효과
 	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
@@ -340,9 +349,37 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
 	TSoftObjectPtr<UMaterialInterface> PositiveEffectMaterial;
 
-	// ================
+	// =======================
+	// 죽음/부활 시각 효과 컴포넌트
+	// =======================
+
+	/** 죽음 연출 효과용 PostProcess 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects|Death")
+	UPostProcessComponent* DeathCinematicPostProcessComp;
+
+	/** 죽음 연출 효과 컴포넌트 (로컬 플레이어 전용) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects|Death")
+	UGS_DeathCinematicComponent* DeathCinematicComp;
+
+	/** 죽음 연출용 PostProcess 머티리얼 - Soft Reference */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Death")
+	TSoftObjectPtr<UMaterialInterface> DeathCinematicMaterial;
+
+	/** 부활 효과용 PostProcess 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects|Revival")
+	UPostProcessComponent* RevivalEffectPostProcessComp;
+
+	/** 부활 효과 컴포넌트 (로컬 플레이어 전용) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects|Revival")
+	UGS_RevivalEffectComponent* RevivalEffectComp;
+
+	/** 부활 효과용 PostProcess 머티리얼 - Soft Reference */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Revival")
+	TSoftObjectPtr<UMaterialInterface> RevivalEffectMaterial;
+
+	// =======================
 	// 함정 VFX 컴포넌트
-	// ================
+	// =======================
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UNiagaraComponent* FeetLavaVFX_L;
 
@@ -450,20 +487,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Manual")
 	FName ManualRowName;
 
-	// ===================================
-	// LowHP 스크린 효과 (효과 보간 관련 변수)
-	// ===================================
 	UPROPERTY()
 	float TargetEffectStrength;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Effect")
-	float EffectInterpSpeed = 2.0f; // 효과 보간 속도
-
-	UPROPERTY(EditDefaultsOnly, Category = "Effect")
-	float EffectFadeInSpeed = 1.0f; // 효과 페이드 인 속도
-
-	UPROPERTY(EditDefaultsOnly, Category = "Effect")
-	float EffectFadeOutSpeed = 0.5f; // 효과 페이드 아웃 속도
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsLowHealthEffectActive)
 	bool bIsLowHealthEffectActive;
@@ -476,12 +501,6 @@ protected:
 
 	UFUNCTION()
 	void OnRep_CurrentEffectStrength();
-
-	// ================
-	// LowHP 스크린 효과
-	// ================
-	UPROPERTY(EditDefaultsOnly, Category = "Effects", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float LowHealthThresholdRatio = 0.3f;
 
 	virtual void OnHoverBegin() override;
 	virtual void OnHoverEnd() override;
@@ -635,9 +654,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dying")
 	void OnRevived();
 
+	/** 클라이언트에게 부활 효과 재생 명령 (Reliable RPC) */
+	UFUNCTION(Client, Reliable)
+	void ClientRPC_PlayRevivalEffect();
+
+	/** 로컬 플레이어 전용 죽음 연출 재생 헬퍼 (OnDeath, OnRep_IsDead에서 호출) */
+	void PlayDeathCinematic_Local();
+
 	/** 빈사 상태 시간 만료 - 실제 사망 처리 */
 	UFUNCTION()
 	void OnDyingTimeExpired();
+
+	/** 테스트용: 즉시 빈사 상태로 진입 */
+	UFUNCTION(Exec)
+	void Debug_Dying();
+
+	UFUNCTION(Server, Reliable)
+	void Server_Debug_Dying();
+
+	/** 테스트용: 즉시 사망 상태로 진입 */
+	UFUNCTION(Exec)
+	void Debug_Kill();
+
+	UFUNCTION(Server, Reliable)
+	void Server_Debug_Kill();
 
 	/** 현재 빈사 상태인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")

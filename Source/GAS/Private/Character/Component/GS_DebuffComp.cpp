@@ -209,9 +209,10 @@ void UGS_DebuffComp::ClearAllDebuffs()
 
 void UGS_DebuffComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// 타이머 매니저가 유효할 때 먼저 디버프 정리
+	ClearAllDebuffs();
 	OnDebuffListUpdated.Clear();
 	Super::EndPlay(EndPlayReason);
-	ClearAllDebuffs();
 }
 
 const FDebuffData* UGS_DebuffComp::GetDebuffData(EDebuffType Type) const
@@ -471,6 +472,7 @@ void UGS_DebuffComp::UpdateReplicatedDebuffList()
 		FDebuffRepInfo Info;
 		Info.Type = Debuff->GetDebuffType();
 		Info.RemainingTime = Debuff->GetRemainingTime(Now);
+		Info.TotalDuration = Debuff->GetDuration();
 		ReplicatedDebuffs.Add(Info);
 	}
 
@@ -480,6 +482,7 @@ void UGS_DebuffComp::UpdateReplicatedDebuffList()
 		FDebuffRepInfo Info;
 		Info.Type = CurrentDebuff->GetDebuffType();
 		Info.RemainingTime = CurrentDebuff->GetRemainingTime(Now);
+		Info.TotalDuration = CurrentDebuff->GetDuration();
 		ReplicatedDebuffs.Add(Info);
 	}
 
@@ -491,6 +494,7 @@ void UGS_DebuffComp::UpdateReplicatedDebuffList()
 		FDebuffRepInfo Info;
 		Info.Type = Debuff->GetDebuffType();
 		Info.RemainingTime = Debuff->GetRemainingTime(Now);
+		Info.TotalDuration = Debuff->GetDuration();
 		ReplicatedDebuffs.Add(Info);
 	}
 }

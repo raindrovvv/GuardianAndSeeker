@@ -26,6 +26,7 @@
 #include "TimerManager.h"
 #include "Misc/App.h"
 #include "UI/Character/GS_HPTextWidgetComp.h"
+#include "Character/Component/GS_DebuffIndicatorComponent.h"
 
 AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -54,6 +55,9 @@ AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
+
+	// 디버프 아이콘 표시 컴포넌트 생성 (시커/가디언 시점에서 보이는 머리 위 아이콘)
+	DebuffIndicatorComponent = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffIndicatorComponent>(this, TEXT("DebuffIndicatorComponent"));
 
 	// UI 컴포넌트 생성 및 초기화
 	TargetedUIComponent =

@@ -103,9 +103,11 @@ void AGS_NeedleFangProjectile::OnBeginOverlap(UPrimitiveComponent* OverlappedCom
 		Multicast_PlayHitSound(ImpactPoint);
 
 		UGS_StatComp* DamagedStat = DamagedCharacter->GetStatComp();
-		float Damage = DamagedStat->CalculateDamage(OwnerCharacter, DamagedCharacter);
+		bool bIsCritical = false;
+		float Damage = DamagedStat->CalculateDamage(OwnerCharacter, DamagedCharacter, bIsCritical);
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::DamageOnly;
+		DamageEvent.bIsCritical = bIsCritical;
 		DamageEvent.bSuppressCameraEffects = true; // 작은 투사체에 의한 카메라 어지러움 방지
 
 		float ActualDamage = DamagedCharacter->TakeDamage(Damage, DamageEvent, GetOwner()->GetInstigatorController(), this);

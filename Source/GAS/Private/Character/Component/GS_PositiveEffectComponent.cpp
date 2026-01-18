@@ -1,7 +1,10 @@
 #include "Character/Component/GS_PositiveEffectComponent.h"
+#include "Character/Component/GS_DamageNumberComponent.h"
+#include "UI/Damage/EDamageNumberType.h"
 #include "Components/PostProcessComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/Actor.h"
+#include "Character/GS_Character.h"
 
 UGS_PositiveEffectComponent::UGS_PositiveEffectComponent()
 {
@@ -69,7 +72,21 @@ void UGS_PositiveEffectComponent::OnHealed(float HealAmount)
 		StartTimer();
 	}
 
-	// UE_LOG(LogTemp, Log, TEXT("[PositiveEffect] Heal triggered - Amount: %.1f"), HealAmount);
+	// 힐 숫자 팝업 표시 (머리 위치에 표시)
+	if (HealAmount > 0.0f)
+	{
+		if (AGS_Character* OwnerCharacter = Cast<AGS_Character>(OwnerActor.Get()))
+		{
+			if (UGS_DamageNumberComponent* DmgNumComp = OwnerCharacter->GetDamageNumberComponent())
+			{
+				// 캐릭터 위치 (캡슐 높이 - 너무 높지 않게)
+				FVector HeadLocation = OwnerCharacter->GetActorLocation();
+				HeadLocation.Z += OwnerCharacter->GetDefaultHalfHeight(); // 1.0x로 낮춤
+
+				DmgNumComp->ShowDamageNumber(HealAmount, EDamageNumberType::Heal, HeadLocation);
+			}
+		}
+	}
 }
 
 void UGS_PositiveEffectComponent::OnBuffReceived(EPositiveEffectType BuffType)

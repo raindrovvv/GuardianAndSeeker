@@ -12,6 +12,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Character/Component/GS_StatComp.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 
@@ -142,10 +143,23 @@ bool AGS_DrakharProjectile::TryApplyDamageToCharacter(AActor* HitActor)
 	}
 
 	// 데미지 적용
+	bool bIsCritical = false;
+	float DamageToApply = BaseDamage;
+	if (AGS_Character* OwnerChar = Cast<AGS_Character>(ProjectileOwner))
+	{
+		UGS_StatComp* DamagedStat = DamagedCharacter->GetStatComp();
+		if (DamagedStat)
+		{
+			// BaseDamage(120)를 계수(1.2)로 활용하여 스탯 기반 데미지 계산
+			DamageToApply = DamagedStat->CalculateDamage(OwnerChar, DamagedCharacter, bIsCritical, BaseDamage / 100.0f);
+		}
+	}
+
 	FGS_DamageEvent DamageEvent;
 	DamageEvent.HitReactType = EHitReactType::Interrupt;
+	DamageEvent.bIsCritical = bIsCritical;
 
-	DamagedCharacter->TakeDamage(BaseDamage, DamageEvent, ProjectileOwner->GetInstigatorController(), this);
+	DamagedCharacter->TakeDamage(DamageToApply, DamageEvent, ProjectileOwner->GetInstigatorController(), this);
 
 	return true;
 }
