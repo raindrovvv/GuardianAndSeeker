@@ -16,6 +16,7 @@
 #include "CollisionQueryParams.h"
 #include "Engine/DamageEvents.h"
 #include "AkGameplayStatics.h"
+#include "Character/F_GS_DamageEvent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
 #include "Character/F_GS_DamageEvent.h"
@@ -233,9 +234,11 @@ void AGS_WeaponSword::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 		UGS_StatComp* DamagedStat = Damaged->GetStatComp();
 		if (DamagedStat)
 		{
-			float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
+			bool bIsCritical = false;
+			float Damage = DamagedStat->CalculateDamage(Attacker, Damaged, bIsCritical);
 			FGS_DamageEvent DamageEvent;
 			DamageEvent.HitReactType = EHitReactType::Interrupt;
+			DamageEvent.bIsCritical = bIsCritical;
 			Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
 			// 피격자 히트스탑 (안정적인 피드백 제공)

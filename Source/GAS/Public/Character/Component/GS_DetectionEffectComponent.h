@@ -12,43 +12,41 @@ class UMaterialInstanceDynamic;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDetectionHUD, bool, bShow);
 
-UCLASS(ClassGroup=(Effects), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Effects), meta = (BlueprintSpawnableComponent))
 class GAS_API UGS_DetectionEffectComponent : public UActorComponent
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    UGS_DetectionEffectComponent();
+	UGS_DetectionEffectComponent();
 
-    UPROPERTY(EditDefaultsOnly, Category="Detection")
-    UMaterialInterface* DetectionEffectMaterial = nullptr;
+	UPROPERTY()
+	UMaterialInterface* DetectionEffectMaterial = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, Category="Detection", meta=(ClampMin="0"))
-    int32 PostProcessPriority = 11;
+	UPROPERTY(EditDefaultsOnly, Category = "Detection", meta = (ClampMin = "0"))
+	int32 PostProcessPriority = 11;
 
-    UPROPERTY(EditDefaultsOnly, Category="Detection|Material")
-    FName DetectionIntensityParamName = TEXT("DetectionIntensity");
+	UPROPERTY(EditDefaultsOnly, Category = "Detection|Material")
+	FName DetectionIntensityParamName = TEXT("DetectionIntensity");
 
-    UPROPERTY(BlueprintAssignable, Category="Detection|UI")
-    FOnDetectionHUD OnDetectionHUD;
+	UPROPERTY(BlueprintAssignable, Category = "Detection|UI")
+	FOnDetectionHUD OnDetectionHUD;
 
-    void InitializeForOwner(AActor* InOwner, UPostProcessComponent* InPostProcessComp, UMaterialInterface* InMaterialOverride = nullptr);
+	void InitializeForOwner(AActor* InOwner, UPostProcessComponent* InPostProcessComp, UMaterialInterface* InMaterialOverride = nullptr);
 
-    void OnDetectedChanged(bool bDetected);
-    void SetIntensity(float Intensity01);
+	void OnDetectedChanged(bool bDetected);
+	void SetIntensity(float Intensity01);
 
-    UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp; }
+	UPostProcessComponent* GetPostProcessComponent() const { return ManagedPostProcessComp; }
 
 protected:
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-    void EnsureMID();
+	void EnsureMID();
 
 private:
-    TWeakObjectPtr<AActor> OwnerActor;
-    UPostProcessComponent* ManagedPostProcessComp = nullptr;
-    UMaterialInstanceDynamic* DynamicMaterial = nullptr;
+	TWeakObjectPtr<AActor> OwnerActor;
+	UPostProcessComponent* ManagedPostProcessComp = nullptr;
+	UMaterialInstanceDynamic* DynamicMaterial = nullptr;
 };
-
-

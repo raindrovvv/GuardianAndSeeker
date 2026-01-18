@@ -94,17 +94,12 @@ void UGS_BTT_SeekerRevive::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* No
 			AGS_Seeker* Seeker = Cast<AGS_Seeker>(Pawn);
 			if (Seeker)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[AI Revive] %s starting revive on %s"), *Seeker->GetName(), *DownedAlly->GetName());
 				DownedAlly->Server_StartRevive(Seeker);
 			}
 		}
 
 		// Simulate holding the E key
 		AIController->SetHoldingReviveKey(true);
-		UE_LOG(LogTemp, Log, TEXT("[AI Revive] %s holding revive key, IsBeingRevived: %s, ReviveProgress: %.2f"),
-		       *Pawn->GetName(),
-		       DownedAlly->IsBeingRevived() ? TEXT("true") : TEXT("false"),
-		       DownedAlly->GetReviveProgress());
 
 		// Check if revive is completed (state changed)
 		if (!DownedAlly->IsInDyingState())

@@ -4,15 +4,15 @@
 #include "Weapon/Projectile/Seeker/GS_SeekerMerciArrowNormal.h"
 #include "Weapon/Projectile/Component/GS_ArrowFXComponent.h"
 #include "Weapon/Projectile/GS_TargetType.h"
-
-#include "Character/Component/GS_StatComp.h"
-#include "Kismet/GameplayStatics.h"
-#include "Character/Skill/GS_IgnoreDefenceDamageType.h"
-#include "Character/Player/Guardian/GS_Guardian.h"
 #include "Character/Player/Monster/GS_Monster.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/Player/Guardian/GS_Guardian.h"
+#include "Character/Component/GS_StatComp.h"
+#include "Character/Skill/GS_IgnoreDefenceDamageType.h"
+#include "Character/F_GS_DamageEvent.h"
 #include "ResourceSystem/Aether/GS_AetherExtractor.h"
 #include "GameFramework/DamageType.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
@@ -45,13 +45,14 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 
 	TSubclassOf<UDamageType> DamageTypeClass = UDamageType::StaticClass();
 
+	bool bIsCritical = false;
 	// 화살 타입별 데미지 계산
 	switch (ArrowType)
 	{
 	case EArrowType::Normal:
 		if (IsValid(DamagedCharacter) && IsValid(OwnerCharacter))
 		{
-			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter);
+			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter, bIsCritical);
 		}
 
 		// 가디언에게는 50% 데미지
@@ -66,14 +67,14 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 		if (IsValid(DamagedCharacter) && IsValid(OwnerCharacter))
 		{
 			// 방어력 무시 데미지 (세 번째 파라미터 1.f, 네 번째 파라미터 0.f)
-			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter, 1.f, 0.f);
+			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter, bIsCritical, 1.f, 0.f);
 		}
 		break;
 
 	case EArrowType::Child:
 		if (IsValid(DamagedCharacter) && IsValid(OwnerCharacter))
 		{
-			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter);
+			DamageToApply = DamagedCharacter->GetStatComp()->CalculateDamage(OwnerCharacter, DamagedCharacter, bIsCritical);
 		}
 		break;
 	}
@@ -93,14 +94,15 @@ void AGS_SeekerMerciArrowNormal::ProcessDamageLogic(ETargetType TargetType, cons
 
 	else if (DamageToApply > 0.f)
 	{
-		UGameplayStatics::ApplyPointDamage(
-		    HitActor,
+		FGS_DamageEvent DamageEvent;
+		DamageEvent.HitReactType = EHitReactType::Interrupt;
+		DamageEvent.bIsCritical = bIsCritical;
+
+		HitActor->TakeDamage(
 		    DamageToApply,
-		    GetActorForwardVector(),
-		    SweepResult,
+		    DamageEvent,
 		    GetInstigatorController(),
-		    this,
-		    DamageTypeClass);
+		    this);
 
 		// 데미지 적용 후 대상 기록 (중복 방지)
 		DamagedActors.Add(HitActor);

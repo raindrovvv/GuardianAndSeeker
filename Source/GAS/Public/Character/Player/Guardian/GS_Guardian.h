@@ -12,6 +12,7 @@ class UGS_VFXComponent;
 class UGS_CameraShakeComponent;
 class UWidgetComponent;
 class AGS_Character;
+class UGS_DebuffIndicatorComponent;
 
 //check ctrl input
 UENUM(BlueprintType)
@@ -61,6 +62,10 @@ public:
 	// VFX 컴포넌트 (디버프 등 모든 VFX) - Drakhar는 자체 VFX 컴포넌트 사용
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	UGS_VFXComponent* VFXComponent;
+
+	// 디버프 아이콘 표시 컴포넌트 (시커/가디언 시점에서 보이는 머리 위 아이콘)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UGS_DebuffIndicatorComponent> DebuffIndicatorComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGS_CameraShakeComponent> CameraShakeComponent;

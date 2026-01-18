@@ -115,9 +115,11 @@ void AGS_WeaponAxe::OnHit(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 	UGS_StatComp* DamagedStat = Damaged->GetStatComp();
 	if (DamagedStat)
 	{
-		float Damage = DamagedStat->CalculateDamage(Attacker, Damaged);
+		bool bIsCritical = false;
+		float Damage = DamagedStat->CalculateDamage(Attacker, Damaged, bIsCritical);
 		FGS_DamageEvent DamageEvent;
 		DamageEvent.HitReactType = EHitReactType::Interrupt;
+		DamageEvent.bIsCritical = bIsCritical;
 		Damaged->TakeDamage(Damage, DamageEvent, OwnerChar->GetController(), OwnerChar);
 
 		// 피격자 히트스탑 적용

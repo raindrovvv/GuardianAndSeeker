@@ -18,8 +18,6 @@ void UGS_HitIndicatorComponent::BeginPlay()
 	// 로컬 플레이어만 HUD 위젯 생성
 	if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] BeginPlay - Owner: %s, IsLocallyControlled: %d"),
-		       *OwnerPawn->GetName(), OwnerPawn->IsLocallyControlled());
 
 		if (OwnerPawn->IsLocallyControlled())
 		{
@@ -56,7 +54,6 @@ void UGS_HitIndicatorComponent::CreateHitIndicatorWidget()
 			{
 				HitIndicatorWidget->AddToViewport(-1); // 메인 HUD(0)보다 뒤에 표시
 				HitIndicatorWidget->SetOwnerComponent(this);
-				UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Widget Created Successfully!"));
 			}
 			else
 			{
@@ -72,8 +69,6 @@ void UGS_HitIndicatorComponent::CreateHitIndicatorWidget()
 
 void UGS_HitIndicatorComponent::NotifyDamageDirection(const FVector& WorldHitDirection, float DamageAmount)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] NotifyDamageDirection called - Dir: %s, Damage: %.1f"),
-	       *WorldHitDirection.ToString(), DamageAmount);
 
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (!OwnerPawn)
@@ -87,13 +82,11 @@ void UGS_HitIndicatorComponent::NotifyDamageDirection(const FVector& WorldHitDir
 		// 리슨 서버에서 로컬 플레이어인 경우 직접 처리
 		if (OwnerPawn->IsLocallyControlled())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Server: Local player - processing directly"));
 			ShowHitIndicatorInternal(WorldHitDirection, DamageAmount);
 		}
 		else
 		{
 			// 클라이언트 소유 Pawn이면 Client RPC 전송
-			UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Server: Sending Client RPC"));
 			Client_ShowHitIndicator(WorldHitDirection, DamageAmount);
 		}
 	}
@@ -109,8 +102,6 @@ void UGS_HitIndicatorComponent::NotifyDamageDirection(const FVector& WorldHitDir
 
 void UGS_HitIndicatorComponent::Client_ShowHitIndicator_Implementation(const FVector& WorldHitDirection, float DamageAmount)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Client RPC received - Dir: %s, Damage: %.1f"),
-	       *WorldHitDirection.ToString(), DamageAmount);
 	ShowHitIndicatorInternal(WorldHitDirection, DamageAmount);
 }
 
@@ -119,15 +110,12 @@ void UGS_HitIndicatorComponent::ShowHitIndicatorInternal(const FVector& WorldHit
 	// 방향 계산
 	EHitDirection Direction = CalculateHitDirectionFromCamera(WorldHitDirection);
 
-	UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] Calculated Direction: %d"), (int32)Direction);
-
 	if (Direction != EHitDirection::None)
 	{
 		// 위젯에 직접 호출
 		if (HitIndicatorWidget)
 		{
 			HitIndicatorWidget->ShowHitIndicator(Direction, DamageAmount);
-			UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] ShowHitIndicator called on widget!"));
 		}
 		else
 		{
@@ -143,7 +131,6 @@ EHitDirection UGS_HitIndicatorComponent::CalculateHitDirectionFromCamera(const F
 {
 	if (WorldHitDirection.IsNearlyZero())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] HitDirection is nearly zero! Returning Omni direction."));
 		return EHitDirection::Omni;
 	}
 
@@ -151,14 +138,12 @@ EHitDirection UGS_HitIndicatorComponent::CalculateHitDirectionFromCamera(const F
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (!OwnerPawn)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] OwnerPawn is NULL!"));
 		return EHitDirection::None;
 	}
 
 	APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController());
 	if (!PC || !PC->PlayerCameraManager)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] PC or CameraManager is NULL!"));
 		return EHitDirection::None;
 	}
 
@@ -195,9 +180,6 @@ EHitDirection UGS_HitIndicatorComponent::CalculateHitDirectionFromCamera(const F
 		RightDot = FVector::DotProduct(HorizontalDir, CamRight);
 	}
 	// else: 순수 수직 공격(Z만 있음) - ForwardDot/RightDot은 0으로 유지되어 상하 판정만 사용됨
-
-	UE_LOG(LogTemp, Warning, TEXT("[HitIndicator] WorldZ: %.3f, Fwd: %.3f, Right: %.3f"),
-	       UpDot, ForwardDot, RightDot);
 
 	return DetermineDirection(ForwardDot, RightDot, UpDot);
 }

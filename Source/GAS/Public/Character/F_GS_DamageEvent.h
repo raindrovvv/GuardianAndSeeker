@@ -16,4 +16,7 @@ public:
 
 	EHitReactType HitReactType;
 	bool bSuppressCameraEffects = false;
+
+	/** 크리티컬 히트 여부 */
+	bool bIsCritical = false;
 };

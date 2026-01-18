@@ -4,6 +4,7 @@
 #include "Character/Player/Seeker/GS_Merci.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 #include "Character/Component/GS_StatComp.h"
+#include "Camera/CameraComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -478,7 +479,18 @@ void AGS_Merci::UpdateZoom(float Alpha)
 {
 	if (!SpringArmComp || !CameraComp)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SpringArmComp or CameraComp null"));
+		return;
+	}
+
+	// 줌 타임라인에 따른 FOV 조정
+	// 현재 시점에 맞는 기본 FOV를 기준으로 조준 시 20도 줄임
+	float BaseFOV = IsFirstPerson() ? FirstPersonFOV : SavedTPSFOV;
+	float TargetFOV = FMath::Lerp(BaseFOV, BaseFOV - 20.0f, Alpha);
+	CameraComp->SetFieldOfView(TargetFOV);
+
+	// 1인칭 모드에서는 카메라 거리(ArmLength) 조정을 스킵
+	if (IsFirstPerson())
+	{
 		return;
 	}
 
@@ -549,6 +561,12 @@ void AGS_Merci::Client_SetWidgetVisibility_Implementation(bool bVisible)
 
 void AGS_Merci::Client_StartZoom_Implementation()
 {
+	// 1인칭 모드에서는 줌 연출 스킵
+	if (IsFirstPerson())
+	{
+		return;
+	}
+
 	ZoomTimeline.Play(); // 줌인
 
 	GetWorldTimerManager().ClearTimer(ReverseTimerHandle);

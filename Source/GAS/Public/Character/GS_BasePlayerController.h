@@ -10,6 +10,7 @@ class UInputAction;
 struct FInputActionValue;
 class UGS_InGameMenuUI;
 class UGS_QuickManualUI;
+class UGS_KillFeedbackComponent;
 
 /**
  * 
@@ -18,7 +19,15 @@ UCLASS()
 class GAS_API AGS_BasePlayerController : public APlayerController
 {
 	GENERATED_BODY()
-	
+
+public:
+	AGS_BasePlayerController(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+public:
+	/** 킬/어시스트 피드백 컴포넌트 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI|Feedback")
+	TObjectPtr<UGS_KillFeedbackComponent> KillFeedbackComp;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
