@@ -460,6 +460,15 @@ void UGS_AresMovingSkill::StartCameraZoomOut()
 		return;
 	}
 
+	// 1인칭 모드에서는 카메라 줌아웃 연출 스킵
+	if (AGS_Player* Player = Cast<AGS_Player>(OwnerCharacter))
+	{
+		if (Player->IsFirstPerson())
+		{
+			return;
+		}
+	}
+
 	// 이미 줌아웃 진행 중이면 중복 호출 방지 (줌인 중이면 줌아웃으로 전환 가능)
 	if (CurrentZoomState == EZoomState::ZoomingOut || CurrentZoomState == EZoomState::ZoomedOut)
 	{
@@ -577,6 +586,17 @@ void UGS_AresMovingSkill::UpdateCameraZoom()
 	if (!OwnerCharacter || !OwnerCharacter->IsLocallyControlled())
 	{
 		return;
+	}
+
+	// 1인칭 모드에서는 카메라 줌 연출 스킵
+	if (AGS_Player* Player = Cast<AGS_Player>(OwnerCharacter))
+	{
+		if (Player->IsFirstPerson())
+		{
+			SafeClearTimer(CameraUpdateTimerHandle);
+			CurrentZoomState = EZoomState::Idle;
+			return;
+		}
 	}
 
 	// 클라이언트에서 소유자 캐싱 보장
