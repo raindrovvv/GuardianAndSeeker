@@ -119,6 +119,8 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
 {
     UE_LOG(LogTemp, Warning, TEXT("SpawnDungeonFromArray called with %d objects."), SaveData.Num());
     CachedSaveData = SaveData;
+    PendingMonsterData.Empty();
+    
     if (SaveData.IsEmpty())
     {
         UE_LOG(LogTemp, Error, TEXT("There is no SaveData. Can't Spawn Dungeon."));
@@ -133,45 +135,66 @@ void AGS_InGameGM::SpawnDungeonFromArray(const TArray<FDESaveData>& SaveData)
     {
         for (const FDESaveData& ObjectData : SaveData)
         {
-            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
-            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
-            {
-                ActorClassToSpawn = *CachedClass;
-            }
-            else
-            {
-                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
-                if (ActorClassToSpawn)
-                {
-                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
-                }
-            }
+            /*
+             * FString -> TSoftClassPtr로 전환해서 생긴 코드
+             */
+            UClass* ActorClassToSpawn = ObjectData.SpawnActorClass.LoadSynchronous();
+            
+            /*
+            * FString -> TSoftClassPtr로 전환해서 사라진 코드 
+            // TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            // if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            // {
+            //     ActorClassToSpawn = *CachedClass;
+            // }
+            // else
+            // {
+            //     ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+            //     if (ActorClassToSpawn)
+            //     {
+            //         ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+            //     }
+            // }
+            */
 
             if (ActorClassToSpawn)
             {
-                if (!ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
+                /*
+                 * 16. 불필요한 이중 순회 로직 해결 코드
+                 */
+                if (ActorClassToSpawn->IsChildOf(AGS_Monster::StaticClass()))
                 {
+                    PendingMonsterData.Add(ObjectData);
+                    continue;
+                }
+                
+                FActorSpawnParameters SpawnParams;
+                SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+                AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);
 
-                    FActorSpawnParameters SpawnParams;
-                    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-                    AActor* NewActor = World->SpawnActor<AActor>(ActorClassToSpawn, ObjectData.SpawnTransform, SpawnParams);
-
-                    if (IsValid(NewActor))
+                if (IsValid(NewActor))
+                {
+                    /*
+                    * 3. 비효율적인 월드 객체 탐색 해결하면서 생성한 코드
+                    */
+                    if (NewActor->IsA(APlayerStart::StaticClass()))
                     {
-                        SpawnedDungeonActors.Add(NewActor);
-                        if (UPlaceInfoComponent* NewActorPlaceInfoComp = NewActor->GetComponentByClass<UPlaceInfoComponent>())
-                        {
-                            NewActorPlaceInfoComp->SetCellInfo(ObjectData.ObjectType, ObjectData.TrapPlacement, ObjectData.CellCoord, ObjectData.ConstructionCost);
-                        }
+                        CachedPlayerStartPoint = NewActor;
                     }
-
-                    // 만약 이번에 스폰한 액터가 방 모듈이면 방 개수 증가.
-                    if (ObjectData.ObjectType == EObjectType::Room
-                        || ObjectData.ObjectType == EObjectType::DoorAndWall)
+                        
+                    SpawnedDungeonActors.Add(NewActor);
+                    if (UPlaceInfoComponent* NewActorPlaceInfoComp = NewActor->GetComponentByClass<UPlaceInfoComponent>())
                     {
-                        RoomCount++;
-                        UE_LOG(LogTemp, Warning, TEXT("[방 숨김] 방 생성 완료 현재 방 개수 : %d"), RoomCount);
+                        NewActorPlaceInfoComp->SetCellInfo(ObjectData.ObjectType, ObjectData.TrapPlacement, ObjectData.CellCoord, ObjectData.ConstructionCost);
                     }
+                }
+
+                // 만약 이번에 스폰한 액터가 방 모듈이면 방 개수 증가.
+                if (ObjectData.ObjectType == EObjectType::Room
+                    || ObjectData.ObjectType == EObjectType::DoorAndWall)
+                {
+                    RoomCount++;
+                    UE_LOG(LogTemp, Warning, TEXT("[방 숨김] 방 생성 완료 현재 방 개수 : %d"), RoomCount);
                 }
             }
         }
@@ -235,30 +258,48 @@ void AGS_InGameGM::CheckNavMeshBuildStatus()
 
 void AGS_InGameGM::OnNavMeshBuildComplete()
 {
-    if (CachedSaveData.IsEmpty())
+    // if (CachedSaveData.IsEmpty())
+    // {
+    //     UE_LOG(LogTemp, Error, TEXT("There is no CachedSaveData. Can't Spawn Monsters."));
+    //     return;
+    // }
+    
+    /*
+     * 16. 불필요한 이중 순회 로직
+     * 이제는 몬스터 정보만 따로 담아두었기 때문에 CachedSaveData가 아닌 PendingMonsterData를 확인해야 함.
+     */
+    if (PendingMonsterData.IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("There is no CachedSaveData. Can't Spawn Monsters."));
+        UE_LOG(LogTemp, Log, TEXT("No monsters to spawn in pending list."));
         return;
     }
 
     UWorld* World = GetWorld();
     if (IsValid(World))
     {
-        for (const FDESaveData& ObjectData : CachedSaveData)
+        for (const FDESaveData& ObjectData : PendingMonsterData)
         {
-            TSubclassOf<AActor> ActorClassToSpawn = nullptr;
-            if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
-            {
-                ActorClassToSpawn = *CachedClass;
-            }
-            else
-            {
-                ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
-                if (ActorClassToSpawn)
-                {
-                    ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
-                }
-            }
+            /*
+             * FString -> TSoftClassPtr로 전환해서 생긴 코드
+             */
+            UClass* ActorClassToSpawn = ObjectData.SpawnActorClass.LoadSynchronous();
+
+            /*
+            * FString -> TSoftClassPtr로 전환해서 사라진 코드 
+            // TSubclassOf<AActor> ActorClassToSpawn = nullptr;
+            // if (TSubclassOf<AActor>* CachedClass = ClassCache.Find(ObjectData.SpawnActorClassPath))
+            // {
+            //     ActorClassToSpawn = *CachedClass;
+            // }
+            // else
+            // {
+            //     ActorClassToSpawn = LoadClass<AActor>(nullptr, *ObjectData.SpawnActorClassPath);
+            //     if (ActorClassToSpawn)
+            //     {
+            //         ClassCache.Add(ObjectData.SpawnActorClassPath, ActorClassToSpawn);
+            //     }
+            // }
+            */
 
             if (ActorClassToSpawn)
             {
@@ -277,6 +318,9 @@ void AGS_InGameGM::OnNavMeshBuildComplete()
             }
         }
     }
+
+    PendingMonsterData.Empty();
+    CachedSaveData.Empty();
 
     // 가디언 벽 숨김 처리
     // for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -332,15 +376,27 @@ AActor* AGS_InGameGM::FindPlayerStart_Implementation(AController* Player, const 
 {
     UE_LOG(LogTemp, Warning, TEXT("Called FindPlayerStart_Implementation."));
 
-    for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+    /*
+     * 3. 비효율적인 월드 객체 탐색 해결하면서 생성한 코드
+     * */
+    if (IsValid(CachedPlayerStartPoint)
+        && CachedPlayerStartPoint->IsA(APlayerStart::StaticClass()))
     {
-        APlayerStart* PlayerStart = *It;
-        if (PlayerStart)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Found a valid PlayerStart '%s' at location %s via TActorIterator."), *PlayerStart->GetName(), *PlayerStart->GetActorLocation().ToString());
-            return PlayerStart;
-        }
+        return CachedPlayerStartPoint;
     }
+    
+    /*
+     * 3. 비효율적인 월드 객체 탐색 해결하면서 제거한 코드
+    // for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+    // {
+    //     APlayerStart* PlayerStart = *It;
+    //     if (PlayerStart)
+    //     {
+    //         UE_LOG(LogTemp, Warning, TEXT("Found a valid PlayerStart '%s' at location %s via TActorIterator."), *PlayerStart->GetName(), *PlayerStart->GetActorLocation().ToString());
+    //         return PlayerStart;
+    //     }
+    // }
+    */
 
     UE_LOG(LogTemp, Error, TEXT("OVERRIDDEN FindPlayerStart FAILED to find any PlayerStart actors. Falling back to default behavior."));
     return Super::FindPlayerStart_Implementation(Player, IncomingName);

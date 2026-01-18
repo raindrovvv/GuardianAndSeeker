@@ -10,6 +10,25 @@ void UGS_DungeonEditorSaveGame::Serialize(FArchive& Ar)
 	// bExcludeDungeonEditingArrays 플래그가 false일 때만 새로운 배열들을 직렬화
 	if (!bExcludeDungeonEditingArrays)
 	{
+		if (Ar.IsSaving())
+		{
+			for (auto It = FloorOccupancyData.CreateIterator(); It; ++It)
+			{
+				if (It.Value() == EDEditorCellType::None)
+				{
+					It.RemoveCurrent();
+				}
+			}
+		
+			for (auto It = CeilingOccupancyData.CreateIterator(); It; ++It)
+			{
+				if (It.Value() == EDEditorCellType::None)
+				{
+					It.RemoveCurrent();
+				}
+			}
+		}
+		
 		Ar << FloorOccupancyData;
 		Ar << CeilingOccupancyData;
 	}
