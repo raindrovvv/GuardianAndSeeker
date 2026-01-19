@@ -50,3 +50,5 @@ tmpclaude-*
 Plugins/WwiseSoundEngine/Source/WwiseSoundEngine/Public/Generated/AkiOSPlugins.h
 
 Plugins/WwiseSoundEngine/Source/WwiseSoundEngine/Public/Generated/AktvOSPlugins.h
+
+.editorconfig
