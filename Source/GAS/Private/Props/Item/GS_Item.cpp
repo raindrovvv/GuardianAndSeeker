@@ -1,54 +1,48 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Props/Item/GS_Item.h"
-#if WITH_EDITOR
-#include "ContentBrowserItemData.h"
-#endif
 #include "Props/Item/GS_ItemData.h"
 
-
-// Sets default values
 AGS_Item::AGS_Item()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
-	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
-	RootComponent = MeshComp;
+	VisualMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMeshComponent"));
+	RootComponent = VisualMeshComponent;
 }
 
-// Called when the game starts or when spawned
 void AGS_Item::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-
-void AGS_Item::SetItemData(UGS_ItemData* InputItemData)
+void AGS_Item::AssignItemData(UGS_ItemData* InItemData)
 {
-	ItemData = InputItemData;
+	ItemConfiguration = InItemData;
 }
 
-void AGS_Item::SetMesh(FName StaticMeshName)
+void AGS_Item::ApplyMeshVariant(FName VariantName)
 {
-	if (!ItemData)
+	if (!ItemConfiguration)
 	{
 		return;
 	}
-	UStaticMesh** StaticMesh = ItemData->ItemMeshs.Find(StaticMeshName);
-	if (*StaticMesh)
+
+	if (UStaticMesh* const* FoundMesh = ItemConfiguration->MeshVariants.Find(VariantName))
 	{
-		MeshComp->SetStaticMesh(*StaticMesh);
+		if (*FoundMesh)
+		{
+			VisualMeshComponent->SetStaticMesh(*FoundMesh);
+		}
 	}
 }
 
-UStaticMeshComponent* AGS_Item::GetMeshComp()
+UStaticMeshComponent* AGS_Item::GetVisualMesh() const
 {
-	return MeshComp;
+	return VisualMeshComponent;
 }
 
-void AGS_Item::ItemDestroy()
+void AGS_Item::DestroyItem()
 {
 	Destroy();
 }

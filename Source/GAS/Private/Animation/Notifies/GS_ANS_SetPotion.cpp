@@ -7,8 +7,10 @@
 #include "Character/Skill/Seeker/GS_HealSkill.h"
 
 
-void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration,
-                                    const FAnimNotifyEventReference& EventReference)
+void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp,
+									UAnimSequenceBase* Animation,
+									float TotalDuration,
+									const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
@@ -34,16 +36,17 @@ void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSeque
 		return;
 	}
 
-	Potion->SetItemData(Seeker->GetItemData(EItemType::HP_Potion));
-	Potion->SetMesh(FName(TEXT("HP_Potion_Full")));
+	Potion->AssignItemData(Seeker->GetItemData(EItemType::HP_Potion));
+	Potion->ApplyMeshVariant(FName(TEXT("HP_Potion_Full")));
 
 	Seeker->Items.Add(EItemType::HP_Potion, Potion);
 
 	Potion->AttachToComponent(Seeker->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("Potion"));
 }
 
-void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                                  const FAnimNotifyEventReference& EventReference)
+void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp,
+								  UAnimSequenceBase* Animation,
+								  const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
@@ -58,9 +61,9 @@ void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenc
 		return;
 	}
 
-	Potion->DropFromSocket();
+	Potion->ReleaseFromHolder();
 
-	UStaticMeshComponent* Mesh = Potion->GetMeshComp();
+	UStaticMeshComponent* Mesh = Potion->GetVisualMesh();
 	if (Mesh)
 	{
 		Mesh->SetSimulatePhysics(true);

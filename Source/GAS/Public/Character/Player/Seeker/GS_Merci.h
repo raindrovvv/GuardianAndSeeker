@@ -33,10 +33,13 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	// Attack Interface
-	virtual void LeftClickPressed_Implementation() override;
-	virtual void LeftClickRelease_Implementation() override;
+	virtual void OnAttackInputPressed_Implementation() override;
+	virtual void OnAttackInputReleased_Implementation() override;
 
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+	virtual float TakeDamage(float DamageAmount,
+							 struct FDamageEvent const& DamageEvent,
+							 class AController* EventInstigator,
+							 AActor* DamageCauser) override;
 
 	// 화살 발사 VFX
 	UFUNCTION(NetMulticast, Unreliable)
@@ -73,10 +76,12 @@ public:
 	void Server_DrawBow(UAnimMontage* DrawMontage);
 
 	UFUNCTION(Server, Reliable)
-	void Server_ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg = 0.0f, int32 NumArrows = 1);
+	void
+	Server_ReleaseArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg = 0.0f, int32 NumArrows = 1);
 
 	UFUNCTION(Server, Reliable)
-	void Server_FireArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg = 0.0f, int32 NumArrows = 1);
+	void
+	Server_FireArrow(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg = 0.0f, int32 NumArrows = 1);
 
 	// Arrow
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
@@ -95,7 +100,10 @@ public:
 	virtual void StateReset() override;
 	void OnDrawMontageEnded();
 
-	bool GetIsFullyDrawn() { return bIsFullyDrawn; }
+	bool GetIsFullyDrawn()
+	{
+		return bIsFullyDrawn;
+	}
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_DrawDebugLine(FVector Start, FVector End, FColor Color = FColor::Green);
@@ -103,7 +111,10 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_ChangeArrowType(int32 Direction);
 
-	void SetArrowTypeWidget(UGS_ArrowTypeWidget* Widget) { ArrowTypeWidget = Widget; }
+	void SetArrowTypeWidget(UGS_ArrowTypeWidget* Widget)
+	{
+		ArrowTypeWidget = Widget;
+	}
 
 	// Auto Aiming
 	void SetAutoAimTarget(AActor* Target);
@@ -115,7 +126,7 @@ public:
 	UFUNCTION(Client, Unreliable)
 	void Client_StopZoom(float Duration);
 
-	//Crosshair
+	// Crosshair
 	UFUNCTION(BlueprintCallable, Category = "Crosshair")
 	void SetCrosshairWidget(UGS_CrossHairImage* InCrosshairWidget);
 

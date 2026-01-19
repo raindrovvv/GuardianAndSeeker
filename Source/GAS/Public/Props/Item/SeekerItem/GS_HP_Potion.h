@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -6,26 +6,44 @@
 #include "Props/Item/GS_Item.h"
 #include "GS_HP_Potion.generated.h"
 
-UCLASS()
+/**
+ * @brief Health Potion item that can be consumed by Seeker characters.
+ * Handles pickup, consumption, and physics simulation when dropped.
+ */
+UCLASS(meta = (DisplayName = "HP Potion"))
 class GAS_API AGS_HP_Potion : public AGS_Item
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
 	AGS_HP_Potion();
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 public:
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Item")
-	FTimerHandle DestroyTimerHandle;
+	/**
+	 * @brief Releases the potion from its socket and enables physics.
+	 * Called when the potion is discarded or the holder dies.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Item|Potion")
+	void ReleaseFromHolder();
 
-	UFUNCTION()
-	void DropFromSocket();
+protected:
+	/** Timer handle for delayed destruction after drop */
+	FTimerHandle DestructionTimerHandle;
+
+	/** Time in seconds before the dropped potion is destroyed */
+	UPROPERTY(EditDefaultsOnly, Category = "Item|Potion", meta = (ClampMin = "1.0"))
+	float DestructionDelay = 5.0f;
+
+	/** Impulse force applied when potion is dropped */
+	UPROPERTY(EditDefaultsOnly, Category = "Item|Potion")
+	float DropImpulseStrength = 250.0f;
+
+private:
+	/** Applies physics impulse and torque when dropped */
+	void ApplyDropPhysics();
 };

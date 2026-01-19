@@ -12,8 +12,8 @@
 
 UGS_HealSkill::UGS_HealSkill()
 {
-	HealAmount = 200.0f; // 기본 치유량 설정
-	MaxHealCount = 5; // 기본 포션 개수
+	HealAmount = 200.0f;			 // 기본 치유량 설정
+	MaxHealCount = 5;				 // 기본 포션 개수
 	CurrentHealCount = MaxHealCount; // 시작 시 최대 개수로 설정
 	bIsPotionDepletedOrHealthFull = false;
 }
@@ -108,9 +108,9 @@ void UGS_HealSkill::InterruptSkill()
 			AGS_HP_Potion* Potion = Cast<AGS_HP_Potion>(CachedSeekerOwner->GetItem(EItemType::HP_Potion));
 			if (Potion)
 			{
-				Potion->DropFromSocket();
+				Potion->ReleaseFromHolder();
 
-				UStaticMeshComponent* Mesh = Potion->GetMeshComp();
+				UStaticMeshComponent* Mesh = Potion->GetVisualMesh();
 				if (Mesh)
 				{
 					Mesh->SetSimulatePhysics(true);
@@ -211,7 +211,7 @@ bool UGS_HealSkill::CanActivateHealSkill() const
 void UGS_HealSkill::ShowPotionDepletedEffect()
 {
 	bIsPotionDepletedOrHealthFull = true;
-	//SetCoolingDown(true); 어차피 true 인데 왜 SEt 하는 거야? // SJE
+	// SetCoolingDown(true); 어차피 true 인데 왜 SEt 하는 거야? // SJE
 
 	if (OwningComp)
 	{
@@ -331,7 +331,11 @@ void UGS_HealSkill::OnRep_CurrentHealCount()
 	// SJE
 }
 
-void UGS_HealSkill::OnOwnerDamaged(AActor* DamagedActor, float DamageAmount, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
+void UGS_HealSkill::OnOwnerDamaged(AActor* DamagedActor,
+								   float DamageAmount,
+								   const class UDamageType* DamageType,
+								   class AController* InstigatedBy,
+								   AActor* DamageCauser)
 {
 	// 체력이 가득 찬 상태에서 피해를 입었을 때만 제한 해제
 	if (bIsPotionDepletedOrHealthFull)

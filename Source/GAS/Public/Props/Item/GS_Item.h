@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -6,39 +6,57 @@
 #include "GameFramework/Actor.h"
 #include "GS_Item.generated.h"
 
-UCLASS()
+class UGS_ItemData;
+
+/**
+ * @brief Base class for all pickup items in the game.
+ * Provides common functionality for item display, data management, and lifecycle.
+ */
+UCLASS(Abstract, BlueprintType)
 class GAS_API AGS_Item : public AActor
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
 	AGS_Item();
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 public:
+	/**
+	 * @brief Assigns item data to this item instance.
+	 * @param InItemData The data asset containing item configuration
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void AssignItemData(UGS_ItemData* InItemData);
 
-	UFUNCTION()
-	void SetItemData(UGS_ItemData* InputItemData);
+	/**
+	 * @brief Updates the visual mesh based on a named variant.
+	 * @param VariantName The key in the MeshVariants map
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Item|Visual")
+	void ApplyMeshVariant(FName VariantName);
 
-	UFUNCTION()
-	void SetMesh(FName StaticMeshName);
+	/**
+	 * @brief Gets the static mesh component for this item.
+	 * @return The mesh component displaying this item
+	 */
+	UFUNCTION(BlueprintPure, Category = "Item|Visual")
+	UStaticMeshComponent* GetVisualMesh() const;
 
-	UFUNCTION()
-	UStaticMeshComponent* GetMeshComp();
-
-	UFUNCTION()
-	void ItemDestroy();
+	/**
+	 * @brief Destroys this item with optional effects.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void DestroyItem();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Item")
-	UStaticMeshComponent* MeshComp;
+	/** Visual representation of this item */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item|Components")
+	TObjectPtr<UStaticMeshComponent> VisualMeshComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
-	UGS_ItemData* ItemData;
-
-
+	/** Configuration data for this item */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Data")
+	TObjectPtr<UGS_ItemData> ItemConfiguration;
 };

@@ -1,6 +1,5 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Character/Interface/GS_AttackInterface.h"
 
-// Add default functionality here for any IGS_AttackInterface functions that are not pure virtual.
+// Default implementations for IGS_AttackInterface functions

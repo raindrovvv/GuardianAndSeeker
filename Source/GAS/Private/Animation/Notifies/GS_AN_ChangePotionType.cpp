@@ -6,8 +6,9 @@
 #include "Props/Item/SeekerItem/GS_HP_Potion.h"
 #include "Components/Capsulecomponent.h"
 
-void UGS_AN_ChangePotionType::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+void UGS_AN_ChangePotionType::Notify(USkeletalMeshComponent* MeshComp,
+									 UAnimSequenceBase* Animation,
+									 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
@@ -21,13 +22,11 @@ void UGS_AN_ChangePotionType::Notify(USkeletalMeshComponent* MeshComp, UAnimSequ
 	AGS_HP_Potion* Potion = Cast<AGS_HP_Potion>(Seeker->GetItem(EItemType::HP_Potion));
 	if (Potion)
 	{
-		Potion->SetMesh(PotionStaticName);
-		
-		Potion->AttachToComponent(
-			Seeker->GetMesh(),
-			FAttachmentTransformRules::SnapToTargetIncludingScale,
-			FName("Potion"));
+		Potion->ApplyMeshVariant(PotionStaticName);
 
-		Potion->GetMeshComp()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		Potion->AttachToComponent(
+			Seeker->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, FName("Potion"));
+
+		Potion->GetVisualMesh()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	}
 }

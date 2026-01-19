@@ -29,12 +29,13 @@
 #include "Component/GS_VisualPoolComp.h"
 #include "Weapon/Projectile/Seeker/GS_ArrowVisualActor.h"
 #include "Character/Skill/GS_SkillComp.h"
-//#include "Weapon/Equipable/"
+// #include "Weapon/Equipable/"
 
 // Sets default values
 AGS_Merci::AGS_Merci()
 {
-	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need
+	// it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	Weapon = CreateDefaultSubobject<UChildActorComponent>(TEXT("MerciBow"));
@@ -121,8 +122,10 @@ void AGS_Merci::BeginPlay()
 		CurrentChildArrows = MaxChildArrows;
 
 		// 일정 주기로 화살 재충전 타이머 시작
-		GetWorld()->GetTimerManager().SetTimer(AxeArrowRegenTimer, this, &AGS_Merci::RegenAxeArrow, RegenInterval, true);
-		GetWorld()->GetTimerManager().SetTimer(ChildArrowRegenTimer, this, &AGS_Merci::RegenChildArrow, RegenInterval, true);
+		GetWorld()->GetTimerManager().SetTimer(
+			AxeArrowRegenTimer, this, &AGS_Merci::RegenAxeArrow, RegenInterval, true);
+		GetWorld()->GetTimerManager().SetTimer(
+			ChildArrowRegenTimer, this, &AGS_Merci::RegenChildArrow, RegenInterval, true);
 	}
 
 	if (ZoomCurve)
@@ -163,7 +166,8 @@ void AGS_Merci::DrawBow(UAnimMontage* DrawMontage)
 		return;
 	}
 
-	// DrawBow 가 Client 외에 Server 에서 호출될 일이 있나? Client 에서 해당 함수가 호출되었다면 이미 쥐에서 Return 으로 막히는 거 아닌가?
+	// DrawBow 가 Client 외에 Server 에서 호출될 일이 있나? Client 에서 해당 함수가 호출되었다면 이미 쥐에서 Return 으로
+	// 막히는 거 아닌가?
 	if (!GetDrawState())
 	{
 		Client_UpdateCrosshairAim(true);
@@ -256,7 +260,9 @@ void AGS_Merci::Server_DrawBow_Implementation(UAnimMontage* DrawMontage)
 	DrawBow(DrawMontage);
 }
 
-void AGS_Merci::Server_ReleaseArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg, int32 NumArrows)
+void AGS_Merci::Server_ReleaseArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass,
+												   float SpreadAngleDeg,
+												   int32 NumArrows)
 {
 	ReleaseArrow(ArrowClass, SpreadAngleDeg, NumArrows);
 }
@@ -295,7 +301,9 @@ void AGS_Merci::Multicast_PlayDrawMontage_Implementation(UAnimMontage* Montage)
 	PlayDrawMontage(Montage);
 }
 
-void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass, float SpreadAngleDeg, int32 NumArrows)
+void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow> ArrowClass,
+												float SpreadAngleDeg,
+												int32 NumArrows)
 {
 	if (!ArrowClass || !Weapon)
 	{
@@ -335,7 +343,7 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 	// 2. 카메라에서 정면으로 Ray를 쏨
 	FVector TraceStart = ViewLoc;
 	FVector TraceEnd = TraceStart + ViewRot.Vector() * 8000.0f;
-	//Multicast_DrawDebugLine(TraceStart, TraceEnd, FColor::Green);
+	// Multicast_DrawDebugLine(TraceStart, TraceEnd, FColor::Green);
 
 	// 3. Ray가 무언가에 부딪히면 그 위치를 목표로 설정, 아니면 끝 지점 사용
 	FHitResult Hit;
@@ -371,12 +379,12 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 
 
 	// 선형 보정 (예: 최대 2000 거리까지, 최대 20도 상승)
-	//float MaxDistance = 5000.0f;
-	//float MaxPitch = 40.0f;
+	// float MaxDistance = 5000.0f;
+	// float MaxPitch = 40.0f;
 	//// 제곱 보정 (거리가 멀수록 더 빠르게 증가)
-	//float PitchAdjustment = FMath::Clamp(FMath::Square(Distance / MaxDistance) * MaxPitch, 0.0f, MaxPitch);
+	// float PitchAdjustment = FMath::Clamp(FMath::Square(Distance / MaxDistance) * MaxPitch, 0.0f, MaxPitch);
 	////float PitchAdjustment = FMath::Clamp((Distance / MaxDistance) * MaxPitch, 0.0f, MaxPitch);
-	//BaseRotation.Pitch += PitchAdjustment;
+	// BaseRotation.Pitch += PitchAdjustment;
 
 	// 5. 여러 발 발사 처리 (SpreadAngleDeg를 기준으로 좌우로 퍼지게 만듦)
 	int32 HalfCount = NumArrows / 2;
@@ -402,7 +410,8 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnParams.Instigator = this;
 
-		AGS_SeekerMerciArrow* SpawnedArrow = GetWorld()->SpawnActor<AGS_SeekerMerciArrow>(ArrowClass, SpawnLocation, ArrowRot, SpawnParams);
+		AGS_SeekerMerciArrow* SpawnedArrow =
+			GetWorld()->SpawnActor<AGS_SeekerMerciArrow>(ArrowClass, SpawnLocation, ArrowRot, SpawnParams);
 
 		if (SpawnedArrow)
 		{
@@ -437,7 +446,7 @@ void AGS_Merci::Server_FireArrow_Implementation(TSubclassOf<AGS_SeekerMerciArrow
 				HomingArrow->Multicast_InitHomingTarget(nullptr);
 			}
 		}
-		//Multicast_DrawDebugLine(SpawnLocation, TargetLocation, FColor::Red);
+		// Multicast_DrawDebugLine(SpawnLocation, TargetLocation, FColor::Red);
 	}
 	// 8. 화살 발사 VFX 및 사운드 호출 (멀티캐스트로 모든 클라이언트에서 재생)
 	Multicast_PlayArrowShotVFX(VFXLocation, VFXRotation, NumArrows);
@@ -581,12 +590,7 @@ void AGS_Merci::Client_StopZoom_Implementation(float Duration)
 		return;
 	}
 
-	GetWorldTimerManager().SetTimer(
-	    ReverseTimerHandle,
-	    this,
-	    &AGS_Merci::ZoomTimelineReverse,
-	    Duration,
-	    false);
+	GetWorldTimerManager().SetTimer(ReverseTimerHandle, this, &AGS_Merci::ZoomTimelineReverse, Duration, false);
 }
 
 void AGS_Merci::SetCrosshairWidget(UGS_CrossHairImage* InCrosshairWidget)
@@ -651,17 +655,20 @@ void AGS_Merci::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
 
-void AGS_Merci::LeftClickPressed_Implementation()
+void AGS_Merci::OnAttackInputPressed_Implementation()
 {
-	IGS_AttackInterface::LeftClickPressed_Implementation();
+	IGS_AttackInterface::OnAttackInputPressed_Implementation();
 }
 
-void AGS_Merci::LeftClickRelease_Implementation()
+void AGS_Merci::OnAttackInputReleased_Implementation()
 {
-	IGS_AttackInterface::LeftClickRelease_Implementation();
+	IGS_AttackInterface::OnAttackInputReleased_Implementation();
 }
 
-float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+float AGS_Merci::TakeDamage(float DamageAmount,
+							FDamageEvent const& DamageEvent,
+							AController* EventInstigator,
+							AActor* DamageCauser)
 {
 	// 이미 빈사 상태인 경우 데미지 및 로직 무시
 	if (IsInDyingState())
@@ -673,7 +680,8 @@ float AGS_Merci::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 
 	// 활을 들고 있는 경우 (궁극기 상태가 아닐 때만 피격 시 해제)
 	// 가벼운 데미지(10 미만)에는 취소되지 않도록 임계값 추가
-	if (ActualDamage >= 20.0f && (GetDrawState() || GetAimState()) && !this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+	if (ActualDamage >= 20.0f && (GetDrawState() || GetAimState()) &&
+		!this->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 	{
 		// 활 쏘기 애니메이션 재생 정지
 		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
@@ -822,16 +830,15 @@ void AGS_Merci::OnRep_AutoAimTarget()
 
 void AGS_Merci::Client_DrawDebugSphere_Implementation(FVector Loc, float Radius, FColor Color, float Duration)
 {
-	DrawDebugSphere(
-	    GetWorld(),
-	    Loc,
-	    Radius, // 반지름
-	    16, // 세그먼트
-	    Color, // 색상
-	    false, // 지속 여부
-	    Duration, // 지속 시간 (2초)
-	    0,
-	    2.0f // 선 두께
+	DrawDebugSphere(GetWorld(),
+					Loc,
+					Radius,	  // 반지름
+					16,		  // 세그먼트
+					Color,	  // 색상
+					false,	  // 지속 여부
+					Duration, // 지속 시간 (2초)
+					0,
+					2.0f // 선 두께
 	);
 }
 
@@ -852,13 +859,7 @@ void AGS_Merci::Multicast_PlayArrowShotVFX_Implementation(FVector Location, FRot
 		FVector FinalLocation = Location + WorldOffset;
 
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		    GetWorld(),
-		    VFXToPlay,
-		    FinalLocation,
-		    Rotation,
-		    FVector::OneVector,
-		    true,
-		    true);
+			GetWorld(), VFXToPlay, FinalLocation, Rotation, FVector::OneVector, true, true);
 	}
 }
 

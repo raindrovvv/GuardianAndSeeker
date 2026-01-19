@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -6,22 +6,36 @@
 #include "UObject/Interface.h"
 #include "GS_AttackInterface.generated.h"
 
-// This class does not need to be modified.
-UINTERFACE(MinimalAPI)
+/**
+ * @brief Interface for attack input handling.
+ * Implement this interface to receive attack input events from the input system.
+ */
+UINTERFACE(MinimalAPI, BlueprintType, meta = (DisplayName = "Attack Interface"))
 class UGS_AttackInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
+/**
+ * @brief Attack interface implementation class.
+ * Classes implementing this interface can respond to left-click attack input.
+ */
 class GAS_API IGS_AttackInterface
 {
 	GENERATED_BODY()
 
-	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	UFUNCTION(BlueprintNativeEvent)
-	void LeftClickPressed();
+	/**
+	 * @brief Called when the left mouse button is pressed.
+	 * Implement to handle attack initiation.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat|Input")
+	void OnAttackInputPressed();
 
-	UFUNCTION(BlueprintNativeEvent)
-	void LeftClickRelease();
+	/**
+	 * @brief Called when the left mouse button is released.
+	 * Implement to handle attack release or charged attack completion.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat|Input")
+	void OnAttackInputReleased();
 };
