@@ -52,9 +52,8 @@ const FName AGS_SeekerAIController::FlankingLocationKey = TEXT("FlankingLocation
 const FName AGS_SeekerAIController::SafeRetreatLocationKey = TEXT("SafeRetreatLocation");
 
 AGS_SeekerAIController::AGS_SeekerAIController(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer
-                .SetDefaultSubobjectClass<UBehaviorTreeComponent>(TEXT("BehaviorTreeComponent"))
-                .SetDefaultSubobjectClass<UCrowdFollowingComponent>(TEXT("PathFollowingComponent")))
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UBehaviorTreeComponent>(TEXT("BehaviorTreeComponent"))
+				.SetDefaultSubobjectClass<UCrowdFollowingComponent>(TEXT("PathFollowingComponent")))
 {
 	PrimaryActorTick.TickInterval = 0.1f; // 10 FPS 틱 속도 (성능 최적화)
 
@@ -86,7 +85,8 @@ void AGS_SeekerAIController::BeginPlay()
 
 	if (GetPerceptionComponent())
 	{
-		GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AGS_SeekerAIController::OnTargetPerceptionUpdated);
+		GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(
+			this, &AGS_SeekerAIController::OnTargetPerceptionUpdated);
 	}
 }
 
@@ -94,16 +94,20 @@ void AGS_SeekerAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::OnPossess] InPawn: %s (Class: %s)"),
-	       InPawn ? *InPawn->GetName() : TEXT("NULL"),
-	       InPawn ? *InPawn->GetClass()->GetName() : TEXT("NULL"));
+	UE_LOG(LogTemp,
+		   Log,
+		   TEXT("[SeekerAIController::OnPossess] InPawn: %s (Class: %s)"),
+		   InPawn ? *InPawn->GetName() : TEXT("NULL"),
+		   InPawn ? *InPawn->GetClass()->GetName() : TEXT("NULL"));
 
 	if (InPawn)
 	{
 		AActor* PawnOwner = InPawn->GetOwner();
-		UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::OnPossess] InPawn Owner: %s (Class: %s)"),
-		       PawnOwner ? *PawnOwner->GetName() : TEXT("NULL"),
-		       PawnOwner ? *PawnOwner->GetClass()->GetName() : TEXT("NULL"));
+		UE_LOG(LogTemp,
+			   Log,
+			   TEXT("[SeekerAIController::OnPossess] InPawn Owner: %s (Class: %s)"),
+			   PawnOwner ? *PawnOwner->GetName() : TEXT("NULL"),
+			   PawnOwner ? *PawnOwner->GetClass()->GetName() : TEXT("NULL"));
 	}
 
 	// 제어 중인 시커 개체 캐싱
@@ -145,15 +149,20 @@ void AGS_SeekerAIController::OnPossess(APawn* InPawn)
 
 	if (AssetsToLoad.Num() > 0)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::OnPossess] %d개의 AI 에셋 비동기 로드 시작..."), AssetsToLoad.Num());
+		UE_LOG(LogTemp,
+			   Log,
+			   TEXT("[SeekerAIController::OnPossess] %d개의 AI 에셋 비동기 로드 시작..."),
+			   AssetsToLoad.Num());
 
 		TWeakObjectPtr<AGS_SeekerAIController> WeakThis(this);
-		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad, [WeakThis]()
-		                                         {
-			if (AGS_SeekerAIController* StrongThis = WeakThis.Get())
-			{
-				StrongThis->InitializeBehaviorTree();
-			} });
+		UGS_AssetLoader::AsyncLoadMultipleAssets(AssetsToLoad,
+												 [WeakThis]()
+												 {
+													 if (AGS_SeekerAIController* StrongThis = WeakThis.Get())
+													 {
+														 StrongThis->InitializeBehaviorTree();
+													 }
+												 });
 	}
 	else
 	{
@@ -169,7 +178,10 @@ void AGS_SeekerAIController::InitializeBehaviorTree()
 	UBehaviorTree* LoadedBT = UGS_AssetLoader::SyncLoadAsset(BehaviorTreeAsset);
 	if (LoadedBT)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[SeekerAIController::InitializeBehaviorTree] 동작 트리 준비 완료: %s"), *LoadedBT->GetName());
+		UE_LOG(LogTemp,
+			   Log,
+			   TEXT("[SeekerAIController::InitializeBehaviorTree] 동작 트리 준비 완료: %s"),
+			   *LoadedBT->GetName());
 
 		UBlackboardComponent* BlackboardComponent = nullptr;
 		UBlackboardData* LoadedBB = UGS_AssetLoader::SyncLoadAsset(BlackboardAsset);
@@ -204,7 +216,8 @@ void AGS_SeekerAIController::InitializeBehaviorTree()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("[SeekerAIController::InitializeBehaviorTree] 로드 후 동작 트리 에셋이 null입니다!"));
+		UE_LOG(
+			LogTemp, Error, TEXT("[SeekerAIController::InitializeBehaviorTree] 로드 후 동작 트리 에셋이 null입니다!"));
 	}
 }
 
@@ -279,24 +292,24 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 
 	switch (TickUpdatePhase)
 	{
-	case 0:
-		HandleStuckDetection(DeltaTime, ControlledPawn, Seeker, World);
-		break;
+		case 0:
+			HandleStuckDetection(DeltaTime, ControlledPawn, Seeker, World);
+			break;
 
-	case 1:
-		if (IsInCombat())
-		{
-			AActor* BestTarget = FindBestTarget();
-			if (BestTarget && BestTarget != CurrentTargetEnemy.Get())
+		case 1:
+			if (IsInCombat())
 			{
-				SetTargetEnemy(BestTarget);
+				AActor* BestTarget = FindBestTarget();
+				if (BestTarget && BestTarget != CurrentTargetEnemy.Get())
+				{
+					SetTargetEnemy(BestTarget);
+				}
 			}
-		}
-		break;
+			break;
 
-	case 2:
-		UpdateOrientation(DeltaTime, ControlledPawn);
-		break;
+		case 2:
+			UpdateOrientation(DeltaTime, ControlledPawn);
+			break;
 	}
 
 	if (Seeker)
@@ -338,7 +351,8 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 			FCollisionQueryParams CollisionParams;
 			CollisionParams.AddIgnoredActor(ControlledPawn);
 			FCollisionShape Sphere = FCollisionShape::MakeSphere(GS_AI::MONSTER_OVERLAP_RADIUS);
-			if (World->OverlapMultiByChannel(Overlaps, ControlledPawn->GetActorLocation(), FQuat::Identity, ECC_Pawn, Sphere, CollisionParams))
+			if (World->OverlapMultiByChannel(
+					Overlaps, ControlledPawn->GetActorLocation(), FQuat::Identity, ECC_Pawn, Sphere, CollisionParams))
 			{
 				bool bShouldStopForMonster = false;
 				for (const FOverlapResult& Overlap : Overlaps)
@@ -347,7 +361,8 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 					{
 						if (GetMoveStatus() == EPathFollowingStatus::Moving)
 						{
-							FVector ToMonster = (Monster->GetActorLocation() - ControlledPawn->GetActorLocation()).GetSafeNormal();
+							FVector ToMonster =
+								(Monster->GetActorLocation() - ControlledPawn->GetActorLocation()).GetSafeNormal();
 							FVector VelocityDir = ControlledPawn->GetVelocity().GetSafeNormal();
 							// 몬스터 방향으로 이동 중인지 확인
 							if (FVector::DotProduct(ToMonster, VelocityDir) > 0.3f)
@@ -366,7 +381,9 @@ void AGS_SeekerAIController::Tick(float DeltaTime)
 					{
 						Blackboard->SetValueAsBool(ShouldEvadeKey, true);
 						// AI를 군중 중심에서 반대 방향으로 밀어내기 위한 가상 목표 설정
-						Blackboard->SetValueAsVector(TargetLocationKey, ControlledPawn->GetActorLocation() + ControlledPawn->GetActorForwardVector() * -100.0f);
+						Blackboard->SetValueAsVector(TargetLocationKey,
+													 ControlledPawn->GetActorLocation() +
+														 ControlledPawn->GetActorForwardVector() * -100.0f);
 					}
 					StopMovement();
 					StationaryTime = 0.0f; // 끼임 감지 로직 중복 실행 방지를 위한 리셋
@@ -382,7 +399,10 @@ void AGS_SeekerAIController::UpdateAI(float DeltaTime)
 	// 현재 대부분의 유틸리티 AI 업데이트는 UGS_BTS_SeekerUtility에서 처리됩니다.
 }
 
-void AGS_SeekerAIController::HandleStuckDetection(float DeltaTime, APawn* ControlledPawn, AGS_Seeker* Seeker, UWorld* World)
+void AGS_SeekerAIController::HandleStuckDetection(float DeltaTime,
+												  APawn* ControlledPawn,
+												  AGS_Seeker* Seeker,
+												  UWorld* World)
 {
 	if (!ControlledPawn || !World)
 	{
@@ -416,8 +436,12 @@ void AGS_SeekerAIController::HandleStuckDetection(float DeltaTime, APawn* Contro
 
 	if (StationaryTime > StuckThreshold && !bIsEvasionSuppressed)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI] %s 가 %.1f초 동안 끼어있음 (트랩 위: %s). 탈출 경로 검색 중..."),
-		       *ControlledPawn->GetName(), StationaryTime, bOnDangerousTrap ? TEXT("예") : TEXT("아니오"));
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[AI] %s 가 %.1f초 동안 끼어있음 (트랩 위: %s). 탈출 경로 검색 중..."),
+			   *ControlledPawn->GetName(),
+			   StationaryTime,
+			   bOnDangerousTrap ? TEXT("예") : TEXT("아니오"));
 
 		bIsEvasionSuppressed = true;
 		EvasionSuppressionTimer = 2.0f; // 빠른 복구를 위해 2.5초에서 2.0초로 단축
@@ -681,8 +705,7 @@ void AGS_SeekerAIController::UpdateThreatAssessment()
 		}
 	}
 
-	CurrentThreats.Sort([](const FGS_ThreatData& A, const FGS_ThreatData& B)
-	                    { return A.ThreatLevel > B.ThreatLevel; });
+	CurrentThreats.Sort([](const FGS_ThreatData& A, const FGS_ThreatData& B) { return A.ThreatLevel > B.ThreatLevel; });
 
 	MaxThreat = CurrentThreats.Num() > 0 ? CurrentThreats[0].ThreatLevel : 0.0f;
 }
@@ -698,8 +721,7 @@ void AGS_SeekerAIController::UpdateUtilityScores()
 	UtilityScores.Add(FGS_UtilityScore(ESeekerBehavior::Revive, CalculateReviveUtility()));
 	UtilityScores.Add(FGS_UtilityScore(ESeekerBehavior::Tactical, CalculateTacticalUtility()));
 
-	UtilityScores.Sort([](const FGS_UtilityScore& A, const FGS_UtilityScore& B)
-	                   { return A.Score > B.Score; });
+	UtilityScores.Sort([](const FGS_UtilityScore& A, const FGS_UtilityScore& B) { return A.Score > B.Score; });
 }
 
 ESeekerBehavior AGS_SeekerAIController::SelectBestBehavior()
@@ -742,7 +764,10 @@ float AGS_SeekerAIController::GetUtilityScoreForBehavior(ESeekerBehavior Behavio
 	return 0.0f;
 }
 
-void AGS_SeekerAIController::GetTeamTacticalIntel(float Radius, bool& bAllyInTrouble, AActor*& Attacker, bool& bAllyNearby)
+void AGS_SeekerAIController::GetTeamTacticalIntel(float Radius,
+												  bool& bAllyInTrouble,
+												  AActor*& Attacker,
+												  bool& bAllyNearby)
 {
 	bAllyInTrouble = false;
 	Attacker = nullptr;
@@ -1026,7 +1051,8 @@ float AGS_SeekerAIController::CalculateEvadeUtility()
 		// StationaryTime이 1.5초 이상이면 회피 유틸리티 상승
 		if (StationaryTime > GS_AI::EVADE_UTILITY_STATIONARY_THRESHOLD)
 		{
-			float StationaryPenalty = FMath::Clamp((StationaryTime - GS_AI::EVADE_UTILITY_STATIONARY_THRESHOLD) / 2.0f, 0.0f, 1.0f);
+			float StationaryPenalty =
+				FMath::Clamp((StationaryTime - GS_AI::EVADE_UTILITY_STATIONARY_THRESHOLD) / 2.0f, 0.0f, 1.0f);
 			FinalUtility = FMath::Max(FinalUtility, StationaryPenalty * GS_AI::EVADE_UTILITY_STATIONARY_SCALE);
 		}
 
@@ -1040,13 +1066,12 @@ float AGS_SeekerAIController::CalculateEvadeUtility()
 			QueryParams.AddIgnoredActor(ControlledPawn);
 
 			// 600 유닛 내 몬스터 탐지
-			if (World->OverlapMultiByChannel(
-			        Overlaps,
-			        ControlledPawn->GetActorLocation(),
-			        FQuat::Identity,
-			        ECollisionChannel::ECC_Pawn,
-			        FCollisionShape::MakeSphere(600.0f),
-			        QueryParams))
+			if (World->OverlapMultiByChannel(Overlaps,
+											 ControlledPawn->GetActorLocation(),
+											 FQuat::Identity,
+											 ECollisionChannel::ECC_Pawn,
+											 FCollisionShape::MakeSphere(600.0f),
+											 QueryParams))
 			{
 				int32 RangedThreatCount = 0;
 				for (const FOverlapResult& Overlap : Overlaps)
@@ -1062,7 +1087,8 @@ float AGS_SeekerAIController::CalculateEvadeUtility()
 				// 주변에 몬스터가 많으면 회피 유틸리티 증가
 				if (RangedThreatCount > 0)
 				{
-					float ThreatUtility = FMath::Clamp(RangedThreatCount * GS_AI::EVADE_UTILITY_RANGED_THREAT_UNIT, 0.0f, 1.2f);
+					float ThreatUtility =
+						FMath::Clamp(RangedThreatCount * GS_AI::EVADE_UTILITY_RANGED_THREAT_UNIT, 0.0f, 1.2f);
 
 					// 체력이 낮으면 더 적극적으로 회피
 					float HealthPercent = 1.0f;
@@ -1163,7 +1189,9 @@ float AGS_SeekerAIController::CalculateReviveUtility()
 		// TODO: 실제 다운 타이머 컴포넌트가 있다면 해당 값 사용
 		// 현재는 거리 기반으로 도달 가능 여부만 판단
 		float EstimatedTravelTime = Dist / 600.0f; // 600cm/s 이동 속도 가정
-		float TimeUrgency = EstimatedTravelTime < GS_AI::REVIVE_UTILITY_URGENCY_TIME_LIMIT ? 1.0f : 0.3f; // 8초 내 도달 가능하면 정상, 아니면 우선순위 낮춤
+		float TimeUrgency = EstimatedTravelTime < GS_AI::REVIVE_UTILITY_URGENCY_TIME_LIMIT
+								? 1.0f
+								: 0.3f; // 8초 내 도달 가능하면 정상, 아니면 우선순위 낮춤
 
 		// 4. 전투 중 페널티 (전투 중엔 구조 위험)
 		float CombatPenalty = IsInCombat() ? GS_AI::REVIVE_UTILITY_COMBAT_PENALTY : 1.0f;
@@ -1267,7 +1295,8 @@ float AGS_SeekerAIController::CalculateTacticalUtility()
 
 		if (IsTargetNearTrap(Target, 500.0f))
 		{
-			Score += GS_AI::TACTICAL_UTILITY_MELEE_TRAP_BONUS; // Strongly prefer tactical repositioning over suicide attack
+			Score +=
+				GS_AI::TACTICAL_UTILITY_MELEE_TRAP_BONUS; // Strongly prefer tactical repositioning over suicide attack
 		}
 	}
 
@@ -1509,7 +1538,10 @@ bool AGS_SeekerAIController::FindNewExplorationTarget()
 		// 마지막 시도에서도 실패하면 방문 여부 무시
 		if (Attempt == MaxAttempts - 1 && !NewTarget.IsZero())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[SeekerAI] %s: All targets visited, reusing old location"), *GetNameSafe(GetPawn()));
+			UE_LOG(LogTemp,
+				   Warning,
+				   TEXT("[SeekerAI] %s: All targets visited, reusing old location"),
+				   *GetNameSafe(GetPawn()));
 			break; // 방문했어도 사용
 		}
 	}
@@ -1518,7 +1550,10 @@ bool AGS_SeekerAIController::FindNewExplorationTarget()
 	if (bIsStuck && VisitedLocations.Num() > 5)
 	{
 		VisitedLocations.RemoveAt(0, FMath::Min(5, VisitedLocations.Num()));
-		UE_LOG(LogTemp, Warning, TEXT("[SeekerAI] %s is stuck! Clearing visited history to find a path."), *GetNameSafe(GetPawn()));
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[SeekerAI] %s is stuck! Clearing visited history to find a path."),
+			   *GetNameSafe(GetPawn()));
 	}
 
 	if (!NewTarget.IsZero())
@@ -1534,7 +1569,10 @@ bool AGS_SeekerAIController::FindNewExplorationTarget()
 	if (VisitedLocations.Num() > 10)
 	{
 		VisitedLocations.RemoveAt(0, 5);
-		UE_LOG(LogTemp, Warning, TEXT("[SeekerAI] %s: Failed to find target, clearing part of history and retrying"), *GetPawn()->GetName());
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[SeekerAI] %s: Failed to find target, clearing part of history and retrying"),
+			   *GetPawn()->GetName());
 
 		NewTarget = GetRandomPointInNavigableRadius(CurrentRadius);
 		if (!NewTarget.IsZero())
@@ -1557,7 +1595,10 @@ bool AGS_SeekerAIController::FindNewExplorationTarget()
 		FNavLocation Loc;
 		if (NavSystem->GetRandomReachablePointInRadius(GetPawn()->GetActorLocation(), 1000.0f, Loc))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[SeekerAI) %s: 로컬 검색을 통해 긴급 대체 타겟을 찾았습니다."), *GetPawn()->GetName());
+			UE_LOG(LogTemp,
+				   Warning,
+				   TEXT("[SeekerAI) %s: 로컬 검색을 통해 긴급 대체 타겟을 찾았습니다."),
+				   *GetPawn()->GetName());
 			if (Blackboard)
 				Blackboard->SetValueAsVector(ExplorationTargetKey, Loc.Location);
 			return true;
@@ -1711,14 +1752,13 @@ AGS_TrapBase* AGS_SeekerAIController::DetectNearbyTraps() const
 	TArray<AActor*> ActorsToIgnore;
 	ActorsToIgnore.Add(ControlledPawn);
 
-	UKismetSystemLibrary::SphereOverlapActors(
-	    GetWorld(),
-	    ControlledPawn->GetActorLocation(),
-	    TrapDetectionRadius,
-	    ObjectTypes,
-	    AGS_TrapBase::StaticClass(),
-	    ActorsToIgnore,
-	    FoundTraps);
+	UKismetSystemLibrary::SphereOverlapActors(GetWorld(),
+											  ControlledPawn->GetActorLocation(),
+											  TrapDetectionRadius,
+											  ObjectTypes,
+											  AGS_TrapBase::StaticClass(),
+											  ActorsToIgnore,
+											  FoundTraps);
 
 	AGS_TrapBase* NearestTrap = nullptr;
 	float NearestDistance = TrapDetectionRadius;
@@ -1960,12 +2000,12 @@ void AGS_SeekerAIController::MarkLocationVisited(const FVector& Location)
 				// 트레이스 실패 시 기본 발높이로 설정
 				MarkerLocation.Z = Seeker->GetActorLocation().Z - 90.0f;
 
-				FRotator DropRotation = FRotator(-90.0f, Seeker->GetActorRotation().Yaw, 0.0f); // 바닥을 향하도록 회전값 설정
+				FRotator DropRotation =
+					FRotator(-90.0f, Seeker->GetActorRotation().Yaw, 0.0f); // 바닥을 향하도록 회전값 설정
 
 				Seeker->MarkerPlacementComponent->Server_SpawnMarker(MarkerLocation, DropRotation, EMarkerType::X);
 
 				LastMarkerPlaceTime = CurrentTime;
-				UE_LOG(LogTemp, Log, TEXT("[SeekerAI] %s placed exploration marker at %s"), *Seeker->GetName(), *MarkerLocation.ToString());
 			}
 		}
 	}
@@ -2008,9 +2048,9 @@ void AGS_SeekerAIController::RunTacticalQuery()
 
 	FEnvQueryRequest QueryRequest(SelectedQuery, ControlledPawn);
 	TacticalQueryRequestID = QueryManager->RunQuery(
-	    QueryRequest,
-	    EEnvQueryRunMode::SingleResult,
-	    FQueryFinishedSignature::CreateUObject(this, &AGS_SeekerAIController::OnTacticalQueryFinished));
+		QueryRequest,
+		EEnvQueryRunMode::SingleResult,
+		FQueryFinishedSignature::CreateUObject(this, &AGS_SeekerAIController::OnTacticalQueryFinished));
 }
 
 void AGS_SeekerAIController::OnTacticalQueryFinished(TSharedPtr<FEnvQueryResult> Result)

@@ -89,7 +89,11 @@ void AGS_InGameGS::SetDungeonData(int32 InTotalRoomCount)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[방 숨김] 서버에서만 호출 bool값 변경 완료"));
 		TotalRoomCount = InTotalRoomCount;
-		UE_LOG(LogTemp, Warning, TEXT("[방 숨김] TotalRoomCount = %d, InTotalRoomCount = %d"), TotalRoomCount, InTotalRoomCount);
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[방 숨김] TotalRoomCount = %d, InTotalRoomCount = %d"),
+			   TotalRoomCount,
+			   InTotalRoomCount);
 
 		// 이 변수를 true로 설정하면, 잠시 후 모든 클라이언트에서 OnRep_DungeonDataReplicated가 호출됩니다.
 		bDungeonDataReady = true;
@@ -109,7 +113,8 @@ void AGS_InGameGS::BeginPlay()
 		// 클라이언트에서만: Room/Door 액터 스폰 감지
 		if (UWorld* World = GetWorld())
 		{
-			World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &AGS_InGameGS::OnActorSpawned));
+			World->AddOnActorSpawnedHandler(
+				FOnActorSpawned::FDelegate::CreateUObject(this, &AGS_InGameGS::OnActorSpawned));
 		}
 	}
 }
@@ -139,6 +144,8 @@ void AGS_InGameGS::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AGS_InGameGS, bIsBossMusicActive);
 	DOREPLIFETIME(AGS_InGameGS, CurrentBossMusicStartEvent);
 	DOREPLIFETIME(AGS_InGameGS, CurrentBossMusicStopEvent);
+	DOREPLIFETIME(AGS_InGameGS, bHasFirstBlood);
+	DOREPLIFETIME(AGS_InGameGS, bHasGuardianSlayer);
 }
 
 void AGS_InGameGS::UpdateGameTime()
@@ -188,7 +195,8 @@ void AGS_InGameGS::OnRep_DungeonDataReplicated()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[방 숨김] 클라이언트에서 방 숨김 진행"));
 		// Guardian 역할을 가진 플레이어의 클라이언트에서만 벽 숨김 처리를 위한 검증을 시작합니다.
-		if (AGS_RTSController* MyController = Cast<AGS_RTSController>(GetGameInstance()->GetFirstLocalPlayerController()))
+		if (AGS_RTSController* MyController =
+				Cast<AGS_RTSController>(GetGameInstance()->GetFirstLocalPlayerController()))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[방 숨김] 컨트롤러가 RTS인 애들만 진행"));
 			// if (AGS_PlayerState* PS = MyController->GetPlayerState<AGS_PlayerState>())
@@ -212,7 +220,6 @@ void AGS_InGameGS::OnRep_DungeonDataReplicated()
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[로딩] 플레이어 룰이 가디언이 아님. 방 숨김 처리 취소"));
-
 		}
 	}
 }
@@ -225,7 +232,10 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 	if (TotalRoomCount > 0 && CachedRoomCount >= TotalRoomCount)
 	{
 		// **검증 성공!** 모든 방이 클라이언트에 도착했습니다.
-		UE_LOG(LogTemp, Warning, TEXT("[로딩] CLIENT: 검증 성공. All %d rooms are present. Hiding walls."), TotalRoomCount);
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[로딩] CLIENT: 검증 성공. All %d rooms are present. Hiding walls."),
+			   TotalRoomCount);
 
 		// 타이머 정리
 		if (RoomVerifyTimerHandle.IsValid())
@@ -233,7 +243,8 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 			GetWorld()->GetTimerManager().ClearTimer(RoomVerifyTimerHandle);
 		}
 
-		if (AGS_RTSController* MyController = Cast<AGS_RTSController>(GetGameInstance()->GetFirstLocalPlayerController()))
+		if (AGS_RTSController* MyController =
+				Cast<AGS_RTSController>(GetGameInstance()->GetFirstLocalPlayerController()))
 		{
 			// 이제 안전하게 벽 숨김 함수를 호출합니다.
 			MyController->HideDungeonElements();
@@ -241,7 +252,7 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 	}
 	else
 	{
-		// 아직 모든 방이 도착하지 않았습니다. 
+		// 아직 모든 방이 도착하지 않았습니다.
 		// OnActorSpawned에서 다음 방이 들어올 때마다 다시 검사하므로 별도의 타이머는 필요하지 않습니다.
 		UE_LOG(LogTemp, Log, TEXT("[로딩] CLIENT: 모든 방이 아직 스폰되지 않았습니다. 대기 중..."));
 	}
@@ -250,7 +261,8 @@ void AGS_InGameGS::Client_VerifyRoomSpawning()
 
 void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
 {
-	if (!IsValid(SpawnedActor)) return;
+	if (!IsValid(SpawnedActor))
+		return;
 
 	// PlaceInfoComponent를 가진 Room/Door 액터만 카운트
 	if (UPlaceInfoComponent* InfoComponent = SpawnedActor->FindComponentByClass<UPlaceInfoComponent>())
@@ -260,7 +272,11 @@ void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
 			(ObjectType == EObjectType::Room || ObjectType == EObjectType::DoorAndWall))
 		{
 			CachedRoomCount++;
-			UE_LOG(LogTemp, VeryVerbose, TEXT("[로딩] Room/Door 스폰 감지: %s (총 %d개)"), *SpawnedActor->GetName(), CachedRoomCount);
+			UE_LOG(LogTemp,
+				   VeryVerbose,
+				   TEXT("[로딩] Room/Door 스폰 감지: %s (총 %d개)"),
+				   *SpawnedActor->GetName(),
+				   CachedRoomCount);
 
 			// Optimization: 모든 방이 스폰되었는지 즉시 확인하여 타이머 의존성 제거
 			if (bDungeonDataReady && TotalRoomCount > 0 && CachedRoomCount >= TotalRoomCount)
@@ -269,4 +285,36 @@ void AGS_InGameGS::OnActorSpawned(AActor* SpawnedActor)
 			}
 		}
 	}
+}
+
+bool AGS_InGameGS::TryTriggerFirstBlood()
+{
+	if (!HasAuthority())
+		return false;
+
+	if (bHasFirstBlood)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[GameState] First Blood already triggered."));
+		return false;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[GameState] Triggering First Blood!"));
+	bHasFirstBlood = true;
+	return true;
+}
+
+bool AGS_InGameGS::TryTriggerGuardianSlayer()
+{
+	if (!HasAuthority())
+		return false;
+
+	if (bHasGuardianSlayer)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[GameState] Guardian Slayer already triggered."));
+		return false;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[GameState] Triggering Guardian Slayer!"));
+	bHasGuardianSlayer = true;
+	return true;
 }

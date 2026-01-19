@@ -41,7 +41,6 @@ void UGS_HitIndicatorComponent::CreateHitIndicatorWidget()
 {
 	if (!HitIndicatorWidgetClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[HitIndicator] CreateWidget FAILED - WidgetClass is NULL!"));
 		return;
 	}
 
@@ -57,12 +56,10 @@ void UGS_HitIndicatorComponent::CreateHitIndicatorWidget()
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("[HitIndicator] CreateWidget returned NULL!"));
 			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("[HitIndicator] No PlayerController found!"));
 		}
 	}
 }
@@ -100,7 +97,8 @@ void UGS_HitIndicatorComponent::NotifyDamageDirection(const FVector& WorldHitDir
 	}
 }
 
-void UGS_HitIndicatorComponent::Client_ShowHitIndicator_Implementation(const FVector& WorldHitDirection, float DamageAmount)
+void UGS_HitIndicatorComponent::Client_ShowHitIndicator_Implementation(const FVector& WorldHitDirection,
+																	   float DamageAmount)
 {
 	ShowHitIndicatorInternal(WorldHitDirection, DamageAmount);
 }
@@ -119,7 +117,6 @@ void UGS_HitIndicatorComponent::ShowHitIndicatorInternal(const FVector& WorldHit
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("[HitIndicator] Widget is NULL!"));
 		}
 
 		// 델리게이트도 브로드캐스트 (다른 곳에서 구독할 수 있도록)

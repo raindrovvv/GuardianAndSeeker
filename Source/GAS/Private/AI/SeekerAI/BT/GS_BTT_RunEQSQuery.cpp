@@ -20,7 +20,6 @@ EBTNodeResult::Type UGS_BTT_RunEQSQuery::ExecuteTask(UBehaviorTreeComponent& Own
 {
 	if (!QueryTemplate)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("EQS Task: No query template assigned"));
 		return EBTNodeResult::Failed;
 	}
 
@@ -48,13 +47,10 @@ EBTNodeResult::Type UGS_BTT_RunEQSQuery::ExecuteTask(UBehaviorTreeComponent& Own
 
 	FEnvQueryRequest QueryRequest(QueryTemplate, Pawn);
 	QueryRequestID = QueryManager->RunQuery(
-	    QueryRequest,
-	    RunMode,
-	    FQueryFinishedSignature::CreateUObject(this, &UGS_BTT_RunEQSQuery::OnQueryFinished));
+		QueryRequest, RunMode, FQueryFinishedSignature::CreateUObject(this, &UGS_BTT_RunEQSQuery::OnQueryFinished));
 
 	if (QueryRequestID == INDEX_NONE)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("EQS Task: Failed to run query"));
 		return EBTNodeResult::Failed;
 	}
 
@@ -94,7 +90,6 @@ void UGS_BTT_RunEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResult> Result)
 	// Check if the query was successful
 	if (!Result.IsValid() || !Result->IsSuccessful())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("EQS Task: Query failed or returned no results"));
 		FinishLatentTask(*CachedOwnerComp, EBTNodeResult::Failed);
 		return;
 	}
@@ -108,12 +103,10 @@ void UGS_BTT_RunEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResult> Result)
 	{
 		Blackboard->SetValueAsVector(ResultLocationKey.SelectedKeyName, BestLocation);
 
-		UE_LOG(LogTemp, Log, TEXT("EQS Task: Found location at %s"), *BestLocation.ToString());
 		FinishLatentTask(*CachedOwnerComp, EBTNodeResult::Succeeded);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("EQS Task: Failed to store result in blackboard"));
 		FinishLatentTask(*CachedOwnerComp, EBTNodeResult::Failed);
 	}
 }

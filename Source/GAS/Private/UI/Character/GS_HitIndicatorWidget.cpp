@@ -8,7 +8,7 @@
 #include "Components/CanvasPanel.h"
 
 UGS_HitIndicatorWidget::UGS_HitIndicatorWidget(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 }
 
@@ -40,8 +40,8 @@ void UGS_HitIndicatorWidget::NativeDestruct()
 	// 델리게이트 언바인드
 	if (OwnerComponent.IsValid())
 	{
-		OwnerComponent->OnDamageDirectionReceived.RemoveDynamic(
-		    this, &UGS_HitIndicatorWidget::OnDamageDirectionReceived);
+		OwnerComponent->OnDamageDirectionReceived.RemoveDynamic(this,
+																&UGS_HitIndicatorWidget::OnDamageDirectionReceived);
 	}
 
 	Super::NativeDestruct();
@@ -64,8 +64,7 @@ void UGS_HitIndicatorWidget::SetOwnerComponent(UGS_HitIndicatorComponent* InComp
 
 	if (OwnerComponent.IsValid())
 	{
-		OwnerComponent->OnDamageDirectionReceived.AddDynamic(
-		    this, &UGS_HitIndicatorWidget::OnDamageDirectionReceived);
+		OwnerComponent->OnDamageDirectionReceived.AddDynamic(this, &UGS_HitIndicatorWidget::OnDamageDirectionReceived);
 
 		// MaxHP 캐싱
 		if (AGS_Character* Character = Cast<AGS_Character>(OwnerComponent->GetOwner()))
@@ -94,11 +93,8 @@ void UGS_HitIndicatorWidget::ShowHitIndicator(EHitDirection Direction, float Dam
 	float CurrentTime = World->GetTimeSeconds();
 
 	// 기존 활성 인디케이터 찾기 (같은 방향)
-	FActiveIndicatorInfo* ExistingInfo = ActiveIndicators.FindByPredicate(
-	    [Direction](const FActiveIndicatorInfo& Info)
-	    {
-		    return Info.Direction == Direction;
-	    });
+	FActiveIndicatorInfo* ExistingInfo = ActiveIndicators.FindByPredicate([Direction](const FActiveIndicatorInfo& Info)
+																		  { return Info.Direction == Direction; });
 
 	if (ExistingInfo)
 	{
@@ -128,19 +124,16 @@ void UGS_HitIndicatorWidget::ShowHitIndicator(EHitDirection Direction, float Dam
 	FLinearColor Color = CalculateIndicatorColor(DamageAmount);
 
 	// 수평 방향 (화살표)
-	if (Direction == EHitDirection::Front || Direction == EHitDirection::Back ||
-	    Direction == EHitDirection::Left || Direction == EHitDirection::Right)
+	if (Direction == EHitDirection::Front || Direction == EHitDirection::Back || Direction == EHitDirection::Left ||
+		Direction == EHitDirection::Right)
 	{
 		if (UImage* Indicator = GetIndicatorForDirection(Direction))
 		{
 			Indicator->SetColorAndOpacity(Color);
 			Indicator->SetRenderOpacity(Color.A);
-			UE_LOG(LogTemp, Warning, TEXT("[HitIndicator Widget] Showing Indicator for Direction %d, Opacity: %.2f"),
-			       (int32)Direction, Color.A);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("[HitIndicator Widget] Indicator is NULL for Direction %d!"), (int32)Direction);
 		}
 	}
 	// 수직 방향 (그레디언트)
@@ -155,7 +148,7 @@ void UGS_HitIndicatorWidget::ShowHitIndicator(EHitDirection Direction, float Dam
 	// 전 방향 (화면 모든 테두리 그레디언트)
 	else if (Direction == EHitDirection::Omni)
 	{
-		UImage* Gradients[] = {TopGradient, BottomGradient, LeftGradient, RightGradient};
+		UImage* Gradients[] = { TopGradient, BottomGradient, LeftGradient, RightGradient };
 		for (UImage* Grad : Gradients)
 		{
 			if (Grad)
@@ -176,16 +169,16 @@ UImage* UGS_HitIndicatorWidget::GetIndicatorForDirection(EHitDirection Direction
 {
 	switch (Direction)
 	{
-	case EHitDirection::Front:
-		return FrontIndicator;
-	case EHitDirection::Back:
-		return BackIndicator;
-	case EHitDirection::Left:
-		return LeftIndicator;
-	case EHitDirection::Right:
-		return RightIndicator;
-	default:
-		return nullptr;
+		case EHitDirection::Front:
+			return FrontIndicator;
+		case EHitDirection::Back:
+			return BackIndicator;
+		case EHitDirection::Left:
+			return LeftIndicator;
+		case EHitDirection::Right:
+			return RightIndicator;
+		default:
+			return nullptr;
 	}
 }
 
@@ -193,16 +186,16 @@ UImage* UGS_HitIndicatorWidget::GetGradientForDirection(EHitDirection Direction)
 {
 	switch (Direction)
 	{
-	case EHitDirection::Up:
-		return TopGradient;
-	case EHitDirection::Down:
-		return BottomGradient;
-	case EHitDirection::Left:
-		return LeftGradient;
-	case EHitDirection::Right:
-		return RightGradient;
-	default:
-		return nullptr;
+		case EHitDirection::Up:
+			return TopGradient;
+		case EHitDirection::Down:
+			return BottomGradient;
+		case EHitDirection::Left:
+			return LeftGradient;
+		case EHitDirection::Right:
+			return RightGradient;
+		default:
+			return nullptr;
 	}
 }
 
@@ -223,7 +216,7 @@ void UGS_HitIndicatorWidget::UpdateIndicators(float DeltaTime)
 
 		// 수평 방향 업데이트
 		if (Info.Direction == EHitDirection::Front || Info.Direction == EHitDirection::Back ||
-		    Info.Direction == EHitDirection::Left || Info.Direction == EHitDirection::Right)
+			Info.Direction == EHitDirection::Left || Info.Direction == EHitDirection::Right)
 		{
 			if (UImage* Indicator = GetIndicatorForDirection(Info.Direction))
 			{
@@ -245,7 +238,7 @@ void UGS_HitIndicatorWidget::UpdateIndicators(float DeltaTime)
 		// 전 방향 업데이트
 		else if (Info.Direction == EHitDirection::Omni)
 		{
-			UImage* Gradients[] = {TopGradient, BottomGradient, LeftGradient, RightGradient};
+			UImage* Gradients[] = { TopGradient, BottomGradient, LeftGradient, RightGradient };
 			for (UImage* Grad : Gradients)
 			{
 				if (Grad)
@@ -271,7 +264,7 @@ void UGS_HitIndicatorWidget::UpdateIndicators(float DeltaTime)
 
 			if (Info.Direction == EHitDirection::Omni)
 			{
-				UImage* Gradients[] = {TopGradient, BottomGradient, LeftGradient, RightGradient};
+				UImage* Gradients[] = { TopGradient, BottomGradient, LeftGradient, RightGradient };
 				for (UImage* Grad : Gradients)
 				{
 					if (Grad)

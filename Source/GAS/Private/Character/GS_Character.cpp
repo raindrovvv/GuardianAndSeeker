@@ -43,18 +43,16 @@
 #include "Sound/GS_AudioMixingComponent.h"
 
 AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = false;
 
 	StatComp = ObjectInitializer.CreateDefaultSubobject<UGS_StatComp>(this, TEXT("StatComp"));
 	DebuffComp = ObjectInitializer.CreateDefaultSubobject<UGS_DebuffComp>(this, TEXT("DebuffComp"));
 	HitReactComp = ObjectInitializer.CreateDefaultSubobject<UGS_HitReactComp>(this, TEXT("HitReactComp"));
-	CameraShakeComp =
-	    ObjectInitializer.CreateDefaultSubobject<UGS_CameraShakeComponent>(this, TEXT("CameraShakeComp"));
+	CameraShakeComp = ObjectInitializer.CreateDefaultSubobject<UGS_CameraShakeComponent>(this, TEXT("CameraShakeComp"));
 
-	HPTextWidgetComp =
-	    ObjectInitializer.CreateDefaultSubobject<UGS_HPTextWidgetComp>(this, TEXT("TextWidgetComp"));
+	HPTextWidgetComp = ObjectInitializer.CreateDefaultSubobject<UGS_HPTextWidgetComp>(this, TEXT("TextWidgetComp"));
 	HPTextWidgetComp->SetupAttachment(RootComponent);
 	HPTextWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -63,8 +61,7 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	// HPTextWidgetComp->SetDrawAtDesiredSize(true);
 	HPTextWidgetComp->SetCullDistance(2000.0f);
 
-	SelectionDecal =
-	    ObjectInitializer.CreateDefaultSubobject<UDecalComponent>(this, TEXT("SelectionDecal"));
+	SelectionDecal = ObjectInitializer.CreateDefaultSubobject<UDecalComponent>(this, TEXT("SelectionDecal"));
 	SelectionDecal->SetupAttachment(RootComponent);
 	SelectionDecal->SetVisibility(false);
 
@@ -73,10 +70,12 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	bIsInvincible = false;
 
 	// 다이내믹 사운드 믹싱 컴포넌트 생성
-	AudioMixingComponent = ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
+	AudioMixingComponent =
+		ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
 
 	// 데미지 숫자 팝업 컴포넌트
-	DamageNumberComp = ObjectInitializer.CreateDefaultSubobject<UGS_DamageNumberComponent>(this, TEXT("DamageNumberComp"));
+	DamageNumberComp =
+		ObjectInitializer.CreateDefaultSubobject<UGS_DamageNumberComponent>(this, TEXT("DamageNumberComp"));
 }
 
 void AGS_Character::BeginPlay()
@@ -91,8 +90,7 @@ void AGS_Character::BeginPlay()
 
 	if (CharacterEnum)
 	{
-		FString EnumToName =
-		    CharacterEnum->GetNameStringByValue((int64)CharacterType);
+		FString EnumToName = CharacterEnum->GetNameStringByValue((int64)CharacterType);
 		StatComp->InitStat(FName(EnumToName));
 		bStatInitialized = true;
 	}
@@ -114,8 +112,7 @@ void AGS_Character::BeginPlay()
 		if (IsValid(HPTextWidgetComp))
 		{
 			// HP 위젯 거리 기반 컬링 설정 (RTS 시점 고려)
-			float CullDistance = GS_Rendering::CalculateCullDistance(
-			    this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+			float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
 			HPTextWidgetComp->SetCullDistance(CullDistance);
 
 			if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
@@ -142,8 +139,7 @@ void AGS_Character::BeginPlay()
 
 	if (SelectionDecal && SelectionDecal->GetDecalMaterial())
 	{
-		DynamicDecalMaterial = UMaterialInstanceDynamic::Create(
-		    SelectionDecal->GetDecalMaterial(), this);
+		DynamicDecalMaterial = UMaterialInstanceDynamic::Create(SelectionDecal->GetDecalMaterial(), this);
 		SelectionDecal->SetDecalMaterial(DynamicDecalMaterial);
 	}
 
@@ -169,21 +165,23 @@ void AGS_Character::RegisterSignificanceManager()
 			TWeakObjectPtr<AGS_Character> WeakThis(this);
 
 			SM->RegisterObject(
-			    this, "Character",
-			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
-			               const FTransform& Viewpoint) -> float
-			    {
-				    if (AGS_Character* StrongThis = WeakThis.Get())
-					    return StrongThis->CalculateSignificance(Viewpoint);
-				    return 0.0f;
-			    },
-			    USignificanceManager::EPostSignificanceType::Sequential,
-			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
-			               float OldValue, float NewValue, bool bExternal)
-			    {
-				    if (AGS_Character* StrongThis = WeakThis.Get())
-					    StrongThis->OnSignificanceChanged(NewValue);
-			    });
+				this,
+				"Character",
+				[WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint) -> float
+				{
+					if (AGS_Character* StrongThis = WeakThis.Get())
+						return StrongThis->CalculateSignificance(Viewpoint);
+					return 0.0f;
+				},
+				USignificanceManager::EPostSignificanceType::Sequential,
+				[WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+						   float OldValue,
+						   float NewValue,
+						   bool bExternal)
+				{
+					if (AGS_Character* StrongThis = WeakThis.Get())
+						StrongThis->OnSignificanceChanged(NewValue);
+				});
 		}
 	}
 }
@@ -196,7 +194,8 @@ void AGS_Character::Tick(float DeltaTime)
 	if (CurrentCameraKnockback > 0.0f)
 	{
 		float PreviousKnockback = CurrentCameraKnockback;
-		CurrentCameraKnockback = FMath::FInterpTo(CurrentCameraKnockback, 0.0f, DeltaTime, CameraKnockbackRecoverySpeed);
+		CurrentCameraKnockback =
+			FMath::FInterpTo(CurrentCameraKnockback, 0.0f, DeltaTime, CameraKnockbackRecoverySpeed);
 
 		AGS_Player* Player = Cast<AGS_Player>(this);
 		if (IsValid(Player) && IsValid(Player->SpringArmComp))
@@ -235,8 +234,7 @@ void AGS_Character::ApplyCameraKnockback(float IntensityMultiplier)
 	}
 }
 
-void AGS_Character::GetLifetimeReplicatedProps(
-    TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -311,9 +309,9 @@ void AGS_Character::BeginDestroy()
 }
 
 float AGS_Character::TakeDamage(float DamageAmount,
-                                FDamageEvent const& DamageEvent,
-                                AController* EventInstigator,
-                                AActor* DamageCauser)
+								FDamageEvent const& DamageEvent,
+								AController* EventInstigator,
+								AActor* DamageCauser)
 {
 	if (bIsInvincible)
 	{
@@ -325,8 +323,7 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		return 0.0f;
 	}
 
-	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent,
-	                                       EventInstigator, DamageCauser);
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	if (!StatComp)
 	{
@@ -392,24 +389,20 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		// FGS_DamageEvent 타입인 경우 (커스텀 데미지 이벤트)
 		if (DamageEvent.IsOfType(FGS_DamageEvent::ClassID))
 		{
-			const FGS_DamageEvent& MyDamageEvent =
-			    static_cast<const FGS_DamageEvent&>(DamageEvent);
+			const FGS_DamageEvent& MyDamageEvent = static_cast<const FGS_DamageEvent&>(DamageEvent);
 			HitReactType = MyDamageEvent.HitReactType;
 
 			// FGS_DamageEvent도 PointDamage나 RadialDamage를 상속받았을 수 있으므로
 			// 체크
 			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 			{
-				const FPointDamageEvent* PointEvent =
-				    static_cast<const FPointDamageEvent*>(&DamageEvent);
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
 				HitDirection = -PointEvent->ShotDirection;
 			}
 			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
 			{
-				const FRadialDamageEvent* RadialEvent =
-				    static_cast<const FRadialDamageEvent*>(&DamageEvent);
-				HitDirection =
-				    (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
 			}
 		}
 		// FGS_DamageEvent가 아닌 일반 UE 데미지 이벤트인 경우 (폴백)
@@ -417,29 +410,24 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		{
 			if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 			{
-				const FPointDamageEvent* PointEvent =
-				    static_cast<const FPointDamageEvent*>(&DamageEvent);
+				const FPointDamageEvent* PointEvent = static_cast<const FPointDamageEvent*>(&DamageEvent);
 				HitDirection = -PointEvent->ShotDirection;
 			}
 			else if (DamageEvent.IsOfType(FRadialDamageEvent::ClassID))
 			{
-				const FRadialDamageEvent* RadialEvent =
-				    static_cast<const FRadialDamageEvent*>(&DamageEvent);
-				HitDirection =
-				    (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
+				const FRadialDamageEvent* RadialEvent = static_cast<const FRadialDamageEvent*>(&DamageEvent);
+				HitDirection = (GetActorLocation() - RadialEvent->Origin).GetSafeNormal();
 			}
 		}
 
-		if (UGS_HitReactComp* HitReactComponent =
-		        GetComponentByClass<UGS_HitReactComp>())
+		if (UGS_HitReactComp* HitReactComponent = GetComponentByClass<UGS_HitReactComp>())
 		{
 			HitReactComponent->PlayHitReact(HitReactType, HitDirection);
 		}
 	}
 
 	// 피격 방향 HUD 표시 (CanHitReact와 관계없이 항상 호출)
-	if (UGS_HitIndicatorComponent* HitIndicator =
-	        GetComponentByClass<UGS_HitIndicatorComponent>())
+	if (UGS_HitIndicatorComponent* HitIndicator = GetComponentByClass<UGS_HitIndicatorComponent>())
 	{
 		// 기본값은 Omni(전 방향)로 설정 - ZeroVector가 전달되면 Omni 인디케이터 활성화
 		FVector DirToAttacker = FVector::ZeroVector;
@@ -475,13 +463,16 @@ float AGS_Character::TakeDamage(float DamageAmount,
 	StatComp->SetCurrentHealth(NewHealth, false);
 
 	// 데미지 숫자 팝업 표시 (공격자 화면에 표시)
-	const FGS_DamageEvent* GSDamageEvent = DamageEvent.IsOfType(FGS_DamageEvent::ClassID) ? static_cast<const FGS_DamageEvent*>(&DamageEvent) : nullptr;
+	const FGS_DamageEvent* GSDamageEvent =
+		DamageEvent.IsOfType(FGS_DamageEvent::ClassID) ? static_cast<const FGS_DamageEvent*>(&DamageEvent) : nullptr;
 
 	// DoT 데미지: HitReactType이 DamageOnly이고 Point/Radial 이벤트가 아닌 경우
 	bool bIsDotDamage = false;
 	if (GSDamageEvent)
 	{
-		bIsDotDamage = (GSDamageEvent->HitReactType == EHitReactType::DamageOnly) && !DamageEvent.IsOfType(FPointDamageEvent::ClassID) && !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
+		bIsDotDamage = (GSDamageEvent->HitReactType == EHitReactType::DamageOnly) &&
+					   !DamageEvent.IsOfType(FPointDamageEvent::ClassID) &&
+					   !DamageEvent.IsOfType(FRadialDamageEvent::ClassID);
 	}
 
 	// 공격자 캐릭터에게 데미지 숫자 표시 요청
@@ -532,8 +523,9 @@ float AGS_Character::TakeDamage(float DamageAmount,
 		}
 
 		// 오래된 기록 정리 (최적화)
-		DamageHistory.RemoveAll([CurrentTime, this](const FDamageRecord& Record)
-		                        { return !Record.Damager.IsValid() || (CurrentTime - Record.LastDamageTime) > AssistWindowSeconds; });
+		DamageHistory.RemoveAll(
+			[CurrentTime, this](const FDamageRecord& Record)
+			{ return !Record.Damager.IsValid() || (CurrentTime - Record.LastDamageTime) > AssistWindowSeconds; });
 	}
 
 	if (AttackerCharacter && ActualDamage > 0.0f)
@@ -591,15 +583,17 @@ float AGS_Character::TakeDamage(float DamageAmount,
 			FString KillerName = AttackerCharacter ? AttackerCharacter->GetCharacterName() : TEXT("");
 			FString VictimName = GetCharacterName();
 			uint8 KillerTeam = AttackerCharacter ? AttackerCharacter->GetGenericTeamId().GetId() : 255;
+			bool bIsKillerPlayer = AttackerCharacter ? AttackerCharacter->IsPlayerControlled() : false;
+			bool bWasCritical = GSDamageEvent ? GSDamageEvent->bIsCritical : false;
 
-			FeedbackComp->NotifyKill(Type, VictimName, KillerName, KillerTeam);
+			FeedbackComp->NotifyKill(Type, VictimName, KillerName, KillerTeam, bIsKillerPlayer, bWasCritical);
 
 			// 어시스트 알림 처리
 			float CurrentTime = GetWorld()->GetTimeSeconds();
 			float MaxHP = StatComp ? StatComp->GetMaxHealth() : 1000.f;
 			float MinAssistDamage = MaxHP * AssistThresholdRatio;
 
-			TSet<FString> UniqueAssisters;
+			TMap<FString, bool> UniqueAssisters;
 
 			// 1. 직접 데미지 기여자
 			for (const FDamageRecord& Record : DamageHistory)
@@ -611,9 +605,9 @@ float AGS_Character::TakeDamage(float DamageAmount,
 				}
 
 				if ((CurrentTime - Record.LastDamageTime) <= AssistWindowSeconds &&
-				    Record.DamageAmount >= MinAssistDamage)
+					Record.DamageAmount >= MinAssistDamage)
 				{
-					UniqueAssisters.Add(DamagerChar->GetCharacterName());
+					UniqueAssisters.Add(DamagerChar->GetCharacterName(), DamagerChar->IsPlayerControlled());
 
 					// 데미지 기여자를 도운 서포터들도 어시스트 (1단계만)
 					for (const FSupportRecord& SRecord : DamagerChar->GetSupportHistory())
@@ -621,9 +615,9 @@ float AGS_Character::TakeDamage(float DamageAmount,
 						AGS_Character* SupporterChar = SRecord.Supporter.Get();
 						// 피해자 본인 및 킬러 제외
 						if (SupporterChar && SupporterChar != this && SupporterChar != AttackerCharacter &&
-						    (CurrentTime - SRecord.LastSupportTime) <= AssistWindowSeconds)
+							(CurrentTime - SRecord.LastSupportTime) <= AssistWindowSeconds)
 						{
-							UniqueAssisters.Add(SupporterChar->GetCharacterName());
+							UniqueAssisters.Add(SupporterChar->GetCharacterName(), SupporterChar->IsPlayerControlled());
 						}
 					}
 				}
@@ -643,15 +637,15 @@ float AGS_Character::TakeDamage(float DamageAmount,
 
 					if ((CurrentTime - SRecord.LastSupportTime) <= AssistWindowSeconds)
 					{
-						UniqueAssisters.Add(SupporterChar->GetCharacterName());
+						UniqueAssisters.Add(SupporterChar->GetCharacterName(), SupporterChar->IsPlayerControlled());
 					}
 				}
 			}
 
 			// 브로드캐스트
-			for (const FString& AssisterName : UniqueAssisters)
+			for (const auto& Pair : UniqueAssisters)
 			{
-				FeedbackComp->NotifyAssist(AssisterName);
+				FeedbackComp->NotifyAssist(Pair.Key, Pair.Value);
 			}
 		}
 
@@ -670,10 +664,7 @@ void AGS_Character::OnDamageStart()
 void AGS_Character::DisableHitReact(float CooldownTime)
 {
 	SetCanHitReact(false);
-	GetWorld()->GetTimerManager().SetTimer(
-	    HitReactTimerHandle, [this]()
-	    { CanHitReact = true; }, CooldownTime,
-	    false);
+	GetWorld()->GetTimerManager().SetTimer(HitReactTimerHandle, [this]() { CanHitReact = true; }, CooldownTime, false);
 }
 
 void AGS_Character::DisableHitReact(bool bAllowHitReact)
@@ -681,8 +672,7 @@ void AGS_Character::DisableHitReact(bool bAllowHitReact)
 	CanHitReact = bAllowHitReact;
 }
 
-void AGS_Character::SetupPlayerInputComponent(
-    UInputComponent* PlayerInputComponent)
+void AGS_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
@@ -692,8 +682,7 @@ bool AGS_Character::GetIsLockedRotationToController()
 	return bLockRotationToController;
 }
 
-void AGS_Character::SetIsLockedRotationToController(
-    bool InputIsRotationRoController)
+void AGS_Character::SetIsLockedRotationToController(bool InputIsRotationRoController)
 {
 	bLockRotationToController = InputIsRotationRoController;
 }
@@ -731,8 +720,7 @@ void AGS_Character::SetHPTextWidget(UGS_HPText* InHPTextWidget)
 	if (IsValid(HPTextWidget))
 	{
 		HPTextWidget->InitializeHPTextWidget(GetStatComp());
-		StatComp->OnCurrentHPChanged.AddUObject(HPTextWidget,
-		                                        &UGS_HPText::OnCurrentHPChanged);
+		StatComp->OnCurrentHPChanged.AddUObject(HPTextWidget, &UGS_HPText::OnCurrentHPChanged);
 	}
 }
 
@@ -741,22 +729,22 @@ EKillFeedbackType AGS_Character::GetKillFeedbackType() const
 	// Default behavior based on CharacterType
 	switch (CharacterType)
 	{
-	case ECharacterType::SmallClaw:
-	case ECharacterType::NeedleFang:
-	case ECharacterType::IronFang:
-	case ECharacterType::StoneClaw:
-		return EKillFeedbackType::MonsterKill;
-	case ECharacterType::ShadowFang:
-		return EKillFeedbackType::EliteKill;
-	case ECharacterType::Ares:
-	case ECharacterType::Chan:
-	case ECharacterType::Merci:
-	case ECharacterType::Reina:
-		return EKillFeedbackType::SeekerKill;
-	case ECharacterType::Drakhar:
-		return EKillFeedbackType::GuardianRepelled;
-	default:
-		return EKillFeedbackType::None;
+		case ECharacterType::SmallClaw:
+		case ECharacterType::NeedleFang:
+		case ECharacterType::IronFang:
+		case ECharacterType::StoneClaw:
+			return EKillFeedbackType::MonsterKill;
+		case ECharacterType::ShadowFang:
+			return EKillFeedbackType::EliteKill;
+		case ECharacterType::Ares:
+		case ECharacterType::Chan:
+		case ECharacterType::Merci:
+		case ECharacterType::Reina:
+			return EKillFeedbackType::SeekerKill;
+		case ECharacterType::Drakhar:
+			return EKillFeedbackType::GuardianRepelled;
+		default:
+			return EKillFeedbackType::None;
 	}
 }
 
@@ -783,24 +771,20 @@ void AGS_Character::SetHPBarWidget(UGS_HPWidget* InHPBarWidget)
 	if (IsValid(HPBarWidget))
 	{
 		HPBarWidget->InitializeHPWidget(GetStatComp());
-		StatComp->OnCurrentHPChanged.AddUObject(
-		    HPBarWidget, &UGS_HPWidget::OnCurrentHPBarChanged);
+		StatComp->OnCurrentHPChanged.AddUObject(HPBarWidget, &UGS_HPWidget::OnCurrentHPBarChanged);
 	}
 }
 
-void AGS_Character::SetPlayerInfoWidget(
-    UGS_PlayerInfoWidget* InPlayerInfoWidget)
+void AGS_Character::SetPlayerInfoWidget(UGS_PlayerInfoWidget* InPlayerInfoWidget)
 {
 	if (IsValid(InPlayerInfoWidget))
 	{
 		InPlayerInfoWidget->InitializePlayerInfoWidget(Cast<AGS_Player>(this));
-		StatComp->OnCurrentHPChanged.AddUObject(
-		    InPlayerInfoWidget, &UGS_PlayerInfoWidget::OnCurrentHPBarChanged);
+		StatComp->OnCurrentHPChanged.AddUObject(InPlayerInfoWidget, &UGS_PlayerInfoWidget::OnCurrentHPBarChanged);
 	}
 }
 
-void AGS_Character::ServerRPCMeleeAttack_Implementation(
-    AGS_Character* InDamagedCharacter)
+void AGS_Character::ServerRPCMeleeAttack_Implementation(AGS_Character* InDamagedCharacter)
 {
 	if (IsValid(InDamagedCharacter))
 	{
@@ -808,16 +792,13 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 		if (IsValid(DamagedCharacterStat))
 		{
 			bool bIsCritical = false;
-			float Damage =
-			    DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter, bIsCritical);
+			float Damage = DamagedCharacterStat->CalculateDamage(this, InDamagedCharacter, bIsCritical);
 			FGS_DamageEvent DamageEvent;
 			DamageEvent.bIsCritical = bIsCritical;
-			InDamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(),
-			                               this);
+			InDamagedCharacter->TakeDamage(Damage, DamageEvent, GetController(), this);
 
 			// 공격이 성공했을 때 공격자에게 카메라 쉐이크 적용
-			if (APlayerController* AttackerPC =
-			        Cast<APlayerController>(GetController()))
+			if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 			{
 				Client_PlayAttackSuccessShake(AttackerPC);
 			}
@@ -825,8 +806,9 @@ void AGS_Character::ServerRPCMeleeAttack_Implementation(
 	}
 }
 
-void AGS_Character::Client_PlayTakeDamageShake_Implementation(
-    APlayerController* TargetPC, const FGS_CameraShakeInfo& ShakeInfo, float KnockbackMultiplier)
+void AGS_Character::Client_PlayTakeDamageShake_Implementation(APlayerController* TargetPC,
+															  const FGS_CameraShakeInfo& ShakeInfo,
+															  float KnockbackMultiplier)
 {
 	if (TargetPC && TargetPC->IsLocalController() && ShakeInfo.ShakeClass)
 	{
@@ -835,24 +817,20 @@ void AGS_Character::Client_PlayTakeDamageShake_Implementation(
 	}
 }
 
-void AGS_Character::Client_PlayAttackSuccessShake_Implementation(
-    APlayerController* TargetPC)
+void AGS_Character::Client_PlayAttackSuccessShake_Implementation(APlayerController* TargetPC)
 {
-	if (TargetPC && TargetPC->IsLocalController() &&
-	    AttackSuccessShake.ShakeClass)
+	if (TargetPC && TargetPC->IsLocalController() && AttackSuccessShake.ShakeClass)
 	{
-		TargetPC->ClientStartCameraShake(AttackSuccessShake.ShakeClass,
-		                                 AttackSuccessShake.Intensity);
+		TargetPC->ClientStartCameraShake(AttackSuccessShake.ShakeClass, AttackSuccessShake.Intensity);
 	}
 }
 
-void AGS_Character::Client_PlayAttackSuccessShakeWithInfo_Implementation(
-    APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo)
+void AGS_Character::Client_PlayAttackSuccessShakeWithInfo_Implementation(APlayerController* TargetPC,
+																		 const FGS_CameraShakeInfo& CustomShakeInfo)
 {
 	if (TargetPC && TargetPC->IsLocalController() && CustomShakeInfo.ShakeClass)
 	{
-		TargetPC->ClientStartCameraShake(CustomShakeInfo.ShakeClass,
-		                                 CustomShakeInfo.Intensity);
+		TargetPC->ClientStartCameraShake(CustomShakeInfo.ShakeClass, CustomShakeInfo.Intensity);
 	}
 }
 
@@ -883,8 +861,7 @@ bool AGS_Character::IsEnemy(const AGS_Character* Other) const
 
 AGS_Weapon* AGS_Character::GetWeaponByIndex(int32 Index) const
 {
-	return WeaponSlots.IsValidIndex(Index) ? WeaponSlots[Index].WeaponInstance
-	                                       : nullptr;
+	return WeaponSlots.IsValidIndex(Index) ? WeaponSlots[Index].WeaponInstance : nullptr;
 }
 
 AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
@@ -902,8 +879,7 @@ AGS_Weapon* AGS_Character::GetWeaponBySocketName(FName SocketName)
 
 void AGS_Character::SetCharacterSpeed(float InRatio)
 {
-	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
-	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD && this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
 		// CharacterSpeed);
@@ -928,8 +904,7 @@ bool AGS_Character::IsDead() const
 
 void AGS_Character::Server_SetCharacterSpeed_Implementation(float InRatio)
 {
-	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD &&
-	    this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
+	if (InRatio >= SLOW_DEBUFF_SPEED_THRESHOLD && this->GetDebuffComp()->IsDebuffActive(EDebuffType::Slow))
 	{
 		// UE_LOG(LogTemp, Error, TEXT("Character Speed(제한됨) = %f"),
 		// CharacterSpeed);
@@ -957,14 +932,12 @@ void AGS_Character::MulticastRPCCharacterDeath_Implementation()
 	// GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AGS_Character::MulticastRPCPlaySkillMontage_Implementation(
-    UAnimMontage* SkillMontage)
+void AGS_Character::MulticastRPCPlaySkillMontage_Implementation(UAnimMontage* SkillMontage)
 {
 	PlayAnimMontage(SkillMontage);
 }
 
-void AGS_Character::MulicastRPCStopCurrentSkillMontage_Implementation(
-    UAnimMontage* CurrentSkillMontage)
+void AGS_Character::MulicastRPCStopCurrentSkillMontage_Implementation(UAnimMontage* CurrentSkillMontage)
 {
 	StopAnimMontage(CurrentSkillMontage);
 }
@@ -1006,31 +979,30 @@ void AGS_Character::OnRep_ImpactVFX()
 
 	// 비동기 로드 시작
 	PendingImpactVFXLoad = UGS_AssetLoader::AsyncLoadAsset<UNiagaraSystem>(
-	    CurrentVFXInfo.VFXAsset,
-	    [WeakThis, CurrentVFXInfo](UNiagaraSystem* LoadedVFX)
-	    {
-		    if (WeakThis.IsValid() && LoadedVFX)
-		    {
-			    UNiagaraComponent* SpawnedVFX =
-			        UNiagaraFunctionLibrary::SpawnSystemAttached(
-			            LoadedVFX,
-			            WeakThis->GetRootComponent(),
-			            NAME_None,
-			            FVector::ZeroVector,
-			            FRotator::ZeroRotator,
-			            EAttachLocation::SnapToTarget,
-			            true, // bAutoDestroy
-			            true, // bAutoActivate
-			            ENCPoolMethod::AutoRelease, // Pooling 활성화
-			            true // bPreCullCheck
-			        );
+		CurrentVFXInfo.VFXAsset,
+		[WeakThis, CurrentVFXInfo](UNiagaraSystem* LoadedVFX)
+		{
+			if (WeakThis.IsValid() && LoadedVFX)
+			{
+				UNiagaraComponent* SpawnedVFX =
+					UNiagaraFunctionLibrary::SpawnSystemAttached(LoadedVFX,
+																 WeakThis->GetRootComponent(),
+																 NAME_None,
+																 FVector::ZeroVector,
+																 FRotator::ZeroRotator,
+																 EAttachLocation::SnapToTarget,
+																 true,						 // bAutoDestroy
+																 true,						 // bAutoActivate
+																 ENCPoolMethod::AutoRelease, // Pooling 활성화
+																 true						 // bPreCullCheck
+					);
 
-			    if (SpawnedVFX)
-			    {
-				    SpawnedVFX->SetWorldScale3D(CurrentVFXInfo.Scale);
-			    }
-		    }
-	    });
+				if (SpawnedVFX)
+				{
+					SpawnedVFX->SetWorldScale3D(CurrentVFXInfo.Scale);
+				}
+			}
+		});
 }
 
 void AGS_Character::SpawnAndAttachWeapons()
@@ -1050,16 +1022,14 @@ void AGS_Character::SpawnAndAttachWeapons()
 
 		FActorSpawnParameters Params;
 		Params.Owner = this;
-		Slot.WeaponInstance =
-		    World->SpawnActor<AGS_Weapon>(Slot.WeaponClass, Params);
+		Slot.WeaponInstance = World->SpawnActor<AGS_Weapon>(Slot.WeaponClass, Params);
 		if (!Slot.WeaponInstance)
 		{
 			continue;
 		}
 
 		Slot.WeaponInstance->AttachToComponent(
-		    GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale,
-		    Slot.SocketName);
+			GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, Slot.SocketName);
 	}
 }
 
@@ -1201,17 +1171,14 @@ EWeaponHandlingState AGS_Character::GetWeaponHandlingState()
 	return WeaponHandlingState;
 }
 
-void AGS_Character::SetWeaponHandlingState(
-    EWeaponHandlingState InputWeaponHandlingState)
+void AGS_Character::SetWeaponHandlingState(EWeaponHandlingState InputWeaponHandlingState)
 {
 	WeaponHandlingState = InputWeaponHandlingState;
 }
 
-bool AGS_Character::ShouldPlayVFXAtLocation(const FVector& Location,
-                                            float MaxDistance) const
+bool AGS_Character::ShouldPlayVFXAtLocation(const FVector& Location, float MaxDistance) const
 {
-	return UGS_VFX_FunctionLibrary::ShouldPlayVFXAtLocation(this, Location,
-	                                                        MaxDistance, true);
+	return UGS_VFX_FunctionLibrary::ShouldPlayVFXAtLocation(this, Location, MaxDistance, true);
 }
 
 UTexture2D* AGS_Character::GetPortrait() const
@@ -1245,23 +1212,23 @@ float AGS_Character::CalculateSignificance(const FTransform& Viewpoint)
 	// 캐릭터 타입별 상수 거리 적용
 	switch (CharacterType)
 	{
-	case ECharacterType::SmallClaw:
-		CullDistance = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
-		break;
-	case ECharacterType::NeedleFang:
-		CullDistance = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
-		break;
-	case ECharacterType::ShadowFang:
-		CullDistance = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
-		break;
-	case ECharacterType::Ares:
-	case ECharacterType::Chan:
-	case ECharacterType::Merci:
-	case ECharacterType::Drakhar:
-		CullDistance = 8000.0f;
-		break; // 플레이어 캐릭터는 멀리서도 보여야 함
-	default:
-		break;
+		case ECharacterType::SmallClaw:
+			CullDistance = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+			break;
+		case ECharacterType::NeedleFang:
+			CullDistance = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+			break;
+		case ECharacterType::ShadowFang:
+			CullDistance = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
+			break;
+		case ECharacterType::Ares:
+		case ECharacterType::Chan:
+		case ECharacterType::Merci:
+		case ECharacterType::Drakhar:
+			CullDistance = 8000.0f;
+			break; // 플레이어 캐릭터는 멀리서도 보여야 함
+		default:
+			break;
 	}
 
 	// [멀티플레이 대응] RTS 모드(가디언)일 경우 더 높은 곳에서 내려다보므로 컬링 거리 확장
@@ -1293,14 +1260,12 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 	if (NewSignificance > 0.5f)
 	{
 		// 중요할 때: 시각적 품질 유지
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 	else
 	{
 		// 보통이거나 낮을 때: 화면에 보일 때만 갱신
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 	}
 
 	// 3. 중요도가 매우 낮으면 Tick 비활성화
@@ -1334,7 +1299,7 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 	// 5. 네트워크 업데이트 빈도 최적화 (서버 전용)
 	if (HasAuthority())
 	{
-		NetUpdateFrequency = GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation());
+		SetNetUpdateFrequency(GS_Rendering::CalculateNetUpdateFrequency(this, GetActorLocation()));
 	}
 
 	// 6. 가시성 컬링 (드로우콜 절감)
@@ -1374,18 +1339,18 @@ void AGS_Character::UpdateShadowCulling()
 		float BaseCullDist = 3000.0f;
 		switch (CharacterType)
 		{
-		case ECharacterType::SmallClaw:
-			BaseCullDist = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
-			break;
-		case ECharacterType::NeedleFang:
-			BaseCullDist = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
-			break;
-		case ECharacterType::ShadowFang:
-			BaseCullDist = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
-			break;
-		default:
-			BaseCullDist = 6000.0f;
-			break;
+			case ECharacterType::SmallClaw:
+				BaseCullDist = GS_Rendering::MONSTER_SMALL_CULL_DISTANCE;
+				break;
+			case ECharacterType::NeedleFang:
+				BaseCullDist = GS_Rendering::MONSTER_MEDIUM_CULL_DISTANCE;
+				break;
+			case ECharacterType::ShadowFang:
+				BaseCullDist = GS_Rendering::MONSTER_LARGE_CULL_DISTANCE;
+				break;
+			default:
+				BaseCullDist = 6000.0f;
+				break;
 		}
 
 		if (GS_Rendering::IsRTSMode(this))
@@ -1441,16 +1406,21 @@ void AGS_Character::Multicast_ApplyHitStop_Implementation(float Duration, float 
 	TWeakObjectPtr<UAnimInstance> WeakAnimInstance(AnimInstance);
 	TWeakObjectPtr<UAnimMontage> WeakMontage(CurrentMontage);
 
-	GetWorldTimerManager().SetTimer(HitStopTimer, [WeakThis, WeakAnimInstance, WeakMontage, OriginalPlayRate]()
-	                                {
-		if (WeakThis.IsValid() && WeakAnimInstance.IsValid())
+	GetWorldTimerManager().SetTimer(
+		HitStopTimer,
+		[WeakThis, WeakAnimInstance, WeakMontage, OriginalPlayRate]()
 		{
-			// 아직 같은 몽타주를 재생 중이라면 PlayRate 복구
-			if (WeakAnimInstance->GetCurrentActiveMontage() == WeakMontage.Get())
+			if (WeakThis.IsValid() && WeakAnimInstance.IsValid())
 			{
-				WeakAnimInstance->Montage_SetPlayRate(WeakMontage.Get(), OriginalPlayRate);
+				// 아직 같은 몽타주를 재생 중이라면 PlayRate 복구
+				if (WeakAnimInstance->GetCurrentActiveMontage() == WeakMontage.Get())
+				{
+					WeakAnimInstance->Montage_SetPlayRate(WeakMontage.Get(), OriginalPlayRate);
+				}
 			}
-		} }, Duration, false);
+		},
+		Duration,
+		false);
 }
 
 void AGS_Character::NotifyHealed(AGS_Character* Healer, float Amount)
@@ -1486,8 +1456,9 @@ void AGS_Character::NotifyHealed(AGS_Character* Healer, float Amount)
 	}
 
 	// 오래된 기록 정리 (최적화)
-	SupportHistory.RemoveAll([CurrentTime, this](const FSupportRecord& Record)
-	                         { return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
+	SupportHistory.RemoveAll(
+		[CurrentTime, this](const FSupportRecord& Record)
+		{ return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
 }
 
 void AGS_Character::NotifyBuffed(AGS_Character* Buffer, EPositiveEffectType BuffType)
@@ -1524,6 +1495,7 @@ void AGS_Character::NotifyBuffed(AGS_Character* Buffer, EPositiveEffectType Buff
 	}
 
 	// 오래된 기록 정리 (최적화)
-	SupportHistory.RemoveAll([CurrentTime, this](const FSupportRecord& Record)
-	                         { return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
+	SupportHistory.RemoveAll(
+		[CurrentTime, this](const FSupportRecord& Record)
+		{ return !Record.Supporter.IsValid() || (CurrentTime - Record.LastSupportTime) > AssistWindowSeconds; });
 }

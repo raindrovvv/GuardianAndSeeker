@@ -28,7 +28,7 @@ public:
 	float CurrentTime;
 
 	float LastServerTimeUpdate;
-	
+
 	// GameMode가 이 함수들을 호출하여 서버가 생성한 방 개수를 설정합니다.
 	void SetDungeonData(int32 InTotalRoomCount);
 
@@ -48,7 +48,9 @@ public:
 
 	/** 보스 음악 상태 설정 (서버 전용) */
 	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void SetBossMusicState(bool bActive, class UAkAudioEvent* StartEvent = nullptr, class UAkAudioEvent* StopEvent = nullptr);
+	void SetBossMusicState(bool bActive,
+						   class UAkAudioEvent* StartEvent = nullptr,
+						   class UAkAudioEvent* StopEvent = nullptr);
 
 	// ============================================
 	// Room/Door Actor Caching (Performance Optimization)
@@ -56,6 +58,24 @@ public:
 	/** 클라이언트에서 스폰된 Room/Door 액터 카운트 (TActorIterator 대체) */
 	UPROPERTY(Transient)
 	int32 CachedRoomCount;
+
+	/** 전역 업적: 퍼스트 블러드 발생 여부 */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Achievements")
+	bool bHasFirstBlood = false;
+
+	/** 전역 업적: 가디언 슬레이어 발생 여부 */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Achievements")
+	bool bHasGuardianSlayer = false;
+
+	/**
+	 * 전역 업적 트리거 시도 (서버 전용)
+	 * @return 성공적으로 처음 트리거된 경우 true
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Achievements")
+	bool TryTriggerFirstBlood();
+
+	UFUNCTION(BlueprintCallable, Category = "Achievements")
+	bool TryTriggerGuardianSlayer();
 
 
 protected:

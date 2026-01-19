@@ -28,16 +28,15 @@
 #include "UI/Character/GS_HPTextWidgetComp.h"
 
 AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	AIControllerClass = AGS_AIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
-	MonsterSkillComp =
-	    ObjectInitializer.CreateDefaultSubobject<UGS_MonsterSkillComp>(this, TEXT("MonsterSkillComp"));
+	MonsterSkillComp = ObjectInitializer.CreateDefaultSubobject<UGS_MonsterSkillComp>(this, TEXT("MonsterSkillComp"));
 
 	SkillCooldownWidgetComp =
-	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("SkillCooldownWidgetComp"));
+		ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("SkillCooldownWidgetComp"));
 	SkillCooldownWidgetComp->SetupAttachment(RootComponent);
 	SkillCooldownWidgetComp->SetVisibility(false);
 	SkillCooldownWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
@@ -48,16 +47,15 @@ AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
 	AkComponent->SetupAttachment(RootComponent);
 
 	// 몬스터 오디오 컴포넌트 생성
-	MonsterAudioComponent = ObjectInitializer.CreateDefaultSubobject<UGS_MonsterAudioComponent>(this,
-	                                                                                            TEXT("MonsterAudioComponent"));
+	MonsterAudioComponent =
+		ObjectInitializer.CreateDefaultSubobject<UGS_MonsterAudioComponent>(this, TEXT("MonsterAudioComponent"));
 	BaseAudioComponent = MonsterAudioComponent;
 
 	// VFX 컴포넌트 생성 (디버프 등 모든 VFX)
 	VFXComponent = ObjectInitializer.CreateDefaultSubobject<UGS_VFXComponent>(this, TEXT("VFXComponent"));
 
 	// UI 컴포넌트 생성 및 초기화
-	TargetedUIComponent =
-	    ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));
+	TargetedUIComponent = ObjectInitializer.CreateDefaultSubobject<UWidgetComponent>(this, TEXT("TargetedUI"));
 	TargetedUIComponent->SetupAttachment(RootComponent);
 	TargetedUIComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	TargetedUIComponent->SetWidgetSpace(EWidgetSpace::Screen);
@@ -73,8 +71,7 @@ AGS_Monster::AGS_Monster(const FObjectInitializer& ObjectInitializer)
 	// RTS 선택을 위한 콜리전 설정 (모든 몬스터에 적용)
 	if (GetCapsuleComponent())
 	{
-		GetCapsuleComponent()->SetCollisionResponseToChannel(
-		    ECC_GameTraceChannel1, ECR_Block); // Interactable
+		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block); // Interactable
 	}
 
 	bCommandLocked = false;
@@ -111,21 +108,20 @@ void AGS_Monster::BeginPlay()
 		// 모든 몬스터가 동일한 프레임에 연산을 수행하지 않도록, 시작 시간을 0.0 ~ 0.1초 사이로 랜덤 분산.
 		float RandomVariance = FMath::RandRange(0.0f, 0.1f);
 
-		GetWorld()->GetTimerManager().SetTimer(
-		    ShadowCullingTimerHandle,
-		    this,
-		    &AGS_Monster::UpdateShadowCulling,
-		    0.1f,
-		    true,
-		    RandomVariance); // 초기 딜레이 적용
+		GetWorld()->GetTimerManager().SetTimer(ShadowCullingTimerHandle,
+											   this,
+											   &AGS_Monster::UpdateShadowCulling,
+											   0.1f,
+											   true,
+											   RandomVariance); // 초기 딜레이 적용
 
-		GetWorld()->GetTimerManager().SetTimer(
-		    HPWidgetVisibilityTimerHandle,
-		    this,
-		    &AGS_Monster::UpdateHPWidgetVisibility,
-		    0.1f,
-		    true,
-		    RandomVariance + 0.05f); // 위젯은 섀도우 타이머와도 겹치지 않게 추가 오프셋
+		GetWorld()->GetTimerManager().SetTimer(HPWidgetVisibilityTimerHandle,
+											   this,
+											   &AGS_Monster::UpdateHPWidgetVisibility,
+											   0.1f,
+											   true,
+											   RandomVariance +
+												   0.05f); // 위젯은 섀도우 타이머와도 겹치지 않게 추가 오프셋
 	}
 
 	// === 데디케이티드 서버 크래시 방지 ===
@@ -147,8 +143,7 @@ void AGS_Monster::BeginPlay()
 
 	if (IsValid(MonsterSkillComp))
 	{
-		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(
-		    this, &AGS_Monster::HandleSkillCooldownChanged);
+		MonsterSkillComp->OnMonsterSkillCooldownChanged.AddDynamic(this, &AGS_Monster::HandleSkillCooldownChanged);
 	}
 
 	// HP 위젯 컴포넌트 틱 간격 최적화 (틱은 유지해야 렌더링됨)
@@ -173,14 +168,12 @@ void AGS_Monster::BeginPlay()
 	if (GetWorld())
 	{
 		// Find local player controller (RTS Player)
-		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(
-		        UGameplayStatics::GetPlayerController(this, 0)))
+		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(UGameplayStatics::GetPlayerController(this, 0)))
 		{
 			if (RTSController->AttackNotificationManager)
 			{
-				OnMonsterAttacked.AddUniqueDynamic(
-				    RTSController->AttackNotificationManager,
-				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
+				OnMonsterAttacked.AddUniqueDynamic(RTSController->AttackNotificationManager,
+												   &UGS_RTSAttackNotificationManager::OnUnitAttacked);
 			}
 		}
 	}
@@ -199,8 +192,7 @@ void AGS_Monster::BeginPlay()
 			GS->RegisterMonster(this);
 		}
 
-		if (UGS_ActorRegistrySubsystem* Registry =
-		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->RegisterMonster(this);
 		}
@@ -210,8 +202,7 @@ void AGS_Monster::BeginPlay()
 	if (FApp::CanEverRender() && GetMesh())
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
-		float CullDistance =
-		    GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GetOptimalCullDistance());
 		int32 MinLOD = GS_Rendering::CalculateMinLOD(this);
 
 		MeshComp->SetCullDistance(CullDistance);
@@ -254,21 +245,23 @@ void AGS_Monster::RegisterSignificanceManager()
 			TWeakObjectPtr<AGS_Monster> WeakThis(this);
 
 			SM->RegisterObject(
-			    this, "Monster",
-			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
-			               const FTransform& Viewpoint) -> float
-			    {
-				    if (AGS_Monster* StrongThis = WeakThis.Get())
-					    return StrongThis->CalculateSignificance(Viewpoint);
-				    return 0.0f;
-			    },
-			    USignificanceManager::EPostSignificanceType::Sequential,
-			    [WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
-			               float OldValue, float NewValue, bool bExternal)
-			    {
-				    if (AGS_Monster* StrongThis = WeakThis.Get())
-					    StrongThis->OnSignificanceChanged(NewValue);
-			    });
+				this,
+				"Monster",
+				[WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint) -> float
+				{
+					if (AGS_Monster* StrongThis = WeakThis.Get())
+						return StrongThis->CalculateSignificance(Viewpoint);
+					return 0.0f;
+				},
+				USignificanceManager::EPostSignificanceType::Sequential,
+				[WeakThis](USignificanceManager::FManagedObjectInfo* ObjectInfo,
+						   float OldValue,
+						   float NewValue,
+						   bool bExternal)
+				{
+					if (AGS_Monster* StrongThis = WeakThis.Get())
+						StrongThis->OnSignificanceChanged(NewValue);
+				});
 		}
 	}
 }
@@ -283,8 +276,7 @@ void AGS_Monster::PostInitializeComponents()
 	}
 }
 
-void AGS_Monster::GetLifetimeReplicatedProps(
-    TArray<FLifetimeProperty>& OutLifetimeProps) const
+void AGS_Monster::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -327,8 +319,7 @@ void AGS_Monster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			GS->UnregisterMonster(this);
 		}
 
-		if (UGS_ActorRegistrySubsystem* Registry =
-		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
 			Registry->UnregisterMonster(this);
 		}
@@ -451,7 +442,12 @@ void AGS_Monster::UpdateHPWidgetVisibility()
 			}
 
 			bool bWaistBlocked = false;
-			if (GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, MonsterLocation + FVector(0.f, 0.f, GS_Rendering::HP_WIDGET_VISIBILITY_TRACE_OFFSET), ECC_Visibility, Params))
+			if (GetWorld()->LineTraceSingleByChannel(
+					HitResult,
+					CameraLocation,
+					MonsterLocation + FVector(0.f, 0.f, GS_Rendering::HP_WIDGET_VISIBILITY_TRACE_OFFSET),
+					ECC_Visibility,
+					Params))
 			{
 				bool bIsPawn = (HitResult.GetActor() && HitResult.GetActor()->IsA<APawn>());
 				bool bIsFloor = (HitResult.ImpactNormal.Z >= 0.7f);
@@ -484,14 +480,12 @@ void AGS_Monster::OnDeath()
 	// Unbind attack notification delegate
 	if (AController* OwnerController = GetController())
 	{
-		if (AGS_RTSController* RTSController =
-		        Cast<AGS_RTSController>(OwnerController))
+		if (AGS_RTSController* RTSController = Cast<AGS_RTSController>(OwnerController))
 		{
 			if (RTSController->AttackNotificationManager)
 			{
-				OnMonsterAttacked.RemoveDynamic(
-				    RTSController->AttackNotificationManager,
-				    &UGS_RTSAttackNotificationManager::OnUnitAttacked);
+				OnMonsterAttacked.RemoveDynamic(RTSController->AttackNotificationManager,
+												&UGS_RTSAttackNotificationManager::OnUnitAttacked);
 			}
 		}
 	}
@@ -511,11 +505,9 @@ void AGS_Monster::OnDeath()
 	// 주변의 모든 Seeker에게 이 몬스터 제거 알림
 	if (UWorld* World = GetWorld())
 	{
-		if (UGS_ActorRegistrySubsystem* Registry =
-		        World->GetSubsystem<UGS_ActorRegistrySubsystem>())
+		if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 		{
-			const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs =
-			    Registry->GetSeekers();
+			const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs = Registry->GetSeekers();
 
 			for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 			{
@@ -532,7 +524,7 @@ void AGS_Monster::OnDeath()
 
 	FTimerHandle DestroyTimerHandle;
 	GetWorldTimerManager().SetTimer(
-	    DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, DELAYED_DESTROY_TIME, false);
+		DestroyTimerHandle, this, &AGS_Monster::HandleDelayedDestroy, DELAYED_DESTROY_TIME, false);
 }
 
 
@@ -578,8 +570,7 @@ void AGS_Monster::SetCanUseSkill(bool bCanUse)
 	}
 }
 
-void AGS_Monster::HandleSkillCooldownChanged(float InCurrentCoolTime,
-                                             float InMaxCoolTime)
+void AGS_Monster::HandleSkillCooldownChanged(float InCurrentCoolTime, float InMaxCoolTime)
 {
 	if (SkillCooldownWidgetComp)
 	{
@@ -623,15 +614,14 @@ void AGS_Monster::Multicast_PlayAttackMontage_Implementation()
 	}
 
 	TWeakObjectPtr<AGS_Monster> WeakThis(this);
-	UGS_AssetLoader::AsyncLoadAsset<UAnimMontage>(
-	    AttackMontage,
-	    [WeakThis](UAnimMontage* LoadedMontage)
-	    {
-		    if (WeakThis.IsValid() && LoadedMontage && WeakThis->MonsterAnim)
-		    {
-			    WeakThis->MonsterAnim->Montage_Play(LoadedMontage);
-		    }
-	    });
+	UGS_AssetLoader::AsyncLoadAsset<UAnimMontage>(AttackMontage,
+												  [WeakThis](UAnimMontage* LoadedMontage)
+												  {
+													  if (WeakThis.IsValid() && LoadedMontage && WeakThis->MonsterAnim)
+													  {
+														  WeakThis->MonsterAnim->Montage_Play(LoadedMontage);
+													  }
+												  });
 }
 
 void AGS_Monster::SetSelected(bool bSelected, bool bPlaySound)
@@ -696,10 +686,6 @@ void AGS_Monster::HandleHPChanged(UGS_StatComp* InStatComp)
 	// Only notify on damage (HP decrease), not healing
 	if (CurrentHP < LastKnownHP && !IsDead())
 	{
-		UE_LOG(LogTemp, Log,
-		       TEXT("[Monster:%s] HP decreased %.1f -> %.1f, Broadcasting attack "
-		            "notification!"),
-		       *GetName(), LastKnownHP, CurrentHP);
 		OnMonsterAttacked.Broadcast(this, GetActorLocation());
 	}
 
@@ -774,20 +760,17 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 	if (NewSignificance > 0.6f)
 	{
 		// 중요할 때: 항상 재생 및 본 갱신
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	}
 	else if (NewSignificance > 0.2f)
 	{
 		// 보통일 때: 화면에 보일 때만 갱신
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 	}
 	else
 	{
 		// 거의 보이지 않거나 멀 때: 몽타주만 재생 (성능 위주)
-		MeshComp->VisibilityBasedAnimTickOption =
-		    EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 	}
 
 	// 4. UI 및 틱 최적화
@@ -828,7 +811,8 @@ void AGS_Monster::OnSignificanceChanged(float NewSignificance)
 			{
 				float Remaining = GetWorldTimerManager().GetTimerRemaining(Handle);
 				GetWorldTimerManager().ClearTimer(Handle);
-				GetWorldTimerManager().SetTimer(Handle, this, Func, NewInterval, true, FMath::Min(Remaining, NewInterval));
+				GetWorldTimerManager().SetTimer(
+					Handle, this, Func, NewInterval, true, FMath::Min(Remaining, NewInterval));
 			}
 		};
 
