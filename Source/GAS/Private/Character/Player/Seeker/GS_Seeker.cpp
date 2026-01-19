@@ -238,17 +238,17 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	// Item (hard coding) -> 나중에 SkillSet DataTable 과 같이 ItemSet DataTable 를 가지고 초기화 할 수 있도록 한다. //
 	// SJE
 	UGS_ItemData* ItemData = ObjectInitializer.CreateDefaultSubobject<UGS_ItemData>(this, TEXT("HP_Potion_Data"));
-	ItemData->ItemName = TEXT("HP_Potion");
-	ItemData->ItemType = EItemType::HP_Potion;
-	ItemData->MaxCount = 5;
-	ItemData->CurCount = 5;
+	ItemData->DisplayName = TEXT("HP_Potion");
+	ItemData->ItemCategory = EItemType::HP_Potion;
+	ItemData->StackLimit = 5;
+	ItemData->CurrentQuantity = 5;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FullPotionMesh(
 		TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Full.HP_Potion_Full"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> EmptyPotionMesh(
 		TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Empty.HP_Potion_Empty"));
 
-	ItemData->ItemMeshs.Add(FName(TEXT("HP_Potion_Full")), FullPotionMesh.Object);
-	ItemData->ItemMeshs.Add(FName(TEXT("HP_Potion_Empty")), EmptyPotionMesh.Object);
+	ItemData->MeshVariants.Add(FName(TEXT("HP_Potion_Full")), FullPotionMesh.Object);
+	ItemData->MeshVariants.Add(FName(TEXT("HP_Potion_Empty")), EmptyPotionMesh.Object);
 
 	ItemDatas.Add(EItemType::HP_Potion, ItemData);
 }
