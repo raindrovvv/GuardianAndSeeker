@@ -6,6 +6,7 @@
 UENUM(BlueprintType)
 enum class ESkillSlot : uint8
 {
+	None,
 	Ready,
 	Moving,
 	Aiming,

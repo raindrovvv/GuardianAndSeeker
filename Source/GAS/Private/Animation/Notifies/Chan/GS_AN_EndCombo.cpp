@@ -1,24 +1,46 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_EndCombo.h"
-
+#include "Character/Player/Seeker/GS_Seeker.h"
+#include "Character/Skill/GS_SkillComp.h"
 #include "Animation/Character/GS_SeekerAnimInstance.h"
-#include "Character/Player/Seeker/GS_Chan.h"
 
-void UGS_AN_EndCombo::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
+UGS_AN_EndCombo::UGS_AN_EndCombo()
+{
+}
+
+void UGS_AN_EndCombo::Notify(USkeletalMeshComponent* MeshComp,
+							 UAnimSequenceBase* Animation,
+							 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
-	
-	if (AGS_Seeker* Character = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+
+	if (!MeshComp || !MeshComp->GetOwner())
 	{
-		if (Character->HasAuthority())
+		return;
+	}
+
+	// Signalling the end of a combo sequence to the seeker character
+	if (AGS_Seeker* SeekerCharacter = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+	{
+		// Combo state cleanup must be synchronized on the server
+		if (SeekerCharacter->HasAuthority())
 		{
-			Character->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-			Character->GetSkillComp()->ResetAllowedSkillsMask();
-			Character->CanChangeSeekerGait = true;
-			Character->CurrentComboIndex = 0;
-			Character->ComboInputOpen();
+			// Reset active montage slot
+			SeekerCharacter->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+
+			// Clear skill permissions and reset movement state
+			if (UGS_SkillComp* SkillComponent = SeekerCharacter->GetSkillComp())
+			{
+				SkillComponent->ResetAllowedSkillsMask();
+			}
+
+			// Restore character defaults for movement and combo tracking
+			SeekerCharacter->CanChangeSeekerGait = true;
+			SeekerCharacter->CurrentComboIndex = 0;
+
+			// Re-enable combo input processing for the next sequence
+			SeekerCharacter->ComboInputOpen();
 		}
 	}
 }

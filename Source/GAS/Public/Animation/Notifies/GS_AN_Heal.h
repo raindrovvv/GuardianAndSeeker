@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -7,12 +7,18 @@
 #include "GS_AN_Heal.generated.h"
 
 /**
- * 
+ * @brief Animation notify that triggers a healing effect on the character.
+ * Consumes a potion from the character's inventory and applies health restoration.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "GS Heal Notify"))
 class GAS_API UGS_AN_Heal : public UAnimNotify
 {
 	GENERATED_BODY()
+
 public:
-	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
+	UGS_AN_Heal();
+
+	virtual void Notify(USkeletalMeshComponent* MeshComp,
+						UAnimSequenceBase* Animation,
+						const FAnimNotifyEventReference& EventReference) override;
 };

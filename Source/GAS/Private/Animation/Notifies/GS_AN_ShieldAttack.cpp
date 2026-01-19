@@ -1,52 +1,39 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/GS_AN_ShieldAttack.h"
 #include "Character/Player/Seeker/GS_Chan.h"
 #include "Weapon/Equipable/GS_WeaponShield.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
-#include "TimerManager.h"
 
 UGS_AN_ShieldAttack::UGS_AN_ShieldAttack()
 {
-	// 노티파이 이름은 기본값 사용 (ShieldAttack)
 }
 
-void UGS_AN_ShieldAttack::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
+void UGS_AN_ShieldAttack::Notify(USkeletalMeshComponent* MeshComp,
+								 UAnimSequenceBase* Animation,
+								 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (!MeshComp)
+	if (!MeshComp || !MeshComp->GetOwner())
 	{
 		return;
 	}
 
-	// 메시 컴포넌트의 소유자에서 찬 캐릭터 찾기
-	AActor* Owner = MeshComp->GetOwner();
-	if (!Owner)
+	AGS_Chan* ChanOwner = Cast<AGS_Chan>(MeshComp->GetOwner());
+	if (!ChanOwner || !ChanOwner->IsLocallyControlled())
 	{
 		return;
 	}
 
-	AGS_Chan* Chan = Cast<AGS_Chan>(Owner);
-	if (!Chan)
-	{
-		return;
-	}
-
-	// 방패를 찾아서 공격 콜리전 활성화
-	// Server RPC는 로컬에서 조종하는 캐릭터에서만 호출
-	if (!Chan->IsLocallyControlled())
-	{
-		return;
-	}
-
+	// Iterate through weapon slots to find and trigger the shield attack
+	// Note: HARDCODED constant 5 from original implementation maintained for compatibility
 	for (int32 i = 0; i < 5; ++i)
 	{
-		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(Chan->GetWeaponByIndex(i)))
+		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(ChanOwner->GetWeaponByIndex(i)))
 		{
-			// 서버에서 콜리전 활성화 및 자동 비활성화 타이머 처리
-			// (ServerEnableAttackHit_Implementation 내부에서 0.3초 타이머 설정)
+			// Request server to enable attack hitbox.
+			// Internal implementation of ServerEnableAttackHit handles the timer.
 			Shield->ServerEnableAttackHit();
 			break;
 		}

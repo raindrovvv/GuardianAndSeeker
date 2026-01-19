@@ -1,17 +1,28 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_TEST.h"
-
 #include "Character/Player/Seeker/GS_Seeker.h"
 
-void UGS_AN_TEST::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                         const FAnimNotifyEventReference& EventReference)
+UGS_AN_TEST::UGS_AN_TEST()
+{
+}
+
+void UGS_AN_TEST::Notify(USkeletalMeshComponent* MeshComp,
+						 UAnimSequenceBase* Animation,
+						 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+	if (MeshComp && MeshComp->GetOwner())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AN_TEST : %s | GetName : %s"), *UEnum::GetValueAsString(Seeker->GetLocalRole()), *Seeker->GetName());
+		if (AGS_Seeker* SeekerCharacter = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+		{
+			// Log network role and character name for debugging purposes
+			UE_LOG(LogTemp,
+				   Warning,
+				   TEXT("[AnimNotify_TEST] Role: %s | Character: %s"),
+				   *UEnum::GetValueAsString(SeekerCharacter->GetLocalRole()),
+				   *SeekerCharacter->GetName());
+		}
 	}
 }

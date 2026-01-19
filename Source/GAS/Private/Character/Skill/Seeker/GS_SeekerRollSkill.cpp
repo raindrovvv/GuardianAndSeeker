@@ -1,12 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Character/Skill/Seeker/GS_SeekerRollSkill.h"
-
-#include "Animation/Character/GS_SeekerAnimInstance.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/Skill/Seeker/GS_HealSkill.h"
-#include "Components/CapsuleComponent.h"
+#include "Character/Skill/GS_SkillComp.h"
+#include "Animation/Character/GS_SeekerAnimInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Sound/GS_SeekerAudioComponent.h"
 
@@ -19,55 +17,56 @@ void UGS_SeekerRollSkill::ActiveSkill()
 {
 	Super::ActiveSkill();
 
-	UE_LOG(LogTemp, Warning, TEXT("SeekerRollSkill")); // SJE
-	
-	CachedSeekerOwner = Cast<AGS_Seeker>(OwnerCharacter);
-
-	if (CachedSeekerOwner.IsValid())
+	CachedSeeker = Cast<AGS_Seeker>(OwnerCharacter);
+	if (!CachedSeeker.IsValid())
 	{
-		if (CachedSeekerOwner->HasAuthority())
+		return;
+	}
+
+	// Rolling logic is orchestrated by the server to ensure synchronized collision and movement
+	if (CachedSeeker->HasAuthority())
+	{
+		// Force the character into the full-body montage slot and lock gait changes
+		CachedSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
+		CachedSeeker->CanChangeSeekerGait = false;
+
+		// Select the appropriate roll animation segment based on current movement direction
+		const FName TargetRollSection = CalRollDirection();
+		UAnimMontage* RollMontage = GetCachedMontage(0);
+
+		if (RollMontage)
 		{
-			CachedSeekerOwner->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-			CachedSeekerOwner->CanChangeSeekerGait = false;
+			// Default to forward ("F0") if no direction is specified/calculated
+			const FName SectionToPlay = (TargetRollSection == FName("00")) ? FName("F0") : TargetRollSection;
+			CachedSeeker->Multicast_PlaySkillMontage(RollMontage, SectionToPlay);
 
-			const FName RollDirection = CalRollDirection();
-			UAnimMontage* AM_Roll = GetCachedMontage(0);
-			if (AM_Roll)
+			// Subscribe to montage completion for cleanup
+			RollEndDelegate.BindUObject(this, &UGS_SeekerRollSkill::HandleRollMontageEnded);
+			if (UGS_SeekerAnimInstance* AnimInstance =
+					Cast<UGS_SeekerAnimInstance>(CachedSeeker->GetMesh()->GetAnimInstance()))
 			{
-				if (RollDirection == FName("00"))
-				{
-					CachedSeekerOwner->Multicast_PlaySkillMontage(AM_Roll, FName("F0"));
-				}
-				else
-				{
-					CachedSeekerOwner->Multicast_PlaySkillMontage(AM_Roll, RollDirection);
-				}
-			}
-			
-			EndDelegate.BindUObject(this, &UGS_SeekerRollSkill::OnRollMontageEnded);
-			UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerCharacter->GetMesh()->GetAnimInstance());
-			if (SeekerAnimInstance)
-			{
-				SeekerAnimInstance->Montage_SetEndDelegate(EndDelegate, AM_Roll);
-			}
-
-			// Ignore collision with all pawns (Seekers, Monsters, etc.) during roll
-			CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-
-			// Also disable collision in CharacterMovement to prevent physics-based collisions
-			if (UCharacterMovementComponent* MoveComp = CachedSeekerOwner->GetCharacterMovement())
-			{
-				MoveComp->SetAvoidanceEnabled(false);
-			}
-
-			// 스킬 시작 사운드 재생 (멀티캐스트)
-			if (UGS_SeekerAudioComponent* AudioComp = CachedSeekerOwner->SeekerAudioComponent)
-			{
-				AudioComp->RequestSkillAudio(CurrentSkillType, 0);
+				AnimInstance->Montage_SetEndDelegate(RollEndDelegate, RollMontage);
 			}
 		}
-		StartCoolDown();
+
+		// Disable collision with other pawns to allow "rolling through" enemies/allies
+		CachedSeeker->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+		// Disable RVO avoidance to prevent jitter during the scripted roll movement
+		if (UCharacterMovementComponent* MoveComp = CachedSeeker->GetCharacterMovement())
+		{
+			MoveComp->SetAvoidanceEnabled(false);
+		}
+
+		// Trigger skill activation audio
+		if (UGS_SeekerAudioComponent* AudioComponent = CachedSeeker->FindComponentByClass<UGS_SeekerAudioComponent>())
+		{
+			AudioComponent->Multicast_RequestSkillAudio(CurrentSkillType, 0, CachedSeeker->GetActorLocation());
+		}
 	}
+
+	// Cooldown starts immediately upon activation attempt
+	StartCoolDown();
 }
 
 void UGS_SeekerRollSkill::OnSkillCanceledByDebuff()
@@ -85,31 +84,39 @@ void UGS_SeekerRollSkill::InterruptSkill()
 	Super::InterruptSkill();
 }
 
-void UGS_SeekerRollSkill::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+void UGS_SeekerRollSkill::HandleRollMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	if (CachedSeekerOwner.IsValid())
+	if (!CachedSeeker.IsValid())
 	{
-		UGS_HealSkill* HealSkill = Cast<UGS_HealSkill>(CachedSeekerOwner->GetSkillComp()->GetSkillFromSkillMap(ESkillSlot::HealPotion));
-		if (HealSkill)
+		DeactiveSkill();
+		return;
+	}
+
+	// Post-roll weapon handling logic (ensure weapon is correctly wielded/sheathed)
+	if (UGS_SkillComp* SkillComponent = CachedSeeker->GetSkillComp())
+	{
+		if (UGS_HealSkill* HealSkill =
+				Cast<UGS_HealSkill>(SkillComponent->GetSkillFromSkillMap(ESkillSlot::HealPotion)))
 		{
-			UAnimMontage* AM_Wielding = HealSkill->GetCachedMontage(2);
+			// Montage Index 2 corresponds to the wielding/unholstering animation
+			UAnimMontage* WieldingMontage = HealSkill->GetCachedMontage(2);
 
-			CachedSeekerOwner->TransWeaponHandingState(
-			EWeaponHandlingState::Sheathing,
-			EWeaponHandlingState::Wielding,
-			AM_Wielding,
-			ESeekerMontageSlot::UpperBody);
-		}
-
-		// Restore collision after roll
-		CachedSeekerOwner->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
-
-		// Re-enable avoidance in CharacterMovement
-		if (UCharacterMovementComponent* MoveComp = CachedSeekerOwner->GetCharacterMovement())
-		{
-			MoveComp->SetAvoidanceEnabled(true);
+			CachedSeeker->TransWeaponHandingState(EWeaponHandlingState::Sheathing,
+												  EWeaponHandlingState::Wielding,
+												  WieldingMontage,
+												  ESeekerMontageSlot::UpperBody);
 		}
 	}
 
+	// Restore pawn-to-pawn collision settings
+	CachedSeeker->Multicast_SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+
+	// Re-enable RVO avoidance
+	if (UCharacterMovementComponent* MovementComponent = CachedSeeker->GetCharacterMovement())
+	{
+		MovementComponent->SetAvoidanceEnabled(true);
+	}
+
+	// Terminate active skill state
 	DeactiveSkill();
 }

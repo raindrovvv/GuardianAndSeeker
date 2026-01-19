@@ -1,17 +1,21 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Character/GS_CharacterAnimInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
-void UGS_CharacterAnimInstance::SetOwnerCharacter(AGS_Character* Character)
+UGS_CharacterAnimInstance::UGS_CharacterAnimInstance()
+	: CurrentGroundSpeed(0.0f)
 {
-	OwnerCharacter = Character;
 }
 
-void UGS_CharacterAnimInstance::SetCharacterMovement(UCharacterMovementComponent* CharacterMovement)
+void UGS_CharacterAnimInstance::BindOwnerCharacter(AGS_Character* InCharacter)
 {
-	OwnerCharacterMovement = CharacterMovement;
+	CachedOwnerCharacter = InCharacter;
+}
+
+void UGS_CharacterAnimInstance::BindMovementComponent(UCharacterMovementComponent* InMovement)
+{
+	CachedMovementComponent = InMovement;
 }
 
 void UGS_CharacterAnimInstance::NativeInitializeAnimation()
@@ -23,9 +27,9 @@ void UGS_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
-	if (OwnerCharacter && OwnerCharacterMovement)
+	if (CachedOwnerCharacter && CachedMovementComponent)
 	{
-		const FVector Velocity = OwnerCharacterMovement->Velocity;
-		GroundSpeed = Velocity.Size2D();
+		const FVector Velocity = CachedMovementComponent->Velocity;
+		CurrentGroundSpeed = Velocity.Size2D();
 	}
 }

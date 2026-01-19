@@ -1,15 +1,24 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_ComboInputOpen.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 
-void UGS_AN_ComboInputOpen::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
+UGS_AN_ComboInputOpen::UGS_AN_ComboInputOpen()
+{
+}
+
+void UGS_AN_ComboInputOpen::Notify(USkeletalMeshComponent* MeshComp,
+								   UAnimSequenceBase* Animation,
+								   const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (AGS_Seeker* Character = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+	if (MeshComp && MeshComp->GetOwner())
 	{
-		Character->ComboInputOpen();
+		if (AGS_Seeker* SeekerCharacter = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+		{
+			// Triggers the base seeker logic for opening the combo input window
+			SeekerCharacter->ComboInputOpen();
+		}
 	}
 }

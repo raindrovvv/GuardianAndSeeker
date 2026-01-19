@@ -270,7 +270,7 @@ void UGS_BTT_SeekerCombat::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* No
 					}
 					else
 					{
-						Seeker->Server_OnComboAttack();
+						Seeker->Server_ExecuteComboAttack();
 					}
 				}
 

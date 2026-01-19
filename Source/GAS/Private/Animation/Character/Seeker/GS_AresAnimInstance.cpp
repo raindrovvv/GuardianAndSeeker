@@ -1,9 +1,12 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Character/Seeker/GS_AresAnimInstance.h"
 #include "Animation/Character/Seeker/GS_ChooserInputObj.h"
 #include "Character/E_Character.h"
+
+UGS_AresAnimInstance::UGS_AresAnimInstance()
+{
+}
 
 void UGS_AresAnimInstance::NativeInitializeAnimation()
 {
@@ -11,7 +14,8 @@ void UGS_AresAnimInstance::NativeInitializeAnimation()
 
 	if (ChooserInputObj)
 	{
-		ChooserInputObj->CharacterType = ECharacterType::Chan; // [임시] Chan으로 해야 올바른 이동 모션이 실행됨
+		// Ares uses Chan's movement logic for now as a placeholder/shared logic
+		ChooserInputObj->CharacterType = ECharacterType::Chan;
 	}
 }
 

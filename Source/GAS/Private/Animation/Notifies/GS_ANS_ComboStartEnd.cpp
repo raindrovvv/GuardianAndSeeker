@@ -1,27 +1,41 @@
-﻿#include "Animation/Notifies/GS_ANS_ComboStartEnd.h"
+﻿// Copyright Greed Fennec Studio. All Rights Reserved.
 
+#include "Animation/Notifies/GS_ANS_ComboStartEnd.h"
 #include "Character/Player/Guardian/GS_Drakhar.h"
 
-void UGS_ANS_ComboStartEnd::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                                        float TotalDuration, const FAnimNotifyEventReference& EventReference)
+UGS_ANS_ComboStartEnd::UGS_ANS_ComboStartEnd()
+{
+}
+
+void UGS_ANS_ComboStartEnd::NotifyBegin(USkeletalMeshComponent* MeshComp,
+										UAnimSequenceBase* Animation,
+										float TotalDuration,
+										const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
-	AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(MeshComp->GetOwner());
-	if (IsValid(Drakhar))
+	if (MeshComp && MeshComp->GetOwner())
 	{
-		Drakhar->bIsAttacking = true;
+		// Toggle attacking flag for Drakhar
+		if (AGS_Drakhar* Guardian = Cast<AGS_Drakhar>(MeshComp->GetOwner()))
+		{
+			Guardian->bIsAttacking = true;
+		}
 	}
 }
 
-void UGS_ANS_ComboStartEnd::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+void UGS_ANS_ComboStartEnd::NotifyEnd(USkeletalMeshComponent* MeshComp,
+									  UAnimSequenceBase* Animation,
+									  const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
-	AGS_Drakhar* Drakhar = Cast<AGS_Drakhar>(MeshComp->GetOwner());
-	if (IsValid(Drakhar))
+	if (MeshComp && MeshComp->GetOwner())
 	{
-		Drakhar->bIsAttacking = false;
+		// Reset attacking flag for Drakhar
+		if (AGS_Drakhar* Guardian = Cast<AGS_Drakhar>(MeshComp->GetOwner()))
+		{
+			Guardian->bIsAttacking = false;
+		}
 	}
 }

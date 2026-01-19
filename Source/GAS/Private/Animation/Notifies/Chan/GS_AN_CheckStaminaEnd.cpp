@@ -1,22 +1,27 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_CheckStaminaEnd.h"
 #include "Character/Player/Seeker/GS_Chan.h"
-#include "Character/Skill/Seeker/Chan/GS_ChanAimingSkill.h"
-#include "Animation/Character/GS_SeekerAnimInstance.h"
 
-void UGS_AN_CheckStaminaEnd::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+UGS_AN_CheckStaminaEnd::UGS_AN_CheckStaminaEnd()
+{
+}
+
+void UGS_AN_CheckStaminaEnd::Notify(USkeletalMeshComponent* MeshComp,
+									UAnimSequenceBase* Animation,
+									const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (AGS_Chan* Chan = Cast<AGS_Chan>(MeshComp->GetOwner()))
+	if (MeshComp && MeshComp->GetOwner())
 	{
-		if (Chan->GetCurrentStamina() <= 0)
+		if (AGS_Chan* ChanCharacter = Cast<AGS_Chan>(MeshComp->GetOwner()))
 		{
-			Chan->ToIdle();
+			// Check if stamina is fully depleted and reset state if necessary
+			if (ChanCharacter->GetCurrentStaminaValue() <= 0.0f)
+			{
+				ChanCharacter->TransitionToIdle();
+			}
 		}
 	}
-	
 }

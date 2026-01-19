@@ -1,194 +1,173 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Character/Player/Seeker/GS_Chan.h"
 #include "Character/Component/Seeker/GS_ChanSkillInputHandlerComp.h"
-#include "Sound/GS_SeekerAudioComponent.h"
 #include "Character/Component/GS_StatComp.h"
-#include "Weapon/Equipable/GS_WeaponAxe.h"
-#include "Weapon/Equipable/GS_WeaponShield.h"
-#include "Weapon/GS_Weapon.h"
-#include "Net/UnrealNetwork.h"
-#include "UI/Character/GS_ChanAimingSkillBar.h"
-#include "Animation/Character/GS_SeekerAnimInstance.h"
-/*#include "Character/GS_TpsController.h"
-#include "AkComponent.h"
-#include "AkAudioEvent.h"
-#include "AkGameplayStatics.h"
-#include "AkAudioDevice.h"*/
-#include "Animation/Character/Seeker/GS_ChooserInputObj.h"
-#include "Components/CapsuleComponent.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Character/Skill/Seeker/Chan/GS_ChanUltimateSkill.h"
-#include "Engine/DamageEvents.h"
+#include "Weapon/Equipable/GS_WeaponAxe.h"
+#include "Weapon/Equipable/GS_WeaponShield.h"
+#include "Sound/GS_SeekerAudioComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "UI/Character/GS_ChanAimingSkillBar.h"
+#include "Animation/Character/GS_SeekerAnimInstance.h"
+#include "DrawDebugHelpers.h"
+#include "Net/UnrealNetwork.h"
 
-
-// Sets default values
 AGS_Chan::AGS_Chan()
 {
-	// Tick 활성화 가능하되, 시작 시 비활성화 (시점 전환 보간 시에만 활성화)
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	CharacterType = ECharacterType::Chan;
-	SkillInputHandlerComponent = CreateDefaultSubobject<UGS_ChanSkillInputHandlerComp>(TEXT("SkillInputHandlerComp"));
 
+	// Create defensive skill handler and overlap collision
+	SkillInputHandlerComponent = CreateDefaultSubobject<UGS_ChanSkillInputHandlerComp>(TEXT("SkillInputHandlerComp"));
 	UltimateCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("UltimateCollision"));
 	UltimateCollision->SetupAttachment(GetRootComponent());
-	UltimateCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	UltimateCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-	UltimateCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	UltimateCollision->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
-	UltimateCollision->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
-	UltimateCollision->SetGenerateOverlapEvents(true);
 
-	// KeyManual에서 쓰일 캐릭터 타입 저장
-	ManualRowName = FName("Chan");
-
-	// 타격 보정 설정 (찬: 짧은 사거리, 넓은 유도각)
+	// Default target magnetism (short range, wide angle for axe swings)
 	MagnetismDistance = 350.0f;
 	MagnetismAngle = 75.0f;
+
+	ManualRowName = FName("Chan");
 }
 
-void AGS_Chan::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AGS_Chan, bIsDefending);
-}
-
-void AGS_Chan::ResetCurrentStamina()
-{
-	CurrentStamina = MaxStamina;
-}
-
-void AGS_Chan::SetCurrentStamina(float NewValue, bool bByDamage)
-{
-	CurrentStamina = FMath::Clamp(NewValue, 0.f, MaxStamina);
-	Client_UpdateChanAimingSkillBar(CurrentStamina / MaxStamina);
-
-	// 스테미나가 다 떨어지면 애니메이션 설정 후 Deactive
-	if (HasAuthority())
-	{
-		if (CurrentStamina <= 0.f && SkillComp) // 직전 값 기준 체크
-		{
-			OnStaminaDepleted.Broadcast(bByDamage);
-			SkillComp->Server_TryDeactiveSkill(ESkillSlot::Ready);
-		}
-	}
-}
-
-void AGS_Chan::DrainStaminaTick()
-{
-	SetCurrentStamina(CurrentStamina - StaminaDrainRate * 0.1f, false);
-}
-
-void AGS_Chan::RegenStaminaTick()
-{
-	SetCurrentStamina(CurrentStamina + StaminaRegenRate * 0.1f, false);
-	if (CurrentStamina >= MaxStamina)
-	{
-		GetWorldTimerManager().ClearTimer(StaminaHandle);
-	}
-}
-
-// Called when the game starts or when spawned
 void AGS_Chan::BeginPlay()
 {
 	Super::BeginPlay();
 
 	SetReplicateMovement(true);
-	GetMesh()->SetIsReplicated(true);
+	if (GetMesh())
+		GetMesh()->SetIsReplicated(true);
 
-	UltimateCollision->OnComponentBeginOverlap.AddDynamic(this, &AGS_Chan::OnUltimateOverlap);
+	// Setup critical/ultimate skill overlap handling
+	UltimateCollision->OnComponentBeginOverlap.AddDynamic(this, &AGS_Chan::HandleUltimateOverlap);
 
 	CurrentStamina = MaxStamina;
-	MaxHealth = GetStatComp()->GetMaxHealth();
+	if (UGS_StatComp* StatComponent = GetStatComp())
+	{
+		BaseMaxHealth = StatComponent->GetMaxHealth();
+	}
 }
 
 void AGS_Chan::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorldTimerManager().ClearTimer(StaminaCycleTimerHandle);
 	Super::EndPlay(EndPlayReason);
 }
 
-void AGS_Chan::OnUltimateOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if (UGS_ChanUltimateSkill* Skill = Cast<UGS_ChanUltimateSkill>(
-	        SkillComp->GetSkillFromSkillMap(ESkillSlot::Ultimate)))
-	{
-		Skill->HandleUltimateCollision(OtherActor, OtherComp, SweepResult);
-	}
-}
-
-// Called every frame
 void AGS_Chan::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-// Called to bind functionality to input
-void AGS_Chan::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void AGS_Chan::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AGS_Chan, bIsDefending);
+	DOREPLIFETIME(AGS_Chan, CurrentStamina);
+	DOREPLIFETIME(AGS_Chan, MaxStamina);
 }
 
-/*void AGS_Chan::OnComboAttack()
+void AGS_Chan::RestoreStaminaFully()
 {
-	Super::OnComboAttack();	
-}*/
+	CurrentStamina = MaxStamina;
+	Client_UpdateSkillBarProgress(1.0f);
+}
+
+void AGS_Chan::AdjustStamina(float NewValue, bool bTriggeredByDamage)
+{
+	CurrentStamina = FMath::Clamp(NewValue, 0.0f, MaxStamina);
+	Client_UpdateSkillBarProgress(CurrentStamina / MaxStamina);
+
+	// Fire events if stamina is fully depleted
+	if (HasAuthority() && CurrentStamina <= SMALL_NUMBER)
+	{
+		OnStaminaDepleted.Broadcast(bTriggeredByDamage);
+		// Force deactivate defensive/aiming skills on depletion
+		if (UGS_SkillComp* SkillComponent = GetSkillComp())
+		{
+			SkillComponent->Server_TryDeactiveSkill(ESkillSlot::Ready);
+		}
+	}
+}
+
+void AGS_Chan::ProcessStaminaDrain()
+{
+	AdjustStamina(CurrentStamina - (StaminaDrainPerTick * 0.1f), false);
+}
+
+void AGS_Chan::ProcessStaminaRegen()
+{
+	AdjustStamina(CurrentStamina + (StaminaRegenPerTick * 0.1f), false);
+	if (CurrentStamina >= MaxStamina)
+	{
+		GetWorldTimerManager().ClearTimer(StaminaCycleTimerHandle);
+	}
+}
+
+void AGS_Chan::HandleUltimateOverlap(UPrimitiveComponent* OverlappedComp,
+									 AActor* OtherActor,
+									 UPrimitiveComponent* OtherComp,
+									 int32 OtherBodyIndex,
+									 bool bFromSweep,
+									 const FHitResult& SweepResult)
+{
+	if (SkillComp)
+	{
+		if (UGS_ChanUltimateSkill* UltimateSkill =
+				Cast<UGS_ChanUltimateSkill>(SkillComp->GetSkillFromSkillMap(ESkillSlot::Ultimate)))
+		{
+			UltimateSkill->HandleUltimateCollision(OtherActor, OtherComp, SweepResult);
+		}
+	}
+}
 
 void AGS_Chan::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 {
 	Super::MulticastPlayComboSection_Implementation(ComboIndex);
 
-	// 오디오 컴포넌트를 통해 찬 전용 콤보 공격 사운드 재생 (1-based 인덱스 전달)
 	if (SeekerAudioComponent)
 	{
 		SeekerAudioComponent->PlayChanComboAttackSound(ComboIndex + 1);
 	}
 }
 
-void AGS_Chan::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
+void AGS_Chan::Multicast_HandleAttackHitEffects_Implementation(int32 ComboIndex)
 {
-	// 4번째 공격일 때 특별한 사운드 재생
+	// Trigger specialized audio for the 4th combo hit (axe slam)
 	if (ComboIndex == 4 && SeekerAudioComponent)
 	{
 		SeekerAudioComponent->PlayChanFinalAttackSound();
 	}
 
-	// 조작감 개선: 콤보 인덱스별 차별화된 타격 정지(Hit-stop) 적용
-	// 멀티플레이 유의: 공격 흐름을 방해하지 않도록 시간을 이전보다 대폭 단축 (0.12 -> 0.05)
-	float BaseDuration = 0.05f;
-	float FinalDuration = BaseDuration;
-
+	// Calculate hit-stop duration: heavier finishers result in longer pauses
+	float BasePause = 0.05f;
 	if (ComboIndex == 4)
 	{
-		FinalDuration = 0.09f; // 피니셔: 짧고 강렬하게 강조
+		BasePause = 0.09f;
 	}
 	else
 	{
-		// 콤보 진행에 따른 점진적 강화 (최대 1.2배)
-		float Scale = 1.0f + (FMath::Min(2, FMath::Max(0, ComboIndex - 1)) * 0.1f);
-		FinalDuration = BaseDuration * Scale;
+		// Progressive pausing intensity
+		BasePause *= (1.0f + (FMath::Clamp(ComboIndex - 1, 0, 2) * 0.1f));
 	}
 
-	Multicast_ApplyHitStop(FinalDuration, 0.0f, true);
+	Multicast_ApplyHitStop(BasePause, 0.0f, true);
 
-	// 공격 성공 시 공격자에게 카메라 쉐이크 적용 (Chan 전용)
+	// Locally apply screen shake on the attacker's client
 	if (HasAuthority())
 	{
 		if (APlayerController* AttackerPC = Cast<APlayerController>(GetController()))
 		{
-			// 4번째 공격(마지막 공격)은 더 강한 쉐이크 적용
 			if (ComboIndex == 4)
 			{
-				// 강한 공격 성공 쉐이크 (마지막 콤보)
-				FGS_CameraShakeInfo StrongAttackShake = AttackSuccessShake;
-				StrongAttackShake.Intensity *= 1.5f; // 강도 1.5배 증가
-				Client_PlayAttackSuccessShakeWithInfo(AttackerPC, StrongAttackShake);
+				FGS_CameraShakeInfo HeavyShake = AttackSuccessShake;
+				HeavyShake.Intensity *= 1.5f;
+				Client_PlayAttackSuccessShakeWithInfo(AttackerPC, HeavyShake);
 			}
 			else
 			{
-				// 일반 공격 성공 쉐이크
 				Client_PlayAttackSuccessShake(AttackerPC);
 			}
 		}
@@ -197,44 +176,33 @@ void AGS_Chan::Multicast_OnAttackHit_Implementation(int32 ComboIndex)
 
 void AGS_Chan::OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult)
 {
-	// 3번째(방패), 4번째(강공격) 공격일 경우 추가 효과(사운드, 카메라 쉐이크 등) 처리
+	// Hits 3 (Shield) and 4 (Axe Slam) generate special visual and physical feedback
 	if (ComboIndex == 3 || ComboIndex == 4)
 	{
-		// 추가 타격 처리 (사운드, 카메라 쉐이크, 히트스탑 포함)
-		Multicast_OnAttackHit(ComboIndex);
+		Multicast_HandleAttackHitEffects(ComboIndex);
 
-		// 4번째 공격일 경우에만 전용 특수 VFX(강화 타격) 재생
-		if (ComboIndex == 4 && FinalAttackHitVFX)
+		if (ComboIndex == 4 && FinisherHitVFX)
 		{
-			if (AGS_Weapon* CurrentWeapon = GetWeaponByIndex(0))
+			if (AGS_Weapon* ActiveWeapon = GetWeaponByIndex(0))
 			{
-				CurrentWeapon->Multicast_PlaySpecialHitVFX(FinalAttackHitVFX, HitResult);
+				ActiveWeapon->Multicast_PlaySpecialHitVFX(FinisherHitVFX, HitResult);
 			}
 		}
 	}
 }
 
-void AGS_Chan::OnJumpAttackSkill()
+void AGS_Chan::HandleJumpAttackSkillStart()
 {
-	/*if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
-	{
-		AnimInstance->IsPlayingFullBodyMontage = true;
-	}*/
 	Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 }
 
-void AGS_Chan::OffJumpAttackSkill()
+void AGS_Chan::HandleJumpAttackSkillEnd()
 {
-	/*if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
-	{
-		AnimInstance->IsPlayingFullBodyMontage = false;
-		
-	}*/
 	Multicast_SetMontageSlot(ESeekerMontageSlot::None);
 	StopAnimMontage();
 }
 
-void AGS_Chan::ToIdle()
+void AGS_Chan::TransitionToIdle()
 {
 	Multicast_StopSkillMontage(GetCurrentMontage());
 	Multicast_SetMontageSlot(ESeekerMontageSlot::None);
@@ -242,192 +210,131 @@ void AGS_Chan::ToIdle()
 	SetLookControlValue(true, true);
 }
 
-void AGS_Chan::Client_UpdateChanAimingSkillBar_Implementation(float Stamina)
+float AGS_Chan::TakeDamage(float DamageAmount,
+						   struct FDamageEvent const& DamageEvent,
+						   class AController* EventInstigator,
+						   AActor* DamageCauser)
 {
-	if (ChanAimingSkillBarWidget)
-	{
-		ChanAimingSkillBarWidget->SetAimingProgress(Stamina);
-	}
-}
-
-void AGS_Chan::Client_UpdateChanAimingSkillBarDealy_Implementation(float Stamina)
-{
-	if (ChanAimingSkillBarWidget)
-	{
-		ChanAimingSkillBarWidget->SetAimingProgressByDamage(Stamina);
-	}
-}
-
-void AGS_Chan::Client_ChanAimingSkillBar_Implementation(bool bShow)
-{
-	if (ChanAimingSkillBarWidget)
-	{
-		ChanAimingSkillBarWidget->ShowSkillBar(bShow);
-	}
-}
-
-void AGS_Chan::Multicast_DrawSkillRange_Implementation(FVector InLocation, float InRadius, FColor InColor, float InLifetime)
-{
-	/*DrawDebugSphere(
-		GetWorld(),
-		InLocation,
-		InRadius,
-		16,
-		InColor,
-		false,
-		InLifetime
-	);*/
-}
-
-float AGS_Chan::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
-{
-	float ActualDamage = DamageAmount;
-
-	// 방어 상태일 때는 스테미나 감소 (피격 애니메이션 방지)
+	// If currently blocking, mitigate damage and drain stamina instead of playing hit reactions
 	if (bIsDefending)
 	{
-		// 방어 성공 시 데미지 0으로 설정하여 피격 애니메이션 방지
-		ActualDamage = 0.0f;
-
-		// 스테미나 감소
-		if (MaxHealth > 0.f)
+		// Convert health damage to stamina damage
+		if (BaseMaxHealth > SMALL_NUMBER)
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("Stamina Damage In"));
-			float StaminaDamage = DamageAmount * (MaxStamina / MaxHealth);
-			SetCurrentStamina(CurrentStamina - StaminaDamage, true);
+			float StaminaCost = DamageAmount * (MaxStamina / BaseMaxHealth);
+			AdjustStamina(CurrentStamina - StaminaCost, true);
 		}
 
-		// === 물리 충돌이 없는 공격(거리 기반 판정 등)에 대한 방어 효과 수동 호출 ===
+		// Visually trigger defense effects on the shield
 		for (int32 i = 0; i < 5; ++i)
 		{
 			if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
 			{
-				FHitResult HitResult;
-				// 히트 정보가 있으면 사용하고, 없으면 방패 앞 임의의 지점 생성
-				HitResult.ImpactPoint = Shield->GetActorLocation() + Shield->GetActorForwardVector() * 50.0f;
-				HitResult.ImpactNormal = -Shield->GetActorForwardVector();
-
-				Shield->PlayDefenseEffects(DamageCauser, HitResult);
+				FHitResult BlockHit;
+				BlockHit.ImpactPoint = Shield->GetActorLocation() + (Shield->GetActorForwardVector() * 50.0f);
+				BlockHit.ImpactNormal = -Shield->GetActorForwardVector();
+				Shield->PlayDefenseEffects(DamageCauser, BlockHit);
 				break;
 			}
 		}
-	}
-	else
-	{
-		// 방어 상태가 아닐 때만 부모 클래스의 TakeDamage 호출
-		ActualDamage = Super::TakeDamage(ActualDamage, DamageEvent, EventInstigator, DamageCauser);
+
+		// Full absorption: no HP damage is taken while blocking
+		return 0.0f;
 	}
 
-	return ActualDamage;
+	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 }
 
-void AGS_Chan::SetDefending(bool bDefending)
+void AGS_Chan::SetDefending(bool bEnabled)
 {
-	if (HasAuthority())
+	if (!HasAuthority() || bIsDefending == bEnabled)
 	{
-		if (bIsDefending == bDefending)
-			return;
+		return;
+	}
 
-		bIsDefending = bDefending;
+	bIsDefending = bEnabled;
+	GetWorldTimerManager().ClearTimer(StaminaCycleTimerHandle);
 
-		GetWorldTimerManager().ClearTimer(StaminaHandle);
-
-		// 방패의 방어용 콜리전 제어
-		for (int32 i = 0; i < 5; ++i)
+	// Sycnronize shield collision states
+	for (int32 i = 0; i < 5; ++i)
+	{
+		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
 		{
-			if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
+			if (bIsDefending)
 			{
-				if (bDefending)
-				{
-					// 방어 시작 - 방어용 콜리전 활성화
-					Shield->ServerEnableDefenseHit();
-
-					// 스테미나 감소
-					GetWorldTimerManager().SetTimer(StaminaHandle, this, &AGS_Chan::DrainStaminaTick, 0.05f, true);
-				}
-				else
-				{
-					// 방어 해제 - 방어용 콜리전 비활성화
-					Shield->ServerDisableDefenseHit();
-
-					GetWorldTimerManager().SetTimer(StaminaHandle, this, &AGS_Chan::RegenStaminaTick, 0.05f, true);
-				}
-				break;
+				Shield->ServerEnableDefenseHit();
+				// Start periodic stamina drain while shield is up
+				GetWorldTimerManager().SetTimer(
+					StaminaCycleTimerHandle, this, &AGS_Chan::ProcessStaminaDrain, 0.05f, true);
 			}
-		}
-
-		// 방어 상태에 따른 애니메이션 변경 (나중에 구현)
-		if (bDefending)
-		{
-			// 방어 애니메이션 재생
-			// Multicast_PlayDefenseAnimation();
-		}
-		else
-		{
-			// 기본 애니메이션으로 복귀
-			// Multicast_StopDefenseAnimation();
+			else
+			{
+				Shield->ServerDisableDefenseHit();
+				// Switch to stamina regeneration mode
+				GetWorldTimerManager().SetTimer(
+					StaminaCycleTimerHandle, this, &AGS_Chan::ProcessStaminaRegen, 0.05f, true);
+			}
+			break;
 		}
 	}
 }
 
 void AGS_Chan::OnRep_IsDefending()
 {
-	// 방어 상태 변경 시 UI 업데이트 등 (나중에 구현)
-	if (bIsDefending)
-	{
-		// 방어 UI 표시
-		// ShowDefenseUI(true);
-	}
-	else
-	{
-		// 방어 UI 숨기기
-		// ShowDefenseUI(false);
-	}
+	// Additional UI/Visual logic when defense state replicates to clients can be placed here
 }
 
-bool AGS_Chan::IsHitInShieldDefenseArea(const FVector& HitLocation) const
+bool AGS_Chan::ValidateBlockDetection(const FVector& ImpactLocation) const
 {
-	// 방패를 찾아서 방어 영역 확인
+	// Find the shield and check if the impact is within its effective protection arc
 	for (int32 i = 0; i < 5; ++i)
 	{
 		if (AGS_WeaponShield* Shield = Cast<AGS_WeaponShield>(GetWeaponByIndex(i)))
 		{
 			if (Shield && Shield->DefenseHitBox)
 			{
-				// 방패의 월드 위치와 방어용 콜리전 크기 가져오기
-				FVector ShieldLocation = Shield->GetActorLocation();
-				FVector ShieldForward = Shield->GetActorForwardVector();
+				const FVector ToImpact = (ImpactLocation - Shield->GetActorLocation()).GetSafeNormal();
+				const float Alignment = FVector::DotProduct(Shield->GetActorForwardVector(), ToImpact);
 
-				// 방패 방어 영역 계산 (방패 앞쪽 반구형 영역)
-				const float DefenseRadius = 200.0f; // 방패 방어 반경
-				const float DefenseAngle = 120.0f; // 방패 방어 각도 (도)
-
-				// 타격 지점과 방패 사이의 거리 계산
-				FVector ToHit = HitLocation - ShieldLocation;
-				float Distance = ToHit.Size();
-
-				// 거리가 방어 반경을 벗어나면 방어 불가
-				if (Distance > DefenseRadius)
-				{
-					return false;
-				}
-
-				// 타격 지점이 방패 앞쪽에 있는지 확인 (각도 체크)
-				ToHit.Normalize();
-				float DotProduct = FVector::DotProduct(ShieldForward, ToHit);
-				float AngleInRadians = FMath::Acos(DotProduct);
-				float AngleInDegrees = FMath::RadiansToDegrees(AngleInRadians);
-
-				// 방어 각도 내에 있으면 방어 가능
-				if (AngleInDegrees <= DefenseAngle * 0.5f)
-				{
-					return true;
-				}
+				// Accept blocks within a ~120 degree frontal arc
+				const float BlockArcThreshold = FMath::Cos(FMath::DegreesToRadians(60.0f));
+				return (Alignment >= BlockArcThreshold);
 			}
 			break;
 		}
 	}
-
-	// 방패를 찾지 못했거나 방어 영역 밖이면 방어 불가
 	return false;
+}
+
+void AGS_Chan::Client_UpdateSkillBarProgress_Implementation(float NormalizedValue)
+{
+	if (LinkedSkillBarWidget)
+		LinkedSkillBarWidget->SetAimingProgress(NormalizedValue);
+}
+
+void AGS_Chan::Client_UpdateSkillBarDamageFlash_Implementation(float NormalizedValue)
+{
+	if (LinkedSkillBarWidget)
+		LinkedSkillBarWidget->SetAimingProgressByDamage(NormalizedValue);
+}
+
+void AGS_Chan::Client_SetSkillBarVisibility_Implementation(bool bIsVisible)
+{
+	if (LinkedSkillBarWidget)
+		LinkedSkillBarWidget->ShowSkillBar(bIsVisible);
+}
+
+void AGS_Chan::Multicast_DrawSkillRange_Implementation(FVector Center, float Radius, FColor Color, float Duration)
+{
+	// Debug visualization for skill range - draws a circle on the ground
+	if (GetWorld())
+	{
+		DrawDebugCircle(GetWorld(), Center, Radius, 32, Color, false, Duration, 0, 2.0f, FVector(0, 1, 0), FVector(1, 0, 0));
+	}
+}
+
+void AGS_Chan::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	// Chan-specific input setup can be added here if needed
 }

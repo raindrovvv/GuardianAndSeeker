@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -9,39 +9,54 @@
 #include "Animation/Character/E_SeekerAnim.h"
 #include "GS_AN_SetState.generated.h"
 
-UCLASS()
+/**
+ * @brief Animation notify to set various character states during an animation.
+ * Allows fine-grained control over movement, gait, combo windows, and skill permissions.
+ */
+UCLASS(BlueprintType, meta = (DisplayName = "GS Set Character State Notify"))
 class GAS_API UGS_AN_SetState : public UAnimNotify
 {
 	GENERATED_BODY()
 
 public:
-	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
+	UGS_AN_SetState();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ESeekerMontageSlot SeekerSlot = ESeekerMontageSlot::End;
+	virtual void Notify(USkeletalMeshComponent* MeshComp,
+						UAnimSequenceBase* Animation,
+						const FAnimNotifyEventReference& EventReference) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bCanChangeSeekerGait;
+	/** Update the active montage slot for the seeker */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State|Animation")
+	ESeekerMontageSlot TargetMontageSlot = ESeekerMontageSlot::End;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bCanAcceptComboInput;
+	/** Whether the character can switch their gait (Walk/Run/Sprint) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State|Movement")
+	bool bAllowGaitChange = true;
 
-	UPROPERTY(EditAnywhere)
-	bool bUseControlValue = false;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition="bUseControlValue"))
-	FControlValue ControlValue;
+	/** Whether the character can accept next combo inputs */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State|Combat")
+	bool bAllowComboInput = true;
 
-	UPROPERTY(EditAnywhere)
-	bool bChangeSeekerGait = false;
+	/** If true, explicitly set movement/look control values using ControlSettings */
+	UPROPERTY(EditAnywhere, Category = "State|Control")
+	bool bOverrideControlValues = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition="bChangeSeekerGait"))
-	EGait Gait = EGait::Walk;
+	/** New control values to apply if bOverrideControlValues is true */
+	UPROPERTY(EditAnywhere,
+			  BlueprintReadWrite,
+			  Category = "State|Control",
+			  meta = (EditCondition = "bOverrideControlValues"))
+	FControlValue ControlSettings;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bCanResetAllowedSkills = false;
+	/** If true, change the character's gait to NewGait */
+	UPROPERTY(EditAnywhere, Category = "State|Movement")
+	bool bApplyNewGait = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition="bCanResetAllowedSkills"))
-	bool bResetAllowedSkills;
+	/** The new gait to apply if bApplyNewGait is true */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State|Movement", meta = (EditCondition = "bApplyNewGait"))
+	EGait NewGait = EGait::Walk;
+
+	/** If true, reset the allowed skills mask to default */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State|Skills")
+	bool bTriggerSkillReset = false;
 };
-

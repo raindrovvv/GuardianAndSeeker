@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2024 Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -18,6 +18,9 @@ class UGS_ReviveIndicatorWidget;
 class IGS_InteractableInterface;
 class UGS_InteractionWidget;
 
+/**
+ * @brief Third-person player controller for the Seeker team, managing movement, combat input, revival, and interaction.
+ */
 UCLASS()
 class GAS_API AGS_TpsController : public AGS_BasePlayerController
 {
@@ -26,48 +29,63 @@ class GAS_API AGS_TpsController : public AGS_BasePlayerController
 public:
 	AGS_TpsController();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputMappingContext* InputMappingContext;
+	/** --- Input Actions --- */
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* MoveAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputMappingContext> InputMappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* LookAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> MoveAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* WalkToggleAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> LookAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* PlaceMarkerAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> WalkToggleAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* RClickAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> PlaceMarkerAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* PageUpAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> RClickAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
-	UInputAction* PageDownAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> PageUpAction;
 
-	// ==========================================
-	// 빈사 플레이어 구조 시스템
-	// ==========================================
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input|Revive")
-	UInputAction* ReviveAction;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input")
+	TObjectPtr<UInputAction> PageDownAction;
 
+	/** Action for reviving downed teammates (default: E key) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Input|Revive")
+	TObjectPtr<UInputAction> ReviveAction;
+
+
+	/** --- UI Management --- */
+
+	/** Active instance of the player's main HUD/Overlay widget */
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PlayerWidgetInstance;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	/** Mapping of character types to their specific HUD widget classes */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|UI")
 	TMap<ECharacterType, TSubclassOf<UUserWidget>> PlayerWidgetClasses;
 
-	UFUNCTION(BlueprintCallable)
+	/** @return The active player HUD widget instance */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|UI")
 	UUserWidget* GetPlayerWidget();
 
-	UFUNCTION(BlueprintCallable, Category = "Audio")
+	/** Initializes or updates the player HUD based on the current pawn's character type */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|UI")
+	void InitializePlayerHUD();
+
+
+	/** --- System Logic --- */
+
+	/** Sets up the local audio listener to follow the player pawn */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|Audio")
 	void SetupPlayerAudioListener();
 
+	/** Input handlers */
 	void Move(const FInputActionValue& InputValue);
 	void Look(const FInputActionValue& InputValue);
 	void WalkToggle(const FInputActionValue& InputValue);
@@ -75,19 +93,21 @@ public:
 	void PageUp(const FInputActionValue& InputValue);
 	void PageDown(const FInputActionValue& InputValue);
 
+	/** Global initialization per level load */
 	void InitControllerPerWorld();
 
-	//[Spectate Other Player]
+	/** Requests to spectate a different surviving teammate on the server */
 	UFUNCTION(Server, Unreliable)
 	void ServerRPCSpectatePlayer(int32 Step = 1);
 
-	/** 관전 모드 진입 시 UI 처리를 위한 클라이언트 RPC */
+	/** Triggered on clients when they enter spectator mode to update UI visibility */
 	UFUNCTION(Client, Reliable)
 	void ClientRPC_OnSpectatorModeStarted();
 
-	/** 현재 관전 중인 플레이어 인덱스 */
+	/** Index of the player currently being spectated */
 	int32 SpectatorIndex = -1;
 
+	/** Movement and look restriction control */
 	UFUNCTION()
 	FControlValue GetControlValue() const;
 
@@ -100,100 +120,122 @@ public:
 	UFUNCTION()
 	void SetLookControlValue(bool CanLookRight, bool CanLookUp);
 
-	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Control")
+	/** Active movement/look permissions, replicated for server authority */
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Seeker|Control")
 	FControlValue ControlValues;
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
+	/** Stores the rotation state when movement started for interpolation or snapping */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|Control")
 	FRotator LastRotatorInMoving;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Control")
+	/** Current raw movement input vector, throttled and replicated */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Seeker|Control")
 	FVector2D MoveInputValue;
 
+	/** Synchronizes high-frequency movement input to the server */
 	UFUNCTION(Server, Unreliable)
 	void Server_CacheMoveInputValue(FVector2D InputValue);
 
-	UFUNCTION(BlueprintCallable)
-	void TestFunction();
-
-	//마우스 민감도 관련 함수
-	UFUNCTION(BlueprintCallable, Category = "Settings")
+	/** @return The current effective mouse sensitivity from settings */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|Settings")
 	float GetCurrentMouseSensitivity() const;
 
-	//메르시 크로스헤어 위젯
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	UGS_CrossHairImage* GetCrosshairWidget() const { return CrosshairWidget; }
+	/** @return The crosshair widget if valid (primary used by Seeker class "Merci") */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|UI")
+	UGS_CrossHairImage* GetCrosshairWidget() const
+	{
+		return CrosshairWidget;
+	}
 
-	// Auto Moving (KCY)
+
+	/** --- Movement Skills --- */
+
+	/** Initiates automated forward movement (e.g., during a charge skill) */
 	void StartAutoMoveForward();
+
+	/** Terminates automated forward movement */
 	void StopAutoMoveForward();
 
-	// Pawn 유효성 검사를 위한 타이머 및 함수 추가
-	void TryCreatingPlayerWidget();
-	FTimerHandle WaitForPawnTimerHandle;
-
-	// Debug
-	UFUNCTION(Client, Unreliable)
-	void Client_DrawAimAssistDebug(const FVector& Start, const FVector& End, const FVector& TargetLocation, float Duration); // SJE
-
+	/** Sets the auto-movement state on the server */
 	void SetIsAutoMoving(bool InIsAutoMoving);
 
-	// ==========================================
-	// 빈사 플레이어 구조 시스템
-	// ==========================================
+	/** --- Debugging --- */
 
-	/** E키 누름 - 구조 시작 시도 */
+	/** Renders aim-assist debug visuals on the local client */
+	UFUNCTION(Client, Unreliable)
+	void
+	Client_DrawAimAssistDebug(const FVector& Start, const FVector& End, const FVector& TargetLocation, float Duration);
+
+
+	/** --- Revival System --- */
+
+	/** Attempt to start reviving a downed teammate */
 	void TryStartRevive(const FInputActionValue& InputValue);
 
-	/** E키 떼기 - 구조 취소 */
+	/** Stop reviving attempt (e.g., key released or target moved) */
 	void StopRevive(const FInputActionValue& InputValue);
 
-	/** 현재 구조 중인지 확인 */
-	UFUNCTION(BlueprintPure, Category = "Revive")
-	bool IsReviving() const { return bIsReviving; }
+	/** @return Whether the controller is currently in a reviving state */
+	UFUNCTION(BlueprintPure, Category = "Seeker|Revive")
+	bool IsReviving() const
+	{
+		return bIsReviving;
+	}
 
-	/** E키를 누르고 있는지 확인 */
-	UFUNCTION(BlueprintPure, Category = "Revive")
-	bool IsHoldingReviveKey() const { return bIsHoldingReviveKey; }
+	/** @return Whether the revive input key is currently held down */
+	UFUNCTION(BlueprintPure, Category = "Seeker|Revive")
+	bool IsHoldingReviveKey() const
+	{
+		return bIsHoldingReviveKey;
+	}
 
-	/** 현재 구조 대상 확인 */
-	UFUNCTION(BlueprintPure, Category = "Revive")
-	AGS_Seeker* GetReviveTarget() const { return ReviveTarget.Get(); }
+	/** @return The current target teammate being revived */
+	UFUNCTION(BlueprintPure, Category = "Seeker|Revive")
+	AGS_Seeker* GetReviveTarget() const
+	{
+		return ReviveTarget.Get();
+	}
 
-	/** 구조 시작 서버 RPC */
-	UFUNCTION(Server, Reliable, Category = "Revive")
+	/** Notifies the server to begin health restoration on a target */
+	UFUNCTION(Server, Reliable, Category = "Seeker|Revive")
 	void Server_RequestRevive(AGS_Seeker* Target);
 
-	/** 구조 취소 서버 RPC */
-	UFUNCTION(Server, Reliable, Category = "Revive")
+	/** Notifies the server to abort the current revive operation */
+	UFUNCTION(Server, Reliable, Category = "Seeker|Revive")
 	void Server_CancelRevive();
 
-	/** E키 홀드 상태 서버로 전달 */
-	UFUNCTION(Server, Unreliable, Category = "Revive")
+	/** Synchronizes revive key hold state for server-side logic validation */
+	UFUNCTION(Server, Unreliable, Category = "Seeker|Revive")
 	void Server_SetHoldingReviveKey(bool bIsHolding);
 
-	// ==========================================
-	// 일반 상호작용 시스템 (IInteractable)
-	// ==========================================
 
-	/** 근처 상호작용 가능 액터 찾기 (캐싱됨) */
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	AActor* GetNearbyInteractable() const { return CachedInteractable.Get(); }
+	/** --- Interaction System --- */
 
-	/** 현재 상호작용 중인지 확인 */
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	bool IsInteracting() const { return bIsInteracting; }
+	/** @return The closest interactable actor detected recently */
+	UFUNCTION(BlueprintCallable, Category = "Seeker|Interaction")
+	AActor* GetNearbyInteractable() const
+	{
+		return CachedInteractable.Get();
+	}
 
-	/** 상호작용 진행률 (0.0 ~ 1.0) */
-	UFUNCTION(BlueprintPure, Category = "Interaction")
+	/** @return Whether the player is currently performing an interaction */
+	UFUNCTION(BlueprintPure, Category = "Seeker|Interaction")
+	bool IsInteracting() const
+	{
+		return bIsInteracting;
+	}
+
+	/** @return Current interaction progress normalized (0.0 to 1.0) */
+	UFUNCTION(BlueprintPure, Category = "Seeker|Interaction")
 	float GetInteractionProgress() const;
 
-	/** 상호작용 완료 서버 RPC */
-	UFUNCTION(Server, Reliable, Category = "Interaction")
+	/** Signals interaction completion to the server for validation/rewards */
+	UFUNCTION(Server, Reliable, Category = "Seeker|Interaction")
 	void Server_CompleteInteraction(AActor* Target);
 
-	/** 상호작용 가능 대상 감지 (오버랩 기반) */
+	/** Scans the vicinity for interactable objects based on priority */
 	void UpdateNearbyInteractable();
 
 protected:
@@ -204,90 +246,100 @@ protected:
 	virtual void BeginPlayingState() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	//게임 인스턴스 참조
-	UPROPERTY(BlueprintReadOnly, Category = "Settings")
-	UGS_GameInstance* GameInstance;
+	/** Cached reference to the global game instance */
+	UPROPERTY(BlueprintReadOnly, Category = "Seeker|Context")
+	TObjectPtr<UGS_GameInstance> GameInstance;
 
-	//메르시 크로스헤어 위젯
-	UPROPERTY(BlueprintReadOnly, Category = "UI")
-	UGS_CrossHairImage* CrosshairWidget;
+	/** Managed crosshair widget for ranged characters */
+	UPROPERTY(BlueprintReadOnly, Category = "Seeker|UI")
+	TObjectPtr<UGS_CrossHairImage> CrosshairWidget;
 
+	/** Aligns the camera rotation with the character's forward vector */
 	void SnapCameraToCharacterYaw();
 
-	/** 근처 빈사 시커 감지 및 위젯 업데이트 (Tick에서 호출) */
+	/** Periodically scans for downed allies and updates HUD visibility markers */
 	void UpdateReviveIndicatorVisibility();
 
 private:
-	// Auto Moving (KCY)
+	/** Timer handles for various periodic updates */
 	FTimerHandle AutoMoveTickHandle;
 	FTimerHandle ReviveIndicatorTimerHandle;
 	FTimerHandle InteractableUpdateTimerHandle;
+	FTimerHandle WaitForPawnTimerHandle;
 
+	/** Whether auto-movement is currently active (replicated) */
 	UPROPERTY(Replicated)
 	bool bIsAutoMoving = false;
 
-	// ==========================================
-	// 빈사 플레이어 구조 시스템 변수들
-	// ==========================================
 
-	/** 현재 구조 중인지 여부 */
+	/** --- Revival Variables --- */
+
+	/** Locally tracked revive state */
 	bool bIsReviving = false;
 
-	/** E키를 누르고 있는지 여부 (서버로 복제됨) */
+	/** Replicated state of the revive key (E) */
 	UPROPERTY(Replicated)
 	bool bIsHoldingReviveKey = false;
 
-	/** 현재 구조 대상 */
+	/** Weak reference to the revive target to prevent lifespan issues */
 	TWeakObjectPtr<AGS_Seeker> ReviveTarget;
 
-	/** 근처에 빈사 시커가 있는지 여부 (위젯 표시 제어) */
+	/** Whether a valid revive target was recently identified in range */
 	bool bNearbyDyingSeekerDetected = false;
 
-	/** 마지막으로 감지된 빈사 시커 */
+	/** Tracking the specific teammate detected for HUD feedback consistency */
 	TWeakObjectPtr<AGS_Seeker> LastDetectedDyingSeeker;
 
-	/** 근처 빈사 상태 시커 찾기 */
+	/** Internal logic to find the best candidate for revival */
 	AGS_Seeker* FindNearbyDyingSeeker() const;
 
-	/** 구조 가능 거리 */
-	UPROPERTY(EditDefaultsOnly, Category = "Revive", meta = (ClampMin = "100.0", ClampMax = "500.0"))
+	/** Max range allowed for starting or maintaining a revival sequence */
+	UPROPERTY(EditDefaultsOnly, Category = "Seeker|Revive", meta = (ClampMin = "100.0", ClampMax = "500.0"))
 	float ReviveDistance = 200.0f;
 
-	/** 구조 표시 위젯 클래스 (BP에서 할당) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Revive", meta = (AllowPrivateAccess = "true"))
+	/** UI Class for displaying revival cues on downed allies */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Seeker|Revive", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UGS_ReviveIndicatorWidget> ReviveIndicatorWidgetClass;
 
-	/** 현재 생성된 구조 표시 위젯 */
+	/** Instance of the revive status widget */
 	UPROPERTY()
-	UGS_ReviveIndicatorWidget* ReviveIndicatorWidget;
+	TObjectPtr<UGS_ReviveIndicatorWidget> ReviveIndicatorWidget;
 
-	/** 상호작용 위젯 클래스 (BP에서 할당) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	/** UI Class for general object interactions */
+	UPROPERTY(EditDefaultsOnly,
+			  BlueprintReadOnly,
+			  Category = "Seeker|Interaction",
+			  meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UGS_InteractionWidget> InteractionWidgetClass;
 
-	/** 현재 생성된 상호작용 위젯 */
+	/** Instance of the interaction feedback widget */
 	UPROPERTY()
-	UGS_InteractionWidget* InteractionWidget;
+	TObjectPtr<UGS_InteractionWidget> InteractionWidget;
 
 
-	/** 이동 입력 Throttling 관련 변수 */
+	/** --- Movement Input Optimization --- */
+
 	FVector2D LastSentMoveInputValue = FVector2D::ZeroVector;
 	float LastMoveInputSentTime = 0.0f;
-	const float MoveInputSendThreshold = 0.05f; // 최소 변화량 임계값
-	const float MoveInputMinSendInterval = 0.033f; // 최소 전송 간격 (약 30fps)
+	const float MoveInputSendThreshold = 0.05f;
+	const float MoveInputMinSendInterval = 0.033f;
 
+	/** Logic update for automated traversal */
 	void AutoMoveTick();
-	void ApplyChargeCameraSettings(bool bCharging);
-	void SaveOriginalCameraSettings();
-	void RestoreOriginalCameraSettings();
 
+	/** RPCs for controlling client-side camera/VFX during auto-move */
 	UFUNCTION(Client, Reliable)
 	void Client_StartAutoMoveForward();
 
 	UFUNCTION(Client, Reliable)
 	void Client_StopAutoMoveForward();
 
-	// 돌진 시 원래 카메라 설정 저장용 (KCY)
+	/** Camera configuration methods */
+	void ApplyChargeCameraSettings(bool bCharging);
+	void SaveOriginalCameraSettings();
+	void RestoreOriginalCameraSettings();
+
+	/** Temporary storage for restoring camera state after skills */
 	bool bOriginalUseControllerRotationYaw = true;
 	bool bOriginalOrientRotationToMovement = false;
 	bool bOriginalUsePawnControlRotation = true;
@@ -295,35 +347,33 @@ private:
 	bool bOriginalEnableCameraRotationLag = true;
 	bool bOriginalInheritYaw = true;
 
-	// ==========================================
-	// 일반 상호작용 시스템 변수들
-	// ==========================================
 
-	/** 현재 상호작용 중인지 여부 */
+	/** --- Interaction Variables --- */
+
+	/** Locally tracked interaction state */
 	bool bIsInteracting = false;
 
-	/** 상호작용 시작 시간 */
+	/** Timestamp of when the current interaction began */
 	float InteractionStartTime = 0.0f;
 
-	/** 상호작용 소요 시간 */
+	/** Required time to hold the interaction for completion */
 	float CurrentInteractionDuration = 0.0f;
 
-	/** 현재 상호작용 대상 (WeakPtr로 안전하게 참조) */
+	/** Targeted actor for the current ongoing interaction */
 	TWeakObjectPtr<AActor> CurrentInteractTarget;
 
-	/** 근처 상호작용 가능 액터 캐싱 (매 Tick 검색 방지) */
+	/** Closest valid interactable actor cached to reduce per-frame overhead */
 	TWeakObjectPtr<AActor> CachedInteractable;
 
-
-	/** 상호작용 시작 */
+	/** Internal flow control for interaction sequence */
 	void StartInteraction(AActor* Target);
-
-	/** 상호작용 취소 */
 	void CancelInteraction();
-
-	/** 상호작용 완료 */
 	void CompleteInteraction();
-
-	/** 상호작용 진행 업데이트 (Tick에서 호출) */
 	void UpdateInteractionProgress(float DeltaTime);
+
+	// Creates and initializes the main HUD based on character type
+	void CreateMainHUD();
+
+	// Waits for pawn to be valid before creating player widget
+	void TryCreatingPlayerWidget();
 };

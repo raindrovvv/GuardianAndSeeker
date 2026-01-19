@@ -235,22 +235,28 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	CanChangeSeekerGait = true;
 	GaitBeforeDying = EGait::Run;
 
-	// Item (hard coding) -> 나중에 SkillSet DataTable 과 같이 ItemSet DataTable 를 가지고 초기화 할 수 있도록 한다. //
-	// SJE
-	UGS_ItemData* ItemData = ObjectInitializer.CreateDefaultSubobject<UGS_ItemData>(this, TEXT("HP_Potion_Data"));
-	ItemData->DisplayName = TEXT("HP_Potion");
-	ItemData->ItemCategory = EItemType::HP_Potion;
-	ItemData->StackLimit = 5;
-	ItemData->CurrentQuantity = 5;
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> FullPotionMesh(
-		TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Full.HP_Potion_Full"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> EmptyPotionMesh(
-		TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Empty.HP_Potion_Empty"));
+	// Initialize default health potion data (to be replaced by DataTable initialization in the future)
+	UGS_ItemData* HealthPotionData =
+		ObjectInitializer.CreateDefaultSubobject<UGS_ItemData>(this, TEXT("HP_Potion_Data"));
+	if (HealthPotionData)
+	{
+		HealthPotionData->DisplayName = TEXT("HP_Potion");
+		HealthPotionData->ItemCategory = EItemType::HP_Potion;
+		HealthPotionData->StackLimit = 5;
+		HealthPotionData->CurrentQuantity = 5;
 
-	ItemData->MeshVariants.Add(FName(TEXT("HP_Potion_Full")), FullPotionMesh.Object);
-	ItemData->MeshVariants.Add(FName(TEXT("HP_Potion_Empty")), EmptyPotionMesh.Object);
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> PotionFullMesh(
+			TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Full.HP_Potion_Full"));
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> PotionEmptyMesh(
+			TEXT("/Game/Props/Item/Stuff/Mesh/HP_Potion_Empty.HP_Potion_Empty"));
 
-	ItemDatas.Add(EItemType::HP_Potion, ItemData);
+		if (PotionFullMesh.Succeeded())
+			HealthPotionData->MeshVariants.Add(FName(TEXT("HP_Potion_Full")), PotionFullMesh.Object);
+		if (PotionEmptyMesh.Succeeded())
+			HealthPotionData->MeshVariants.Add(FName(TEXT("HP_Potion_Empty")), PotionEmptyMesh.Object);
+
+		ItemDatas.Add(EItemType::HP_Potion, HealthPotionData);
+	}
 }
 
 void AGS_Seeker::PossessedBy(AController* NewController)
@@ -435,7 +441,7 @@ void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AGS_Seeker, CanChangeSeekerGait);
 	DOREPLIFETIME(AGS_Seeker, CanAcceptComboInput);
 	DOREPLIFETIME(AGS_Seeker, CurrentComboIndex);
-	DOREPLIFETIME(AGS_Seeker, SeekerState);
+	DOREPLIFETIME(AGS_Seeker, SeekerActionState);
 
 	DOREPLIFETIME(AGS_Seeker, bIsDetectedByGuardian);
 	DOREPLIFETIME(AGS_Seeker, DetectionIntensity);
@@ -521,10 +527,10 @@ void AGS_Seeker::SetAimState(bool IsAim)
 		   Error,
 		   TEXT("[SetAimState] %s - IsAim: %d -> %d (HasAuthority=%d)"),
 		   *GetName(),
-		   SeekerState.IsAim,
+		   SeekerActionState.bIsAiming,
 		   IsAim,
 		   HasAuthority());
-	SeekerState.IsAim = IsAim;
+	SeekerActionState.bIsAiming = IsAim;
 
 	// 시커 오디오 컴포넌트에 조준 상태 변경 알림
 	if (SeekerAudioComponent)
@@ -543,47 +549,48 @@ void AGS_Seeker::SetAimState(bool IsAim)
 
 bool AGS_Seeker::GetAimState()
 {
-	return SeekerState.IsAim;
+	return SeekerActionState.bIsAiming;
 }
 
 void AGS_Seeker::SetDrawState(bool IsDraw)
 {
-	FSeekerState NewState = SeekerState;
-	NewState.IsDraw = IsDraw;
-	SeekerState = NewState;
+	FSeekerActionState NewState = SeekerActionState;
+	NewState.bIsDrawing = IsDraw;
+	SeekerActionState = NewState;
 }
 
 bool AGS_Seeker::GetDrawState()
 {
-	return SeekerState.IsDraw;
+	return SeekerActionState.bIsDrawing;
 }
 
-void AGS_Seeker::Internal_SetSeekerGait(EGait Gait)
+void AGS_Seeker::Internal_SetSeekerGait(EGait NewGait)
 {
-	// 현재 Gait와 같으면 무시
-	if (SeekerGait == Gait)
+	if (SeekerCurrentGait == NewGait)
 	{
 		return;
 	}
 
-	// 빈사 상태인 경우 Crawl 외의 Gait 변경 무시
-	if (bIsInDyingState && Gait != EGait::Crawl)
+	// Restrict gait changes in critical states (e.g., dying)
+	if (bIsInDyingState && NewGait != EGait::Crawl)
 	{
 		return;
 	}
 
-	LastSeekerGait = SeekerGait;
-	SeekerGait = Gait;
+	SeekerPreviousGait = SeekerCurrentGait;
+	SeekerCurrentGait = NewGait;
 
-	if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
+	// Push state to the Chooser Input Object for animation selection
+	if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
-		if (SeekerAnim->ChooserInputObj)
+		if (AnimInstance->ChooserInputObj)
 		{
-			SeekerAnim->ChooserInputObj->Gait = SeekerGait;
+			AnimInstance->ChooserInputObj->Gait = SeekerCurrentGait;
 		}
 	}
 
-	switch (Gait)
+	// Update Character Movement component speed based on the selected gait
+	switch (NewGait)
 	{
 		case EGait::Walk:
 			SetCharacterSpeed(GAIT_SPEED_WALK);
@@ -595,7 +602,7 @@ void AGS_Seeker::Internal_SetSeekerGait(EGait Gait)
 			SetCharacterSpeed(GAIT_SPEED_SPRINT);
 			break;
 		case EGait::Crawl:
-			SetCharacterSpeed(GAIT_SPEED_CRAWL); // 빈사 상태 기어다니기 - 매우 느린 속도
+			SetCharacterSpeed(GAIT_SPEED_CRAWL);
 			break;
 	}
 }
@@ -622,36 +629,30 @@ EGait AGS_Seeker::GetLastSeekerGait()
 
 void AGS_Seeker::StateReset()
 {
-	this->SetAimState(false);
-	this->SetDrawState(false);
+	SetAimState(false);
+	SetDrawState(false);
 
-	if (GetMesh() && GetMesh()->GetAnimInstance())
+	// Clear active animation states
+	Multicast_SetMontageSlot(ESeekerMontageSlot::None);
+
+	// Stop any auto-movement from the controller
+	if (AGS_TpsController* TPSController = Cast<AGS_TpsController>(GetController()))
 	{
-		if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
-		{
-			this->Multicast_SetMontageSlot(ESeekerMontageSlot::None);
-		}
+		TPSController->SetIsAutoMoving(false);
 	}
 
-	if (AController* PlayerController = GetController())
+	// Restore mobility and input processing
+	CanChangeSeekerGait = true;
+	CanAcceptComboInput = true;
+	SetMoveControlValue(true, true);
+	SetLookControlValue(true, true);
+
+	if (UGS_SkillComp* SkillComponent = GetSkillComp())
 	{
-		if (AGS_TpsController* TPSController = Cast<AGS_TpsController>(PlayerController))
-		{
-			TPSController->SetIsAutoMoving(false);
-		}
+		SkillComponent->ResetAllowedSkillsMask();
 	}
 
-	this->CanChangeSeekerGait = true;
-	this->CanAcceptComboInput = true;
-	this->SetMoveControlValue(true, true);
-	this->SetLookControlValue(true, true);
-
-	if (this->GetSkillComp())
-	{
-		this->GetSkillComp()->ResetAllowedSkillsMask();
-	}
-
-	// 무기 히트박스 강제 비활성화 (공격 중 피격/상태 리셋 시 콜리전 잔류 방지)
+	// Safety: Force weapon hitbox recovery if interrupted during an active swing
 	if (Weapon)
 	{
 		if (AGS_WeaponEquipable* WeaponActor = Cast<AGS_WeaponEquipable>(Weapon->GetChildActor()))
@@ -744,7 +745,7 @@ void AGS_Seeker::InitializeCameraManager()
 
 void AGS_Seeker::Server_SetNextComboFlag_Implementation(bool NextCombo)
 {
-	bNextCombo = NextCombo;
+	bHasBufferedNextCombo = NextCombo;
 }
 
 void AGS_Seeker::Server_SetComboInputFlag_Implementation(bool InputCombo)
@@ -756,25 +757,25 @@ void AGS_Seeker::ComboInputOpen()
 {
 	CanAcceptComboInput = true;
 
-	// 입력 버퍼링 처리: 최근에 입력된 기록이 있다면 즉시 다음 공격 실행
+	// Process buffered input if a click was registered within the window
 	if (IsLocallyControlled())
 	{
-		float CurrentTime = GetWorld()->GetTimeSeconds();
-		if (LastInputTime > 0.0f && (CurrentTime - LastInputTime) <= InputBufferWindow)
+		const float CurrentTime = GetWorld()->GetTimeSeconds();
+		if (LastCombatInputTimestamp > 0.0f && (CurrentTime - LastCombatInputTimestamp) <= ComboInputBufferDuration)
 		{
-			// 조작감 개선: 클라이언트에서 즉시 회전 보정 (Prediction)
+			// Immediate local orientation correction
 			PreAttackSnap();
 
-			// 버퍼 소진: 다음 공격 요청
-			Server_OnComboAttack();
-			LastInputTime = -1.0f; // 버퍼 초기화
+			// Trigger buffered attack sequence
+			Server_ExecuteComboAttack();
+			LastCombatInputTimestamp = -1.0f;
 		}
 	}
 
-	// 조작감 개선: 콤보 가능 시점부터는 회피(Rolling)로의 캔슬도 항상 허용
-	if (GetSkillComp())
+	// Allow combo cancellation into mobility skills
+	if (UGS_SkillComp* SkillComponent = GetSkillComp())
 	{
-		GetSkillComp()->AddAllowedSkill(ESkillSlot::Rolling);
+		SkillComponent->AddAllowedSkill(ESkillSlot::Rolling);
 	}
 }
 
@@ -791,7 +792,7 @@ void AGS_Seeker::ComboInputClose()
 
 	if (HasAuthority())
 	{
-		if (bNextCombo)
+		if (bHasBufferedNextCombo)
 		{
 			ServerAttackMontage();
 			Server_SetNextComboFlag(false);
@@ -830,7 +831,7 @@ float AGS_Seeker::TakeDamage(float DamageAmount,
 	return ActualDamage;
 }
 
-void AGS_Seeker::Server_OnComboAttack_Implementation()
+void AGS_Seeker::Server_ExecuteComboAttack_Implementation()
 {
 	// 빈사 상태에서는 공격 불가
 	if (bIsInDyingState)
@@ -843,13 +844,13 @@ void AGS_Seeker::Server_OnComboAttack_Implementation()
 	// → 클라이언트에서 즉각적인 반응을 위해 한 번, 서버에서 정확한 판정과 보안을 위해 다시 검사하는 것은 네트워킹의
 	// 정석.
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, CanAcceptComboInput == false"));
+		UE_LOG(LogTemp, Warning, TEXT("Server_ExecuteComboAttack, CanAcceptComboInput == false"));
 		return;
 	}
 
 	if (!GetSkillComp()->IsSkillAllowed(ESkillSlot::Combo))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Server_OnComboAttack, IsSkillAllowed == false"));
+		UE_LOG(LogTemp, Warning, TEXT("Server_ExecuteComboAttack, IsSkillAllowed == false"));
 		return;
 	}
 
@@ -860,7 +861,7 @@ void AGS_Seeker::Server_OnComboAttack_Implementation()
 	}
 	else
 	{
-		bNextCombo = true;
+		bHasBufferedNextCombo = true;
 		CanAcceptComboInput = false;
 	}
 }
@@ -1037,7 +1038,7 @@ void AGS_Seeker::MulticastPlayComboSection_Implementation(int32 ComboIndex)
 		{
 			CurrentComboIndex++;
 			CanAcceptComboInput = false;
-			bNextCombo = false;
+			bHasBufferedNextCombo = false;
 		}
 	}
 }
@@ -1415,16 +1416,21 @@ void AGS_Seeker::HandleAliveStatusChanged(AGS_PlayerState* ChangedPlayerState, b
 	}
 }
 
-void AGS_Seeker::TransWeaponHandingState(EWeaponHandlingState RequiredCurState,
+void AGS_Seeker::TransWeaponHandingState(EWeaponHandlingState RequiredState,
 										 EWeaponHandlingState NextState,
-										 UAnimMontage* TargetAM,
-										 ESeekerMontageSlot TargetMontageSlot)
+										 UAnimMontage* TransitionMontage,
+										 ESeekerMontageSlot TargetSlot)
 {
-	if (WeaponHandlingState == RequiredCurState)
+	// Atomically switch weapon equipment state and trigger required animations
+	if (WeaponHandlingState == RequiredState)
 	{
-		GetSkillComp()->SetCurAllowedSkillsMask(0);
-		Multicast_SetMontageSlot(TargetMontageSlot);
-		Multicast_PlaySkillMontage(TargetAM);
+		if (UGS_SkillComp* SkillComponent = GetSkillComp())
+		{
+			SkillComponent->SetCurAllowedSkillsMask(0);
+		}
+
+		Multicast_SetMontageSlot(TargetSlot);
+		Multicast_PlaySkillMontage(TransitionMontage);
 		SetWeaponHandlingState(NextState);
 	}
 }

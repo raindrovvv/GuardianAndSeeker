@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -6,23 +6,26 @@
 #include "GS_WeaponEquipable.h"
 #include "GS_WeaponBow.generated.h"
 
-UCLASS()
+/**
+ * @brief Seeker's bow weapon class.
+ * Manages the bow's visual mesh and the child actor component for arrows.
+ */
+UCLASS(BlueprintType, meta = (DisplayName = "GS Seeker Bow"))
 class GAS_API AGS_WeaponBow : public AGS_WeaponEquipable
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
 	AGS_WeaponBow();
 
-
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	UPROPERTY(VisibleAnywhere, Category = "Attack")
-	USkeletalMeshComponent* BowMeshcomponent;
+	/** Skeletal mesh representing the bow itself (includes string/limbs) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Mesh")
+	TObjectPtr<USkeletalMeshComponent> BowMesh;
 
-	UPROPERTY(VisibleAnywhere, Category = "Arrow")
-	UChildActorComponent* Arrow;
+	/** Child actor component that represents the arrow currently notched or prepared */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Attachment")
+	TObjectPtr<UChildActorComponent> ArrowActorComponent;
 };

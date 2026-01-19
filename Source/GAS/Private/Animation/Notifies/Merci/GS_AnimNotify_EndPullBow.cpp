@@ -1,31 +1,23 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Merci/GS_AnimNotify_EndPullBow.h"
 #include "Character/Player/Seeker/GS_Merci.h"
 
-void UGS_AnimNotify_EndPullBow::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
+void UGS_AnimNotify_EndPullBow::Notify(USkeletalMeshComponent* MeshComp,
+									   UAnimSequenceBase* Animation,
+									   const FAnimNotifyEventReference& EventReference)
 {
-	UE_LOG(LogTemp, Error, TEXT("========== [AnimNotify_EndPullBow] FIRED! =========="));
+	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (!MeshComp)
+	if (!MeshComp || !MeshComp->GetOwner())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[AnimNotify_EndPullBow] MeshComp is NULL!"));
 		return;
 	}
 
-	AActor* Owner = MeshComp->GetOwner();
-	UE_LOG(LogTemp, Warning, TEXT("[AnimNotify_EndPullBow] Owner: %s"), Owner ? *Owner->GetName() : TEXT("NULL"));
-
-	if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(Owner))
+	// Signalling Merci character that the draw montage has completed
+	if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(MeshComp->GetOwner()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AnimNotify_EndPullBow] Merci cast success - HasAuthority=%d"), MerciCharacter->HasAuthority());
-		// 🔴 CRITICAL: Always call on client where animation plays
-		// OnDrawMontageEnded will handle server RPC internally
+		// This should be called on the client where the animation is playing
 		MerciCharacter->OnDrawMontageEnded();
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[AnimNotify_EndPullBow] Failed to cast to Merci!"));
 	}
 }

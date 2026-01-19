@@ -1,28 +1,23 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Weapon/Equipable/GS_WeaponBow.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Components/ChildActorComponent.h"
 
-
-// Sets default values
 AGS_WeaponBow::AGS_WeaponBow()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
-	BowMeshcomponent = CreateDefaultSubobject<USkeletalMeshComponent>("BowMesh");
-	RootComponent = BowMeshcomponent;
+	// Construct the bow's skeletal mesh
+	BowMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("BowMesh"));
+	SetRootComponent(BowMesh);
 
-	Arrow = CreateDefaultSubobject<UChildActorComponent>("Arrow");
-	
-	Arrow->SetupAttachment(RootComponent);
+	// Setup the arrow child actor attachment
+	ArrowActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ArrowActorComponent"));
+	ArrowActorComponent->SetupAttachment(GetRootComponent());
 }
 
-// Called when the game starts or when spawned
 void AGS_WeaponBow::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
-
-

@@ -1,156 +1,155 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
-#include "Iris/ReplicationSystem/ReplicationSystemTypes.h"
 #include "GS_Chan.generated.h"
 
 class AGS_WeaponShield;
 class AGS_WeaponAxe;
 class UGS_ChanAimingSkillBar;
-class UAkAudioEvent;
+class UNiagaraSystem;
+class UCapsuleComponent;
 
+/** Delegate for stamina depletion events */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaDepleted, bool, bByDamage);
 
-UCLASS()
+/**
+ * @brief Chan character class - The defensive tank seeker.
+ * Specializes in axe-and-shield combat, stamina-based blocking, and area-of-effect ultimate skills.
+ */
+UCLASS(BlueprintType, meta = (DisplayName = "GS Seeker Chan"))
 class GAS_API AGS_Chan : public AGS_Seeker
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	AGS_Chan();
 
-	// Called every frame
+	// AActor / ACharacter interface
 	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual float TakeDamage(float DamageAmount,
+							 struct FDamageEvent const& DamageEvent,
+							 class AController* EventInstigator,
+							 AActor* DamageCauser) override;
+	// ~AActor / ACharacter interface
 
-	/*virtual void OnComboAttack() override;*/
-
+	// AGS_Character interface
 	virtual void MulticastPlayComboSection_Implementation(int32 ComboIndex) override;
-
-	// Aim Skill
-	/*void OnReadyAimSkill();*/
-	void OnJumpAttackSkill();
-	void OffJumpAttackSkill();
-	void ToIdle();
-
-	// ===============
-	// 찬 전용 공격 시스템
-	// ===============
-
-	// 찬 전용 공격 VFX
-	UPROPERTY(EditDefaultsOnly, Category = "Chan|VFX|Attack", meta = (DisplayName = "4번째 공격 타격 VFX"))
-	class UNiagaraSystem* FinalAttackHitVFX;
-
-	// ===============
-	// 찬 전용 스킬 시스템
-	// ===============
-
-	// 찬 전용 방패 슬램 스킬 범위 표시
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_DrawSkillRange(FVector InLocation, float InRadius, FColor InColor, float InLifetime);
-
-	// 찬 전용 콤보 공격 타격 처리
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnAttackHit(int32 ComboIndex);
-
 	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) override;
+	// ~AGS_Character interface
 
-	// 찬 전용 궁극기 충돌 컴포넌트
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chan|UltimateSkill", meta = (DisplayName = "궁극기 충돌 컴포넌트"))
-	UCapsuleComponent* UltimateCollision;
+	/** Triggers jump attack specific state changes */
+	void HandleJumpAttackSkillStart();
+	void HandleJumpAttackSkillEnd();
 
-	// 찬 전용 궁극기 오버랩 처리 Knockback Collision (KCY)
+	/** Forces the character back to an idle state and restores control */
+	void TransitionToIdle();
+
+	/** VFX played specifically on the final hit of Chan's basic combo */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|VFX")
+	TObjectPtr<UNiagaraSystem> FinisherHitVFX;
+
+	/** Debug tool to draw the radius of ground slam skills */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_DrawSkillRange(FVector Center, float Radius, FColor Color, float Duration);
+
+	/** Synchronizes hit-stop and camera feedback for combos */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_HandleAttackHitEffects(int32 ComboIndex);
+
+	/** Capsule used to detect targets during critical skill phases */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chan|Collision")
+	TObjectPtr<UCapsuleComponent> UltimateCollision;
+
+	/** Internal handler for ultimate skill collision events */
 	UFUNCTION()
-	void OnUltimateOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	                       UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-	                       bool bFromSweep, const FHitResult& SweepResult);
+	void HandleUltimateOverlap(UPrimitiveComponent* OverlappedComp,
+							   AActor* OtherActor,
+							   UPrimitiveComponent* OtherComp,
+							   int32 OtherBodyIndex,
+							   bool bFromSweep,
+							   const FHitResult& SweepResult);
 
-	// ===============
-	// 찬 전용 UI 시스템
-	// ===============
-
-	// 찬 전용 방패 들기 스킬 UI 위젯
-	void SetChanAimingSkillBarWidget(UGS_ChanAimingSkillBar* Widget) { ChanAimingSkillBarWidget = Widget; }
-
-	UFUNCTION(Client, Reliable)
-	void Client_UpdateChanAimingSkillBar(float Stamina);
-
-	UFUNCTION(Client, Reliable)
-	void Client_UpdateChanAimingSkillBarDealy(float Stamina);
+	/** UI Synchronization for the stamina-based aiming/blocking bar */
+	void SetChanAimingSkillBarWidget(UGS_ChanAimingSkillBar* Widget)
+	{
+		LinkedSkillBarWidget = Widget;
+	}
 
 	UFUNCTION(Client, Reliable)
-	void Client_ChanAimingSkillBar(bool bShow);
+	void Client_UpdateSkillBarProgress(float NormalizedValue);
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const;
+	UFUNCTION(Client, Reliable)
+	void Client_UpdateSkillBarDamageFlash(float NormalizedValue);
 
-	// Damage handling with audio feedback
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+	UFUNCTION(Client, Reliable)
+	void Client_SetSkillBarVisibility(bool bIsVisible);
 
-	// 방어 상태 관련
-	UPROPERTY(ReplicatedUsing = OnRep_IsDefending, BlueprintReadOnly, Category = "Chan|Defense")
-	bool bIsDefending;
-
-	// 방어력 증가량 (0.0f = 100% 데미지, 0.7f = 30% 데미지)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Defense")
-	float DefenseDamageReduction = 0.7f;
-
-	// 방어 상태 변경 함수
-	UFUNCTION(BlueprintCallable, Category = "Chan|Defense")
-	void SetDefending(bool bDefending);
-
-	virtual bool IsDefending() const override { return bIsDefending; }
-
-	// =============
-	// 스테미나 관리
-	// =============
-	UPROPERTY(BlueprintAssignable, Category = "Stamina")
+	// Stamina Management
+	UPROPERTY(BlueprintAssignable, Category = "Chan|Events")
 	FOnStaminaDepleted OnStaminaDepleted;
 
-	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stamina")
-	float MaxStamina = 100.f;
+	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stats")
+	float MaxStamina = 100.0f;
 
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Chan|Stamina")
-	float CurrentStamina = 0.f;
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Chan|Stats")
+	float CurrentStamina = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stamina")
-	float StaminaDrainRate = 1.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stats")
+	float StaminaDrainPerTick = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stamina")
-	float StaminaRegenRate = 1.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stats")
+	float StaminaRegenPerTick = 1.0f;
 
-	float GetCurrentStamina() const { return CurrentStamina; }
-	void ResetCurrentStamina();
-	void SetCurrentStamina(float NewValue, bool SetbyDamage = false);
-	bool HasEnoughStamina(float Cost) const { return CurrentStamina >= Cost; }
-	void DrainStaminaTick();
-	void RegenStaminaTick();
+	UFUNCTION(BlueprintPure, Category = "Chan|Stats")
+	float GetCurrentStaminaValue() const
+	{
+		return CurrentStamina;
+	}
+
+	void RestoreStaminaFully();
+	void AdjustStamina(float Delta, bool bTriggeredByDamage = false);
+	void ProcessStaminaDrain();
+	void ProcessStaminaRegen();
+
+	// Defense / Blocking
+	UPROPERTY(ReplicatedUsing = OnRep_IsDefending, BlueprintReadOnly, Category = "Chan|State")
+	bool bIsDefending = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Chan|Stats")
+	float DefenseDamageMitigation = 0.7f;
+
+	UFUNCTION(BlueprintCallable, Category = "Chan|Actions")
+	void SetDefending(bool bEnabled);
+
+	virtual bool IsDefending() const override
+	{
+		return bIsDefending;
+	}
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-	// Called when actor is being removed from level
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// 방어 상태 변경 시 호출되는 함수
+	/** Callback for replicated defense state */
 	UFUNCTION()
 	void OnRep_IsDefending();
 
-	// 타격 지점이 방패 방어 영역 내에 있는지 확인하는 함수
-	bool IsHitInShieldDefenseArea(const FVector& HitLocation) const;
+	/** Validates if an incoming hit direction is within the shield's block arc */
+	bool ValidateBlockDetection(const FVector& ImpactLocation) const;
 
 private:
-	UGS_ChanAimingSkillBar* ChanAimingSkillBarWidget;
+	/** Linked UI widget for stamina visualization */
+	UPROPERTY()
+	TObjectPtr<UGS_ChanAimingSkillBar> LinkedSkillBarWidget;
 
-	// 스테미나 관리
-	FTimerHandle StaminaHandle;
+	/** Handler for periodic stamina updates */
+	FTimerHandle StaminaCycleTimerHandle;
 
-	// 체력 관리
-	float MaxHealth;
+	/** Cached health for damage calculations */
+	float BaseMaxHealth = 100.0f;
 };

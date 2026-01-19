@@ -1,19 +1,30 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_StateReset.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 
-void UGS_AN_StateReset::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+UGS_AN_StateReset::UGS_AN_StateReset()
+{
+}
+
+void UGS_AN_StateReset::Notify(USkeletalMeshComponent* MeshComp,
+							   UAnimSequenceBase* Animation,
+							   const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner()))
-	{		
-		if (Seeker->HasAuthority())
+	if (!MeshComp || !MeshComp->GetOwner())
+	{
+		return;
+	}
+
+	// Triggering a formal state reset on the seeker character
+	if (AGS_Seeker* SeekerCharacter = Cast<AGS_Seeker>(MeshComp->GetOwner()))
+	{
+		// Resetting character state flags is typically a server-side responsibility
+		if (SeekerCharacter->HasAuthority())
 		{
-			Seeker->StateReset();
+			SeekerCharacter->StateReset();
 		}
 	}
 }

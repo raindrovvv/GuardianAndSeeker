@@ -33,24 +33,32 @@ class UGS_DeathCinematicComponent;
 class UGS_RevivalEffectComponent;
 class UGS_DebuffIndicatorComponent;
 
-USTRUCT(BlueprintType) // Current Action
-struct FSeekerState
+/**
+ * @brief Represents the current action state of the Seeker.
+ */
+USTRUCT(BlueprintType)
+struct FSeekerActionState
 {
 	GENERATED_BODY()
 
-	FSeekerState()
+	FSeekerActionState()
+		: bIsAiming(false)
+		, bIsDrawing(false)
+		, bIsEquipped(false)
 	{
-		IsAim = false;
-		IsDraw = false;
-		IsEquip = false;
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsAim;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsDraw;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsEquip;
+	/** Whether the character is currently aiming a ranged weapon */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|State")
+	bool bIsAiming;
+
+	/** Whether the character is preparing a draw (e.g., pulling a bowstring) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|State")
+	bool bIsDrawing;
+
+	/** Whether the primary weapon is currently equipped and ready for use */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeker|State")
+	bool bIsEquipped;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSeekerHover, bool, bIsHover);
@@ -152,12 +160,16 @@ public:
 	UFUNCTION()
 	void PreAttackSnap();
 
-	UFUNCTION(Server, Reliable)
-	virtual void Server_OnComboAttack();
+	/** Triggers a combo attack attempt on the server */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Seeker|Combat")
+	virtual void Server_ExecuteComboAttack();
 
 
 	// Damage Handler
-	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+	virtual float TakeDamage(float DamageAmount,
+							 FDamageEvent const& DamageEvent,
+							 AController* EventInstigator,
+							 AActor* DamageCauser) override;
 
 	// Control
 	UFUNCTION()
@@ -207,34 +219,45 @@ public:
 	AGS_Item* GetItem(EItemType ItemType);
 
 	// State
-	UPROPERTY(Replicated)
-	bool CanChangeSeekerGait;
+	/** Internal tracker for the current gait (Walk/Run/Sprint) */
+	UPROPERTY(ReplicatedUsing = OnRep_SeekerGait, BlueprintReadOnly, Category = "Seeker|Movement")
+	EGait SeekerCurrentGait = EGait::Run;
 
-	// Combo
-	/*UPROPERTY(Replicated)
-	bool bComboEnded = true;*/
+	/** The gait state from the previous frame */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Seeker|Movement")
+	EGait SeekerPreviousGait = EGait::Run;
+
+	/** Whether the character can currently initiate a gait change (e.g., switch to sprint) */
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Seeker|Movement")
+	bool CanChangeSeekerGait = true;
+
+	/** Current combo index (0-based) for basic attack sequences */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Seeker|Combat")
+	int32 CurrentComboIndex = 0;
+
+	/** Whether the combo system is currently accepting input results */
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Seeker|Combat")
+	bool CanAcceptComboInput = true;
+
+	/** Whether a follow-up combo input has been buffered for the next sequence */
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Seeker|Combat")
+	bool bHasBufferedNextCombo = false;
+
+	/** Timestamp of the last valid combat input for buffer window checks */
+	float LastCombatInputTimestamp = -1.0f;
+
+	/** Duration during which a subsequent click is buffered for the next combo stage */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Seeker|Combat|Settings")
+	float ComboInputBufferDuration = 0.25f;
 
 	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* ComboAnimMontage;
 
-	UPROPERTY(Replicated)
-	int32 CurrentComboIndex;
-
 	UFUNCTION(BlueprintPure, Category = "Combat")
-	int32 GetCurrentComboIndex() const { return CurrentComboIndex; }
-
-	UPROPERTY(Replicated)
-	bool CanAcceptComboInput = true;
-
-	UPROPERTY(Replicated)
-	bool bNextCombo = false;
-
-	/** 마지막 입력 시간 (입력 버퍼링용) */
-	float LastInputTime = -1.0f;
-
-	/** 입력 버퍼링 허용 시간 (0.2초) */
-	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
-	float InputBufferWindow = 0.25f;
+	int32 GetCurrentComboIndex() const
+	{
+		return CurrentComboIndex;
+	}
 
 	UPROPERTY(ReplicatedUsing = OnRep_SeekerGait)
 	EGait SeekerGait;
@@ -444,10 +467,18 @@ public:
 	void HandleEnemyDeath();
 
 	UFUNCTION()
-	void OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent,
+									 AActor* OtherActor,
+									 UPrimitiveComponent* OtherComp,
+									 int32 OtherBodyIndex,
+									 bool bFromSweep,
+									 const FHitResult& SweepResult);
 
 	UFUNCTION()
-	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent,
+								   AActor* OtherActor,
+								   UPrimitiveComponent* OtherComp,
+								   int32 OtherBodyIndex);
 
 protected:
 	void Internal_SetSeekerGait(EGait Gait);
@@ -515,8 +546,9 @@ protected:
 	virtual bool ShowDecal() override;
 
 private:
-	UPROPERTY(VisibleAnywhere, Category = "State", Replicated)
-	FSeekerState SeekerState;
+	/** Tracks the character's active aiming and equipment states */
+	UPROPERTY(Replicated)
+	FSeekerActionState SeekerActionState;
 
 	/** 현재 주변에 있는 적들의 목록 (타격 보정용) */
 	UPROPERTY()
@@ -577,7 +609,10 @@ private:
 
 public:
 	// RequiredCurState 가 현재 캐릭터의 상태와 같다면 캐릭터의 상태를 NextState 로 변경하고 TargetAM 을 재생한다.
-	void TransWeaponHandingState(EWeaponHandlingState RequiredCurState, EWeaponHandlingState NextState, UAnimMontage* TargetAM, ESeekerMontageSlot TargetMontageSlot);
+	void TransWeaponHandingState(EWeaponHandlingState RequiredCurState,
+								 EWeaponHandlingState NextState,
+								 UAnimMontage* TargetAM,
+								 ESeekerMontageSlot TargetMontageSlot);
 
 public:
 	UFUNCTION(Server, Reliable)
@@ -591,20 +626,35 @@ public:
 	// 시커 타입 체크 함수들 (GS_Character의 ECharacterType 사용)
 	// ===============
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsChan() const { return GetCharacterType() == ECharacterType::Chan; }
+	bool IsChan() const
+	{
+		return GetCharacterType() == ECharacterType::Chan;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsAres() const { return GetCharacterType() == ECharacterType::Ares; }
+	bool IsAres() const
+	{
+		return GetCharacterType() == ECharacterType::Ares;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsMerci() const { return GetCharacterType() == ECharacterType::Merci; }
+	bool IsMerci() const
+	{
+		return GetCharacterType() == ECharacterType::Merci;
+	}
 
 	// 근접/원거리 체크 (하위 호환성)
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsMeleeSeeker() const { return IsChan() || IsAres(); }
+	bool IsMeleeSeeker() const
+	{
+		return IsChan() || IsAres();
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsRangedSeeker() const { return IsMerci(); }
+	bool IsRangedSeeker() const
+	{
+		return IsMerci();
+	}
 
 	// ==========================================
 	// 가디언 감지 HUD 시스템
@@ -616,7 +666,10 @@ public:
 
 	/** 현재 가디언에게 감지되었는지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Detection")
-	bool IsDetectedByGuardian() const { return bIsDetectedByGuardian; }
+	bool IsDetectedByGuardian() const
+	{
+		return bIsDetectedByGuardian;
+	}
 
 	/** 화면 중앙 근접도 설정 (서버에서 호출) */
 	UFUNCTION(BlueprintCallable, Category = "Detection")
@@ -624,7 +677,10 @@ public:
 
 	/** 현재 감지 강도 확인 */
 	UFUNCTION(BlueprintPure, Category = "Detection")
-	float GetDetectionIntensity() const { return DetectionIntensity; }
+	float GetDetectionIntensity() const
+	{
+		return DetectionIntensity;
+	}
 
 	/** 감지 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "UI|Detection")
@@ -688,31 +744,52 @@ public:
 
 	/** 현재 빈사 상태인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	bool IsInDyingState() const { return bIsInDyingState; }
+	bool IsInDyingState() const
+	{
+		return bIsInDyingState;
+	}
 
 	/** 남은 빈사 시간 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetDyingTimeRemaining() const { return DyingTimeRemaining; }
+	float GetDyingTimeRemaining() const
+	{
+		return DyingTimeRemaining;
+	}
 
 	/** 최대 빈사 시간 (90초) */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetMaxDyingTime() const { return MaxDyingTime; }
+	float GetMaxDyingTime() const
+	{
+		return MaxDyingTime;
+	}
 
 	/** 구조 중인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	bool IsBeingRevived() const { return bIsBeingRevived; }
+	bool IsBeingRevived() const
+	{
+		return bIsBeingRevived;
+	}
 
 	/** 현재 구조 진행도 (0~1) */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetReviveProgress() const { return ReviveProgress; }
+	float GetReviveProgress() const
+	{
+		return ReviveProgress;
+	}
 
 	/** 현재 빈사 횟수 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	int32 GetCurrentDyingCount() const { return CurrentDyingCount; }
+	int32 GetCurrentDyingCount() const
+	{
+		return CurrentDyingCount;
+	}
 
 	/** 최대 빈사 허용 횟수 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	int32 GetMaxDyingCount() const { return MaxDyingCount; }
+	int32 GetMaxDyingCount() const
+	{
+		return MaxDyingCount;
+	}
 
 	/** 구조 시작 (서버 RPC) */
 	UFUNCTION(Server, Reliable, Category = "Dying")

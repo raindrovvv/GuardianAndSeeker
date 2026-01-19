@@ -1,20 +1,20 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Character/Seeker/GS_ChooserInputObj.h"
 #include "Kismet/KismetMathLibrary.h"
 
-
-bool UGS_ChooserInputObj::ShouldTurnInPlace()
+bool UGS_ChooserInputObj::ShouldTurnInPlace() const
 {
-	if ((MovementState == EMovementState::Idle && LastMovementState == EMovementState::Moving) || bMustTurnInPlace)
+	// Check turn-in-place criteria: Transitioning from moving to idle, or explicitly requested
+	if (bMustTurnInPlace || (MovementState == EMovementState::Idle && LastMovementState == EMovementState::Moving))
 	{
 		const FRotator CharacterRot = CharacterTransform.GetRotation().Rotator();
 		const FRotator RootRot = RootTransform.GetRotation().Rotator();
-		
-		FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRot, RootRot);
-		DeltaRot.Yaw = FMath::Abs(DeltaRot.Yaw);
-		if (DeltaRot.Yaw >= 50)
+
+		const FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRot, RootRot);
+
+		// If orientation delta exceeds 50 degrees, trigger a turning animation
+		if (FMath::Abs(DeltaRot.Yaw) >= 50.0f)
 		{
 			return true;
 		}
@@ -22,21 +22,24 @@ bool UGS_ChooserInputObj::ShouldTurnInPlace()
 	return false;
 }
 
-bool UGS_ChooserInputObj::IsMoving()
+bool UGS_ChooserInputObj::IsMoving() const
 {
-	bool bVelocityNotZero       = !Velocity.Equals(FVector::ZeroVector, 0.1f);
-	bool bFutureVelocityNotZero = !FutureVelocity.Equals(FVector::ZeroVector, 0.1f);
-	
-	return bVelocityNotZero && bFutureVelocityNotZero;
+	// Velocity is considered non-zero if above a small stabilization threshold
+	const bool bHasCurrentVelocity = !Velocity.IsNearlyZero(0.1f);
+	const bool bHasFutureVelocity = !FutureVelocity.IsNearlyZero(0.1f);
+
+	return bHasCurrentVelocity && bHasFutureVelocity;
 }
 
-bool UGS_ChooserInputObj::IsStarting()
+bool UGS_ChooserInputObj::IsStarting() const
 {
-	bool bContains = CurrentDatabasesTags.Contains(TEXT("Pivots"));
-	
-	if (FutureVelocity.Size2D() > Velocity.Size2D() + 100.0f)
+	// Check if already in a "Pivots" context (to avoid double-starting) and ensure we are moving correctly
+	const bool bAlreadyPivoting = CurrentDatabaseTags.Contains(TEXT("Pivots"));
+
+	// Consider a start if future predicted speed is significantly higher than current speed
+	if (FutureVelocity.Size2D() > (Velocity.Size2D() + 100.0f))
 	{
-		if (!bContains && IsMoving())
+		if (!bAlreadyPivoting && IsMoving())
 		{
 			return true;
 		}
@@ -44,44 +47,42 @@ bool UGS_ChooserInputObj::IsStarting()
 	return false;
 }
 
-bool UGS_ChooserInputObj::IsPivoting()
+bool UGS_ChooserInputObj::IsPivoting() const
 {
-	const FRotator CurrentRot = Velocity.Rotation();
-	const FRotator FutureRot = FutureVelocity.Rotation();
+	// Calculate rotation delta between current velocity and predicted future velocity
+	const FRotator CurrentVelocityRot = Velocity.Rotation();
+	const FRotator FutureVelocityRot = FutureVelocity.Rotation();
 
-	FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CurrentRot, FutureRot);
-	DeltaRot.Yaw = FMath::Abs(DeltaRot.Yaw);
+	const FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CurrentVelocityRot, FutureVelocityRot);
+	const float AbsYawDelta = FMath::Abs(DeltaRot.Yaw);
 
-	float Threshold = 0.f;
+	// Thresholds depend on whether we are oriented to movement or strafing
+	float PivotThreshold = 0.0f;
 	switch (RotationMode)
 	{
-	case ERotationMode::OrientToMovement :
-		Threshold = 60.0f;
-		break;
-	case ERotationMode::Strafe :
-		Threshold = 40.0f;
+		case ERotationMode::OrientToMovement:
+			PivotThreshold = 60.0f;
+			break;
+		case ERotationMode::Strafe:
+			PivotThreshold = 40.0f;
+			break;
 	}
 
-	if (DeltaRot.Yaw > Threshold)
-	{
-		return true;
-	}
-	return false;
+	return (AbsYawDelta > PivotThreshold);
 }
 
-bool UGS_ChooserInputObj::ShouldSpinTransition()
+bool UGS_ChooserInputObj::ShouldSpinTransition() const
 {
-	bool bContains = CurrentDatabasesTags.Contains(TEXT("Pivots"));
+	// Spins are specific types of high-rotation transitions used when already pivoting
+	if (!CurrentDatabaseTags.Contains(TEXT("Pivots")))
+	{
+		return false;
+	}
 
 	const FRotator CharacterRot = CharacterTransform.GetRotation().Rotator();
 	const FRotator RootRot = RootTransform.GetRotation().Rotator();
-	FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRot, RootRot);
-	DeltaRot.Yaw = FMath::Abs(DeltaRot.Yaw);
-	
-	if (bContains && DeltaRot.Yaw >= 130.0f && Speed2D >= 150.0f)
-	{
-		return true;
-	}
-	
-	return false;
+	const FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRot, RootRot);
+
+	// Fast moving characters with high orientation divergence trigger a spin
+	return (FMath::Abs(DeltaRot.Yaw) >= 130.0f && Speed2D >= 150.0f);
 }
