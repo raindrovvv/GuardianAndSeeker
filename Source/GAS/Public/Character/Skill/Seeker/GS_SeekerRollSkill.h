@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -7,25 +7,33 @@
 #include "GS_SeekerRollSkill.generated.h"
 
 /**
- * 
+ * @brief Seeker rolling skill that provides mobility and temporary invulnerability.
+ * Manages montage playback based on movement direction and handles collision switching.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "GS Seeker Roll Skill"))
 class GAS_API UGS_SeekerRollSkill : public UGS_SeekerSkillBase
 {
 	GENERATED_BODY()
+
 public:
 	UGS_SeekerRollSkill();
+
+	// UGS_SkillBase interface
 	virtual void ActiveSkill() override;
 	virtual void OnSkillCanceledByDebuff() override;
 	virtual void OnSkillAnimationEnd() override;
 	virtual void InterruptSkill() override;
+	// ~UGS_SkillBase interface
 
-	FOnMontageEnded EndDelegate;
+protected:
+	/** Internal delegate to handle logic when the roll montage concludes */
+	FOnMontageEnded RollEndDelegate;
 
+	/** Handles cleanup and state restoration once the roll animation finishes */
 	UFUNCTION()
-	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void HandleRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	/** 캐싱된 Seeker 소유자 */
+	/** Weak pointer to the seeker character owning this skill instance */
 	UPROPERTY()
-	TWeakObjectPtr<class AGS_Seeker> CachedSeekerOwner;
+	TWeakObjectPtr<class AGS_Seeker> CachedSeeker;
 };

@@ -1,22 +1,16 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_EndAimSkill.h"
-#include "Character/Player/Seeker/GS_Chan.h"
-#include "Animation/Character/GS_SeekerAnimInstance.h"
-#include "Character/Skill/GS_SkillComp.h"
 
-void UGS_AN_EndAimSkill::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                                const FAnimNotifyEventReference& EventReference)
+UGS_AN_EndAimSkill::UGS_AN_EndAimSkill()
 {
-	/*Super::Notify(MeshComp, Animation, EventReference);
+}
 
-	if (AGS_Chan* Character = Cast<AGS_Chan>(MeshComp->GetOwner()))
-	{
-		if (Character->HasAuthority())
-		{
-			Character->Multicast_StopSkillMontage(Character->GetCurrentMontage());
-			Character->GetSkillComp()->Server_TrySkillAnimationEnd(ESkillSlot::Aiming);
-		}
-	}*/
-} // 더는 사용되지 않음.
+void UGS_AN_EndAimSkill::Notify(USkeletalMeshComponent* MeshComp,
+								UAnimSequenceBase* Animation,
+								const FAnimNotifyEventReference& EventReference)
+{
+	Super::Notify(MeshComp, Animation, EventReference);
+
+	// This notify is currently deprecated and performs no logic.
+}

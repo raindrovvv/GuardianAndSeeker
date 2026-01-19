@@ -1,11 +1,13 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/GS_ANS_SetPotion.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Props/Item/SeekerItem/GS_HP_Potion.h"
-#include "Character/Skill/Seeker/GS_HealSkill.h"
+#include "Engine/World.h"
 
+UGS_ANS_SetPotion::UGS_ANS_SetPotion()
+{
+}
 
 void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp,
 									UAnimSequenceBase* Animation,
@@ -14,8 +16,12 @@ void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp,
 {
 	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
-	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
+	if (!MeshComp || !MeshComp->GetOwner())
+	{
+		return;
+	}
 
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
 	if (!Seeker)
 	{
 		return;
@@ -27,21 +33,25 @@ void UGS_ANS_SetPotion::NotifyBegin(USkeletalMeshComponent* MeshComp,
 		return;
 	}
 
+	// Spawn parameters for the potion actor
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = Seeker; // 생성 주체 지정
+	SpawnParams.Owner = Seeker;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
+	// Spawn a new HP potion instance
 	AGS_HP_Potion* Potion = World->SpawnActor<AGS_HP_Potion>(AGS_HP_Potion::StaticClass(), SpawnParams);
-	if (!Potion)
+	if (Potion)
 	{
-		return;
+		// Initialize the potion with seeker's item data and default visual
+		Potion->AssignItemData(Seeker->GetItemData(EItemType::HP_Potion));
+		Potion->ApplyMeshVariant(FName(TEXT("HP_Potion_Full")));
+
+		// Track the potion globally/per-character if needed
+		Seeker->Items.Add(EItemType::HP_Potion, Potion);
+
+		// Attach to the character's potion socket
+		Potion->AttachToComponent(MeshComp, FAttachmentTransformRules::SnapToTargetIncludingScale, FName("Potion"));
 	}
-
-	Potion->AssignItemData(Seeker->GetItemData(EItemType::HP_Potion));
-	Potion->ApplyMeshVariant(FName(TEXT("HP_Potion_Full")));
-
-	Seeker->Items.Add(EItemType::HP_Potion, Potion);
-
-	Potion->AttachToComponent(Seeker->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("Potion"));
 }
 
 void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp,
@@ -50,27 +60,30 @@ void UGS_ANS_SetPotion::NotifyEnd(USkeletalMeshComponent* MeshComp,
 {
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
+	if (!MeshComp || !MeshComp->GetOwner())
+	{
+		return;
+	}
+
 	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
 	if (!Seeker)
 	{
 		return;
 	}
+
+	// Retrieve the active potion to release it
 	AGS_HP_Potion* Potion = Cast<AGS_HP_Potion>(Seeker->GetItem(EItemType::HP_Potion));
-	if (!Potion)
+	if (Potion)
 	{
-		return;
+		// Trigger the drop/destruction sequence
+		Potion->ReleaseFromHolder();
+
+		// Ensure physics are enabled for a realistic drop effect
+		if (UStaticMeshComponent* VisualMesh = Potion->GetVisualMesh())
+		{
+			VisualMesh->SetSimulatePhysics(true);
+			VisualMesh->SetEnableGravity(true);
+			VisualMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		}
 	}
-
-	Potion->ReleaseFromHolder();
-
-	UStaticMeshComponent* Mesh = Potion->GetVisualMesh();
-	if (Mesh)
-	{
-		Mesh->SetSimulatePhysics(true);
-		Mesh->SetEnableGravity(true);
-		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	}
-
-	// DeactiveSkill은 이제 몽타주 종료 콜백(OnMontageEnded)에서 처리됨
-	// 여기서 호출하면 몽타주 슬롯이 None으로 바뀌어 애니메이션이 중간에 끊김
 }

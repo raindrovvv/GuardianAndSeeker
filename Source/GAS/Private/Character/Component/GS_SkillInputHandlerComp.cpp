@@ -112,7 +112,7 @@ void UGS_SkillInputHandlerComp::OnRightClick(const FInputActionInstance& Instanc
 	{
 		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 		{
-			Seeker->LastInputTime = GetWorld()->GetTimeSeconds();
+			Seeker->LastCombatInputTimestamp = GetWorld()->GetTimeSeconds();
 		}
 	}
 }
@@ -141,7 +141,7 @@ void UGS_SkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Instance
 		{
 			if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
 			{
-				Seeker->LastInputTime = GetWorld()->GetTimeSeconds();
+				Seeker->LastCombatInputTimestamp = GetWorld()->GetTimeSeconds();
 			}
 		}
 	}

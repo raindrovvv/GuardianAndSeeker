@@ -1,5 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright 2024 Greed Fennec Studio. All Rights Reserved.
 
 #include "Character/GS_TpsController.h"
 #include "Character/Component/Seeker/GS_MarkerPlacementComponent.h"
@@ -22,12 +21,13 @@
 #include "UI/Character/GS_BossHP.h"
 #include "UI/Character/GS_DrakharFeverGauge.h"
 #include "UI/Character/GS_FeverGaugeBoard.h"
+#include "UI/Character/GS_CrossHairImage.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Character/Component/GS_DebuffComp.h"
 #include "System/GameMode/GS_InGameGM.h"
-#include "EngineUtils.h" // TActorIterator
+#include "EngineUtils.h"
 #include "UI/Character/GS_ReviveIndicatorWidget.h"
 #include "Interface/GS_InteractableInterface.h"
 #include "UI/Interaction/GS_InteractionWidget.h"
@@ -44,10 +44,8 @@ AGS_TpsController::AGS_TpsController()
 	LookAction = nullptr;
 	WalkToggleAction = nullptr;
 
-	//KimYJ
 	bReplicates = true;
 	bIsAutoMoving = false;
-	//SetReplicates(true); 신중은
 }
 
 void AGS_TpsController::Move(const FInputActionValue& InputValue)
@@ -55,9 +53,10 @@ void AGS_TpsController::Move(const FInputActionValue& InputValue)
 	const FVector2D InputAxisVector = InputValue.Get<FVector2D>();
 	LastRotatorInMoving = GetControlRotation();
 
-	// Throttling 로직: 입력값이 유의미하게 변했거나, 일정 시간이 지났을 경우에만 서버 전송
+	// Throttling logic: only send input update to server if the value changed significantly or interval expired
 	const float CurrentTime = GetWorld()->GetTimeSeconds();
-	const bool bValueSignificantChange = FVector2D::Distance(InputAxisVector, LastSentMoveInputValue) > MoveInputSendThreshold;
+	const bool bValueSignificantChange =
+		FVector2D::Distance(InputAxisVector, LastSentMoveInputValue) > MoveInputSendThreshold;
 	const bool bIntervalPassed = (CurrentTime - LastMoveInputSentTime) > MoveInputMinSendInterval;
 	const bool bIsStopping = InputAxisVector.IsNearlyZero() && !LastSentMoveInputValue.IsNearlyZero();
 
@@ -68,15 +67,14 @@ void AGS_TpsController::Move(const FInputActionValue& InputValue)
 		LastMoveInputSentTime = CurrentTime;
 	}
 
-	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
-		// 자동 이동 시 좌우 이동 (KCY)
+		// Handle turns during automated forward movement
 		if (bIsAutoMoving)
 		{
 			if (!FMath::IsNearlyZero(InputAxisVector.Y))
 			{
-				float TurnSpeed = 0.7f;
-
+				const float TurnSpeed = 0.7f;
 				if (IsLocalController())
 				{
 					FRotator ControlRot = GetControlRotation();
@@ -87,18 +85,18 @@ void AGS_TpsController::Move(const FInputActionValue& InputValue)
 			return;
 		}
 
-		// 일반 이동
+		// Standard character move logic
 		const FRotator YawRotation(0.f, LastRotatorInMoving.Yaw, 0.0f);
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
 		if (ControlValues.bCanMoveForward)
 		{
-			ControlledPawn->AddMovementInput(ForwardDirection, InputAxisVector.X);
+			ControlledCharacter->AddMovementInput(ForwardDirection, InputAxisVector.X);
 		}
 		if (ControlValues.bCanMoveRight)
 		{
-			ControlledPawn->AddMovementInput(RightDirection, InputAxisVector.Y);
+			ControlledCharacter->AddMovementInput(RightDirection, InputAxisVector.Y);
 		}
 	}
 }
@@ -107,36 +105,34 @@ void AGS_TpsController::Look(const FInputActionValue& InputValue)
 {
 	if (bIsAutoMoving)
 	{
-		// 자동 이동 중에는 마우스 회전 무시
+		// Disable look control during automated movement
 		return;
 	}
 
 	const FVector2D InputAxisVector = InputValue.Get<FVector2D>();
-	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
 		if (GameInstance)
 		{
-			float SensitivityMultiplier = GameInstance->GetMouseSensitivity();
+			const float SensitivityMultiplier = GameInstance->GetMouseSensitivity();
 			if (ControlValues.bCanLookRight)
 			{
-				ControlledPawn->AddControllerYawInput(InputAxisVector.X * SensitivityMultiplier);
+				ControlledCharacter->AddControllerYawInput(InputAxisVector.X * SensitivityMultiplier);
 			}
 
 			if (ControlValues.bCanLookUp)
 			{
 				FRotator CurrentRot = GetControlRotation();
 
-				// 위로 50, 아래로 80
-				const float PitchMin = -80.f;
-				const float PitchMax = 50.f;
+				// Vertical pitch clamping - Prevents camera flipping or gimballock
+				static constexpr float PitchMin = -80.f;
+				static constexpr float PitchMax = 50.f;
 
 				float NewPitch = CurrentRot.Pitch + (-InputAxisVector.Y * SensitivityMultiplier);
 				NewPitch = FMath::ClampAngle(NewPitch, PitchMin, PitchMax);
 
 				CurrentRot.Pitch = NewPitch;
 				SetControlRotation(CurrentRot);
-
-				//ControlledPawn->AddControllerPitchInput(InputAxisVector.Y * SensitivityMultiplier);
 			}
 		}
 	}
@@ -144,20 +140,13 @@ void AGS_TpsController::Look(const FInputActionValue& InputValue)
 
 void AGS_TpsController::WalkToggle(const FInputActionValue& InputValue)
 {
-	if (AGS_Seeker* ControlledPawn = Cast<AGS_Seeker>(GetPawn()))
+	if (AGS_Seeker* SeekerPawn = Cast<AGS_Seeker>(GetPawn()))
 	{
-		if (ControlledPawn->CanChangeSeekerGait)
+		if (SeekerPawn->CanChangeSeekerGait)
 		{
-			EGait CurGait = ControlledPawn->GetSeekerGait();
-
-			if (CurGait == EGait::Walk)
-			{
-				ControlledPawn->Server_SetSeekerGait(EGait::Run);
-			}
-			else if (CurGait == EGait::Run)
-			{
-				ControlledPawn->Server_SetSeekerGait(EGait::Walk);
-			}
+			const EGait CurGait = SeekerPawn->GetSeekerGait();
+			const EGait NewGait = (CurGait == EGait::Walk) ? EGait::Run : EGait::Walk;
+			SeekerPawn->Server_SetSeekerGait(NewGait);
 		}
 	}
 }
@@ -196,12 +185,11 @@ void AGS_TpsController::PageDown(const FInputActionValue& InputValue)
 
 void AGS_TpsController::SetMoveControlValue(bool CanMoveRight, bool CanMoveForward)
 {
-	// 움직임 활성화 시 Stun 디버프 상태인지 확인 (KCY)
-	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
+	// Restrict movement changes if the character is currently stunned
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
-		if ((CanMoveRight || CanMoveForward) && ControlledPawn->GetDebuffComp()->IsDebuffActive(EDebuffType::Stun))
+		if ((CanMoveRight || CanMoveForward) && ControlledCharacter->GetDebuffComp()->IsDebuffActive(EDebuffType::Stun))
 		{
-			// Stun 디버프 상태라면 ControlValues 값 변경하지 않음
 			return;
 		}
 	}
@@ -247,27 +235,20 @@ void AGS_TpsController::InitControllerPerWorld()
 	{
 		if (!InputMappingContext)
 		{
-			UE_LOG(LogTemp, Error, TEXT("[Revive] InputMappingContext is NULL! Please assign IMC_Seeker in BP_PlayerController!"));
+			UE_LOG(LogTemp, Error, TEXT("[Controller] InputMappingContext is NULL! Check Seeker PC Blueprint."));
 			return;
 		}
 
-		UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-		if (!Subsystem)
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+				ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
-			UE_LOG(LogTemp, Error, TEXT("[Revive] Failed to get EnhancedInputLocalPlayerSubsystem"));
-			return;
+			Subsystem->AddMappingContext(InputMappingContext, 0);
+
+			// Setup audio listener with a slight delay to ensure pawn validity
+			FTimerHandle AudioTimerHandle;
+			GetWorld()->GetTimerManager().SetTimer(
+				AudioTimerHandle, this, &AGS_TpsController::SetupPlayerAudioListener, 0.1f, false);
 		}
-
-		Subsystem->AddMappingContext(InputMappingContext, 0);
-
-		// 오디오 리스너 설정 (약간의 지연을 두고 실행)
-		FTimerHandle TimerHandle;
-		GetWorld()->GetTimerManager().SetTimer(
-		    TimerHandle,
-		    this,
-		    &AGS_TpsController::SetupPlayerAudioListener,
-		    0.1f,
-		    false);
 	}
 }
 
@@ -348,12 +329,14 @@ void AGS_TpsController::ClientRPC_OnSpectatorModeStarted_Implementation()
 		if (Tree)
 		{
 			// 1. 모든 위젯을 일단 숨김.
-			Tree->ForEachWidget([&](UWidget* Widget)
-			                    {
-				if (Widget)
+			Tree->ForEachWidget(
+				[&](UWidget* Widget)
 				{
-					Widget->SetVisibility(ESlateVisibility::Collapsed);
-				} });
+					if (Widget)
+					{
+						Widget->SetVisibility(ESlateVisibility::Collapsed);
+					}
+				});
 
 			// 2. 타이머 위젯(UGS_Timer)을 찾아 그 부모 계층까지 다시 보이도록 설정.
 			TArray<UWidget*> AllWidgets;
@@ -382,68 +365,76 @@ void AGS_TpsController::Server_CacheMoveInputValue_Implementation(FVector2D Inpu
 	MoveInputValue = InputValue;
 }
 
-void AGS_TpsController::TestFunction()
+void AGS_TpsController::InitializePlayerHUD()
 {
-	AGS_Character* GS_Character = Cast<AGS_Character>(GetPawn());
-	if (IsValid(GS_Character))
+	AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn());
+	if (!IsValid(ControlledCharacter))
 	{
-		TSubclassOf<UUserWidget> Widget = PlayerWidgetClasses[GS_Character->GetCharacterType()];
-		if (IsValid(Widget))
+		return;
+	}
+
+	TSubclassOf<UUserWidget> WidgetClass = PlayerWidgetClasses[ControlledCharacter->GetCharacterType()];
+	if (!IsValid(WidgetClass))
+	{
+		return;
+	}
+
+	// Reuse existing widget if classes match, otherwise recreate
+	if (PlayerWidgetInstance)
+	{
+		if (PlayerWidgetInstance->GetClass() != WidgetClass)
 		{
-			// 기존 위젯이 있고 클래스가 같다면 재사용, 아니면 새로 생성
-			if (PlayerWidgetInstance)
-			{
-				if (PlayerWidgetInstance->GetClass() != Widget)
-				{
-					PlayerWidgetInstance->RemoveFromParent();
-					PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
-				}
-			}
-			else
-			{
-				PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
-			}
+			PlayerWidgetInstance->RemoveFromParent();
+			PlayerWidgetInstance = CreateWidget<UUserWidget>(this, WidgetClass);
+		}
+	}
+	else
+	{
+		PlayerWidgetInstance = CreateWidget<UUserWidget>(this, WidgetClass);
+	}
 
-			if (IsValid(PlayerWidgetInstance))
-			{
-				UGS_HPBoardWidget* HPBoardWidget = Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
-				UGS_BossHP* BossWidget = Cast<UGS_BossHP>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_BossHPBoard")));
-				UGS_FeverGaugeBoard* FeverWidget = Cast<UGS_FeverGaugeBoard>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_FeverBoard")));
+	if (!IsValid(PlayerWidgetInstance))
+	{
+		return;
+	}
 
-				if (BossWidget)
-				{
-					BossWidget->SetOwningActor(GS_Character);
-					BossWidget->InitGuardianHPWidget();
-				}
+	// Initialize specific HUD components
+	UGS_HPBoardWidget* HPBoard = Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
+	UGS_BossHP* BossHUD = Cast<UGS_BossHP>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_BossHPBoard")));
+	UGS_FeverGaugeBoard* FeverHUD =
+		Cast<UGS_FeverGaugeBoard>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_FeverBoard")));
 
-				if (FeverWidget)
-				{
-					FeverWidget->InitDrakharFeverWidget();
-				}
+	if (BossHUD)
+	{
+		BossHUD->SetOwningActor(ControlledCharacter);
+		BossHUD->InitGuardianHPWidget();
+	}
 
-				if (HPBoardWidget)
-				{
-					HPBoardWidget->InitBoardWidget();
-				}
+	if (FeverHUD)
+	{
+		FeverHUD->InitDrakharFeverWidget();
+	}
 
-				if (!PlayerWidgetInstance->IsInViewport())
-				{
-					PlayerWidgetInstance->AddToViewport(0);
-				}
-				else
-				{
-					PlayerWidgetInstance->SetVisibility(ESlateVisibility::Visible);
-				}
+	if (HPBoard)
+	{
+		HPBoard->InitBoardWidget();
+	}
 
-				CrosshairWidget = Cast<UGS_CrossHairImage>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_CrossHairImage")));
-				if (CrosshairWidget)
-				{
-					if (AGS_Merci* MerciCharacter = Cast<AGS_Merci>(GS_Character))
-					{
-						MerciCharacter->SetCrosshairWidget(CrosshairWidget);
-					}
-				}
-			}
+	if (!PlayerWidgetInstance->IsInViewport())
+	{
+		PlayerWidgetInstance->AddToViewport(0);
+	}
+	else
+	{
+		PlayerWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+	}
+
+	CrosshairWidget = Cast<UGS_CrossHairImage>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_CrossHairImage")));
+	if (CrosshairWidget)
+	{
+		if (AGS_Merci* MerciPawn = Cast<AGS_Merci>(ControlledCharacter))
+		{
+			MerciPawn->SetCrosshairWidget(CrosshairWidget);
 		}
 	}
 }
@@ -511,120 +502,97 @@ void AGS_TpsController::SetIsAutoMoving(bool InIsAutoMoving)
 
 void AGS_TpsController::AutoMoveTick()
 {
-	if (!IsValid(this) || !IsLocalController())
+	if (!IsValid(this) || !IsLocalController() || !bIsAutoMoving)
 	{
 		return;
 	}
 
-	if (!bIsAutoMoving)
-	{
-		return;
-	}
-
-	ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn());
+	AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn());
 	if (!IsValid(ControlledCharacter) || !ControlledCharacter->GetCharacterMovement())
 	{
-		StopAutoMoveForward(); // 안전하게 정지
+		StopAutoMoveForward();
 		return;
 	}
 
-	const FRotator YawRotation(0.f, GetPawn()->GetActorRotation().Yaw, 0.0f);
+	const FRotator YawRotation(0.f, ControlledCharacter->GetActorRotation().Yaw, 0.0f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-	if (AGS_Character* ControlledPawn = Cast<AGS_Character>(GetPawn()))
-	{
-		ControlledPawn->AddMovementInput(ForwardDirection, 10.0f);
-	}
+	ControlledCharacter->AddMovementInput(ForwardDirection, 10.0f);
 }
 
 void AGS_TpsController::SaveOriginalCameraSettings()
 {
-	if (APawn* MyPawn = GetPawn())
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
-		bOriginalUseControllerRotationYaw = MyPawn->bUseControllerRotationYaw;
+		bOriginalUseControllerRotationYaw = ControlledCharacter->bUseControllerRotationYaw;
 
-		if (AGS_Character* MyCharacter = Cast<AGS_Character>(MyPawn))
+		if (UCharacterMovementComponent* Movement = ControlledCharacter->GetCharacterMovement())
 		{
-			if (UCharacterMovementComponent* Movement = MyCharacter->GetCharacterMovement())
-			{
-				bOriginalOrientRotationToMovement = Movement->bOrientRotationToMovement;
-			}
+			bOriginalOrientRotationToMovement = Movement->bOrientRotationToMovement;
+		}
 
-			if (USpringArmComponent* SpringArm = MyCharacter->FindComponentByClass<USpringArmComponent>())
-			{
-				bOriginalUsePawnControlRotation = SpringArm->bUsePawnControlRotation;
-				bOriginalEnableCameraLag = SpringArm->bEnableCameraLag;
-				bOriginalEnableCameraRotationLag = SpringArm->bEnableCameraRotationLag;
-				bOriginalInheritYaw = SpringArm->bInheritYaw;
-			}
+		if (USpringArmComponent* SpringArm = ControlledCharacter->FindComponentByClass<USpringArmComponent>())
+		{
+			bOriginalUsePawnControlRotation = SpringArm->bUsePawnControlRotation;
+			bOriginalEnableCameraLag = SpringArm->bEnableCameraLag;
+			bOriginalEnableCameraRotationLag = SpringArm->bEnableCameraRotationLag;
+			bOriginalInheritYaw = SpringArm->bInheritYaw;
 		}
 	}
 }
 
 void AGS_TpsController::RestoreOriginalCameraSettings()
 {
-	if (APawn* MyPawn = GetPawn())
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
-		MyPawn->bUseControllerRotationYaw = bOriginalUseControllerRotationYaw;
+		ControlledCharacter->bUseControllerRotationYaw = bOriginalUseControllerRotationYaw;
 
-		if (AGS_Character* MyCharacter = Cast<AGS_Character>(MyPawn))
+		if (UCharacterMovementComponent* Movement = ControlledCharacter->GetCharacterMovement())
 		{
-			if (UCharacterMovementComponent* Movement = MyCharacter->GetCharacterMovement())
-			{
-				Movement->bOrientRotationToMovement = bOriginalOrientRotationToMovement;
-			}
+			Movement->bOrientRotationToMovement = bOriginalOrientRotationToMovement;
+		}
 
-			if (USpringArmComponent* SpringArm = MyCharacter->FindComponentByClass<USpringArmComponent>())
-			{
-				SpringArm->bUsePawnControlRotation = bOriginalUsePawnControlRotation;
-				SpringArm->bEnableCameraLag = bOriginalEnableCameraLag;
-				SpringArm->bEnableCameraRotationLag = bOriginalEnableCameraRotationLag;
-				SpringArm->bInheritYaw = bOriginalInheritYaw;
-			}
+		if (USpringArmComponent* SpringArm = ControlledCharacter->FindComponentByClass<USpringArmComponent>())
+		{
+			SpringArm->bUsePawnControlRotation = bOriginalUsePawnControlRotation;
+			SpringArm->bEnableCameraLag = bOriginalEnableCameraLag;
+			SpringArm->bEnableCameraRotationLag = bOriginalEnableCameraRotationLag;
+			SpringArm->bInheritYaw = bOriginalInheritYaw;
 		}
 	}
 
-	// 마우스 입력 복구
 	SetLookControlValue(true, true);
 }
 
 void AGS_TpsController::ApplyChargeCameraSettings(bool bCharging)
 {
 	if (!IsLocalController())
-	{
-		return; // 로컬 컨트롤러에서만 실행
-	}
+		return;
 
-	if (APawn* MyPawn = GetPawn())
+	if (AGS_Character* ControlledCharacter = Cast<AGS_Character>(GetPawn()))
 	{
-		// === 게임플레이에 영향을 주는 설정 (서버-클라 동기화 필요) ===
-		// 이 부분은 서버에서도 설정되어야 함 (별도 함수로 분리 권장)
-		MyPawn->bUseControllerRotationYaw = true;
+		ControlledCharacter->bUseControllerRotationYaw = true;
 
-		if (AGS_Character* MyCharacter = Cast<AGS_Character>(MyPawn))
+		if (UCharacterMovementComponent* Movement = ControlledCharacter->GetCharacterMovement())
 		{
-			if (UCharacterMovementComponent* Movement = MyCharacter->GetCharacterMovement())
-			{
-				Movement->bOrientRotationToMovement = false;
-			}
+			Movement->bOrientRotationToMovement = false;
+		}
 
-			// === 시각적 표현만 담당하는 설정 (클라이언트 전용) ===
-			if (USpringArmComponent* SpringArm = MyCharacter->FindComponentByClass<USpringArmComponent>())
-			{
-				SpringArm->bUsePawnControlRotation = false;
-				SpringArm->bEnableCameraLag = false;
-				SpringArm->bEnableCameraRotationLag = false;
-				SpringArm->bInheritYaw = true;
-			}
+		if (USpringArmComponent* SpringArm = ControlledCharacter->FindComponentByClass<USpringArmComponent>())
+		{
+			SpringArm->bUsePawnControlRotation = false;
+			SpringArm->bEnableCameraLag = false;
+			SpringArm->bEnableCameraRotationLag = false;
+			SpringArm->bInheritYaw = true;
 		}
 	}
 
-	// 마우스 입력 비활성화 (클라이언트 전용)
 	SetLookControlValue(false, false);
 }
 
-void AGS_TpsController::Client_DrawAimAssistDebug_Implementation(const FVector& Start, const FVector& End,
-                                                                 const FVector& TargetLocation, float Duration)
+void AGS_TpsController::Client_DrawAimAssistDebug_Implementation(const FVector& Start,
+																 const FVector& End,
+																 const FVector& TargetLocation,
+																 float Duration)
 {
 	if (UWorld* World = GetWorld())
 	{
@@ -638,43 +606,31 @@ void AGS_TpsController::BeginPlay()
 	Super::BeginPlay();
 
 	GameInstance = Cast<UGS_GameInstance>(GetGameInstance());
-
-	// Input 설정 유효성 검사 : 가디언 테스트용 코드
-	// if (!InputMappingContext)
-	//{
-	//	UE_LOG(LogTemp, Warning, TEXT("AGS_TpsController (%s): InputMappingContext is not set! Please configure it in Blueprint."), *GetNameSafe(this));
-	//}
-
 	InitControllerPerWorld();
 
-	// 위젯 생성 (로컬 컨트롤러만)
 	if (IsLocalController())
 	{
-		// 구조 표시 위젯 생성
+		// Initialize Revive HUD
 		if (ReviveIndicatorWidgetClass)
 		{
 			ReviveIndicatorWidget = CreateWidget<UGS_ReviveIndicatorWidget>(this, ReviveIndicatorWidgetClass);
 			if (ReviveIndicatorWidget)
-			{
 				ReviveIndicatorWidget->AddToViewport();
-			}
 		}
 
-		// 상호작용 위젯 생성
+		// Initialize Interaction HUD
 		if (InteractionWidgetClass)
 		{
 			InteractionWidget = CreateWidget<UGS_InteractionWidget>(this, InteractionWidgetClass);
 			if (InteractionWidget)
-			{
 				InteractionWidget->AddToViewport();
-			}
 		}
 
-		// 빈사 상태 체크 타이머 시작 (0.2초 간격)
-		GetWorldTimerManager().SetTimer(ReviveIndicatorTimerHandle, this, &AGS_TpsController::UpdateReviveIndicatorVisibility, 0.2f, true);
-
-		// 상호작용 가능 대상 감지 타이머 시작 (0.1초 간격)
-		GetWorldTimerManager().SetTimer(InteractableUpdateTimerHandle, this, &AGS_TpsController::UpdateNearbyInteractable, 0.1f, true);
+		// Setup monitoring timers
+		GetWorldTimerManager().SetTimer(
+			ReviveIndicatorTimerHandle, this, &AGS_TpsController::UpdateReviveIndicatorVisibility, 0.2f, true);
+		GetWorldTimerManager().SetTimer(
+			InteractableUpdateTimerHandle, this, &AGS_TpsController::UpdateNearbyInteractable, 0.1f, true);
 	}
 }
 
@@ -697,7 +653,10 @@ void AGS_TpsController::SetupPlayerAudioListener()
 	if (AGS_Player* ControlledPlayer = Cast<AGS_Player>(GetPawn()))
 	{
 		ControlledPlayer->SetupLocalAudioListener();
-		UE_LOG(LogAudio, Log, TEXT("Audio listener setup initiated from controller for: %s"), *ControlledPlayer->GetName());
+		UE_LOG(LogAudio,
+			   Log,
+			   TEXT("Audio listener setup initiated from controller for: %s"),
+			   *ControlledPlayer->GetName());
 	}
 }
 
@@ -723,22 +682,28 @@ void AGS_TpsController::SetupInputComponent()
 	}
 	if (WalkToggleAction)
 	{
-		EnhancedInputComponent->BindAction(WalkToggleAction, ETriggerEvent::Started, this, &AGS_TpsController::WalkToggle);
+		EnhancedInputComponent->BindAction(
+			WalkToggleAction, ETriggerEvent::Started, this, &AGS_TpsController::WalkToggle);
 	}
 	if (PlaceMarkerAction)
 	{
-		EnhancedInputComponent->BindAction(PlaceMarkerAction, ETriggerEvent::Started, this, &AGS_TpsController::PlaceMarker);
+		EnhancedInputComponent->BindAction(
+			PlaceMarkerAction, ETriggerEvent::Started, this, &AGS_TpsController::PlaceMarker);
 	}
 
 	// 빈사 플레이어 구조 (E키)
 	if (ReviveAction)
 	{
-		EnhancedInputComponent->BindAction(ReviveAction, ETriggerEvent::Started, this, &AGS_TpsController::TryStartRevive);
-		EnhancedInputComponent->BindAction(ReviveAction, ETriggerEvent::Completed, this, &AGS_TpsController::StopRevive);
+		EnhancedInputComponent->BindAction(
+			ReviveAction, ETriggerEvent::Started, this, &AGS_TpsController::TryStartRevive);
+		EnhancedInputComponent->BindAction(
+			ReviveAction, ETriggerEvent::Completed, this, &AGS_TpsController::StopRevive);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("[Revive] ReviveAction is NULL! Please assign IA_ReviveAction in BP_PlayerController!"));
+		UE_LOG(LogTemp,
+			   Error,
+			   TEXT("[Revive] ReviveAction is NULL! Please assign IA_ReviveAction in BP_PlayerController!"));
 	}
 }
 
@@ -756,7 +721,7 @@ void AGS_TpsController::BeginPlayingState()
 	UE_LOG(LogTemp, Warning, TEXT("AGS_TpsController (%s) --- BeginPlayingState CALLED ---"), *GetNameSafe(this));
 	if (IsLocalController())
 	{
-		TestFunction();
+		CreateMainHUD();
 	}
 }
 
@@ -775,42 +740,31 @@ void AGS_TpsController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AGS_TpsController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 	if (!IsLocalController())
-	{
 		return;
-	}
 
-	// 상호작용 진행 업데이트 (진행바의 부드러움을 위해 Tick 유지)
 	UpdateInteractionProgress(DeltaTime);
 
-	// 기존 구조 중 로직 (변경 없음)
+	// Cleanup revive state if target recovers suddenly
 	if (bIsReviving && ReviveTarget.IsValid())
 	{
-		AGS_Seeker* Target = ReviveTarget.Get();
-
-		// 구조 완료: 대상이 더 이상 빈사 상태가 아님
-		if (!Target->IsInDyingState())
+		if (!ReviveTarget->IsInDyingState())
 		{
 			bIsReviving = false;
 			bIsHoldingReviveKey = false;
 			ReviveTarget = nullptr;
 
 			if (ReviveIndicatorWidget)
-			{
 				ReviveIndicatorWidget->StopRevive();
-			}
 			return;
 		}
 
-		// 거리 체크: 너무 멀리 떨어짐
+		// Distance check validation
 		if (AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn()))
 		{
-			float Distance = FVector::Dist(MySeeker->GetActorLocation(), Target->GetActorLocation());
-			if (Distance > ReviveDistance)
+			if (FVector::Dist(MySeeker->GetActorLocation(), ReviveTarget->GetActorLocation()) > ReviveDistance)
 			{
 				StopRevive(FInputActionValue());
-				return;
 			}
 		}
 	}
@@ -822,20 +776,10 @@ void AGS_TpsController::Tick(float DeltaTime)
 
 void AGS_TpsController::UpdateReviveIndicatorVisibility()
 {
-	// 자신이 시커가 아니면 무시
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-	if (!IsValid(MySeeker))
-	{
+	if (!IsValid(MySeeker) || bIsReviving)
 		return;
-	}
 
-	// 구조 중이면 위젯 상태를 건드리지 않음 (StopRevive에서 처리)
-	if (bIsReviving)
-	{
-		return;
-	}
-
-	// 자신이 빈사 상태면 무시
 	if (MySeeker->IsInDyingState())
 	{
 		if (bNearbyDyingSeekerDetected && ReviveIndicatorWidget)
@@ -846,90 +790,60 @@ void AGS_TpsController::UpdateReviveIndicatorVisibility()
 		return;
 	}
 
-	// 근처 빈사 시커 찾기
 	AGS_Seeker* NearbyDyingSeeker = FindNearbyDyingSeeker();
-
 	if (IsValid(NearbyDyingSeeker))
 	{
-		// 빈사 시커 감지됨
 		if (!bNearbyDyingSeekerDetected || LastDetectedDyingSeeker != NearbyDyingSeeker)
 		{
-			// 새로운 빈사 시커 감지 또는 대상 변경
 			bNearbyDyingSeekerDetected = true;
 			LastDetectedDyingSeeker = NearbyDyingSeeker;
-
 			if (ReviveIndicatorWidget)
-			{
-				// E키 안내만 표시 (진행도 바는 표시 안 함)
 				ReviveIndicatorWidget->ShowNearbyIndicator(NearbyDyingSeeker);
-			}
 		}
 	}
-	else
+	else if (bNearbyDyingSeekerDetected)
 	{
-		// 빈사 시커 없음
-		if (bNearbyDyingSeekerDetected)
-		{
-			bNearbyDyingSeekerDetected = false;
-			LastDetectedDyingSeeker = nullptr;
-
-			if (ReviveIndicatorWidget)
-			{
-				ReviveIndicatorWidget->HideNearbyIndicator();
-			}
-		}
+		bNearbyDyingSeekerDetected = false;
+		LastDetectedDyingSeeker = nullptr;
+		if (ReviveIndicatorWidget)
+			ReviveIndicatorWidget->HideNearbyIndicator();
 	}
 }
 
 void AGS_TpsController::TryStartRevive(const FInputActionValue& InputValue)
 {
-	// 로컬 컨트롤러에서만 처리
 	if (!IsLocalController())
-	{
 		return;
-	}
 
-	// 현재 조종 중인 캐릭터가 시커인지 확인
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-	if (!IsValid(MySeeker))
-	{
+	if (!IsValid(MySeeker) || MySeeker->IsInDyingState())
 		return;
-	}
 
-	// 자신이 빈사 상태면 구조/상호작용 불가
-	if (MySeeker->IsInDyingState())
-	{
-		return;
-	}
-
-	// 우선순위 1: 빈사 아군 구조
+	// Teammate revival takes priority over object interaction
 	AGS_Seeker* DyingSeeker = FindNearbyDyingSeeker();
 	if (IsValid(DyingSeeker))
 	{
-		// 구조 시작
 		bIsReviving = true;
 		bIsHoldingReviveKey = true;
 		ReviveTarget = DyingSeeker;
 
 		if (ReviveIndicatorWidget)
-		{
 			ReviveIndicatorWidget->StartRevive(DyingSeeker);
-		}
 
 		Server_SetHoldingReviveKey(true);
 		Server_RequestRevive(DyingSeeker);
 		return;
 	}
 
-	// 우선순위 2: IInteractable 상호작용
+	// Trigger object interaction if no revivable targets are found
 	if (CachedInteractable.IsValid())
 	{
-		AActor* Interactable = CachedInteractable.Get();
-		if (Interactable->Implements<UGS_InteractableInterface>())
+		AActor* TargetActor = CachedInteractable.Get();
+		if (TargetActor->Implements<UGS_InteractableInterface>())
 		{
-			if (IGS_InteractableInterface::Execute_CanInteract(Interactable, MySeeker))
+			if (IGS_InteractableInterface::Execute_CanInteract(TargetActor, MySeeker))
 			{
-				StartInteraction(Interactable);
+				StartInteraction(TargetActor);
 			}
 		}
 	}
@@ -937,29 +851,18 @@ void AGS_TpsController::TryStartRevive(const FInputActionValue& InputValue)
 
 void AGS_TpsController::StopRevive(const FInputActionValue& InputValue)
 {
-	// 구조 중이면 구조 취소
 	if (bIsReviving)
 	{
 		bIsReviving = false;
 		bIsHoldingReviveKey = false;
-
 		if (ReviveIndicatorWidget)
-		{
 			ReviveIndicatorWidget->StopReviveProgress();
-		}
-
 		if (ReviveTarget.IsValid())
-		{
 			Server_CancelRevive();
-		}
-
 		Server_SetHoldingReviveKey(false);
 		ReviveTarget = nullptr;
-		return;
 	}
-
-	// 상호작용 중이면 상호작용 취소
-	if (bIsInteracting)
+	else if (bIsInteracting)
 	{
 		CancelInteraction();
 	}
@@ -969,120 +872,75 @@ AGS_Seeker* AGS_TpsController::FindNearbyDyingSeeker() const
 {
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
 	if (!IsValid(MySeeker))
-	{
 		return nullptr;
-	}
 
 	UWorld* World = GetWorld();
 	if (!World)
-	{
 		return nullptr;
-	}
 
-	FVector MyLocation = MySeeker->GetActorLocation();
+	const FVector MyLocation = MySeeker->GetActorLocation();
 	AGS_Seeker* ClosestDyingSeeker = nullptr;
 	float ClosestDistance = ReviveDistance;
 
-	// 모든 시커를 순회하여 빈사 상태인 시커 찾기
 	if (UGS_ActorRegistrySubsystem* Registry = World->GetSubsystem<UGS_ActorRegistrySubsystem>())
 	{
 		const TArray<TWeakObjectPtr<AGS_Seeker>>& SeekerPtrs = Registry->GetSeekers();
-
 		for (const TWeakObjectPtr<AGS_Seeker>& SeekerPtr : SeekerPtrs)
 		{
 			AGS_Seeker* OtherSeeker = SeekerPtr.Get();
-			if (!IsValid(OtherSeeker))
+			if (!IsValid(OtherSeeker) || OtherSeeker == MySeeker || !OtherSeeker->IsInDyingState())
 				continue;
 
-			// 자기 자신 제외
-			if (OtherSeeker == MySeeker)
-			{
-				continue;
-			}
-
-			// 빈사 상태가 아니면 스킵
-			if (!OtherSeeker->IsInDyingState())
-			{
-				continue;
-			}
-
-			// 거리 확인
-			float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
-
+			const float Distance = FVector::Dist(MyLocation, OtherSeeker->GetActorLocation());
 			if (Distance < ClosestDistance)
 			{
-				// 시야(LOS) 확인 - 벽 너머 구조 방지 및 UI 가독성 향상
 				FHitResult LOSHit;
 				FCollisionQueryParams Params;
 				Params.AddIgnoredActor(MySeeker);
 				Params.AddIgnoredActor(OtherSeeker);
 
-				if (!World->LineTraceSingleByChannel(LOSHit, MyLocation, OtherSeeker->GetActorLocation(), ECC_Visibility, Params))
+				// Ensure direct line of sight to prevent reviving through walls
+				if (!World->LineTraceSingleByChannel(
+						LOSHit, MyLocation, OtherSeeker->GetActorLocation(), ECC_Visibility, Params))
 				{
-					// 가려진 것 없음
 					ClosestDistance = Distance;
 					ClosestDyingSeeker = OtherSeeker;
 				}
 			}
 		}
 	}
-
 	return ClosestDyingSeeker;
 }
 
 void AGS_TpsController::Server_RequestRevive_Implementation(AGS_Seeker* Target)
 {
-	if (!IsValid(Target))
-	{
-		return;
-	}
-
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-	if (!IsValid(MySeeker))
-	{
+	if (!IsValid(Target) || !IsValid(MySeeker))
 		return;
-	}
 
-	// 거리 재확인 (서버 검증)
-	float Distance = FVector::Dist(MySeeker->GetActorLocation(), Target->GetActorLocation());
-	if (Distance > ReviveDistance)
-	{
+	// Server-side validation of range and line of sight
+	if (FVector::Dist(MySeeker->GetActorLocation(), Target->GetActorLocation()) > ReviveDistance)
 		return;
-	}
 
-	// [보안/로직] 시야(LOS) 재확인 (서버 검증)
 	FHitResult LOSHit;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(MySeeker);
 	Params.AddIgnoredActor(Target);
 
-	if (GetWorld()->LineTraceSingleByChannel(LOSHit, MySeeker->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params))
-	{
-		// 무언가에 가려짐
+	if (GetWorld()->LineTraceSingleByChannel(
+			LOSHit, MySeeker->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params))
 		return;
-	}
 
-	// 서버에서도 ReviveTarget 설정 (Server_CancelRevive에서 사용)
 	ReviveTarget = Target;
-
-	// 서버에서 홀드 상태 설정 (타이밍 문제 해결)
 	bIsHoldingReviveKey = true;
-
-	// 대상에게 구조 시작 알림
 	Target->Server_StartRevive(MySeeker);
 }
 
 void AGS_TpsController::Server_CancelRevive_Implementation()
 {
-	// 서버에서 홀드 상태 해제
 	bIsHoldingReviveKey = false;
-
 	if (ReviveTarget.IsValid())
-	{
 		ReviveTarget->Server_CancelRevive();
-	}
-
-	// 서버에서도 ReviveTarget 초기화
 	ReviveTarget = nullptr;
 }
 
@@ -1098,11 +956,8 @@ void AGS_TpsController::Server_SetHoldingReviveKey_Implementation(bool bIsHoldin
 float AGS_TpsController::GetInteractionProgress() const
 {
 	if (!bIsInteracting || CurrentInteractionDuration <= 0.0f)
-	{
 		return 0.0f;
-	}
-
-	float Elapsed = GetWorld()->GetTimeSeconds() - InteractionStartTime;
+	const float Elapsed = GetWorld()->GetTimeSeconds() - InteractionStartTime;
 	return FMath::Clamp(Elapsed / CurrentInteractionDuration, 0.0f, 1.0f);
 }
 
@@ -1115,7 +970,6 @@ void AGS_TpsController::UpdateNearbyInteractable()
 		return;
 	}
 
-	// 오버랩 기반 감지 - 시커의 Capsule과 겹치는 IInteractable 찾기
 	TArray<AActor*> OverlappingActors;
 	MySeeker->GetOverlappingActors(OverlappingActors);
 
@@ -1124,15 +978,9 @@ void AGS_TpsController::UpdateNearbyInteractable()
 
 	for (AActor* Actor : OverlappingActors)
 	{
-		if (!Actor || !Actor->Implements<UGS_InteractableInterface>())
-		{
+		if (!Actor || !Actor->Implements<UGS_InteractableInterface>() ||
+			!IGS_InteractableInterface::Execute_CanInteract(Actor, MySeeker))
 			continue;
-		}
-
-		if (!IGS_InteractableInterface::Execute_CanInteract(Actor, MySeeker))
-		{
-			continue;
-		}
 
 		int32 Priority = IGS_InteractableInterface::Execute_GetInteractionPriority(Actor);
 		if (Priority > HighestPriority)
@@ -1142,51 +990,37 @@ void AGS_TpsController::UpdateNearbyInteractable()
 		}
 	}
 
-	// 위젯 업데이트: 상호작용 가능 대상이 변경되었을 때만 호출
-	if (InteractionWidget)
+	if (InteractionWidget && (BestInteractable != CachedInteractable.Get() || bIsInteracting))
 	{
-		if (BestInteractable != CachedInteractable.Get() || bIsInteracting)
+		if (BestInteractable && !bIsInteracting)
 		{
-			if (BestInteractable && !bIsInteracting)
-			{
-				FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
-				InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
-			}
-			else
-			{
-				InteractionWidget->HideNearbyIndicator();
-			}
+			const FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(BestInteractable);
+			InteractionWidget->ShowNearbyIndicator(BestInteractable, ActionText);
+		}
+		else
+		{
+			InteractionWidget->HideNearbyIndicator();
 		}
 	}
-
 	CachedInteractable = BestInteractable;
 }
 
 void AGS_TpsController::StartInteraction(AActor* Target)
 {
-	if (!Target || !Target->Implements<UGS_InteractableInterface>())
-	{
-		return;
-	}
-
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-	if (!IsValid(MySeeker))
-	{
+	if (!Target || !Target->Implements<UGS_InteractableInterface>() || !IsValid(MySeeker))
 		return;
-	}
 
 	bIsInteracting = true;
 	CurrentInteractTarget = Target;
 	InteractionStartTime = GetWorld()->GetTimeSeconds();
 	CurrentInteractionDuration = IGS_InteractableInterface::Execute_GetInteractionDuration(Target);
 
-	// 대상에게 상호작용 시작 알림
 	IGS_InteractableInterface::Execute_BeginInteract(Target, MySeeker);
 
-	// 위젯 업데이트
 	if (InteractionWidget)
 	{
-		FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(Target);
+		const FText ActionText = IGS_InteractableInterface::Execute_GetInteractionText(Target);
 		InteractionWidget->ShowInteraction(Target, CurrentInteractionDuration, ActionText);
 	}
 }
@@ -1194,23 +1028,17 @@ void AGS_TpsController::StartInteraction(AActor* Target)
 void AGS_TpsController::CancelInteraction()
 {
 	if (!bIsInteracting)
-	{
 		return;
-	}
 
-	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-
-	// 대상에게 상호작용 취소 알림
 	if (CurrentInteractTarget.IsValid() && CurrentInteractTarget->Implements<UGS_InteractableInterface>())
 	{
-		IGS_InteractableInterface::Execute_EndInteract(CurrentInteractTarget.Get(), MySeeker, false);
+		IGS_InteractableInterface::Execute_EndInteract(CurrentInteractTarget.Get(), Cast<AGS_Seeker>(GetPawn()), false);
 	}
 
 	bIsInteracting = false;
 	CurrentInteractTarget.Reset();
 	CurrentInteractionDuration = 0.0f;
 
-	// 위젯 업데이트
 	if (InteractionWidget)
 	{
 		InteractionWidget->OnInteractionCancelled();
@@ -1221,23 +1049,14 @@ void AGS_TpsController::CancelInteraction()
 void AGS_TpsController::CompleteInteraction()
 {
 	if (!bIsInteracting)
-	{
 		return;
-	}
-
-	AActor* Target = CurrentInteractTarget.Get();
-
-	// 서버에 상호작용 완료 알림 (서버에서 보상 지급)
-	if (Target)
-	{
+	if (AActor* Target = CurrentInteractTarget.Get())
 		Server_CompleteInteraction(Target);
-	}
 
 	bIsInteracting = false;
 	CurrentInteractTarget.Reset();
 	CurrentInteractionDuration = 0.0f;
 
-	// 위젯 업데이트
 	if (InteractionWidget)
 	{
 		InteractionWidget->OnInteractionComplete();
@@ -1247,18 +1066,10 @@ void AGS_TpsController::CompleteInteraction()
 
 void AGS_TpsController::Server_CompleteInteraction_Implementation(AActor* Target)
 {
-	if (!IsValid(Target))
-	{
-		return;
-	}
-
 	AGS_Seeker* MySeeker = Cast<AGS_Seeker>(GetPawn());
-	if (!IsValid(MySeeker))
-	{
+	if (!IsValid(Target) || !IsValid(MySeeker))
 		return;
-	}
 
-	// 서버에서 상호작용 완료 처리
 	if (Target->Implements<UGS_InteractableInterface>())
 	{
 		IGS_InteractableInterface::Execute_EndInteract(Target, MySeeker, true);
@@ -1268,28 +1079,94 @@ void AGS_TpsController::Server_CompleteInteraction_Implementation(AActor* Target
 void AGS_TpsController::UpdateInteractionProgress(float DeltaTime)
 {
 	if (!bIsInteracting)
-	{
 		return;
-	}
 
-	// 대상이 유효한지 확인
 	if (!CurrentInteractTarget.IsValid())
 	{
 		CancelInteraction();
 		return;
 	}
 
-	// 진행률 확인
-	float Progress = GetInteractionProgress();
-
-	// 위젯 진행률 업데이트
+	const float Progress = GetInteractionProgress();
 	if (InteractionWidget)
-	{
 		InteractionWidget->UpdateProgress(Progress);
-	}
-
 	if (Progress >= 1.0f)
-	{
 		CompleteInteraction();
+}
+
+void AGS_TpsController::CreateMainHUD()
+{
+	UE_LOG(LogTemp, Warning, TEXT("=================CreateMainHUD 호출==================="));
+	AGS_Character* GS_Character = Cast<AGS_Character>(GetPawn());
+	if (IsValid(GS_Character))
+	{
+		TSubclassOf<UUserWidget> Widget = PlayerWidgetClasses[GS_Character->GetCharacterType()];
+		if (IsValid(Widget))
+		{
+			if (PlayerWidgetInstance)
+			{
+				PlayerWidgetInstance->RemoveFromParent();
+				PlayerWidgetInstance = nullptr;
+				CrosshairWidget = nullptr;
+			}
+
+			PlayerWidgetInstance = CreateWidget<UUserWidget>(this, Widget);
+			if (IsValid(PlayerWidgetInstance))
+			{
+				UGS_HPBoardWidget* HPBoardWidget =
+					Cast<UGS_HPBoardWidget>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_HPBoard")));
+				UGS_BossHP* BossWidget =
+					Cast<UGS_BossHP>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_BossHPBoard")));
+				UGS_FeverGaugeBoard* FeverWidget =
+					Cast<UGS_FeverGaugeBoard>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_FeverBoard")));
+
+				if (IsValid(HPBoardWidget))
+				{
+					HPBoardWidget->InitBoardWidget();
+				}
+				if (IsValid(BossWidget))
+				{
+					BossWidget->InitGuardianHPWidget();
+				}
+				if (IsValid(FeverWidget))
+				{
+					FeverWidget->InitDrakharFeverWidget();
+				}
+
+				CrosshairWidget =
+					Cast<UGS_CrossHairImage>(PlayerWidgetInstance->GetWidgetFromName(TEXT("WBP_CrossHair")));
+
+				PlayerWidgetInstance->AddToViewport();
+				UE_LOG(LogTemp, Warning, TEXT("CreateMainHUD에서 PlayerWidgetInstance 생성 및 뷰포트에 추가 성공"));
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("CreateMainHUD 호출 시 Pawn이 유효하지 않습니다!"));
+	}
+}
+
+void AGS_TpsController::TryCreatingPlayerWidget()
+{
+	// GetPawn()으로 Pawn이 유효한지 확인
+	if (GetPawn())
+	{
+		// Pawn이 유효하면 CreateMainHUD()을 호출하고 타이머를 정리
+		CreateMainHUD();
+		if (GetWorld() && WaitForPawnTimerHandle.IsValid())
+		{
+			GetWorld()->GetTimerManager().ClearTimer(WaitForPawnTimerHandle);
+		}
+	}
+	else
+	{
+		// Pawn이 아직 유효하지 않으면 0.2초 후에 이 함수를 다시 시도하도록 타이머 설정
+		UE_LOG(LogTemp, Warning, TEXT("UI 위젯을 생성하기 위해 Pawn을 기다리는 중..."));
+		if (GetWorld())
+		{
+			GetWorld()->GetTimerManager().SetTimer(
+				WaitForPawnTimerHandle, this, &AGS_TpsController::TryCreatingPlayerWidget, 0.2f, false);
+		}
 	}
 }

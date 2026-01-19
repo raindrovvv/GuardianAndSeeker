@@ -6,6 +6,7 @@
 UENUM(BlueprintType)
 enum class ECharacterType : uint8
 {
+	Seeker,
 	Ares,
 	Chan,
 	Merci,

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -7,13 +7,18 @@
 #include "GS_AN_TEST.generated.h"
 
 /**
- * 
+ * @brief Debugging animation notify to log ownership and role information.
+ * Only intended for temporary testing and debugging of network synchronization.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "GS Network Test Notify"))
 class GAS_API UGS_AN_TEST : public UAnimNotify
 {
 	GENERATED_BODY()
-public:
-	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
+public:
+	UGS_AN_TEST();
+
+	virtual void Notify(USkeletalMeshComponent* MeshComp,
+						UAnimSequenceBase* Animation,
+						const FAnimNotifyEventReference& EventReference) override;
 };

@@ -1,110 +1,106 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Character/Component/GS_HitReactComp.h"
-
 #include "Animation/Character/GS_SeekerAnimInstance.h"
 #include "Character/Player/GS_Player.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
-#include "Character/Skill/GS_SkillBase.h"
-#include "Weapon/Equipable/GS_WeaponAxe.h"
-#include "Character/Player/Seeker/GS_Chan.h"
-#include "Character/Skill/Seeker/GS_HealSkill.h"
+#include "Character/Skill/GS_SkillComp.h"
+#include "Weapon/Equipable/GS_WeaponEquipable.h"
+#include "Engine/World.h"
 
-
-// Sets default values for this component's properties
 UGS_HitReactComp::UGS_HitReactComp()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 
-	AM_HitReacts.Init(nullptr, static_cast<int>(EHitReactType::TypeNum));
+	// Pre-initialize the hit reaction montage array
+	HitReactMontages.Init(nullptr, static_cast<int32>(EHitReactType::TypeNum));
 }
 
 void UGS_HitReactComp::PlayHitReact(EHitReactType ReactType, FVector HitDirection)
 {
-	FName Section = CalculateHitDirection(HitDirection);
 	AGS_Player* OwnerCharacter = Cast<AGS_Player>(GetOwner());
-	AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter);
-	if (OwnerCharacter)
+	if (!OwnerCharacter)
 	{
-		// ============================================
-		// Hit React Cooldown System
-		// ============================================
-		float CurrentTime = GetWorld()->GetTimeSeconds();
+		return;
+	}
 
-		// Interrupt 타입이고 쿨다운 시간 내라면 DamageOnly로 변경
-		if (ReactType == EHitReactType::Interrupt &&
-		    (CurrentTime - LastHitReactTime) < HitReactCooldown)
+	AGS_Seeker* OwnerSeeker = Cast<AGS_Seeker>(OwnerCharacter);
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	const FName HitSection = CalculateHitDirection(HitDirection);
+
+	// Implement Hit Reaction Cooldown for 'Interrupt' types
+	// If hit again too soon, downgrade to 'DamageOnly' to prevent infinite stun-locking
+	if (ReactType == EHitReactType::Interrupt && (CurrentTime - LastHitReactTimestamp) < HitReactCooldownSeconds)
+	{
+		ReactType = EHitReactType::DamageOnly;
+	}
+
+	// Check for Super Armor (e.g., during Ultimate skills)
+	bool bIsSuperArmorActive = false;
+	if (OwnerSeeker && OwnerSeeker->GetSkillComp())
+	{
+		if (OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
 		{
-			ReactType = EHitReactType::DamageOnly;
+			bIsSuperArmorActive = true;
 		}
+	}
 
-		// 궁극기 상태인지 확인 (슈퍼아머 효과: 모든 시커 공통)
-		bool bIsSuperArmorActive = false;
-		if (OwnerSeeker)
+	// Handle different reaction behaviors
+	switch (ReactType)
+	{
+		case EHitReactType::Interrupt:
 		{
-			if (OwnerSeeker->GetSkillComp() && OwnerSeeker->GetSkillComp()->IsSkillActive(ESkillSlot::Ultimate))
+			if (OwnerSeeker && !bIsSuperArmorActive)
 			{
-				bIsSuperArmorActive = true;
-			}
-		}
+				// Cancel current skills and force into the full-body reaction slot
+				OwnerSeeker->GetSkillComp()->SkillsInterrupt();
+				OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
 
-		if (ReactType == EHitReactType::Interrupt)
-		{
-			if (OwnerSeeker)
-			{
-				// 궁극기 중에는 인터럽트 무시 (슈퍼아머 효과)
-				if (!bIsSuperArmorActive)
+				if (UAnimMontage* HitMontage = HitReactMontages[static_cast<int32>(EHitReactType::Interrupt)])
 				{
-					OwnerSeeker->GetSkillComp()->SkillsInterrupt();
+					OwnerCharacter->Multicast_PlaySkillMontage(HitMontage, HitSection);
 
-					OwnerSeeker->Multicast_SetMontageSlot(ESeekerMontageSlot::FullBody);
-
-					UAnimMontage* AM_HitReact = AM_HitReacts[static_cast<int>(ReactType)];
-					if (AM_HitReact)
+					// Setup end delegate to restore state after the stagger
+					if (UGS_SeekerAnimInstance* AnimInstance =
+							Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance()))
 					{
-						OwnerCharacter->Multicast_PlaySkillMontage(AM_HitReact, Section);
-
-						UGS_SeekerAnimInstance* SeekerAnimInstance = Cast<UGS_SeekerAnimInstance>(OwnerSeeker->GetMesh()->GetAnimInstance());
-						if (SeekerAnimInstance)
-						{
-							HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::OnEndDelegate);
-							SeekerAnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, AM_HitReact);
-						}
+						HitReactEndDelegate.BindUObject(this, &UGS_HitReactComp::HandleHitReactEnded);
+						AnimInstance->Montage_SetEndDelegate(HitReactEndDelegate, HitMontage);
 					}
-
-					// 피격모션 재생 시간 기록 (쿨다운용)
-					LastHitReactTime = CurrentTime;
 				}
+
+				LastHitReactTimestamp = CurrentTime;
 			}
+
+			// Globally disable hit reaction for a duration to allow a 'breathing' window
 			OwnerCharacter->DisableHitReact(3.0f);
+			break;
 		}
-		else if (ReactType == EHitReactType::Additive)
+
+		case EHitReactType::Additive:
 		{
+			// Light reactions that reset the gait but don't cancel skills
 			if (OwnerSeeker && !bIsSuperArmorActive)
 			{
 				OwnerSeeker->StateReset();
 				OwnerSeeker->SetSeekerGait(EGait::Run);
 			}
-		}
-		else if (ReactType == EHitReactType::DamageOnly)
-		{
-			if (OwnerSeeker)
-			{
-				// 단순 데미지만 입을 때는 상태를 초기화하지 않음
-			}
+			break;
 		}
 
+		case EHitReactType::DamageOnly:
+		default:
+			// No animation change for purely damage-based events
+			break;
+	}
 
-		// 궁극기 중이 아니며, 단순 데미지 피격이 아닐 때만 활 조준 상태를 해제함
-		if (OwnerSeeker && !bIsSuperArmorActive && ReactType != EHitReactType::DamageOnly)
-		{
-			OwnerSeeker->SetAimState(false);
-			OwnerSeeker->SetDrawState(false);
-		}
+	// Automatic draw/aim cancellation for bow users, unless in super armor or minor hit
+	if (OwnerSeeker && !bIsSuperArmorActive && ReactType != EHitReactType::DamageOnly)
+	{
+		OwnerSeeker->SetAimState(false);
+		OwnerSeeker->SetDrawState(false);
 	}
 }
-
 
 void UGS_HitReactComp::StopHitReact(UAnimMontage* TargetMontage)
 {
@@ -116,74 +112,61 @@ void UGS_HitReactComp::StopHitReact(UAnimMontage* TargetMontage)
 
 FName UGS_HitReactComp::CalculateHitDirection(FVector HitDirection)
 {
-	FName Section = NAME_None;
-
-	if (AGS_Player* OwnerCharacter = Cast<AGS_Player>(GetOwner()))
+	AGS_Player* OwnerCharacter = Cast<AGS_Player>(GetOwner());
+	if (!OwnerCharacter || HitDirection.IsNearlyZero())
 	{
-		FVector Front = OwnerCharacter->GetActorRotation().Vector();
-		FVector Right = OwnerCharacter->GetActorRightVector();
-
-		float FrontDot = FVector::DotProduct(Front, HitDirection);
-		float RightDot = FVector::DotProduct(Right, HitDirection);
-
-		if (FrontDot > 0.7f)
-		{
-			Section = FName("Front");
-		}
-		else if (FrontDot < -0.7f)
-		{
-			Section = FName("Back");
-		}
-		else if (RightDot > 0.0f)
-		{
-			Section = FName("Right");
-		}
-		else
-		{
-			Section = FName("Left");
-		}
+		return FName("Front");
 	}
 
-	return Section;
+	// Calculate hit quadrant based on actor's forward and right vectors
+	const FVector Forward = OwnerCharacter->GetActorForwardVector();
+	const FVector Right = OwnerCharacter->GetActorRightVector();
+
+	const float ForwardDot = FVector::DotProduct(Forward, HitDirection);
+	const float RightDot = FVector::DotProduct(Right, HitDirection);
+
+	if (ForwardDot > 0.7f)
+		return FName("Front");
+	if (ForwardDot < -0.7f)
+		return FName("Back");
+
+	return (RightDot > 0.0f) ? FName("Right") : FName("Left");
 }
 
-void UGS_HitReactComp::OnEndDelegate(UAnimMontage* Montage, bool bInterrupted)
+void UGS_HitReactComp::HandleHitReactEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	// 다른 애니메이션(예: 구르기)에 의해 중단된 경우, 상태를 복구하지 않음.
+	// Interrupted hit reactions (by skills like Roll) shouldn't force-reset the character state
 	if (bInterrupted)
 	{
 		return;
 	}
 
-	AActor* Owner = GetOwner();
-	if (!Owner)
-		return;
-
-	// 모든 캐릭터(시커, 몬스터 등)에 대해 공통적으로 무기 콜리전 초기화
-	if (AGS_Character* Character = Cast<AGS_Character>(Owner))
+	AGS_Character* OwnerCharacter = Cast<AGS_Character>(GetOwner());
+	if (!OwnerCharacter)
 	{
-		// 1. 등록된 모든 무기 슬롯의 콜리전 강제 비활성화
-		for (int32 i = 0; i < 5; ++i) // 최대 5개 슬롯 체크
-		{
-			if (AGS_WeaponEquipable* Weapon = Cast<AGS_WeaponEquipable>(Character->GetWeaponByIndex(i)))
-			{
-				Weapon->ForceDisableHit();
-			}
-		}
-
-		// 2. 시커 전용 상태 복구
-		if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(Character))
-		{
-			Seeker->StateReset();
-			Seeker->SetSeekerGait(EGait::Run);
-		}
-
-		// 외부 델리게이트 호출
-		OnHitReactEnd.Broadcast(Montage, bInterrupted);
+		return;
 	}
+
+	// 1. Safety: Disable hitboxes for all weapon slots to prevent active hitboxes during recovery
+	for (int32 i = 0; i < 5; ++i)
+	{
+		if (AGS_WeaponEquipable* Weapon = Cast<AGS_WeaponEquipable>(OwnerCharacter->GetWeaponByIndex(i)))
+		{
+			Weapon->ForceDisableHit();
+		}
+	}
+
+	// 2. Specialized seeker recovery
+	if (AGS_Seeker* Seeker = Cast<AGS_Seeker>(OwnerCharacter))
+	{
+		Seeker->StateReset();
+		Seeker->SetSeekerGait(EGait::Run);
+	}
+
+	// 3. Broadcast completion for external systems (e.g., AI)
+	OnHitReactEnd.Broadcast(Montage, bInterrupted);
 }
 
-// Called when the game starts
 void UGS_HitReactComp::BeginPlay()
 {
 	Super::BeginPlay();
@@ -192,6 +175,5 @@ void UGS_HitReactComp::BeginPlay()
 void UGS_HitReactComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	HitReactEndDelegate.Unbind();
-
 	Super::EndPlay(EndPlayReason);
 }

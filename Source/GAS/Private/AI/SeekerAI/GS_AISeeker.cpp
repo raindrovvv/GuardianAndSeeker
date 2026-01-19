@@ -551,7 +551,7 @@ void AGS_AISeeker::PerformAttack()
 			else
 			{
 				// 근접 캐릭터 콤보 공격
-				SpawnedSeeker->Server_OnComboAttack();
+				SpawnedSeeker->Server_ExecuteComboAttack();
 			}
 			return;
 		}

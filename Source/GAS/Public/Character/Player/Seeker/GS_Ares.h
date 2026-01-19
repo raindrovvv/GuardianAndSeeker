@@ -1,83 +1,87 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GS_Seeker.h"
-#include "Curves/CurveFloat.h"
 #include "GS_Ares.generated.h"
 
 class AGS_SwordAuraProjectile;
-class UAkAudioEvent;
+class UNiagaraSystem;
+class UCurveFloat;
 
-UCLASS()
+/**
+ * @brief Ares character class - The heavy melee seeker.
+ * Specializes in high-damage, large-scale sword attacks with built-in hit-stop and camera feedback.
+ */
+UCLASS(BlueprintType, meta = (DisplayName = "GS Seeker Ares"))
 class GAS_API AGS_Ares : public AGS_Seeker
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	AGS_Ares();
 
-	// Called every frame
+	// AActor / ACharacter interface
 	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual float TakeDamage(float DamageAmount,
+							 struct FDamageEvent const& DamageEvent,
+							 class AController* EventInstigator,
+							 AActor* DamageCauser) override;
+	// ~AActor / ACharacter interface
 
-	// Projectile
-	UPROPERTY(EditDefaultsOnly, Category = "Skill|Projectile")
+	// AGS_Character interface
+	virtual void ServerAttackMontage() override;
+	virtual void MulticastPlayComboSection_Implementation(int32 ComboIndex) override;
+	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) override;
+	// ~AGS_Character interface
+
+	/** Projectile class used by Ares' special sword aura skills */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ares|Skills")
 	TSubclassOf<AGS_SwordAuraProjectile> AresProjectileClass;
 
-	/*virtual void OnComboAttack() override;*/
+	/** VFX played specifically on the final hit of the basic attack combo */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ares|VFX")
+	TObjectPtr<UNiagaraSystem> FinisherHitVFX;
 
-	virtual void ServerAttackMontage() override;
-
-	virtual void MulticastPlayComboSection_Implementation(int32 ComboIndex) override;
-
-	UPROPERTY(EditDefaultsOnly, Category = "VFX|Attack")
-	class UNiagaraSystem* FinalAttackHitVFX; // 4번째 공격 추가 VFX
-
-	// 사운드 중첩 방지를 위한 현재 재생 중인 사운드 ID
-	UPROPERTY()
-	int32 CurrentSoundPlayingID = -1;
-
-	// ===============
-	// 타격 처리 관련
-	// ===============
+	/** Broadcasts hit effects (hit-stop, screenshake) to all relevant clients */
 	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnAttackHit(int32 ComboIndex);
+	void Multicast_HandleAttackHitEffects(int32 ComboIndex);
 
-	// Damage handling with audio feedback
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
-
-	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) override;
-
-	// 아레스 대시 스킬 카메라 복원
+	/** Restores the camera zoom state after a dash skill move */
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_RestoreDashCameraZoom();
 
-public:
-	// 아레스 대시 스킬 카메라 설정
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving")
-	float MovingSkill_ZoomOutDistance = 300.0f;
+	// Ares Moving Skill (Dash) Configuration
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ares|Skills|Moving")
+	float DashZoomDistance = 300.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving")
-	UCurveFloat* MovingSkill_CameraZoomCurve;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ares|Skills|Moving")
+	TObjectPtr<UCurveFloat> DashZoomCurve;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving|Camera")
-	bool MovingSkill_EnableMotionBlur = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ares|Skills|Moving|VFX")
+	bool bEnableDashMotionBlur = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving|Camera", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float MovingSkill_MotionBlurPeakAmount = 1.0f; // 기본값을 1.0으로 설정하여 더 강한 효과
+	UPROPERTY(EditAnywhere,
+			  BlueprintReadOnly,
+			  Category = "Ares|Skills|Moving|VFX",
+			  meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float DashMotionBlurIntensity = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving|Camera")
-	UCurveFloat* MovingSkill_MotionBlurCurve;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ares|Skills|Moving|VFX")
+	TObjectPtr<UCurveFloat> DashMotionBlurCurve;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Moving|Camera", meta = (ClampMin = "0.1", ClampMax = "5.0"))
-	float MovingSkill_MotionBlurExponent = 2.0f;
+	UPROPERTY(EditAnywhere,
+			  BlueprintReadOnly,
+			  Category = "Ares|Skills|Moving|VFX",
+			  meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float DashMotionBlurExponent = 2.0f;
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+private:
+	/** Internal ID of the current playing sound for overlap management */
+	int32 ActiveSoundID = -1;
 };

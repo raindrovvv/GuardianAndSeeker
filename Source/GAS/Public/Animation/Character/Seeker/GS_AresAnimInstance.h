@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -7,13 +7,17 @@
 #include "GS_AresAnimInstance.generated.h"
 
 /**
- * 
+ * @brief Animation instance specific to the Ares Seeker character.
+ * Handles Ares-specific animation states and transitions.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "Ares Anim Instance"))
 class GAS_API UGS_AresAnimInstance : public UGS_SeekerAnimInstance
 {
 	GENERATED_BODY()
+
 public:
+	UGS_AresAnimInstance();
+
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 };

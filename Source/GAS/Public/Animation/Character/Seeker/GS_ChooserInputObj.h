@@ -1,71 +1,89 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
+#include "UObject/NoExportTypes.h"
 #include "Animation/Character/E_SeekerAnim.h"
 #include "Character/E_Character.h"
 #include "GS_ChooserInputObj.generated.h"
 
 /**
- * 
+ * @brief Input object used by the Unreal Engine Chooser system to determine motion matching animations.
+ * Provides predicates for turning in place, pivoting, starting, and state-based transitions.
  */
-UCLASS(BlueprintType, Blueprintable)
+UCLASS(BlueprintType, Blueprintable, meta = (DisplayName = "GS Seeker Chooser Input"))
 class GAS_API UGS_ChooserInputObj : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Movement")
-	bool ShouldTurnInPlace();
+	/** Returns true if the character orientation delta warrants a turn-in-place animation */
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Movement")
+	bool ShouldTurnInPlace() const;
 
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"),Category = "Movement")
-	bool IsMoving();
+	/** Returns true if the character has significant current and predicted future velocity */
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Movement")
+	bool IsMoving() const;
 
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Movement")
-	bool IsStarting();
+	/** Returns true if the character is starting to move from an idle state */
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Movement")
+	bool IsStarting() const;
 
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Movement")
-	bool IsPivoting();
+	/** Returns true if the character's movement direction is changing significantly (pivoting) */
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Movement")
+	bool IsPivoting() const;
 
-	UFUNCTION(BlueprintPure, meta=(BlueprintThreadSafe="true"), Category = "Movement")
-	bool ShouldSpinTransition();
+	/** Returns true if a spin transition is required based on rotation delta and speed */
+	UFUNCTION(BlueprintPure, meta = (BlueprintThreadSafe = "true"), Category = "Movement")
+	bool ShouldSpinTransition() const;
 
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")
-	FVector Velocity;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")
-	FVector FutureVelocity;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")
-	FTransform CharacterTransform;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")
-	FTransform RootTransform;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")
-	float Speed2D;
-	
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
-	EMovementState MovementState;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
-	EMovementState LastMovementState;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, CAtegory = "StateValue")
-	EGait Gait;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
-	EGait LastGait;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "StateValue")
-	ERotationMode RotationMode;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Control")
+	// Movement Vectors
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Vectors")
+	FVector Velocity = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Vectors")
+	FVector FutureVelocity = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Context")
+	FTransform CharacterTransform = FTransform::Identity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Context")
+	FTransform RootTransform = FTransform::Identity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Context")
+	float Speed2D = 0.0f;
+
+	// State values
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	EMovementState MovementState = EMovementState::Idle;
+
+	/** Movement state from the previous frame for transition detection */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	EMovementState LastMovementState = EMovementState::Idle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	EGait Gait = EGait::Walk;
+
+	/** Gait from the previous frame for transition detection */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	EGait LastGait = EGait::Walk;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	ERotationMode RotationMode = ERotationMode::OrientToMovement;
+
+	/** External flag to force a turn-in-place logic check */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Control")
 	bool bMustTurnInPlace = false;
 
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Database")
-	TArray<FName> CurrentDatabasesTags;
+	/** Tags currently active in the motion matching databases for context-aware logic */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Database")
+	TArray<FName> CurrentDatabaseTags;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CharacterClass")
-	ECharacterType CharacterType;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
+	ECharacterType CharacterType = ECharacterType::Seeker;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "StateValue")
-	bool IsBlock = false;
+	/** Whether the character is currently in a blocking/defensive state */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	bool bIsBlocking = false;
 };

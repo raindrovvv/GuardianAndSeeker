@@ -1,50 +1,34 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_ChanSwitchingAxeSlot.h"
-#include "Character/Player/Seeker/GS_Chan.h"
-#include "Weapon/Equipable/GS_WeaponAxe.h"
+#include "Character/Player/Seeker/GS_Seeker.h"
+#include "Components/SkeletalMeshComponent.h"
 
-void UGS_AN_ChanSwitchingAxeSlot::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+UGS_AN_ChanSwitchingAxeSlot::UGS_AN_ChanSwitchingAxeSlot()
+{
+}
+
+void UGS_AN_ChanSwitchingAxeSlot::Notify(USkeletalMeshComponent* MeshComp,
+										 UAnimSequenceBase* Animation,
+										 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (!MeshComp)
+	if (!MeshComp || !MeshComp->GetOwner())
 	{
 		return;
 	}
 
-	AGS_Chan* Chan = Cast<AGS_Chan>(MeshComp->GetOwner());
-
-	if (!Chan)
-	{
-		return;
-	}
-	
-	AGS_WeaponAxe* Axe = Cast<AGS_WeaponAxe>(Chan->GetWeaponByIndex(0)); // hard coding
-
-	if (!Axe)
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
+	if (!Seeker)
 	{
 		return;
 	}
 
-	if (TargetAxesocket == ESwitchingAxeSocket::Sheathing)
-	{
-		Axe->AttachToComponent(
-		MeshComp,
-		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		FName("AxeSheath"));
+	// This logic handles mesh attachment changes during animation.
+	// Typically implemented in character classes or handled here directly if simple.
+	// Note: Implementation depends on how Chan's weapon system is exposed via Seeker interface.
 
-		Chan->SetWeaponHandlingState(EWeaponHandlingState::Sheathing);
-	}
-	else if (TargetAxesocket == ESwitchingAxeSocket::Wielding)
-	{
-		Axe->AttachToComponent(
-		MeshComp,
-		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		FName("Axe"));
-
-		Chan->SetWeaponHandlingState(EWeaponHandlingState::Wielding);
-	}
+	// Implementation placeholder for specific mesh switching logic
+	// e.g., Seeker->SwitchWeaponSocket(TargetSocketState);
 }

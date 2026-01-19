@@ -59,7 +59,7 @@ void UGS_ChanSkillInputHandlerComp::OnLeftClick(const FInputActionInstance& Inst
 				{
 					// 조작감 개선: 클라이언트에서 즉시 회전 보정
 					ChanCharacter->PreAttackSnap();
-					ChanCharacter->Server_OnComboAttack();
+					ChanCharacter->Server_ExecuteComboAttack();
 				}
 			}
 		}

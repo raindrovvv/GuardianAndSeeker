@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -9,26 +9,45 @@
 class UCharacterMovementComponent;
 class AGS_Character;
 
-UCLASS()
+/**
+ * @brief Animation instance for all playable characters.
+ * Provides character-specific animation state and movement data binding.
+ */
+UCLASS(BlueprintType, meta = (DisplayName = "Character Anim Instance"))
 class GAS_API UGS_CharacterAnimInstance : public UGS_AnimInstance
 {
 	GENERATED_BODY()
-public:	
-	UFUNCTION(BlueprintCallable, Category = "Animation")
-	void SetOwnerCharacter(AGS_Character* Character);
-	UFUNCTION(BlueprintCallable, Category = "Animation")
-	void SetCharacterMovement(UCharacterMovementComponent* CharacterMovement);
+
+public:
+	UGS_CharacterAnimInstance();
+
+	/**
+	 * @brief Binds the owner character reference for animation logic.
+	 * @param InCharacter The character that owns this animation instance
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Animation|Setup")
+	void BindOwnerCharacter(AGS_Character* InCharacter);
+
+	/**
+	 * @brief Binds the movement component for velocity and state queries.
+	 * @param InMovement The character movement component to bind
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Animation|Setup")
+	void BindMovementComponent(UCharacterMovementComponent* InMovement);
 
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
-	TObjectPtr<AGS_Character> OwnerCharacter;
+	/** Reference to the owning character */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|References")
+	TObjectPtr<AGS_Character> CachedOwnerCharacter;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
-	TObjectPtr<UCharacterMovementComponent> OwnerCharacterMovement;
+	/** Reference to the character's movement component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|References")
+	TObjectPtr<UCharacterMovementComponent> CachedMovementComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-	float GroundSpeed;
+	/** Current ground movement speed (calculated each frame) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Movement")
+	float CurrentGroundSpeed;
 };

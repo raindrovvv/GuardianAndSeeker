@@ -493,7 +493,7 @@ void UGS_SkillComp::SkillsInterrupt()
 	{
 		Seeker->CurrentComboIndex = 0;
 		Seeker->CanAcceptComboInput = true;
-		Seeker->bNextCombo = false;
+		Seeker->bHasBufferedNextCombo = false;
 	}
 
 	for (TPair<ESkillSlot, UGS_SkillBase*> slot : SkillMap)

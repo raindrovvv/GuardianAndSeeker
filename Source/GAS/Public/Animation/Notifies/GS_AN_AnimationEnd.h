@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -8,16 +8,22 @@
 #include "GS_AN_AnimationEnd.generated.h"
 
 /**
- * 
+ * @brief Animation notify that signals the end of a skill-related animation.
+ * Used to clean up skill state and potentially trigger follow-up logic in the skill component.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "GS Animation End Notify"))
 class GAS_API UGS_AN_AnimationEnd : public UAnimNotify
 {
 	GENERATED_BODY()
-	
-public:
-	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ESkillSlot SkillType;
+public:
+	UGS_AN_AnimationEnd();
+
+	virtual void Notify(USkeletalMeshComponent* MeshComp,
+						UAnimSequenceBase* Animation,
+						const FAnimNotifyEventReference& EventReference) override;
+
+	/** The skill slot associated with this animation end event */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+	ESkillSlot TargetSkillSlot = ESkillSlot::None;
 };

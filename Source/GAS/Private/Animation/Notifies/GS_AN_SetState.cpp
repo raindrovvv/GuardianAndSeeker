@@ -1,65 +1,74 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/GS_AN_SetState.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
 #include "Character/GS_TpsController.h"
-#include "Kismet/GameplayStatics.h"
+#include "Character/Skill/GS_SkillComp.h"
 
-void UGS_AN_SetState::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                             const FAnimNotifyEventReference& EventReference)
+UGS_AN_SetState::UGS_AN_SetState()
+{
+}
+
+void UGS_AN_SetState::Notify(USkeletalMeshComponent* MeshComp,
+							 UAnimSequenceBase* Animation,
+							 const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	// 여기에서는 Notify 에서 받는 값에 따라서 변경할지에 관한 if 문들로 이루어 져야 한다.
-	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
+	if (!MeshComp || !MeshComp->GetOwner())
+	{
+		return;
+	}
 
+	AGS_Seeker* Seeker = Cast<AGS_Seeker>(MeshComp->GetOwner());
 	if (!Seeker)
 	{
 		return;
 	}
 
-	if (SeekerSlot != ESeekerMontageSlot::End)
+	// Update Montage Slot (Server-side Multicast)
+	if (TargetMontageSlot != ESeekerMontageSlot::End)
 	{
-		// Multicast RPC는 서버에서만 호출해야 함
 		if (Seeker->HasAuthority())
 		{
-			Seeker->Multicast_SetMontageSlot(SeekerSlot);
+			Seeker->Multicast_SetMontageSlot(TargetMontageSlot);
 		}
 	}
 
-	if (Seeker->CanChangeSeekerGait != bCanChangeSeekerGait)
+	// Update Gait Change permission
+	if (Seeker->CanChangeSeekerGait != bAllowGaitChange)
 	{
-		Seeker->CanChangeSeekerGait = bCanChangeSeekerGait;
+		Seeker->CanChangeSeekerGait = bAllowGaitChange;
 	}
 
-	if (Seeker->CanAcceptComboInput != bCanAcceptComboInput)
+	// Update Combo Input permission
+	if (Seeker->CanAcceptComboInput != bAllowComboInput)
 	{
-		Seeker->CanAcceptComboInput = bCanAcceptComboInput;
-	}
-	
-	AGS_TpsController* TpsController = Cast<AGS_TpsController>(Seeker->GetController());
-	if (!TpsController)
-	{
-		return;
-	}
-	
-	if (bUseControlValue)
-	{
-		TpsController->SetMoveControlValue(ControlValue.bCanMoveRight, ControlValue.bCanMoveForward);
-		TpsController->SetLookControlValue(ControlValue.bCanLookRight, ControlValue.bCanLookUp);
+		Seeker->CanAcceptComboInput = bAllowComboInput;
 	}
 
-	if (bChangeSeekerGait)
+	// Update Control Values via Controller
+	if (bOverrideControlValues)
 	{
-		Seeker->SetSeekerGait(Gait);
-	}
-
-	if (bResetAllowedSkills)
-	{
-		if (Seeker->GetSkillComp())
+		if (AGS_TpsController* TpsController = Cast<AGS_TpsController>(Seeker->GetController()))
 		{
-			Seeker->GetSkillComp()->ResetAllowedSkillsMask();
+			TpsController->SetMoveControlValue(ControlSettings.bCanMoveRight, ControlSettings.bCanMoveForward);
+			TpsController->SetLookControlValue(ControlSettings.bCanLookRight, ControlSettings.bCanLookUp);
+		}
+	}
+
+	// Apply New Gait
+	if (bApplyNewGait)
+	{
+		Seeker->SetSeekerGait(NewGait);
+	}
+
+	// Reset Allowed Skills
+	if (bTriggerSkillReset)
+	{
+		if (UGS_SkillComp* SkillComponent = Seeker->GetSkillComp())
+		{
+			SkillComponent->ResetAllowedSkillsMask();
 		}
 	}
 }

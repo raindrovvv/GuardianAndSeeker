@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #pragma once
 
@@ -7,9 +7,11 @@
 #include "GS_HealSkill.generated.h"
 
 /**
- * 모든 시커가 사용할 수 있는 치유 스킬
+ * @brief Universal healing skill used by all Seeker characters.
+ * Manages a limited pool of health potions, provides temporary health restoration,
+ * and handles interrupt logic during the drinking animation.
  */
-UCLASS()
+UCLASS(BlueprintType, meta = (DisplayName = "GS Seeker Heal Skill"))
 class GAS_API UGS_HealSkill : public UGS_SeekerSkillBase
 {
 	GENERATED_BODY()
@@ -17,86 +19,98 @@ class GAS_API UGS_HealSkill : public UGS_SeekerSkillBase
 public:
 	UGS_HealSkill();
 
+	// UGS_SkillBase interface
 	virtual void ActiveSkill() override;
 	virtual void DeactiveSkill() override;
 	virtual void InterruptSkill() override;
-	virtual bool CanActive() const override; // 포션 개수와 체력 상태를 고려한 활성화 가능 여부
+	virtual bool CanActive() const override;
+	// ~UGS_SkillBase interface
+
+	// UGS_SeekerSkillBase interface
+	virtual void InitializeDelegate() override;
+	// ~UGS_SeekerSkillBase interface
+
+	/** Triggers when the healing montage ends naturally */
+	UFUNCTION()
+	void HandleHealMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	/** Callback when the owner character takes damage to potentially reset 'HealthFull' block */
+	UFUNCTION()
+	void HandleOwnerDamaged(AActor* DamagedActor,
+							float DamageAmount,
+							const class UDamageType* DamageType,
+							class AController* InstigatedBy,
+							AActor* DamageCauser);
+
+	/** Manually set the current number of potions */
+	UFUNCTION(BlueprintCallable, Category = "Heal|State")
+	void SetCurrentHealCount(int32 NewCount);
+
+	/** Returns true if the seeker has at least one potion remaining */
+	UFUNCTION(BlueprintPure, Category = "Heal|State")
+	bool HasPotionsRemaining() const
+	{
+		return CurrentHealCount > 0;
+	}
+
+	/** Returns true if the character's health is already at max */
+	UFUNCTION(BlueprintPure, Category = "Heal|State")
+	bool IsCharacterHealthFull() const;
+
+	/** Internal check for all conditions required to trigger a heal */
+	UFUNCTION(BlueprintPure, Category = "Heal|State")
+	bool CanActivateHealLogic() const;
+
+	/** Decrements the potion count by one */
+	void ConsumeHealCharge();
+
+	// Getters
+	UFUNCTION(BlueprintPure, Category = "Heal|Stats")
+	float GetHealAmountValue() const
+	{
+		return HealAmountValue;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Heal|Stats")
+	int32 GetCurrentHealCount() const
+	{
+		return CurrentHealCount;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Heal|Stats")
+	int32 GetMaxHealCount() const
+	{
+		return MaxHealthPotions;
+	}
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Heal")
-	float HealAmount;
+	/** Amount of health restored per drink */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Heal|Stats")
+	float HealAmountValue = 200.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Heal")
-	int32 MaxHealCount;
+	/** Maximum number of health potions the character can carry */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Heal|Stats")
+	int32 MaxHealthPotions = 5;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealCount, BlueprintReadOnly, Category = "Heal")
-	int32 CurrentHealCount;
+	/** Current number of available potions */
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealCount, BlueprintReadOnly, Category = "Heal|State")
+	int32 CurrentHealCount = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Heal")
-	bool bIsPotionDepletedOrHealthFull;
+	/** Internal flag indicating the skill is blocked due to empty potions or full health */
+	UPROPERTY(BlueprintReadOnly, Category = "Heal|State")
+	bool bIsActivationBlocked = false;
 
-public:
-	// 리플리케이션 함수
+	/** Notifies client when potion count is replicated */
 	UFUNCTION()
 	void OnRep_CurrentHealCount();
 
-	// 피해를 입었을 때 호출될 함수
-	UFUNCTION()
-	void OnOwnerDamaged(AActor* DamagedActor, float DamageAmount, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
-
-	// 포션 개수 확인
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	int32 GetCurrentHealCount() const { return CurrentHealCount; }
-
-	// 최대 포션 개수 확인
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	int32 GetMaxHealCount() const { return MaxHealCount; }
-
-	// 포션 개수 설정
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	void SetCurrentHealCount(int32 NewCount);
-
-	// 포션 사용 가능 여부 확인
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	bool CanUseHeal() const;
-
-	// 체력이 가득 찼는지 확인
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	bool IsHealthFull() const;
-
-	// 힐 스킬 사용 가능 여부 확인 (포션 + 체력 체크)
-	UFUNCTION(BlueprintCallable, Category = "Heal")
-	bool CanActivateHealSkill() const;
-
-	// 포션 부족 시 쿨다운 효과 표시
-	void ShowPotionDepletedEffect();
-
-	// Delegate
-	virtual void InitializeDelegate() override;
-
-	// 몽타주 종료 콜백 - 몽타주가 완전히 끝난 후 DeactiveSkill 호출
-	UFUNCTION()
-	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
-
-	// Get
-	float GetHealAmount();
-	int32 GetCurrentHealCount();
-	void DecreaseCurrentHealCount();
-	int32 GetMaxHealCount();
-
-	/*// 포션 이후 무기 확인
-	UFUNCTION()
-	void CheckWeaponStateAndPlayWielding();*/
-
-	// ===================
-	// VFX/SFX 참고
-	// ===================
-	// VFX: DT_SkillSet의 Skill Cast VFX, Skill Impact VFX 등을 사용
-	// SFX: DT_SkillSet의 사운드 이벤트를 PlaySkillStartSound()로 재생
-
-	// 캐싱된 Seeker 소유자
+	/** Weak pointer to the seeker character owning this skill */
 	UPROPERTY()
-	TWeakObjectPtr<class AGS_Seeker> CachedSeekerOwner;
+	TWeakObjectPtr<class AGS_Seeker> CachedSeeker;
+
+private:
+	/** Broadcasts a notification when the user tries to heal without charges */
+	void NotifyHealBlocked();
 };
