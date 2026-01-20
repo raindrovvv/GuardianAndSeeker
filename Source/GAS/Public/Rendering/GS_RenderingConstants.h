@@ -153,8 +153,7 @@ constexpr float TIMER_INTERVAL_MIN = 1.0f;
  * @param ActorLocation 액터의 위치
  * @return 거리 기반 최적 네트워크 업데이트 빈도
  */
-float CalculateNetUpdateFrequency(const UObject* WorldContext,
-                                  const FVector& ActorLocation);
+float CalculateNetUpdateFrequency(const UObject* WorldContext, const FVector& ActorLocation);
 
 // ========================================
 // Shadow Casting Distance Optimization
@@ -221,6 +220,32 @@ inline float GetAdaptiveTimerInterval(float Significance)
 	if (Significance > 0.1f)
 		return TIMER_INTERVAL_LOW;
 	return TIMER_INTERVAL_MIN;
+}
+
+// ========================================
+// Significance Thresholds
+// ========================================
+
+/** Significance Manager: 애니메이션 URO 임계값 (0.7 미만이면 프레임 스킵 허용) */
+constexpr float SIGNIFICANCE_THRESHOLD_URO = 0.7f;
+
+/** Significance Manager: 고품질 애니메이션 틱 임계값 (0.5 이상이면 AlwaysTick) */
+constexpr float SIGNIFICANCE_THRESHOLD_ANIM_HIGH = 0.5f;
+
+/** Significance Manager: 액터 틱 활성화 임계값 (0.1 이하면 Tick 비활성화) */
+constexpr float SIGNIFICANCE_THRESHOLD_TICK = 0.1f;
+
+/** Significance Manager: 메시 가시성 임계값 (0.08 이하면 메시 숨김) */
+constexpr float SIGNIFICANCE_THRESHOLD_MESH_VISIBLE = 0.08f;
+
+/** Significance Manager: 빈사 상태 업데이트 간격 계산 */
+inline float GetDyingUpdateInterval(float Significance)
+{
+	if (Significance > 0.6f)
+		return 0.05f; // 높은 틱 (20Hz) - 로컬 플레이어 등 근처 상황
+	if (Significance > 0.2f)
+		return 0.2f; // 중간 틱 (5Hz) - 관전은 하지만 비중이 낮은 경우
+	return 0.5f;	 // 낮은 틱 (2Hz) - 매우 먼 상황
 }
 
 // ========================================

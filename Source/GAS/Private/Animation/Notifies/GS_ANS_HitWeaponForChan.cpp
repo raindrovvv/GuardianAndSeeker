@@ -5,10 +5,12 @@
 #include "Character/GS_Character.h"
 #include "Weapon/Equipable/GS_WeaponEquipable.h"
 
-void UGS_ANS_HitWeaponForChan::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-                                           float TotalDuration)
+void UGS_ANS_HitWeaponForChan::NotifyBegin(USkeletalMeshComponent* MeshComp,
+										   UAnimSequenceBase* Animation,
+										   float TotalDuration,
+										   const FAnimNotifyEventReference& EventReference)
 {
-	Super::NotifyBegin(MeshComp, Animation, TotalDuration);
+	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
 	if (!MeshComp || !MeshComp->GetOwner())
 		return;
@@ -26,9 +28,11 @@ void UGS_ANS_HitWeaponForChan::NotifyBegin(USkeletalMeshComponent* MeshComp, UAn
 	}
 }
 
-void UGS_ANS_HitWeaponForChan::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
+void UGS_ANS_HitWeaponForChan::NotifyEnd(USkeletalMeshComponent* MeshComp,
+										 UAnimSequenceBase* Animation,
+										 const FAnimNotifyEventReference& EventReference)
 {
-	Super::NotifyEnd(MeshComp, Animation);
+	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
 	if (!MeshComp || !MeshComp->GetOwner())
 		return;

@@ -1,4 +1,6 @@
 #include "Character/GS_Character.h"
+#include "Net/UnrealNetwork.h"
+#include "Character/Player/GS_Player.h"
 #include "SignificanceManager.h"
 #include "Engine/World.h"
 #include "AI/RTS/GS_RTSController.h"
@@ -12,7 +14,6 @@
 #include "Character/Component/GS_StatComp.h"
 #include "UI/Damage/EDamageNumberType.h"
 #include "Character/F_GS_DamageEvent.h"
-#include "Character/Player/GS_Player.h"
 #include "Character/Component/GS_KillFeedbackComponent.h"
 #include "Character/Component/GS_PositiveEffectComponent.h"
 #include "Containers/Set.h"
@@ -25,7 +26,6 @@
 #include "Engine/DamageEvents.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Rendering/GS_RenderingConstants.h"
@@ -41,6 +41,7 @@
 #include "VFX/GS_VFX_FunctionLibrary.h"
 #include "Weapon/GS_Weapon.h"
 #include "Sound/GS_AudioMixingComponent.h"
+#include "Props/Trap/GS_TrapBase.h"
 
 AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -58,7 +59,6 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	HPTextWidgetComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HPTextWidgetComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 	HPTextWidgetComp->SetVisibility(false);
-	// HPTextWidgetComp->SetDrawAtDesiredSize(true);
 	HPTextWidgetComp->SetCullDistance(2000.0f);
 
 	SelectionDecal = ObjectInitializer.CreateDefaultSubobject<UDecalComponent>(this, TEXT("SelectionDecal"));
@@ -69,11 +69,8 @@ AGS_Character::AGS_Character(const FObjectInitializer& ObjectInitializer)
 	bIsHovered = false;
 	bIsInvincible = false;
 
-	// 다이내믹 사운드 믹싱 컴포넌트 생성
 	AudioMixingComponent =
 		ObjectInitializer.CreateDefaultSubobject<UGS_AudioMixingComponent>(this, TEXT("AudioMixingComponent"));
-
-	// 데미지 숫자 팝업 컴포넌트
 	DamageNumberComp =
 		ObjectInitializer.CreateDefaultSubobject<UGS_DamageNumberComponent>(this, TEXT("DamageNumberComp"));
 }
@@ -84,7 +81,6 @@ void AGS_Character::BeginPlay()
 
 	bIsInvincible = false;
 
-	// Set Default Stats to Character
 	const UEnum* CharacterEnum = StaticEnum<ECharacterType>();
 	bool bStatInitialized = false;
 
@@ -94,44 +90,35 @@ void AGS_Character::BeginPlay()
 		StatComp->InitStat(FName(EnumToName));
 		bStatInitialized = true;
 	}
+
 	if (bStatInitialized)
 	{
 		AGS_PlayerState* PS = GetPlayerState<AGS_PlayerState>();
-		if (PS)
+		if (PS && PS->CurrentPlayerRole == EPlayerRole::PR_Seeker)
 		{
-			if (PS->CurrentPlayerRole == EPlayerRole::PR_Seeker)
-			{
-				PS->OnPawnStatInitialized();
-			}
+			PS->OnPawnStatInitialized();
 		}
 	}
 
-	// Set HP 3D widget (monster)
-	if (GetNetMode() != NM_DedicatedServer)
+	if (GetNetMode() != NM_DedicatedServer && IsValid(HPTextWidgetComp))
 	{
-		if (IsValid(HPTextWidgetComp))
-		{
-			// HP 위젯 거리 기반 컬링 설정 (RTS 시점 고려)
-			float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
-			HPTextWidgetComp->SetCullDistance(CullDistance);
+		float CullDistance = GS_Rendering::CalculateCullDistance(this, GS_Rendering::HP_WIDGET_CULL_DISTANCE);
+		HPTextWidgetComp->SetCullDistance(CullDistance);
 
-			if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+		if (HPTextWidgetComp->GetOwner()->ActorHasTag("Monster"))
+		{
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			{
-				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-				{
-					HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
-				}
+				HPTextWidgetComp->SetVisibility(PC->IsA<AGS_RTSController>());
 			}
-			else if (IsA<AGS_Seeker>())
+		}
+		else if (IsA<AGS_Seeker>())
+		{
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			{
-				// 시커(AI 포함)는 아군 정보나 적 정보를 위해 표시할 수 있음.
-				// 특히 RTS(가디언) 시점에서는 항상 보여야 함.
-				if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				if (PC->IsA<AGS_RTSController>())
 				{
-					if (PC->IsA<AGS_RTSController>())
-					{
-						HPTextWidgetComp->SetVisibility(true);
-					}
+					HPTextWidgetComp->SetVisibility(true);
 				}
 			}
 		}
@@ -144,14 +131,12 @@ void AGS_Character::BeginPlay()
 	}
 
 	DefaultCharacterSpeed = this->GetCharacterMovement()->MaxWalkSpeed;
-	// CharacterSpeed = DefaultCharacterSpeed;
 
 	if (HasAuthority())
 	{
 		SpawnAndAttachWeapons();
 	}
 
-	// === Significance Manager 등록 (클라이언트만) ===
 	RegisterSignificanceManager();
 }
 
@@ -161,9 +146,7 @@ void AGS_Character::RegisterSignificanceManager()
 	{
 		if (USignificanceManager* SM = USignificanceManager::Get(GetWorld()))
 		{
-			// TWeakObjectPtr로 캡처하여 액터 파괴 후 람다 호출 시 안전성 확보
 			TWeakObjectPtr<AGS_Character> WeakThis(this);
-
 			SM->RegisterObject(
 				this,
 				"Character",
@@ -190,26 +173,22 @@ void AGS_Character::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 카메라 낙아웃 효과 복구
 	if (CurrentCameraKnockback > 0.0f)
 	{
 		float PreviousKnockback = CurrentCameraKnockback;
 		CurrentCameraKnockback =
 			FMath::FInterpTo(CurrentCameraKnockback, 0.0f, DeltaTime, CameraKnockbackRecoverySpeed);
 
-		AGS_Player* Player = Cast<AGS_Player>(this);
+		AGS_Player* Player = IsA<AGS_Player>() ? static_cast<AGS_Player*>(this) : nullptr;
 		if (IsValid(Player) && IsValid(Player->SpringArmComp))
 		{
 			float Delta = PreviousKnockback - CurrentCameraKnockback;
 			Player->SpringArmComp->TargetArmLength -= Delta;
 		}
 
-		// 완전히 복구되면 Tick 비활성화 고려 (원래 비활성 상태였다면)
 		if (CurrentCameraKnockback <= KINDA_SMALL_NUMBER)
 		{
 			CurrentCameraKnockback = 0.0f;
-			// Player는 bCanEverTick가 true이므로 계속 켜둬도 됨
-			// Boss 등은 OnSignificanceChanged에서 제어함
 		}
 	}
 }
@@ -219,10 +198,9 @@ void AGS_Character::ApplyCameraKnockback(float IntensityMultiplier)
 	if (!IsLocallyControlled())
 		return;
 
-	AGS_Player* Player = Cast<AGS_Player>(this);
+	AGS_Player* Player = IsA<AGS_Player>() ? static_cast<AGS_Player*>(this) : nullptr;
 	if (IsValid(Player) && IsValid(Player->SpringArmComp))
 	{
-		// 데미지 강도에 따라 밀림 거리 가변 적용
 		float DynamicKnockbackDistance = CameraKnockbackDistance * IntensityMultiplier;
 		float NewKnockback = FMath::Min(CurrentCameraKnockback + DynamicKnockbackDistance, 20.0f);
 		float Delta = NewKnockback - CurrentCameraKnockback;
@@ -234,7 +212,7 @@ void AGS_Character::ApplyCameraKnockback(float IntensityMultiplier)
 	}
 }
 
-void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void AGS_Character::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -245,6 +223,7 @@ void AGS_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 	DOREPLIFETIME(AGS_Character, bLockRotationToController);
 	DOREPLIFETIME(AGS_Character, WeaponHandlingState);
 	DOREPLIFETIME(AGS_Character, RepImpactVFX);
+	DOREPLIFETIME(AGS_Character, LastKillerInfo);
 }
 
 void AGS_Character::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -493,6 +472,30 @@ float AGS_Character::TakeDamage(float DamageAmount,
 			AttackerCharacter = Cast<AGS_Character>(Weapon->GetOwner());
 		}
 	}
+
+	// 마지막 공격자 정보 저장 (사망 화면 표시용)
+	if (ActualDamage > 0.0f)
+	{
+		if (AttackerCharacter)
+		{
+			LastKillerInfo.KillerName = AttackerCharacter->GetCharacterName();
+			LastKillerInfo.KillerType = AttackerCharacter->GetCharacterType();
+			LastKillerInfo.bIsPlayerControlled = AttackerCharacter->IsPlayerControlled();
+		}
+		// 캐릭터가 아닌 경우 (함정 등)
+		else if (AGS_TrapBase* Trap = Cast<AGS_TrapBase>(DamageCauser))
+		{
+			// 함정 ID가 있으면 해당 ID를 이름으로 사용하거나, 기본 '함정' 텍스트 사용
+			FString TrapName = Trap->TrapID.IsNone() ? TEXT("함정") : Trap->TrapID.ToString();
+			LastKillerInfo.KillerName = TrapName;
+
+			// 함정은 특정 캐릭터 타입이 없으므로 Ares(기본값)로 두되,
+			// 위젯에서 이름이 '함정'이므로 인지 가능
+			// 필요하다면 ECharacterType에 Trap을 추가할 수 있음
+			LastKillerInfo.bIsPlayerControlled = false;
+		}
+	}
+
 
 	// 데미지 기록 업데이트 (서버 전용 어시스트 추적)
 	if (HasAuthority() && AttackerCharacter && AttackerCharacter != this && ActualDamage > 0.1f)
@@ -779,7 +782,8 @@ void AGS_Character::SetPlayerInfoWidget(UGS_PlayerInfoWidget* InPlayerInfoWidget
 {
 	if (IsValid(InPlayerInfoWidget))
 	{
-		InPlayerInfoWidget->InitializePlayerInfoWidget(Cast<AGS_Player>(this));
+		AGS_Player* Player = IsA<AGS_Player>() ? static_cast<AGS_Player*>(this) : nullptr;
+		InPlayerInfoWidget->InitializePlayerInfoWidget(Player);
 		StatComp->OnCurrentHPChanged.AddUObject(InPlayerInfoWidget, &UGS_PlayerInfoWidget::OnCurrentHPBarChanged);
 	}
 }
@@ -1253,11 +1257,11 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 		return;
 
 	// 1. 애니메이션 URO (Update Rate Optimization) 제어
-	// 중요도가 0.7 미만이면 프레임 스킵 허용
-	MeshComp->bEnableUpdateRateOptimizations = (NewSignificance < 0.7f);
+	// 중요도가 임계값 미만이면 프레임 스킵 허용
+	MeshComp->bEnableUpdateRateOptimizations = (NewSignificance < GS_Rendering::SIGNIFICANCE_THRESHOLD_URO);
 
 	// 2. 중요도에 따른 애니메이션 틱 옵션 조정
-	if (NewSignificance > 0.5f)
+	if (NewSignificance > GS_Rendering::SIGNIFICANCE_THRESHOLD_ANIM_HIGH)
 	{
 		// 중요할 때: 시각적 품질 유지
 		MeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
@@ -1271,7 +1275,7 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 	// 3. 중요도가 매우 낮으면 Tick 비활성화
 	if (PrimaryActorTick.bCanEverTick)
 	{
-		SetActorTickEnabled(NewSignificance > 0.1f);
+		SetActorTickEnabled(NewSignificance > GS_Rendering::SIGNIFICANCE_THRESHOLD_TICK);
 	}
 
 	// 4. 이동 및 물리 연산 최적화
@@ -1304,7 +1308,7 @@ void AGS_Character::OnSignificanceChanged(float NewSignificance)
 
 	// 6. 가시성 컬링 (드로우콜 절감)
 	// 중요도가 매우 낮으면 (카메라에서 매우 멀면) 메시를 숨김
-	const bool bShouldShow = NewSignificance > 0.08f;
+	const bool bShouldShow = NewSignificance > GS_Rendering::SIGNIFICANCE_THRESHOLD_MESH_VISIBLE;
 	if (MeshComp->GetVisibleFlag() != bShouldShow)
 	{
 		MeshComp->SetVisibility(bShouldShow, true); // true: 자식 컴포넌트(무기 등)도 함께 제어

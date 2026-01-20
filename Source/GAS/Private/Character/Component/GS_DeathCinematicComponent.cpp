@@ -14,7 +14,9 @@ UGS_DeathCinematicComponent::UGS_DeathCinematicComponent()
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
-void UGS_DeathCinematicComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UGS_DeathCinematicComponent::TickComponent(float DeltaTime,
+												ELevelTick TickType,
+												FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -24,8 +26,10 @@ void UGS_DeathCinematicComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	}
 }
 
-void UGS_DeathCinematicComponent::InitializeForOwner(AActor* InOwner, UPostProcessComponent* InPostProcessComp,
-                                                     UMaterialInterface* InMaterialOverride, USpringArmComponent* InSpringArm)
+void UGS_DeathCinematicComponent::InitializeForOwner(AActor* InOwner,
+													 UPostProcessComponent* InPostProcessComp,
+													 UMaterialInterface* InMaterialOverride,
+													 USpringArmComponent* InSpringArm)
 {
 	ManagedPostProcessComp = InPostProcessComp;
 
@@ -64,7 +68,26 @@ void UGS_DeathCinematicComponent::PlayDeathCinematic()
 		return;
 	}
 
-	// 초기화 시점에 저장한 로컬 플레이어 여부로 체크
+	// 초기화 시점이 너무 빨라 로컬 체크가 누락되었을 경우를 위해 재확인
+	if (!bIsOwnedByLocalPlayer && OwnerCharacter.IsValid())
+	{
+		if (OwnerCharacter->IsLocallyControlled())
+		{
+			bIsOwnedByLocalPlayer = true;
+		}
+		else if (UWorld* World = GetWorld())
+		{
+			if (APlayerController* PC = World->GetFirstPlayerController())
+			{
+				if (PC->GetViewTarget() == OwnerCharacter.Get())
+				{
+					bIsOwnedByLocalPlayer = true;
+				}
+			}
+		}
+	}
+
+	// 최종 로컬 플레이어 여부 체크
 	if (!bIsOwnedByLocalPlayer)
 	{
 		return;
@@ -208,9 +231,7 @@ void UGS_DeathCinematicComponent::TickUpdate(float DeltaTime)
 	// 슬로우 모션 보정: CustomTimeDilation이 적용된 DeltaTime을 실제 시간으로 변환
 	// DeltaTime = RealDeltaTime * CustomTimeDilation 이므로,
 	// RealDeltaTime = DeltaTime / CustomTimeDilation
-	float CharacterDilation = OwnerCharacter.IsValid()
-	                              ? FMath::Max(OwnerCharacter->CustomTimeDilation, 0.001f)
-	                              : 1.0f;
+	float CharacterDilation = OwnerCharacter.IsValid() ? FMath::Max(OwnerCharacter->CustomTimeDilation, 0.001f) : 1.0f;
 	float RealDeltaTime = DeltaTime / CharacterDilation;
 
 	ElapsedTime += RealDeltaTime;

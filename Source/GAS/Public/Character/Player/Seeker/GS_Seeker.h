@@ -32,6 +32,7 @@ class UGS_PositiveEffectComponent;
 class UGS_DeathCinematicComponent;
 class UGS_RevivalEffectComponent;
 class UGS_DebuffIndicatorComponent;
+class UGS_DeathScreenWidget;
 
 USTRUCT(BlueprintType) // Current Action
 struct FSeekerState
@@ -157,7 +158,10 @@ public:
 
 
 	// Damage Handler
-	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+	virtual float TakeDamage(float DamageAmount,
+							 FDamageEvent const& DamageEvent,
+							 AController* EventInstigator,
+							 AActor* DamageCauser) override;
 
 	// Control
 	UFUNCTION()
@@ -221,13 +225,19 @@ public:
 	int32 CurrentComboIndex;
 
 	UFUNCTION(BlueprintPure, Category = "Combat")
-	int32 GetCurrentComboIndex() const { return CurrentComboIndex; }
+	int32 GetCurrentComboIndex() const
+	{
+		return CurrentComboIndex;
+	}
 
 	UPROPERTY(Replicated)
 	bool CanAcceptComboInput = true;
 
 	UPROPERTY(Replicated)
 	bool bNextCombo = false;
+
+	/** 사망 연출 중복 실행 방지용 플래그 (로컬) */
+	bool bDeathCinematicPlayed = false;
 
 	/** 마지막 입력 시간 (입력 버퍼링용) */
 	float LastInputTime = -1.0f;
@@ -444,10 +454,18 @@ public:
 	void HandleEnemyDeath();
 
 	UFUNCTION()
-	void OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void OnCombatTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent,
+									 AActor* OtherActor,
+									 UPrimitiveComponent* OtherComp,
+									 int32 OtherBodyIndex,
+									 bool bFromSweep,
+									 const FHitResult& SweepResult);
 
 	UFUNCTION()
-	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	void OnCombatTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent,
+								   AActor* OtherActor,
+								   UPrimitiveComponent* OtherComp,
+								   int32 OtherBodyIndex);
 
 protected:
 	void Internal_SetSeekerGait(EGait Gait);
@@ -459,6 +477,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual float GetOptimalCullDistance() const override;
+	virtual void OnSignificanceChanged(float NewSignificance) override;
 
 	// 상수들
 	static const FName HPRatioParamName;
@@ -577,7 +596,10 @@ private:
 
 public:
 	// RequiredCurState 가 현재 캐릭터의 상태와 같다면 캐릭터의 상태를 NextState 로 변경하고 TargetAM 을 재생한다.
-	void TransWeaponHandingState(EWeaponHandlingState RequiredCurState, EWeaponHandlingState NextState, UAnimMontage* TargetAM, ESeekerMontageSlot TargetMontageSlot);
+	void TransWeaponHandingState(EWeaponHandlingState RequiredCurState,
+								 EWeaponHandlingState NextState,
+								 UAnimMontage* TargetAM,
+								 ESeekerMontageSlot TargetMontageSlot);
 
 public:
 	UFUNCTION(Server, Reliable)
@@ -591,20 +613,35 @@ public:
 	// 시커 타입 체크 함수들 (GS_Character의 ECharacterType 사용)
 	// ===============
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsChan() const { return GetCharacterType() == ECharacterType::Chan; }
+	bool IsChan() const
+	{
+		return GetCharacterType() == ECharacterType::Chan;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsAres() const { return GetCharacterType() == ECharacterType::Ares; }
+	bool IsAres() const
+	{
+		return GetCharacterType() == ECharacterType::Ares;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsMerci() const { return GetCharacterType() == ECharacterType::Merci; }
+	bool IsMerci() const
+	{
+		return GetCharacterType() == ECharacterType::Merci;
+	}
 
 	// 근접/원거리 체크 (하위 호환성)
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsMeleeSeeker() const { return IsChan() || IsAres(); }
+	bool IsMeleeSeeker() const
+	{
+		return IsChan() || IsAres();
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Seeker Type")
-	bool IsRangedSeeker() const { return IsMerci(); }
+	bool IsRangedSeeker() const
+	{
+		return IsMerci();
+	}
 
 	// ==========================================
 	// 가디언 감지 HUD 시스템
@@ -616,7 +653,10 @@ public:
 
 	/** 현재 가디언에게 감지되었는지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Detection")
-	bool IsDetectedByGuardian() const { return bIsDetectedByGuardian; }
+	bool IsDetectedByGuardian() const
+	{
+		return bIsDetectedByGuardian;
+	}
 
 	/** 화면 중앙 근접도 설정 (서버에서 호출) */
 	UFUNCTION(BlueprintCallable, Category = "Detection")
@@ -624,7 +664,10 @@ public:
 
 	/** 현재 감지 강도 확인 */
 	UFUNCTION(BlueprintPure, Category = "Detection")
-	float GetDetectionIntensity() const { return DetectionIntensity; }
+	float GetDetectionIntensity() const
+	{
+		return DetectionIntensity;
+	}
 
 	/** 감지 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "UI|Detection")
@@ -666,7 +709,23 @@ public:
 	void ClientRPC_PlayRevivalEffect();
 
 	/** 로컬 플레이어 전용 죽음 연출 재생 헬퍼 (OnDeath, OnRep_IsDead에서 호출) */
-	void PlayDeathCinematic_Local();
+	void PlayDeathCinematic_Local(bool bForcePlay = false);
+
+	/** 클라이언트에게 죽음 연출 재생 명령 (Reliable RPC) */
+	UFUNCTION(Client, Reliable)
+	void Client_PlayDeathCinematic();
+
+	// =======================
+	// 사망 화면 위젯
+	// =======================
+
+	/** 사망 화면 위젯 클래스 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Death")
+	TSubclassOf<UGS_DeathScreenWidget> DeathScreenWidgetClass;
+
+	/** 사망 화면 위젯 인스턴스 */
+	UPROPERTY()
+	UGS_DeathScreenWidget* DeathScreenWidgetInstance;
 
 	/** 빈사 상태 시간 만료 - 실제 사망 처리 */
 	UFUNCTION()
@@ -686,33 +745,61 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_Debug_Kill();
 
+	/** 테스트용: 빈사 상태에서 즉시 부활 */
+	UFUNCTION(Exec)
+	void Debug_Revive();
+
+	UFUNCTION(Server, Reliable)
+	void Server_Debug_Revive();
+
 	/** 현재 빈사 상태인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	bool IsInDyingState() const { return bIsInDyingState; }
+	bool IsInDyingState() const
+	{
+		return bIsInDyingState;
+	}
 
 	/** 남은 빈사 시간 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetDyingTimeRemaining() const { return DyingTimeRemaining; }
+	float GetDyingTimeRemaining() const
+	{
+		return DyingTimeRemaining;
+	}
 
 	/** 최대 빈사 시간 (90초) */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetMaxDyingTime() const { return MaxDyingTime; }
+	float GetMaxDyingTime() const
+	{
+		return MaxDyingTime;
+	}
 
 	/** 구조 중인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	bool IsBeingRevived() const { return bIsBeingRevived; }
+	bool IsBeingRevived() const
+	{
+		return bIsBeingRevived;
+	}
 
 	/** 현재 구조 진행도 (0~1) */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	float GetReviveProgress() const { return ReviveProgress; }
+	float GetReviveProgress() const
+	{
+		return ReviveProgress;
+	}
 
 	/** 현재 빈사 횟수 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	int32 GetCurrentDyingCount() const { return CurrentDyingCount; }
+	int32 GetCurrentDyingCount() const
+	{
+		return CurrentDyingCount;
+	}
 
 	/** 최대 빈사 허용 횟수 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")
-	int32 GetMaxDyingCount() const { return MaxDyingCount; }
+	int32 GetMaxDyingCount() const
+	{
+		return MaxDyingCount;
+	}
 
 	/** 구조 시작 (서버 RPC) */
 	UFUNCTION(Server, Reliable, Category = "Dying")
