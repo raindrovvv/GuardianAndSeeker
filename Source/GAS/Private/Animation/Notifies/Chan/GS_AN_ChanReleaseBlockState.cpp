@@ -1,14 +1,14 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright Greed Fennec Studio. All Rights Reserved.
 
 #include "Animation/Notifies/Chan/GS_AN_ChanReleaseBlockState.h"
 
 #include "Animation/Character/GS_SeekerAnimInstance.h"
 #include "Character/Player/Seeker/GS_Seeker.h"
-#include "Animation/Character/Seeker/GS_ChooserInputObj.h"
+#include "Animation/Character/Seeker/GS_ChooserInputObject.h"
 
-void UGS_AN_ChanReleaseBlockState::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
-	const FAnimNotifyEventReference& EventReference)
+void UGS_AN_ChanReleaseBlockState::Notify(USkeletalMeshComponent* MeshComp,
+										  UAnimSequenceBase* Animation,
+										  const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
@@ -16,7 +16,7 @@ void UGS_AN_ChanReleaseBlockState::Notify(USkeletalMeshComponent* MeshComp, UAni
 	{
 		if (UGS_SeekerAnimInstance* SeekerAnim = Cast<UGS_SeekerAnimInstance>(MeshComp->GetAnimInstance()))
 		{
-			//SeekerAnim->ChooserInputObj->IsBlock = false;
+			// SeekerAnim->ChooserInputObject->bIsBlocking = false;
 		}
 		if (Seeker->HasAuthority())
 		{

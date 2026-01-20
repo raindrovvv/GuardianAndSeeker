@@ -1,9 +1,9 @@
 // Copyright Greed Fennec Studio. All Rights Reserved.
 
-#include "Animation/Character/Seeker/GS_ChooserInputObj.h"
+#include "Animation/Character/Seeker/GS_ChooserInputObject.h"
 #include "Kismet/KismetMathLibrary.h"
 
-bool UGS_ChooserInputObj::ShouldTurnInPlace() const
+bool UGS_ChooserInputObject::ShouldTurnInPlace() const
 {
 	// Check turn-in-place criteria: Transitioning from moving to idle, or explicitly requested
 	if (bMustTurnInPlace || (MovementState == EMovementState::Idle && LastMovementState == EMovementState::Moving))
@@ -22,24 +22,23 @@ bool UGS_ChooserInputObj::ShouldTurnInPlace() const
 	return false;
 }
 
-bool UGS_ChooserInputObj::IsMoving() const
+bool UGS_ChooserInputObject::IsMoving() const
 {
-	// Velocity is considered non-zero if above a small stabilization threshold
-	const bool bHasCurrentVelocity = !Velocity.IsNearlyZero(0.1f);
-	const bool bHasFutureVelocity = !FutureVelocity.IsNearlyZero(0.1f);
-
-	return bHasCurrentVelocity && bHasFutureVelocity;
+	// Increased threshold to 10.0f to avoid jittering in idle.
+	// Only current velocity is required to be "moving" for core state detection.
+	return Velocity.Size2D() > 10.0f;
 }
 
-bool UGS_ChooserInputObj::IsStarting() const
+bool UGS_ChooserInputObject::IsStarting() const
 {
 	// Check if already in a "Pivots" context (to avoid double-starting) and ensure we are moving correctly
 	const bool bAlreadyPivoting = CurrentDatabaseTags.Contains(TEXT("Pivots"));
 
 	// Consider a start if future predicted speed is significantly higher than current speed
+	const bool bHasFutureVelocity = FutureVelocity.Size2D() > 10.0f;
 	if (FutureVelocity.Size2D() > (Velocity.Size2D() + 100.0f))
 	{
-		if (!bAlreadyPivoting && IsMoving())
+		if (!bAlreadyPivoting && bHasFutureVelocity)
 		{
 			return true;
 		}
@@ -47,7 +46,7 @@ bool UGS_ChooserInputObj::IsStarting() const
 	return false;
 }
 
-bool UGS_ChooserInputObj::IsPivoting() const
+bool UGS_ChooserInputObject::IsPivoting() const
 {
 	// Calculate rotation delta between current velocity and predicted future velocity
 	const FRotator CurrentVelocityRot = Velocity.Rotation();
@@ -71,7 +70,7 @@ bool UGS_ChooserInputObj::IsPivoting() const
 	return (AbsYawDelta > PivotThreshold);
 }
 
-bool UGS_ChooserInputObj::ShouldSpinTransition() const
+bool UGS_ChooserInputObject::ShouldSpinTransition() const
 {
 	// Spins are specific types of high-rotation transitions used when already pivoting
 	if (!CurrentDatabaseTags.Contains(TEXT("Pivots")))

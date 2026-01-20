@@ -8,7 +8,7 @@
 #include "GS_SeekerAnimInstance.generated.h"
 
 class UChooserTable;
-class UGS_ChooserInputObj;
+class UGS_ChooserInputObject;
 struct UPoseSearchDatabase;
 
 UENUM(BlueprintType)
@@ -90,7 +90,7 @@ public:
 
 	// Chooser
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced, Category = "Motion Matching")
-	TObjectPtr<UGS_ChooserInputObj> ChooserInputObj;
+	TObjectPtr<UGS_ChooserInputObject> ChooserInputObject;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EssentialValue")

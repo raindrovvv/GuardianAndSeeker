@@ -6,11 +6,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
-#include "Animation/Character/Seeker/GS_ChooserInputObj.h"
+#include "Animation/Character/Seeker/GS_ChooserInputObject.h"
 
 UGS_SeekerAnimInstance::UGS_SeekerAnimInstance()
 {
-	ChooserInputObj = CreateDefaultSubobject<UGS_ChooserInputObj>(TEXT("ChooserInputObj"));
+	ChooserInputObject = CreateDefaultSubobject<UGS_ChooserInputObject>(TEXT("ChooserInputObject"));
 }
 
 void UGS_SeekerAnimInstance::NativeInitializeAnimation()
@@ -24,11 +24,12 @@ void UGS_SeekerAnimInstance::NativeInitializeAnimation()
 		CachedMovementComponent = SeekerOwner->GetCharacterMovement();
 
 		// Initialize chooser data from character state
-		if (ChooserInputObj)
+		if (ChooserInputObject)
 		{
-			ChooserInputObj->Gait = SeekerOwner->GetSeekerGait();
-			ChooserInputObj->LastGait = ChooserInputObj->Gait;
-			LastGait = ChooserInputObj->Gait;
+			ChooserInputObject->CharacterType = SeekerOwner->GetCharacterType();
+			ChooserInputObject->Gait = SeekerOwner->GetSeekerGait();
+			ChooserInputObject->LastGait = ChooserInputObject->Gait;
+			LastGait = ChooserInputObject->Gait;
 		}
 
 		// Root bone offsetting logic for authority
@@ -85,61 +86,62 @@ void UGS_SeekerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 void UGS_SeekerAnimInstance::UpdateEssentialValue_Implementation(float DeltaSeconds)
 {
-	if (!ChooserInputObj || !CachedOwnerCharacter || !CachedMovementComponent)
+	if (!ChooserInputObject || !CachedOwnerCharacter || !CachedMovementComponent)
 	{
 		return;
 	}
 
 	// Synchronize world transform
-	ChooserInputObj->CharacterTransform = CachedOwnerCharacter->GetActorTransform();
+	ChooserInputObject->CharacterTransform = CachedOwnerCharacter->GetActorTransform();
 
 	// Update movement vectors
 	Acceleration = CachedMovementComponent->GetCurrentAcceleration();
-	VelocityLastFrame = ChooserInputObj->Velocity;
-	ChooserInputObj->Velocity = CachedMovementComponent->Velocity;
-	ChooserInputObj->Speed2D = ChooserInputObj->Velocity.Size2D();
+	VelocityLastFrame = ChooserInputObject->Velocity;
+	ChooserInputObject->Velocity = CachedMovementComponent->Velocity;
+	ChooserInputObject->Speed2D = ChooserInputObject->Velocity.Size2D();
 
 	// Calculate velocity acceleration for leaning effects
 	const float SafeDeltaTime = FMath::Max(DeltaSeconds, SMALL_NUMBER);
-	VelocityAcceleration = (ChooserInputObj->Velocity - VelocityLastFrame) / SafeDeltaTime;
+	VelocityAcceleration = (ChooserInputObject->Velocity - VelocityLastFrame) / SafeDeltaTime;
 
 	// Keep track of the last direction of movement for orienting idles
-	if (ChooserInputObj->Speed2D > 5.0f)
+	if (ChooserInputObject->Speed2D > 5.0f)
 	{
-		LastNonZeroVelocity = ChooserInputObj->Velocity;
+		LastNonZeroVelocity = ChooserInputObject->Velocity;
 	}
 
-	bIsMoving = ChooserInputObj->IsMoving();
+	ChooserInputObject->bIsMoving = ChooserInputObject->IsMoving();
+	bIsMoving = ChooserInputObject->bIsMoving;
 }
 
 void UGS_SeekerAnimInstance::UpdateState_Implementation()
 {
-	if (!ChooserInputObj || !CachedOwnerCharacter || !CachedMovementComponent)
+	if (!ChooserInputObject || !CachedOwnerCharacter || !CachedMovementComponent)
 	{
 		return;
 	}
 
 	// Previous state caching for transition detection
-	LastRotationMode = ChooserInputObj->RotationMode;
+	LastRotationMode = ChooserInputObject->RotationMode;
 
 	// Determine rotation mode from movement component settings
-	ChooserInputObj->RotationMode =
+	ChooserInputObject->RotationMode =
 		CachedMovementComponent->bOrientRotationToMovement ? ERotationMode::OrientToMovement : ERotationMode::Strafe;
 
 	// Handle movement state transitions and controller rotation dependencies
-	ChooserInputObj->LastMovementState = ChooserInputObj->MovementState;
+	ChooserInputObject->LastMovementState = ChooserInputObject->MovementState;
 
-	if (ChooserInputObj->IsMoving())
+	if (ChooserInputObject->IsMoving())
 	{
 		// Strafe mode requires controller sync, OrientToMovement handles it internally/smoothly
-		CachedOwnerCharacter->bUseControllerRotationYaw = (ChooserInputObj->RotationMode == ERotationMode::Strafe);
-		ChooserInputObj->MovementState = EMovementState::Moving;
+		CachedOwnerCharacter->bUseControllerRotationYaw = (ChooserInputObject->RotationMode == ERotationMode::Strafe);
+		ChooserInputObject->MovementState = EMovementState::Moving;
 	}
 	else
 	{
 		// Idle state rotation locking
 		CachedOwnerCharacter->bUseControllerRotationYaw = CachedOwnerCharacter->GetIsLockedRotationToController();
-		ChooserInputObj->MovementState = EMovementState::Idle;
+		ChooserInputObject->MovementState = EMovementState::Idle;
 	}
 
 	// Manage gait (Walk/Run/Sprint) transitions
@@ -148,8 +150,8 @@ void UGS_SeekerAnimInstance::UpdateState_Implementation()
 		EGait CurrentGait = SeekerCharacter->GetSeekerGait();
 		if (LastGait != CurrentGait)
 		{
-			ChooserInputObj->LastGait = LastGait;
-			ChooserInputObj->Gait = CurrentGait;
+			ChooserInputObject->LastGait = LastGait;
+			ChooserInputObject->Gait = CurrentGait;
 
 			bIsTransitioningGait = true;
 			GaitTransitionTimer = GaitTransitionDelay;
@@ -158,29 +160,29 @@ void UGS_SeekerAnimInstance::UpdateState_Implementation()
 		}
 	}
 
-	bIsMoving = ChooserInputObj->IsMoving();
+	bIsMoving = ChooserInputObject->IsMoving();
 }
 
 bool UGS_SeekerAnimInstance::GetMustTurnInPlace()
 {
-	return ChooserInputObj ? ChooserInputObj->bMustTurnInPlace : false;
+	return ChooserInputObject ? ChooserInputObject->bMustTurnInPlace : false;
 }
 
 void UGS_SeekerAnimInstance::SetMustTurnInPlace(bool MustTurn)
 {
-	if (ChooserInputObj)
+	if (ChooserInputObject)
 	{
-		ChooserInputObj->bMustTurnInPlace = MustTurn;
+		ChooserInputObject->bMustTurnInPlace = MustTurn;
 	}
 }
 
 float UGS_SeekerAnimInstance::GetOffsetRootTranslationHalfLife()
 {
-	if (!ChooserInputObj)
+	if (!ChooserInputObject)
 		return 0.0f;
 
 	// Use specific half-lives based on movement state for stable root offsetting
-	switch (ChooserInputObj->MovementState)
+	switch (ChooserInputObject->MovementState)
 	{
 		case EMovementState::Idle:
 			return 0.15f;
@@ -193,7 +195,7 @@ float UGS_SeekerAnimInstance::GetOffsetRootTranslationHalfLife()
 
 FVector UGS_SeekerAnimInstance::CalculateRelativeAccelerationAmount()
 {
-	if (!CachedMovementComponent || !ChooserInputObj)
+	if (!CachedMovementComponent || !ChooserInputObject)
 	{
 		return FVector::ZeroVector;
 	}
@@ -204,11 +206,11 @@ FVector UGS_SeekerAnimInstance::CalculateRelativeAccelerationAmount()
 	if (MaxAcceleration > 0.0f && MaxDeceleration > 0.0f)
 	{
 		// Accelerating or Decelerating relative to current velocity
-		const bool bIsAccelerating = FVector::DotProduct(Acceleration, ChooserInputObj->Velocity) > 0.0f;
+		const bool bIsAccelerating = FVector::DotProduct(Acceleration, ChooserInputObject->Velocity) > 0.0f;
 		const float ClampValue = bIsAccelerating ? MaxAcceleration : MaxDeceleration;
 
 		FVector ClampedAcc = VelocityAcceleration.GetClampedToMaxSize(ClampValue);
-		return ChooserInputObj->CharacterTransform.GetRotation().UnrotateVector(ClampedAcc / ClampValue);
+		return ChooserInputObject->CharacterTransform.GetRotation().UnrotateVector(ClampedAcc / ClampValue);
 	}
 
 	return FVector::ZeroVector;
@@ -216,11 +218,11 @@ FVector UGS_SeekerAnimInstance::CalculateRelativeAccelerationAmount()
 
 float UGS_SeekerAnimInstance::Get_LeanAmount()
 {
-	if (ChooserInputObj && CachedMovementComponent)
+	if (ChooserInputObject && CachedMovementComponent)
 	{
 		// Scale leaning based on 2D speed
 		const float LeanIntensity = FMath::GetMappedRangeValueClamped(
-			FVector2D(200.0f, 500.0f), FVector2D(0.5f, 1.0f), ChooserInputObj->Speed2D);
+			FVector2D(200.0f, 500.0f), FVector2D(0.5f, 1.0f), ChooserInputObject->Speed2D);
 
 		return CalculateRelativeAccelerationAmount().Y * LeanIntensity;
 	}
@@ -229,7 +231,7 @@ float UGS_SeekerAnimInstance::Get_LeanAmount()
 
 bool UGS_SeekerAnimInstance::EnableSteering()
 {
-	return ChooserInputObj && ChooserInputObj->MovementState == EMovementState::Moving;
+	return ChooserInputObject && ChooserInputObject->MovementState == EMovementState::Moving;
 }
 
 FVector2D UGS_SeekerAnimInstance::Get_AOValue()
@@ -241,12 +243,12 @@ FVector2D UGS_SeekerAnimInstance::Get_AOValue_Internal()
 {
 	FVector2D AO = FVector2D::ZeroVector;
 
-	if (CachedOwnerCharacter && ChooserInputObj)
+	if (CachedOwnerCharacter && ChooserInputObject)
 	{
 		if (AController* Controller = CachedOwnerCharacter->GetController())
 		{
 			const FRotator ControllerRot = Controller->GetControlRotation();
-			const FRotator RootRot = ChooserInputObj->RootTransform.Rotator();
+			const FRotator RootRot = ChooserInputObject->RootTransform.Rotator();
 
 			const FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(ControllerRot, RootRot);
 
@@ -270,7 +272,7 @@ bool UGS_SeekerAnimInstance::Enable_AO()
 bool UGS_SeekerAnimInstance::Enable_AO_Internal()
 {
 	// Only enable Aim Offset when strafing and within reasonable pitch limits
-	if (!ChooserInputObj || ChooserInputObj->RotationMode != ERotationMode::Strafe)
+	if (!ChooserInputObject || ChooserInputObject->RotationMode != ERotationMode::Strafe)
 	{
 		return false;
 	}

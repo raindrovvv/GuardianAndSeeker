@@ -6,14 +6,14 @@
 #include "UObject/NoExportTypes.h"
 #include "Animation/Character/E_SeekerAnim.h"
 #include "Character/E_Character.h"
-#include "GS_ChooserInputObj.generated.h"
+#include "GS_ChooserInputObject.generated.h"
 
 /**
  * @brief Input object used by the Unreal Engine Chooser system to determine motion matching animations.
  * Provides predicates for turning in place, pivoting, starting, and state-based transitions.
  */
 UCLASS(BlueprintType, Blueprintable, meta = (DisplayName = "GS Seeker Chooser Input"))
-class GAS_API UGS_ChooserInputObj : public UObject
+class GAS_API UGS_ChooserInputObject : public UObject
 {
 	GENERATED_BODY()
 
@@ -86,4 +86,8 @@ public:
 	/** Whether the character is currently in a blocking/defensive state */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
 	bool bIsBlocking = false;
+
+	/** Whether the character is currently moving (for AnimGraph property paths) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|State")
+	bool bIsMoving = false;
 };

@@ -40,11 +40,11 @@ public:
 
 protected:
 	/** Reference to the owning character */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|References")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Animation|References")
 	TObjectPtr<AGS_Character> CachedOwnerCharacter;
 
 	/** Reference to the character's movement component */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|References")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Animation|References")
 	TObjectPtr<UCharacterMovementComponent> CachedMovementComponent;
 
 	/** Current ground movement speed (calculated each frame) */

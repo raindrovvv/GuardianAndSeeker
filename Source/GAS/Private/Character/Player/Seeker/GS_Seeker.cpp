@@ -28,7 +28,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Character/Component/GS_VFXComponent.h"
-#include "Animation/Character/Seeker/GS_ChooserInputObj.h"
+#include "Animation/Character/Seeker/GS_ChooserInputObject.h"
 #include "Character/GS_TpsController.h"
 #include "Character/Skill/GS_SkillComp.h"
 #include "Rendering/GS_RenderingConstants.h"
@@ -583,9 +583,9 @@ void AGS_Seeker::Internal_SetSeekerGait(EGait NewGait)
 	// Push state to the Chooser Input Object for animation selection
 	if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
-		if (AnimInstance->ChooserInputObj)
+		if (AnimInstance->ChooserInputObject)
 		{
-			AnimInstance->ChooserInputObj->Gait = SeekerCurrentGait;
+			AnimInstance->ChooserInputObject->Gait = SeekerCurrentGait;
 		}
 	}
 
@@ -1063,7 +1063,7 @@ void AGS_Seeker::OnRep_SeekerGait()
 {
 	if (UGS_SeekerAnimInstance* AnimInstance = Cast<UGS_SeekerAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
-		if (UGS_ChooserInputObj* InputObj = AnimInstance->ChooserInputObj)
+		if (UGS_ChooserInputObject* InputObj = AnimInstance->ChooserInputObject)
 		{
 			InputObj->Gait = SeekerGait;
 		}
