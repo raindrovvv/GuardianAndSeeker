@@ -32,6 +32,7 @@ class UGS_PositiveEffectComponent;
 class UGS_DeathCinematicComponent;
 class UGS_RevivalEffectComponent;
 class UGS_DebuffIndicatorComponent;
+class UGS_DeathScreenWidget;
 
 /**
  * @brief Represents the current action state of the Seeker.
@@ -258,12 +259,9 @@ public:
 	{
 		return CurrentComboIndex;
 	}
+	/** 사망 연출 중복 실행 방지용 플래그 (로컬) */
+	bool bDeathCinematicPlayed = false;
 
-	UPROPERTY(ReplicatedUsing = OnRep_SeekerGait)
-	EGait SeekerGait;
-
-	UPROPERTY(Replicated)
-	EGait LastSeekerGait;
 
 	/** 타격 보정(Target Magnetism) 거리 */
 	UPROPERTY(EditDefaultsOnly, Category = "Animation|Combo")
@@ -490,6 +488,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual float GetOptimalCullDistance() const override;
+	virtual void OnSignificanceChanged(float NewSignificance) override;
 
 	// 상수들
 	static const FName HPRatioParamName;
@@ -722,7 +721,23 @@ public:
 	void ClientRPC_PlayRevivalEffect();
 
 	/** 로컬 플레이어 전용 죽음 연출 재생 헬퍼 (OnDeath, OnRep_IsDead에서 호출) */
-	void PlayDeathCinematic_Local();
+	void PlayDeathCinematic_Local(bool bForcePlay = false);
+
+	/** 클라이언트에게 죽음 연출 재생 명령 (Reliable RPC) */
+	UFUNCTION(Client, Reliable)
+	void Client_PlayDeathCinematic();
+
+	// =======================
+	// 사망 화면 위젯
+	// =======================
+
+	/** 사망 화면 위젯 클래스 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Death")
+	TSubclassOf<UGS_DeathScreenWidget> DeathScreenWidgetClass;
+
+	/** 사망 화면 위젯 인스턴스 */
+	UPROPERTY()
+	UGS_DeathScreenWidget* DeathScreenWidgetInstance;
 
 	/** 빈사 상태 시간 만료 - 실제 사망 처리 */
 	UFUNCTION()
@@ -741,6 +756,13 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_Debug_Kill();
+
+	/** 테스트용: 빈사 상태에서 즉시 부활 */
+	UFUNCTION(Exec)
+	void Debug_Revive();
+
+	UFUNCTION(Server, Reliable)
+	void Server_Debug_Revive();
 
 	/** 현재 빈사 상태인지 확인 */
 	UFUNCTION(BlueprintPure, Category = "Dying")

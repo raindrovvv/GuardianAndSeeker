@@ -54,6 +54,7 @@
 #include "Character/Component/GS_DeathCinematicComponent.h"
 #include "Character/Component/GS_RevivalEffectComponent.h"
 #include "Character/Component/GS_DebuffIndicatorComponent.h"
+#include "UI/Character/GS_DeathScreenWidget.h"
 
 // Sets default values
 AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
@@ -230,8 +231,8 @@ AGS_Seeker::AGS_Seeker(const FObjectInitializer& ObjectInitializer)
 	GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel4, ECR_Ignore);
 
 	// State
-	SeekerGait = EGait::Run;
-	LastSeekerGait = SeekerGait;
+	SeekerCurrentGait = EGait::Run;
+	SeekerPreviousGait = SeekerCurrentGait;
 	CanChangeSeekerGait = true;
 	GaitBeforeDying = EGait::Run;
 
@@ -269,8 +270,8 @@ void AGS_Seeker::BeginPlay()
 	Super::BeginPlay();
 
 	// 초기 Gait 상태 (속도 및 애니메이션) 강제 동기화
-	EGait InitialGait = SeekerGait;
-	SeekerGait = (InitialGait == EGait::Walk) ? EGait::Run : EGait::Walk; // 강제 호출을 위해 임시 변경
+	EGait InitialGait = SeekerCurrentGait;
+	SeekerCurrentGait = (InitialGait == EGait::Walk) ? EGait::Run : EGait::Walk; // 강제 호출을 위해 임시 변경
 	Internal_SetSeekerGait(InitialGait);
 
 	// CombatTrigger 오버랩 이벤트 바인딩 (중복 바인딩 방지)
@@ -436,8 +437,8 @@ void AGS_Seeker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME_CONDITION(AGS_Seeker, bIsLowHealthEffectActive, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AGS_Seeker, CurrentEffectStrength, COND_SkipOwner);
 
-	DOREPLIFETIME(AGS_Seeker, LastSeekerGait);
-	DOREPLIFETIME(AGS_Seeker, SeekerGait);
+	DOREPLIFETIME(AGS_Seeker, SeekerPreviousGait);
+	DOREPLIFETIME(AGS_Seeker, SeekerCurrentGait);
 	DOREPLIFETIME(AGS_Seeker, CanChangeSeekerGait);
 	DOREPLIFETIME(AGS_Seeker, CanAcceptComboInput);
 	DOREPLIFETIME(AGS_Seeker, CurrentComboIndex);
@@ -619,12 +620,12 @@ void AGS_Seeker::SetSeekerGait(EGait Gait)
 
 EGait AGS_Seeker::GetSeekerGait()
 {
-	return SeekerGait;
+	return SeekerCurrentGait;
 }
 
 EGait AGS_Seeker::GetLastSeekerGait()
 {
-	return LastSeekerGait;
+	return SeekerPreviousGait;
 }
 
 void AGS_Seeker::StateReset()
@@ -1065,7 +1066,7 @@ void AGS_Seeker::OnRep_SeekerGait()
 	{
 		if (UGS_ChooserInputObject* InputObj = AnimInstance->ChooserInputObject)
 		{
-			InputObj->Gait = SeekerGait;
+			InputObj->Gait = SeekerCurrentGait;
 		}
 	}
 }
@@ -1361,8 +1362,12 @@ void AGS_Seeker::ClientRPCStopCombatMusic_Implementation()
 
 void AGS_Seeker::OnDeath()
 {
-	// === 죽음 연출 효과 재생 (로컬 플레이어) ===
-	PlayDeathCinematic_Local();
+	// === 죽음 연출 효과 재생 (클라이언트/호스트) ===
+	// 사망 판정 즉시 소유한 클라이언트에게 연출 명령 전송 (Unpossess 전에 실행)
+	if (HasAuthority())
+	{
+		Client_PlayDeathCinematic();
+	}
 
 	// 사망 시 빈사 상태 효과 확실히 제거
 	if (HasAuthority())
@@ -1871,8 +1876,8 @@ void AGS_Seeker::UpdatePeripheralSensor()
 
 void AGS_Seeker::UpdateDyingStateTimer()
 {
-	// 고정 시간 간격 (0.05s)
-	const float DeltaTime = 0.05f;
+	// 현재 타이머 주기에 맞춰 DeltaTime 계산 (Adaptive)
+	const float DeltaTime = GetWorldTimerManager().GetTimerRate(DyingUpdateTimerHandle);
 
 	if (bIsInDyingState)
 	{
@@ -2309,11 +2314,10 @@ void AGS_Seeker::OnRep_IsDead()
 	}
 
 	// === 죽음 연출 효과 재생 (로컬 플레이어) ===
-	// 서버에서 죽음 판정 시 OnDeath가 호출되지만,
-	// 클라이언트는 OnRep_IsDead를 통해 죽음을 인지하므로 여기서도 호출이 필요함
-	if (IsDead())
+	if (IsDead() && !bDeathCinematicPlayed)
 	{
-		PlayDeathCinematic_Local();
+		// OnRep에서는 강제 실행이 아닌 관전 여부 등에 따른 일반 체크 수행
+		PlayDeathCinematic_Local(false);
 	}
 }
 
@@ -2544,13 +2548,138 @@ void AGS_Seeker::ClientRPC_PlayRevivalEffect_Implementation()
 	}
 }
 
-void AGS_Seeker::PlayDeathCinematic_Local()
+void AGS_Seeker::PlayDeathCinematic_Local(bool bForcePlay)
 {
+	UE_LOG(LogTemp,
+		   Warning,
+		   TEXT("[DeathCinematic] PlayDeathCinematic_Local called. Character: %s, bForcePlay: %s"),
+		   *GetName(),
+		   bForcePlay ? TEXT("True") : TEXT("False"));
+
+	// 이미 연출이 시작되었거나 위젯이 떠 있다면 중복 실행 방지
+	if (DeathScreenWidgetInstance && DeathScreenWidgetInstance->IsInViewport())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Early return: Widget already in viewport"));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Early return: World is null"));
+		return;
+	}
+
+	// 기기의 실제 로컬 플레이어 컨트롤러를 가져옴
+	APlayerController* LocalPC = World->GetFirstPlayerController();
+	if (!LocalPC || !LocalPC->IsLocalController())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Early return: LocalPC check failed"));
+		return;
+	}
+
+	// RPC를 통해 명시적으로 호출되었거나(Owner인 경우) 관전 중인 타겟인 경우 연출 진행
+	bool bShouldPlay = bForcePlay;
+
+	if (!bShouldPlay)
+	{
+		// 이 캐릭터가 로컬 플레이어의 것인지 확인 (PlayerState 또는 통제권 기준)
+		bool bIsMyCharacter = false;
+		if (GetPlayerState() && LocalPC->PlayerState == GetPlayerState())
+		{
+			bIsMyCharacter = true;
+			UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] bIsMyCharacter = true (PlayerState match)"));
+		}
+		else if (IsLocallyControlled())
+		{
+			bIsMyCharacter = true;
+			UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] bIsMyCharacter = true (IsLocallyControlled)"));
+		}
+
+		// 내가 조종하던 캐릭터거나, 현재 내가 이 캐릭터를 보고 있다면(관전 등) 연출 진행
+		if (bIsMyCharacter || LocalPC->GetViewTarget() == this)
+		{
+			bShouldPlay = true;
+		}
+	}
+
+	if (!bShouldPlay)
+	{
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[DeathCinematic] Early return: Not my character and not viewing this character. ViewTarget: %s"),
+			   LocalPC->GetViewTarget() ? *LocalPC->GetViewTarget()->GetName() : TEXT("Null"));
+		return;
+	}
+
+	// 슬로우모션, 카메라 회전 등 기존 죽음 연출
 	if (DeathCinematicComp)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Playing DeathCinematic via component"));
 		DeathCinematicComp->PlayDeathCinematic();
 	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[DeathCinematic] DeathCinematicComp is NULL!"));
+	}
+
+	// 사망 화면 위젯 생성 및 표시
+	UE_LOG(LogTemp,
+		   Warning,
+		   TEXT("[DeathCinematic] DeathScreenWidgetClass: %s, DeathScreenWidgetInstance: %s"),
+		   DeathScreenWidgetClass ? TEXT("Valid") : TEXT("Null"),
+		   DeathScreenWidgetInstance ? TEXT("Valid") : TEXT("Null"));
+
+	if (DeathScreenWidgetClass && !DeathScreenWidgetInstance)
+	{
+		DeathScreenWidgetInstance = CreateWidget<UGS_DeathScreenWidget>(LocalPC, DeathScreenWidgetClass);
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[DeathCinematic] Created DeathScreenWidget: %s"),
+			   DeathScreenWidgetInstance ? TEXT("Success") : TEXT("Failed"));
+	}
+
+	if (DeathScreenWidgetInstance)
+	{
+		if (!DeathScreenWidgetInstance->IsInViewport())
+		{
+			DeathScreenWidgetInstance->AddToViewport(100);
+			UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Added DeathScreenWidget to viewport"));
+		}
+
+		// 위젯이 이미 있는 경우 가시성 확인
+		DeathScreenWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+
+		// 킬러 정보 전달 및 애니메이션 재생
+		const FLastKillerInfo& KillerInfo = GetLastKillerInfo();
+		UE_LOG(LogTemp,
+			   Warning,
+			   TEXT("[DeathCinematic] Showing DeathScreen. Killer: %s, Type: %d"),
+			   *KillerInfo.KillerName,
+			   static_cast<int32>(KillerInfo.KillerType));
+		DeathScreenWidgetInstance->ShowDeathScreen(KillerInfo);
+	}
+	else
+	{
+		UE_LOG(
+			LogTemp, Error, TEXT("[DeathCinematic] DeathScreenWidgetInstance is still NULL after creation attempt!"));
+	}
+
+	// 연출이 실행되었음을 기록 (중복 방지)
+	bDeathCinematicPlayed = true;
 }
+
+void AGS_Seeker::Client_PlayDeathCinematic_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[DeathCinematic] Client_PlayDeathCinematic RPC Received"));
+
+	// RPC는 소유한 클라이언트에게만 도달하므로 강제 실행(true) 시도
+	if (!bDeathCinematicPlayed)
+	{
+		PlayDeathCinematic_Local(true);
+	}
+}
+
 
 void AGS_Seeker::Debug_Dying()
 {
@@ -2575,5 +2704,36 @@ void AGS_Seeker::Server_Debug_Kill_Implementation()
 	if (!IsDead())
 	{
 		OnDeath();
+	}
+}
+
+void AGS_Seeker::Debug_Revive()
+{
+	Server_Debug_Revive();
+}
+
+void AGS_Seeker::Server_Debug_Revive_Implementation()
+{
+	if (bIsInDyingState && !IsDead())
+	{
+		OnRevived();
+	}
+}
+void AGS_Seeker::OnSignificanceChanged(float NewSignificance)
+{
+	Super::OnSignificanceChanged(NewSignificance);
+
+	// 빈사 상태 업데이트 주기 최적화
+	if (bIsInDyingState && DyingUpdateTimerHandle.IsValid())
+	{
+		float NewInterval = GS_Rendering::GetDyingUpdateInterval(NewSignificance);
+		float CurrentRate = GetWorldTimerManager().GetTimerRate(DyingUpdateTimerHandle);
+
+		// 주기가 유의미하게 달라졌을 때만 타이머 재설정 (성능 최적화)
+		if (!FMath::IsNearlyEqual(CurrentRate, NewInterval))
+		{
+			GetWorldTimerManager().SetTimer(
+				DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, NewInterval, true);
+		}
 	}
 }

@@ -93,6 +93,31 @@ struct FWeaponSlot
 	FName SocketName = NAME_None;
 };
 
+/** 마지막 킬러 정보 (사망 화면 표시용) */
+USTRUCT(BlueprintType)
+struct FLastKillerInfo
+{
+	GENERATED_BODY()
+
+	/** 킬러 이름 */
+	UPROPERTY(BlueprintReadOnly)
+	FString KillerName;
+
+	/** 킬러 캐릭터 타입 (몬스터/시커/가디언 등) */
+	UPROPERTY(BlueprintReadOnly)
+	ECharacterType KillerType = ECharacterType::Ares;
+
+	/** 킬러가 플레이어 컨트롤인지 여부 (AI vs 실 플레이어 구분) */
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsPlayerControlled = false;
+
+	void Reset()
+	{
+		KillerName = TEXT("");
+		KillerType = ECharacterType::Ares;
+		bIsPlayerControlled = false;
+	}
+};
 
 UCLASS()
 class GAS_API AGS_Character : public ACharacter, public IGenericTeamAgentInterface
@@ -108,7 +133,10 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void BeginDestroy() override;
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+	virtual float TakeDamage(float DamageAmount,
+							 struct FDamageEvent const& DamageEvent,
+							 class AController* EventInstigator,
+							 AActor* DamageCauser) override;
 	virtual void OnDamageStart();
 
 	// HitReact
@@ -127,7 +155,7 @@ public:
 	// 죽음 사운드는 각 캐릭터 타입별 오디오 컴포넌트에서 처리됨
 	// 시커: GS_SeekerAudioComponent, 가디언: GS_GuardianAudioComponent, 몬스터: GS_MonsterAudioComponent
 
-	//variable
+	// variable
 	float MaxSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
@@ -206,22 +234,36 @@ public:
 		return CharacterData ? CharacterData->TypeName : FText::GetEmpty();
 	}
 
-	//getter
-	FORCEINLINE UGS_StatComp* GetStatComp() const { return StatComp; }
-	FORCEINLINE UGS_DebuffComp* GetDebuffComp() const { return DebuffComp; }
-	FORCEINLINE ECharacterType GetCharacterType() const { return CharacterType; }
-	FORCEINLINE UGS_DamageNumberComponent* GetDamageNumberComponent() const { return DamageNumberComp; }
+	// getter
+	FORCEINLINE UGS_StatComp* GetStatComp() const
+	{
+		return StatComp;
+	}
+	FORCEINLINE UGS_DebuffComp* GetDebuffComp() const
+	{
+		return DebuffComp;
+	}
+	FORCEINLINE ECharacterType GetCharacterType() const
+	{
+		return CharacterType;
+	}
+	FORCEINLINE UGS_DamageNumberComponent* GetDamageNumberComponent() const
+	{
+		return DamageNumberComp;
+	}
 
-	//serverRPC
+	// serverRPC
 	/** 타격 정격(Hit-stop) 효과 적용 (멀티캐스트) */
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_ApplyHitStop(float Duration, float TimeDilation, bool bPlayShake = false);
 	UFUNCTION(Server, Reliable)
 	void ServerRPCMeleeAttack(AGS_Character* InDamagedCharacter);
 
-	//clientRPC for camera shake
+	// clientRPC for camera shake
 	UFUNCTION(Client, Unreliable)
-	void Client_PlayTakeDamageShake(APlayerController* TargetPC, const FGS_CameraShakeInfo& ShakeInfo, float KnockbackMultiplier = 1.0f);
+	void Client_PlayTakeDamageShake(APlayerController* TargetPC,
+									const FGS_CameraShakeInfo& ShakeInfo,
+									float KnockbackMultiplier = 1.0f);
 
 	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShake(APlayerController* TargetPC);
@@ -229,7 +271,7 @@ public:
 	UFUNCTION(Client, Unreliable)
 	void Client_PlayAttackSuccessShakeWithInfo(APlayerController* TargetPC, const FGS_CameraShakeInfo& CustomShakeInfo);
 
-	//character death play ragdoll
+	// character death play ragdoll
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastRPCCharacterDeath();
 
@@ -241,7 +283,7 @@ public:
 	UFUNCTION()
 	void DestroyAllWeapons();
 
-	//HP widget
+	// HP widget
 	void SetHPTextWidget(UGS_HPText* InHPTextWidget);
 	void SetHPBarWidget(UGS_HPWidget* InHPBarWidget);
 	void SetPlayerInfoWidget(UGS_PlayerInfoWidget* InPlayerInfoWidget);
@@ -269,7 +311,9 @@ public:
 	void Server_SetCharacterSpeed(float InRatio);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetCanUseSkill(bool bCanUse) {}
+	virtual void SetCanUseSkill(bool bCanUse)
+	{
+	}
 
 	UFUNCTION()
 	void SetCharacterSpeed(float InRatio);
@@ -287,7 +331,10 @@ public:
 	void SetCanHitReact(bool bCanReact);
 
 	UFUNCTION(BlueprintCallable, Category = "State")
-	bool IsInvincible() const { return bIsInvincible; }
+	bool IsInvincible() const
+	{
+		return bIsInvincible;
+	}
 
 	/** 이 캐릭터가 처치되었을 때의 피드백 타입 반환 */
 	virtual EKillFeedbackType GetKillFeedbackType() const;
@@ -302,21 +349,36 @@ public:
 	void NotifyBuffed(AGS_Character* Buffer, EPositiveEffectType BuffType);
 
 	/** 서포트 기록 조회 (읽기 전용) */
-	const TArray<FSupportRecord>& GetSupportHistory() const { return SupportHistory; }
+	const TArray<FSupportRecord>& GetSupportHistory() const
+	{
+		return SupportHistory;
+	}
 
 	/** 가드/방어 중인지 여부 (자식 클래스에서 오버라이드) */
 	UFUNCTION(BlueprintCallable, Category = "State")
-	virtual bool IsDefending() const { return false; }
+	virtual bool IsDefending() const
+	{
+		return false;
+	}
 
-	/** 
+	/**
 	 * 공격 성공 시 추가적인 특수 효과(VFX, 사운드 등)를 처리합니다.
 	 * @param ComboIndex 현재 콤보 인덱스
 	 * @param HitResult 타격 정보
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult) {}
+	virtual void OnAttackHitSuccess(int32 ComboIndex, const FHitResult& HitResult)
+	{
+	}
 
 	void SetInvincible(bool bEnable);
+
+	/** 마지막 킬러 정보 반환 (사망 화면 표시용) */
+	UFUNCTION(BlueprintPure, Category = "Death")
+	const FLastKillerInfo& GetLastKillerInfo() const
+	{
+		return LastKillerInfo;
+	}
 
 	// VFX 거리 기반 컬링 (성능 최적화)
 	// @param Location VFX를 재생할 월드 위치
@@ -331,13 +393,19 @@ public:
 	virtual void OnSignificanceChanged(float NewSignificance);
 
 	/** 현재 중요도 값 반환 */
-	FORCEINLINE float GetSignificance() const { return CurrentSignificance; }
+	FORCEINLINE float GetSignificance() const
+	{
+		return CurrentSignificance;
+	}
 
 	/** 캐릭터의 타격 재질 타입 (사운드 레이어 분기용) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character|Sound")
 	EImpactMaterialType ImpactMaterialType = EImpactMaterialType::Flesh;
 
-	virtual EImpactMaterialType GetImpactMaterialType() const { return ImpactMaterialType; }
+	virtual EImpactMaterialType GetImpactMaterialType() const
+	{
+		return ImpactMaterialType;
+	}
 
 	/** 현재 누적된 카메라 낙아웃 거리 */
 	float CurrentCameraKnockback = 0.0f;
@@ -346,7 +414,10 @@ public:
 	void ApplyCameraKnockback(float IntensityMultiplier = 1.0f);
 
 	/** 모든 무기가 공유하여 사용할 사운드 믹싱(Ducking) 타이머 핸들 */
-	FORCEINLINE FTimerHandle& GetAudioFocusTimerHandle() { return AudioFocusTimerHandle; }
+	FORCEINLINE FTimerHandle& GetAudioFocusTimerHandle()
+	{
+		return AudioFocusTimerHandle;
+	}
 
 protected:
 	/** 모든 무기가 공유하여 사용할 사운드 믹싱(Ducking) 타이머 핸들 */
@@ -367,7 +438,7 @@ protected:
 	virtual void NotifyActorEndCursorOver() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	//component
+	// component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGS_DebuffComp> DebuffComp;
 
@@ -461,4 +532,8 @@ private:
 
 	/** 어시스트 인정을 위한 최소 데미지 비율 (최대 체력 대비) */
 	float AssistThresholdRatio = 0.1f;
+
+	/** 마지막 킬러 정보 (사망 화면 표시용) */
+	UPROPERTY(Replicated)
+	FLastKillerInfo LastKillerInfo;
 };
