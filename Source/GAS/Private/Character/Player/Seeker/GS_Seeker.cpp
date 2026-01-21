@@ -1692,7 +1692,7 @@ void AGS_Seeker::EnterDyingState()
 	GetWorldTimerManager().SetTimer(DyingUpdateTimerHandle, this, &AGS_Seeker::UpdateDyingStateTimer, 0.05f, true);
 
 	// 현재 Gait 저장
-	GaitBeforeDying = SeekerGait;
+	GaitBeforeDying = SeekerCurrentGait;
 
 	// 기어다니기 모드로 전환
 	Server_SetSeekerGait(EGait::Crawl);
