@@ -39,6 +39,7 @@ Documentation/windsurf-guide.txt
 Config/WindsurfSettings.ini
 
 Plugins/GameLiftPlugin/
+Plugins/NodeToCode_5.5/
 
 Content/Player/TEST/BP_SJEGM.uasset
 
@@ -52,3 +53,6 @@ Plugins/WwiseSoundEngine/Source/WwiseSoundEngine/Public/Generated/AkiOSPlugins.h
 Plugins/WwiseSoundEngine/Source/WwiseSoundEngine/Public/Generated/AktvOSPlugins.h
 
 .editorconfig
+
+# RiderLink
+Plugins/Developer/RiderLink/
