@@ -46,15 +46,15 @@
 <details>
 <summary>English version</summary>
 
-## Guardian & Seeker - Technical Audio Notes
+# Guardian & Seeker - Technical Audio Notes
 
-4v1 asymmetrical PvP project focused on readable combat, spatial threat cues, and responsive feedback audio.
+This document outlines the technical solutions designed for the 4v1 asymmetrical PvP project 'Guardian & Seeker,' focusing on readable combat signals, spatial threat detection, and intuitive UI feedback.
 
-### Audio Implementation Focus
+## Key Implementation Features
 
-This project includes a C++ audio component layer that connects Unreal Engine 5 gameplay state with Wwise Events and RTPCs.
+The project features a C++ based audio component layer that precisely bridges Unreal Engine 5 gameplay states with Wwise Events and RTPCs.
 
-Key files:
+**Key Files:**
 
 - `Source/GAS/Public/Sound/GS_AudioComponentBase.h`
 - `Source/GAS/Public/Sound/GS_AudioManager.h`
@@ -62,33 +62,33 @@ Key files:
 - `Source/GAS/Public/Sound/GS_SeekerAudioComponent.h`
 - `Source/GAS/Public/Sound/GS_UIAudioSystem.h`
 
-### Core Structure
+## Core Architecture
 
-`UGS_AudioComponentBase` is a shared `UActorComponent` base for gameplay audio behavior. It manages Wwise RTPC references such as distance, attenuation mode, and occlusion control, then exposes a reusable structure for monster and seeker audio components.
+`UGS_AudioComponentBase` serves as the foundation for all gameplay audio logic. As an extension of `UActorComponent`, it centrally manages Wwise RTPC references—such as Distance, Attenuation Mode, and Occlusion—providing a scalable architecture for the derived Monster and Seeker audio components.
 
-Derived systems separate audio behavior by gameplay role:
+**Role-Based Audio Systems:**
 
-- Monster audio: threat cues, distance, obstruction, and spatial readability
-- Seeker audio: player-facing feedback, movement, and interaction timing
-- UI audio: short 2D feedback that stays readable over combat and BGM
+- **Monster Audio:** Enhances threat cues and maximizes spatial awareness through precision distance and occlusion implementation.
+- **Seeker Audio:** Provides immediate feedback for player actions and optimizes the timing of movement and interactions.
+- **UI Audio:** Delivers clear 2D interaction feedback that remains legible even in intense combat and high-energy BGM environments.
 
-### Wwise / UE5 Workflow
+## Wwise / UE5 Pipeline
 
-- Wwise Events, Switches, RTPCs, and containers are organized by gameplay purpose.
-- UE5 C++ / Blueprint logic triggers audio from real gameplay state instead of decorative playback.
-- Physical Material footsteps, Anim Notify timing, and occlusion behavior are verified inside play sessions.
-- Playtest feedback is translated into priority, mix, and system-level tasks.
+- **Structured Management:** Organized Wwise Events, Switches, RTPCs, and Containers systematically based on gameplay objectives.
+- **State-Driven Integration:** Designed audio to be triggered by real-time C++ and Blueprint game states rather than static playback.
+- **Field Verification:** Validated and optimized adaptive footsteps based on Physical Materials, precise Anim Notify control, and occlusion systems through live play sessions.
+- **Feedback Loop:** Refined the overall quality by resetting priorities, adjusting mix balances, and implementing system improvements based on large-scale playtest data.
 
-### Evidence
+## Project Achievements
 
-- G-STAR 2025 project
-- 299 player test participants
-- 4.36 / 5 average rating
-- 191 audio assets organized across character, monster, environment, and UI/System categories
+- **G-STAR 2025** Showcase Project
+- Conducted large-scale playtests with **299 participants**
+- Achieved an average user satisfaction rating of **4.36 / 5**
+- Built and managed **191 audio assets** covering characters, monsters, environment, and UI/System categories
 
-### Portfolio Links
+## Primary Links
 
-- Demo reel: https://www.youtube.com/watch?v=d7xon5fv-kg
-- Audio debugging video: https://www.youtube.com/watch?v=dp_Kr3LQ6EE
+- **Gameplay Demo Video:** https://www.youtube.com/watch?v=MGSCKdCAgDY&t=19s
+- **Sound Design & Implementation Showcase:** https://www.youtube.com/watch?v=d7xon5fv-kg
 
 </details>
