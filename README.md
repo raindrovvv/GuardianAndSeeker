@@ -1,11 +1,11 @@
 #  프로젝트 개요
-프로젝트명: 가디언 & 시커 (Guardian & Seeker)
-장르: 비대칭 멀티플레이어 액션 (4 vs 1)
-개발 기간: 2025.05.07 ~ 2025.12.22 (약 7개월)
-엔진: Unreal Engine 5.4 → 5.6
-협업 도구: Confluence, Slack, Notion, Figma, Discord, GitHub
+- 프로젝트명: 가디언 & 시커 (Guardian & Seeker)
+- 장르: 비대칭 멀티플레이어 액션 (4 vs 1)
+- 개발 기간: 2025.05.07 ~ 2025.12.22 (약 7개월)
+- 엔진: Unreal Engine 5.4 → 5.6
+- 협업 도구: Confluence, Slack, Notion, Figma, Discord, GitHub
 
-[프로젝트 디테일](https://github.com/NbcampUnreal/1st-Team1-Final-Project/blob/main/README.md)
+* [프로젝트 디테일](https://github.com/NbcampUnreal/1st-Team1-Final-Project/blob/main/README.md)
 
 # Guardian & Seeker - Technical Audio Notes
 
