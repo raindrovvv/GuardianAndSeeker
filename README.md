@@ -7,7 +7,7 @@
 
 * [프로젝트 디테일](https://github.com/NbcampUnreal/1st-Team1-Final-Project/blob/main/README.md)
 
-# Guardian & Seeker - Technical Audio Notes
+# Guardian & Seeker
 
 4v1 비대칭 PvP 프로젝트 'Guardian & Seeker'에서 전투의 흐름을 읽는 오디오 신호, 공간 위협 탐지, 그리고 직관적인 UI 피드백을 구현하기 위해 설계된 기술적 솔루션을 정리한 문서입니다.
 
